@@ -1,0 +1,34 @@
+{
+  "short_name": "Anota & Ganha",
+  "name": "Anota & Ganha Incentivos",
+  "description": "Sistema de gerenciamento de campanhas de incentivo com controle por indústrias e produtos",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "fullscreen"],
+  "theme_color": "#2563eb",
+  "background_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "categories": ["business", "productivity"],
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "shortcuts": []
+}
+
+

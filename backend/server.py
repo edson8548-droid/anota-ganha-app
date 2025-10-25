@@ -1567,4 +1567,715 @@ Observation: /app/backend/server.py:
 1562|            "keys": list(first_ind.keys()) if isinstance(first_ind, dict) else None,
 1563|            "products_type": str(type(first_ind.get('products'))) if isinstance(first_ind, dict) else None,
 1564|            "products_length": len(first_ind.get('produ<response clipped><NOTE>To save on context only part of this file has been shown to you. You should retry this tool after you have searched inside the file with `grep -n` in order to find the line numbers of what you are looking for.</NOTE>
-[Content truncated to 64000 characters]
+@api_router.get("/analytics/test-by-name")
+async def test_by_name(name: str, current_user: dict = Depends(get_current_user)):
+    """Test endpoint to see exact client structure by name"""
+    client = await db.clients.find_one({"name": {"$regex": name, "$options": "i"}, "user_id": current_user['id']}, {"_id": 0})
+    if not client:
+        return {"error": f"Client not found with name containing: {name}"}
+    
+    # Get industries structure
+    industries_obj = client.get('industries', {})
+    result = {
+        "client_name": client.get('name'),
+        "industries_type": str(type(industries_obj)),
+        "industries_keys": list(industries_obj.keys()) if isinstance(industries_obj, dict) else None,
+        "industries_raw": industries_obj
+    }
+    
+    return result
+
+@api_router.get("/analytics/debug-raw")
+
+
+@api_router.get("/analytics/list-all-clients")
+async def list_all_clients(current_user: dict = Depends(get_current_user)):
+    """List all clients in database"""
+    clients = await db.clients.find({"user_id": current_user['id']}).to_list(100)
+    
+    result = {
+        "total_clients": len(clients),
+        "clients": []
+    }
+    
+    for client in clients:
+        industries_obj = client.get('industries', {})
+        result["clients"].append({
+            "name": client.get('name'),
+            "city": client.get('CIDADE'),
+            "has_industries": isinstance(industries_obj, dict) and len(industries_obj) > 0,
+            "industries_count": len(industries_obj) if isinstance(industries_obj, dict) else 0,
+            "industries_names": list(industries_obj.keys()) if isinstance(industries_obj, dict) else []
+        })
+    
+    return result
+
+
+
+@api_router.get("/analytics/test-by-city")
+async def test_by_city(city: str, current_user: dict = Depends(get_current_user)):
+    """Get full client structure by city"""
+    client = await db.clients.find_one({"CIDADE": city, "user_id": current_user['id']}, {"_id": 0})
+    if not client:
+        return {"error": f"Client not found in city: {city}"}
+    
+    # Return full structure
+    return {
+        "client": client
+    }
+
+@api_router.delete("/analytics/reset-all-data")
+async def reset_all_data(current_user: dict = Depends(get_current_user)):
+    """Delete all campaigns and clients for current user - DANGER!"""
+    
+    # Delete all clients
+    clients_result = await db.clients.delete_many({"user_id": current_user['id']})
+    
+    # Delete all campaigns
+    campaigns_result = await db.campaigns.delete_many({"user_id": current_user['id']})
+    
+    # Delete all sheets
+    sheets_result = await db.sheets.delete_many({"user_id": current_user['id']})
+    
+    return {
+        "success": True,
+        "deleted_clients": clients_result.deleted_count,
+        "deleted_campaigns": campaigns_result.deleted_count,
+        "deleted_sheets": sheets_result.deleted_count,
+        "message": "Todos os dados foram excluídos. Você pode começar do zero!"
+    }
+
+@api_router.get("/analytics/debug-raw")
+async def debug_raw_data(current_user: dict = Depends(get_current_user)):
+    """Show raw structure of first client"""
+    campaign = await db.campaigns.find_one({"user_id": current_user['id']}, {"_id": 0})
+    if not campaign:
+        return {"error": "No campaign found"}
+    
+    campaign_id = campaign.get('id')
+    clients = await db.clients.find({"campaign_id": campaign_id, "user_id": current_user['id']}).to_list(10)
+    
+    if not clients:
+        return {"error": "No clients found"}
+    
+    # Get raw structure of first client
+    first_client = clients[0]
+    
+    return {
+        "campaign_industries_raw": [ind for ind in campaign.get('industries', [])],
+        "first_client_raw": {
+            "name": first_client.get('name'),
+            "industries": first_client.get('industries', [])
+        }
+    }
+
+
+# ==================== MERCADO PAGO ROUTES ====================
+
+import mercadopago
+import hmac
+import hashlib
+
+# Initialize Mercado Pago SDK
+mp_access_token = os.environ.get('MP_ACCESS_TOKEN', '')
+mp_sdk = mercadopago.SDK(mp_access_token) if mp_access_token else None
+
+class PaymentPreferenceCreate(BaseModel):
+    plan: str  # "monthly_30" or "annual_300"
+    payer_email: str
+    payer_name: Optional[str] = None
+
+class WebhookNotification(BaseModel):
+    action: str
+    api_version: str
+    data: Dict[str, Any]
+    date_created: str
+    id: int
+    live_mode: bool
+    type: str
+    user_id: str
+
+# ==================== Subscription Models ====================
+class SubscriptionPlanCreate(BaseModel):
+    plan_type: str  # "monthly" or "annual"
+
+class SubscriptionCreate(BaseModel):
+    card_token: str
+    plan_type: str  # "monthly" or "annual"
+    payer_email: str
+
+class SubscriptionResponse(BaseModel):
+    subscription_id: str
+    status: str
+    init_point: str
+    next_payment_date: Optional[str] = None
+    auto_recurring: Optional[Dict] = None
+
+@api_router.get("/payments/config")
+async def get_payment_config():
+    """Retorna a Public Key para o frontend"""
+    return {
+        "public_key": os.environ.get('MP_PUBLIC_KEY', ''),
+        "plans": [
+            {
+                "id": "monthly_30",
+                "name": "Mensal",
+                "price": 30.00,
+                "currency": "BRL",
+                "interval": "month"
+            },
+            {
+                "id": "annual_300",
+                "name": "Anual",
+                "price": 300.00,
+                "currency": "BRL",
+                "interval": "year",
+                "discount": "Economia de R$ 60,00/ano"
+            }
+        ]
+    }
+
+@api_router.post("/payments/create-preference")
+async def create_payment_preference(
+    preference_data: PaymentPreferenceCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Cria uma preferência de pagamento no Mercado Pago"""
+    if not mp_sdk:
+        raise HTTPException(status_code=500, detail="Mercado Pago não configurado")
+    
+    # Determinar valor baseado no plano
+    plan_prices = {
+        "monthly_30": 30.00,
+        "monthly_simple": 35.00,
+        "monthly": 29.90,
+        "annual_300": 300.00,
+        "annual": 300.00
+    }
+    
+    if preference_data.plan not in plan_prices:
+        raise HTTPException(status_code=400, detail="Plano inválido")
+    
+    amount = plan_prices[preference_data.plan]
+    
+    # Nome do plano para exibição
+    plan_names = {
+        "monthly_30": "Plano Mensal",
+        "monthly_simple": "Plano Mensal Flexível",
+        "monthly": "Plano Mensal 12 meses",
+        "annual_300": "Plano Anual",
+        "annual": "Plano Anual"
+    }
+    
+    # Criar preferência de pagamento com Pix habilitado
+    preference_payload = {
+        "items": [
+            {
+                "title": f"{plan_names.get(preference_data.plan, 'Assinatura')} - Anota & Ganha",
+                "description": "Assinatura mensal do sistema de incentivos",
+                "quantity": 1,
+                "unit_price": amount,
+                "currency_id": "BRL"
+            }
+        ],
+        "payer": {
+            "email": preference_data.payer_email,
+            "name": preference_data.payer_name or current_user.get('name', '')
+        },
+        "back_urls": {
+            "success": f"{FRONTEND_URL}/payment/success",
+            "failure": f"{FRONTEND_URL}/payment/failure",
+            "pending": f"{FRONTEND_URL}/payment/pending"
+        },
+        "auto_return": "approved",
+        "external_reference": f"{current_user['id']}:{preference_data.plan}",
+        "notification_url": f"{BACKEND_URL}/api/payments/webhook",
+        "statement_descriptor": "ANOTA & GANHA",
+        "payment_methods": {
+            "excluded_payment_types": [],
+            "installments": 1  # Sem parcelamento
+        }
+    }
+    
+    try:
+        preference_response = mp_sdk.preference().create(preference_payload)
+        preference = preference_response["response"]
+        
+        # Salvar referência no banco
+        payment_ref = {
+            "id": str(uuid.uuid4()),
+            "user_id": current_user['id'],
+            "preference_id": preference["id"],
+            "plan": preference_data.plan,
+            "amount": amount,
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.payment_references.insert_one(payment_ref)
+        
+        return {
+            "preference_id": preference["id"],
+            "init_point": preference["init_point"],
+            "sandbox_init_point": preference.get("sandbox_init_point"),
+            "payment_ref_id": payment_ref["id"]
+        }
+    except Exception as e:
+        logger.error(f"Erro ao criar preferência: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao criar pagamento: {str(e)}")
+
+@api_router.post("/payments/webhook")
+async def mercadopago_webhook(request: dict):
+    """Recebe notificações do Mercado Pago (pagamentos e assinaturas)"""
+    logger.info(f"Webhook recebido: {request}")
+    
+    # Verificar tipo de notificação
+    notification_type = request.get("type")
+    
+    # ===== ASSINATURAS =====
+    if notification_type in ["subscription_authorized", "subscription_payment", "subscription_preapproval"]:
+        subscription_id = request.get("data", {}).get("id")
+        
+        if not subscription_id:
+            return {"status": "ok"}
+        
+        try:
+            # Buscar informações da assinatura
+            subscription_info = mp_sdk.preapproval().get(subscription_id)
+            subscription = subscription_info["response"]
+            
+            logger.info(f"Assinatura info: {subscription}")
+            
+            external_ref = subscription.get("external_reference", "")
+            subscription_status = subscription.get("status")
+            
+            # Extrair user_id do external_reference
+            if ":" in external_ref:
+                user_id = external_ref.split(":")[0]
+                
+                # Atualizar status da assinatura no banco
+                await db.subscriptions.update_one(
+                    {"subscription_id": subscription_id},
+                    {"$set": {
+                        "status": subscription_status,
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }}
+                )
+                
+                # Se assinatura foi autorizada, ativar licença
+                if subscription_status == "authorized":
+                    logger.info(f"Assinatura autorizada! Ativando licença para user {user_id}")
+                    
+                    # Buscar dados da assinatura no banco para saber o tipo
+                    sub_ref = await db.subscriptions.find_one({"subscription_id": subscription_id})
+                    
+                    if sub_ref:
+                        plan_type = sub_ref.get("plan_type")
+                        
+                        # Determinar tipo e duração da licença
+                        if plan_type in ["monthly", "monthly_simple"]:
+                            license_type = "monthly"
+                            expiry = datetime.now(timezone.utc) + timedelta(days=30)
+                        else:  # annual
+                            license_type = "annual"
+                            expiry = datetime.now(timezone.utc) + timedelta(days=365)
+                        
+                        # Atualizar usuário
+                        await db.users.update_one(
+                            {"id": user_id},
+                            {"$set": {
+                                "license_type": license_type,
+                                "license_expiry": expiry.isoformat(),
+                                "last_payment_date": datetime.now(timezone.utc).isoformat(),
+                                "payment_method": "mercadopago_subscription",
+                                "subscription_id": subscription_id
+                            }}
+                        )
+                        
+                        logger.info(f"Licença {license_type} ativada via assinatura!")
+                
+                # Se pagamento recorrente foi processado, renovar licença
+                elif notification_type == "subscription_payment":
+                    logger.info(f"Pagamento recorrente processado para user {user_id}")
+                    
+                    sub_ref = await db.subscriptions.find_one({"subscription_id": subscription_id})
+                    
+                    if sub_ref:
+                        plan_type = sub_ref.get("plan_type")
+                        
+                        # Renovar licença
+                        if plan_type in ["monthly", "monthly_simple"]:
+                            expiry = datetime.now(timezone.utc) + timedelta(days=30)
+                        else:  # annual
+                            expiry = datetime.now(timezone.utc) + timedelta(days=365)
+                        
+                        await db.users.update_one(
+                            {"id": user_id},
+                            {"$set": {
+                                "license_expiry": expiry.isoformat(),
+                                "last_payment_date": datetime.now(timezone.utc).isoformat()
+                            }}
+                        )
+                        
+                        logger.info("Licença renovada via pagamento recorrente!")
+            
+            return {"status": "ok"}
+            
+        except Exception as e:
+            logger.error(f"Erro ao processar webhook de assinatura: {str(e)}")
+            return {"status": "error", "message": str(e)}
+    
+    # ===== PAGAMENTOS ÚNICOS (ANTIGO) =====
+    elif notification_type == "payment":
+        payment_id = request.get("data", {}).get("id")
+        
+        if not payment_id:
+            return {"status": "ok"}
+        
+        try:
+            # Buscar informações do pagamento
+            payment_info = mp_sdk.payment().get(payment_id)
+            payment = payment_info["response"]
+            
+            logger.info(f"Pagamento info: {payment}")
+            
+            # Extrair external_reference (user_id:plan)
+            external_ref = payment.get("external_reference", "")
+            if ":" not in external_ref:
+                logger.warning(f"External reference inválido: {external_ref}")
+                return {"status": "ok"}
+            
+            user_id, plan = external_ref.split(":", 1)
+            payment_status = payment.get("status")
+            
+            # Atualizar referência de pagamento
+            await db.payment_references.update_one(
+                {"user_id": user_id, "plan": plan, "status": "pending"},
+                {"$set": {
+                    "payment_id": str(payment_id),
+                    "status": payment_status,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "payment_data": {
+                        "transaction_amount": payment.get("transaction_amount"),
+                        "status_detail": payment.get("status_detail"),
+                        "payment_method_id": payment.get("payment_method_id")
+                    }
+                }}
+            )
+            
+            # Se pagamento aprovado, ativar licença
+            if payment_status == "approved":
+                logger.info(f"Pagamento aprovado! Ativando licença para user {user_id}")
+                
+                # Determinar tipo e duração da licença
+                if plan == "monthly_30":
+                    license_type = "monthly"
+                    license_plan = "monthly_30"
+                    expiry = datetime.now(timezone.utc) + timedelta(days=30)
+                elif plan == "annual_300":
+                    license_type = "annual"
+                    license_plan = "annual_300"
+                    expiry = datetime.now(timezone.utc) + timedelta(days=365)
+                else:
+                    logger.warning(f"Plano desconhecido: {plan}")
+                    return {"status": "ok"}
+                
+                # Atualizar usuário
+                update_result = await db.users.update_one(
+                    {"id": user_id},
+                    {"$set": {
+                        "license_type": license_type,
+                        "license_plan": license_plan,
+                        "license_expiry": expiry.isoformat(),
+                        "last_payment_date": datetime.now(timezone.utc).isoformat(),
+                        "payment_method": "mercadopago"
+                    }}
+                )
+                
+                logger.info(f"Licença ativada! Documentos modificados: {update_result.modified_count}")
+            
+            return {"status": "ok"}
+            
+        except Exception as e:
+            logger.error(f"Erro ao processar webhook: {str(e)}")
+            return {"status": "error", "message": str(e)}
+    
+    return {"status": "ok"}
+
+@api_router.get("/payments/status/{payment_ref_id}")
+async def get_payment_status(
+    payment_ref_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Consulta o status de um pagamento"""
+    payment_ref = await db.payment_references.find_one(
+        {"id": payment_ref_id, "user_id": current_user['id']},
+        {"_id": 0}
+    )
+    
+    if not payment_ref:
+        raise HTTPException(status_code=404, detail="Pagamento não encontrado")
+    
+    # Se tem payment_id, buscar status atualizado no Mercado Pago
+    if payment_ref.get("payment_id") and mp_sdk:
+        try:
+            payment_info = mp_sdk.payment().get(payment_ref["payment_id"])
+            payment = payment_info["response"]
+            
+            # Atualizar status no banco
+            current_status = payment.get("status")
+            await db.payment_references.update_one(
+                {"id": payment_ref_id},
+                {"$set": {"status": current_status}}
+            )
+            
+            payment_ref["status"] = current_status
+        except Exception as e:
+            logger.error(f"Erro ao buscar status do pagamento: {str(e)}")
+    
+    return payment_ref
+
+
+# ==================== Subscription Endpoints ====================
+
+@api_router.post("/subscriptions/create")
+async def create_subscription(
+    subscription_data: SubscriptionCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Cria uma assinatura recorrente no Mercado Pago.
+    Planos disponíveis: monthly (12x R$ 29,00) ou annual (R$ 300,00)
+    """
+    try:
+        if not mp_sdk:
+            raise HTTPException(
+                status_code=500,
+                detail="Mercado Pago não configurado"
+            )
+        
+        # Determinar configuração do plano
+        if subscription_data.plan_type == "monthly_simple":
+            reason = "Assinatura Mensal - Anota & Ganha Incentivos"
+            amount = MONTHLY_SIMPLE_PRICE
+            frequency = 1
+            frequency_type = "months"
+        elif subscription_data.plan_type == "monthly":
+            reason = "Assinatura Mensal (12 meses) - Anota & Ganha Incentivos"
+            amount = MONTHLY_PRICE
+            frequency = 1
+            frequency_type = "months"
+        elif subscription_data.plan_type == "annual":
+            reason = "Assinatura Anual - Anota & Ganha Incentivos"
+            amount = ANNUAL_PRICE
+            frequency = 1
+            frequency_type = "years"
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Tipo de plano inválido. Use 'monthly_simple', 'monthly' ou 'annual'"
+            )
+        
+        # Criar dados da assinatura SEM repetitions (assinatura contínua)
+        # O Mercado Pago cobra automaticamente até ser cancelado
+        preapproval_data = {
+            "reason": reason,
+            "auto_recurring": {
+                "frequency": frequency,
+                "frequency_type": frequency_type,
+                "transaction_amount": amount,
+                "currency_id": "BRL"
+            },
+            "payer_email": subscription_data.payer_email,
+            "back_url": f"{FRONTEND_URL}/payment/success",
+            "external_reference": f"{current_user['id']}:subscription:{subscription_data.plan_type}",
+            "status": "pending",
+            # Adicionar informações adicionais para reduzir "high risk"
+            "collector_id": 54275427,  # Seu collector ID
+            "application_id": 6279807309571506  # Seu application ID
+        }
+        
+        # Se tiver card_token, incluir (mas na prática não funciona com CardPayment)
+        # Melhor abordagem é redirecionar para init_point
+        # if subscription_data.card_token:
+        #     preapproval_data["card_token_id"] = subscription_data.card_token
+        
+        logger.info(f"Criando assinatura para usuário {current_user['id']}: {subscription_data.plan_type}")
+        logger.info(f"Email do pagador: {subscription_data.payer_email}")
+        logger.info(f"Dados da assinatura: {preapproval_data}")
+        
+        # Criar assinatura no Mercado Pago
+        result = mp_sdk.preapproval().create(preapproval_data)
+        
+        logger.info(f"Resposta do Mercado Pago - Status: {result.get('status')}")
+        
+        if result["status"] not in [200, 201]:
+            logger.error(f"Erro ao criar assinatura: {result}")
+            error_msg = result.get('response', {}).get('message', 'Erro desconhecido')
+            logger.error(f"Mensagem de erro: {error_msg}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Erro ao criar assinatura: {error_msg}"
+            )
+        
+        response = result["response"]
+        subscription_id = response.get("id")
+        
+        logger.info(f"Assinatura criada com sucesso: {subscription_id}")
+        
+        # Salvar referência da assinatura no banco
+        subscription_ref = {
+            "id": str(uuid.uuid4()),
+            "user_id": current_user['id'],
+            "subscription_id": subscription_id,
+            "plan_type": subscription_data.plan_type,
+            "status": response.get("status", "pending"),
+            "amount": amount,
+            "frequency": f"{frequency} {frequency_type}",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.subscriptions.insert_one(subscription_ref)
+        
+        return {
+            "subscription_id": subscription_id,
+            "status": response.get("status"),
+            "init_point": response.get("init_point"),
+            "next_payment_date": response.get("next_payment_date"),
+            "auto_recurring": response.get("auto_recurring")
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao criar assinatura: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro interno ao criar assinatura: {str(e)}"
+        )
+
+@api_router.get("/subscriptions/status")
+async def get_subscription_status(
+    current_user: dict = Depends(get_current_user)
+):
+    """Consulta o status da assinatura do usuário"""
+    subscription_ref = await db.subscriptions.find_one(
+        {"user_id": current_user['id']},
+        {"_id": 0},
+        sort=[("created_at", -1)]  # Pegar a mais recente
+    )
+    
+    if not subscription_ref:
+        return {"has_subscription": False}
+    
+    # Se tem subscription_id, buscar status atualizado no Mercado Pago
+    if subscription_ref.get("subscription_id") and mp_sdk:
+        try:
+            result = mp_sdk.preapproval().get(subscription_ref["subscription_id"])
+            
+            if result["status"] == 200:
+                subscription = result["response"]
+                current_status = subscription.get("status")
+                
+                # Atualizar status no banco
+                await db.subscriptions.update_one(
+                    {"id": subscription_ref["id"]},
+                    {"$set": {
+                        "status": current_status,
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }}
+                )
+                
+                subscription_ref["status"] = current_status
+                subscription_ref["next_payment_date"] = subscription.get("next_payment_date")
+                subscription_ref["summarized"] = subscription.get("summarized")
+                
+        except Exception as e:
+            logger.error(f"Erro ao buscar status da assinatura: {str(e)}")
+    
+    return {
+        "has_subscription": True,
+        "subscription": subscription_ref
+    }
+
+@api_router.delete("/subscriptions/cancel")
+async def cancel_subscription(
+    current_user: dict = Depends(get_current_user)
+):
+    """Cancela a assinatura ativa do usuário"""
+    try:
+        # Buscar assinatura ativa
+        subscription_ref = await db.subscriptions.find_one(
+            {"user_id": current_user['id'], "status": {"$in": ["authorized", "pending"]}},
+            sort=[("created_at", -1)]
+        )
+        
+        if not subscription_ref:
+            raise HTTPException(
+                status_code=404,
+                detail="Nenhuma assinatura ativa encontrada"
+            )
+        
+        if not mp_sdk:
+            raise HTTPException(
+                status_code=500,
+                detail="Mercado Pago não configurado"
+            )
+        
+        # Cancelar no Mercado Pago
+        subscription_id = subscription_ref["subscription_id"]
+        update_data = {"status": "cancelled"}
+        
+        result = mp_sdk.preapproval().update(subscription_id, update_data)
+        
+        if result["status"] != 200:
+            raise HTTPException(
+                status_code=400,
+                detail="Erro ao cancelar assinatura no Mercado Pago"
+            )
+        
+        # Atualizar no banco
+        await db.subscriptions.update_one(
+            {"id": subscription_ref["id"]},
+            {"$set": {
+                "status": "cancelled",
+                "cancelled_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        logger.info(f"Assinatura cancelada: {subscription_id}")
+        
+        return {"message": "Assinatura cancelada com sucesso"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao cancelar assinatura: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro interno ao cancelar assinatura: {str(e)}"
+        )
+
+
+# Include the router in the main app
+app.include_router(api_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    client.close()

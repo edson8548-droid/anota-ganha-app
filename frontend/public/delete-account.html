@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exclusão de Conta - Anota & Ganha Incentivos</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #764ba2;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .info-box {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .success-box {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            display: none;
+        }
+        form {
+            margin: 30px 0;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #555;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            margin: 20px 0;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 10px;
+            margin-top: 4px;
+        }
+        .checkbox-group label {
+            margin: 0;
+            font-weight: normal;
+        }
+        button {
+            background: #dc3545;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #c82333;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        ul {
+            margin-left: 20px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        .contact-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 30px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗑️ Exclusão de Conta e Dados</h1>
+        
+        <p>
+            De acordo com a Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018), você tem o direito 
+            de solicitar a exclusão completa da sua conta e de todos os seus dados pessoais armazenados 
+            no aplicativo <strong>Anota & Ganha Incentivos</strong>.
+        </p>
+
+        <div class="warning-box">
+            <strong>⚠️ ATENÇÃO: Esta ação é irreversível!</strong>
+            <p style="margin: 10px 0 0 0;">
+                Ao solicitar a exclusão da sua conta, todos os seus dados serão permanentemente removidos, 
+                incluindo campanhas, clientes, histórico e informações pessoais. Não será possível recuperar 
+                esses dados posteriormente.
+            </p>
+        </div>
+
+        <h2>📋 O Que Será Excluído</h2>
+        <ul>
+            <li>Dados pessoais (nome, email, CPF, telefone)</li>
+            <li>Todas as suas campanhas criadas</li>
+            <li>Todos os clientes cadastrados</li>
+            <li>Histórico de positivações</li>
+            <li>Dados de assinatura e pagamentos</li>
+            <li>Configurações e preferências</li>
+            <li>Estatísticas e analytics associados à sua conta</li>
+        </ul>
+
+        <div class="info-box">
+            <strong>📅 Prazo de Atendimento:</strong>
+            <p style="margin: 10px 0 0 0;">
+                Sua solicitação será processada em até <strong>15 dias úteis</strong>, conforme estabelecido 
+                pela LGPD. Você receberá uma confirmação por email quando a exclusão for concluída.
+            </p>
+        </div>
+
+        <h2>📝 Solicitar Exclusão de Conta</h2>
+        <p>Preencha o formulário abaixo para solicitar a exclusão:</p>
+
+        <form id="deleteForm">
+            <div class="form-group">
+                <label for="name">Nome Completo *</label>
+                <input type="text" id="name" name="name" required placeholder="Seu nome completo">
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email da Conta *</label>
+                <input type="email" id="email" name="email" required placeholder="email@exemplo.com">
+            </div>
+
+            <div class="form-group">
+                <label for="cpf">CPF (opcional)</label>
+                <input type="text" id="cpf" name="cpf" placeholder="000.000.000-00">
+            </div>
+
+            <div class="form-group">
+                <label for="reason">Motivo da Exclusão (opcional)</label>
+                <textarea id="reason" name="reason" placeholder="Nos ajude a melhorar contando o motivo (opcional)"></textarea>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="confirm" name="confirm" required>
+                <label for="confirm">
+                    Confirmo que li e entendi que a exclusão da minha conta é <strong>irreversível</strong> 
+                    e que todos os meus dados serão permanentemente removidos. Não poderei recuperar 
+                    minhas campanhas, clientes ou qualquer informação após a exclusão.
+                </label>
+            </div>
+
+            <button type="submit" id="submitBtn">Solicitar Exclusão de Conta</button>
+        </form>
+
+        <div class="success-box" id="successMessage">
+            <strong>✅ Solicitação Enviada com Sucesso!</strong>
+            <p style="margin: 10px 0 0 0;">
+                Sua solicitação de exclusão de conta foi recebida. Você receberá uma confirmação por email 
+                em até 15 dias úteis. Se tiver dúvidas, entre em contato conosco.
+            </p>
+        </div>
+
+        <div class="contact-info">
+            <h3>📞 Precisa de Ajuda?</h3>
+            <p>Se você tiver dúvidas sobre o processo de exclusão ou desejar mais informações:</p>
+            <ul style="margin: 10px 0;">
+                <li><strong>Email:</strong> edson854_8@hotmail.com</li>
+                <li><strong>WhatsApp:</strong> +55 17 99604-0954</li>
+            </ul>
+            <p style="margin: 15px 0 0 0;">
+                <strong>Encarregado de Dados (DPO):</strong> Edson
+            </p>
+        </div>
+
+        <a href="/" class="back-link">← Voltar ao Aplicativo</a>
+    </div>
+
+    <script>
+        document.getElementById('deleteForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const cpf = document.getElementById('cpf').value;
+            const reason = document.getElementById('reason').value;
+            
+            // Criar o corpo do email
+            const subject = 'Solicitação de Exclusão de Conta - Anota & Ganha Incentivos';
+            const body = `SOLICITAÇÃO DE EXCLUSÃO DE CONTA E DADOS (LGPD)
+
+Nome: ${name}
+Email da Conta: ${email}
+CPF: ${cpf || 'Não informado'}
+
+Motivo da Exclusão:
+${reason || 'Não informado'}
+
+---
+Confirmo que li e entendi que a exclusão da minha conta é IRREVERSÍVEL e que todos os meus dados serão permanentemente removidos.
+
+Data da Solicitação: ${new Date().toLocaleString('pt-BR')}
+
+Conforme Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018), solicito a exclusão completa de minha conta e todos os dados pessoais associados.`;
+
+            // Abrir cliente de email
+            window.location.href = `mailto:edson854_8@hotmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            
+            // Mostrar mensagem de sucesso
+            document.getElementById('deleteForm').style.display = 'none';
+            document.getElementById('successMessage').style.display = 'block';
+        });
+        
+        // Validar CPF (formato)
+        document.getElementById('cpf').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 11) value = value.slice(0, 11);
+            
+            if (value.length > 9) {
+                value = value.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+            } else if (value.length > 6) {
+                value = value.replace(/(\d{3})(\d{3})(\d{1,3})/, '$1.$2.$3');
+            } else if (value.length > 3) {
+                value = value.replace(/(\d{3})(\d{1,3})/, '$1.$2');
+            }
+            
+            e.target.value = value;
+        });
+    </script>
+</body>
+</html>
+
+
