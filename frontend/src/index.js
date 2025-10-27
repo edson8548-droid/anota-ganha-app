@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "@/index.css";
-import app from './App';
+import app from './app';
 import { Toaster } from "sonner";
 
 // Registrar Service Worker para PWA
