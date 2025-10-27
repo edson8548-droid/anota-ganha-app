@@ -1,3 +1,5 @@
+const path = require('path');
+
 module.exports = {
   style: {
     postcss: {
@@ -6,5 +8,10 @@ module.exports = {
         require('autoprefixer'),
       ],
     },
+  },
+  webpack: {
+    alias: {
+      '@': path.resolve(__dirname, 'src/'),
+    }
   },
 }
