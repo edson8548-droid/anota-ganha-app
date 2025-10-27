@@ -1,5 +1,5 @@
 import React from "react";
-import './App.css';
+import './app.css';
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { PrivateRoute } from "./components/PrivateRoute";
