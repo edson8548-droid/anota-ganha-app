@@ -1,18 +1,21 @@
 const path = require('path');
 
 module.exports = {
+  eslint: {
+    configure: {
+      parserOptions: {
+        ecmaVersion: 2020,
+        sourceType: 'module',
+        ecmaFeatures: {
+          jsx: true
+        }
+      }
+    }
+  },
   webpack: {
     configure: (webpackConfig) => {
-      // Configurar resolução de extensões explicitamente
-      webpackConfig.resolve.extensions = ['.js', '.jsx', '.json', '.ts', '.tsx'];
-      
-      // Configurar fallback para extensões
-      webpackConfig.resolve.extensionAlias = {
-        '.js': ['.js', '.jsx'],
-      };
-      
-      // Garantir que paths sejam case-sensitive
-      webpackConfig.resolve.symlinks = false;
+      // Configurar resolução de extensões
+      webpackConfig.resolve.extensions = ['.js', '.jsx', '.json'];
       
       return webpackConfig;
     },
