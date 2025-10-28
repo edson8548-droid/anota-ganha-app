@@ -1,7 +1,7 @@
 import React from "react";
-import ReactDOM from "react-dom/client";
-import "./index.css";  // <-- CORREÇÃO 1
-import App from './App';    // <-- CORREÇÃO 2
+import ReactDOM from "react-dom";
+import "./index.css";  
+import App from './App';    
 import { Toaster } from "sonner";
 
 // Registrar Service Worker para PWA
@@ -17,10 +17,10 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(
+ReactDOM.render(
   <React.StrictMode>
     <App />
     <Toaster position="top-right" richColors />
   </React.StrictMode>,
+  document.getElementById("root")
 );
