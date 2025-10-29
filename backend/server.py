@@ -552,3 +552,119 @@ async def get_clients(campaign_id: str, user_id: str = Depends(verify_token)):
         
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Campaign not found")
+        
+        cursor.execute("SELECT * FROM clients WHERE campaign_id = %s ORDER BY created_at DESC", (campaign_id,))
+        clients = []
+        for row in cursor.fetchall():
+            client = dict(row)
+            client['industries'] = client['industries'] if client['industries'] else {}
+            clients.append(client)
+        
+        return clients
+
+@app.post("/api/campaigns/{campaign_id}/clients")
+async def create_client(campaign_id: str, client_data: ClientCreate, user_id: str = Depends(verify_token)):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Verify campaign access
+        cursor.execute("""
+            SELECT c.id FROM campaigns c
+            JOIN sheets s ON c.sheet_id = s.id
+            WHERE c.id = %s AND s.user_id = %s
+        """, (campaign_id, user_id))
+        
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        
+        client_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc)
+        
+        try:
+            industries_json = json.dumps(client_data.industries if client_data.industries else {})
+        except:
+            industries_json = json.dumps({})
+        
+        cursor.execute("""
+            INSERT INTO clients (id, campaign_id, name, cnpj, address, city, neighborhood, notes, industries, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
+        """, (client_id, campaign_id, client_data.name, client_data.cnpj, client_data.address,
+              client_data.city, client_data.neighborhood, client_data.notes,
+              industries_json, now, now))
+        
+        conn.commit()
+        
+        return {
+            "id": client_id,
+            "campaign_id": campaign_id,
+            "name": client_data.name,
+            "cnpj": client_data.cnpj,
+            "address": client_data.address,
+            "city": client_data.city,
+            "neighborhood": client_data.neighborhood,
+            "notes": client_data.notes,
+            "industries": client_data.industries if client_data.industries else {},
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat()
+        }
+
+@app.put("/api/clients/{client_id}")
+async def update_client(client_id: str, client_data: ClientCreate, user_id: str = Depends(verify_token)):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now(timezone.utc)
+        
+        try:
+            industries_json = json.dumps(client_data.industries if client_data.industries else {})
+        except:
+            industries_json = json.dumps({})
+        
+        cursor.execute("""
+            UPDATE clients
+            SET name = %s, cnpj = %s, address = %s, city = %s, neighborhood = %s, notes = %s, industries = %s::jsonb, updated_at = %s
+            WHERE id = %s AND campaign_id IN (
+                SELECT c.id FROM campaigns c
+                JOIN sheets s ON c.sheet_id = s.id
+                WHERE s.user_id = %s
+            )
+        """, (client_data.name, client_data.cnpj, client_data.address, client_data.city,
+              client_data.neighborhood, client_data.notes, industries_json,
+              now, client_id, user_id))
+        
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Client not found")
+        
+        conn.commit()
+        
+        cursor.execute("SELECT * FROM clients WHERE id = %s", (client_id,))
+        result = dict(cursor.fetchone())
+        result['industries'] = result['industries'] if result['industries'] else {}
+        return result
+
+@app.delete("/api/clients/{client_id}")
+async def delete_client(client_id: str, user_id: str = Depends(verify_token)):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            DELETE FROM clients
+            WHERE id = %s AND campaign_id IN (
+                SELECT c.id FROM campaigns c
+                JOIN sheets s ON c.sheet_id = s.id
+                WHERE s.user_id = %s
+            )
+        """, (client_id, user_id))
+        
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Client not found")
+        
+        conn.commit()
+        return {"message": "Client deleted successfully"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "database": "PostgreSQL connected"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
