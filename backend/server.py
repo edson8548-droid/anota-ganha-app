@@ -32,7 +32,7 @@ DATABASE_URL = 'postgresql://anota_ganha_user:ZJ9wbemhq9szq1llTSl55rRtPbmfxote@d
 # Mercado Pago Configuration
 MERCADO_PAGO_ACCESS_TOKEN = 'APP_USR-6279807309571506-102117-f33e754b9f5b91b7bce0c79c3327d3dd-54275427'
 
-# Plans Configuration
+# Plans Configuration (including lifetime for admin)
 PLANS = {
     "monthly": {
         "name": "Plano Mensal",
@@ -58,6 +58,14 @@ PLANS = {
         "frequency": 1,
         "frequency_type": "years",
         "auto_recurring": True
+    },
+    "lifetime": {
+        "name": "Licença Vitalícia",
+        "price": 0.00,
+        "duration_days": 36500,
+        "frequency": 0,
+        "frequency_type": "none",
+        "auto_recurring": False
     }
 }
 
@@ -155,7 +163,7 @@ def init_db():
         conn.commit()
         logger.info("✅ Database initialized successfully")
 
-# Create default admin with 7-day trial
+# Create default admin with LIFETIME license
 def create_default_admin():
     ADMIN_EMAIL = "admin@anotaganha.com"
     ADMIN_PASSWORD = "Admin@123456"
@@ -169,9 +177,32 @@ def create_default_admin():
             existing = cursor.fetchone()
             
             if existing:
-                logger.info("Admin already exists")
+                # Check if admin has lifetime license
+                admin_id = existing['id']
+                cursor.execute("""
+                    SELECT id FROM licenses 
+                    WHERE user_id = %s AND plan_type = 'lifetime' AND status = 'active'
+                """, (admin_id,))
+                
+                if not cursor.fetchone():
+                    # Give lifetime license to existing admin
+                    license_id = str(uuid.uuid4())
+                    now = datetime.now(timezone.utc)
+                    expires = datetime(2099, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+                    
+                    cursor.execute(
+                        """INSERT INTO licenses (id, user_id, plan_type, status, starts_at, expires_at)
+                           VALUES (%s, %s, 'lifetime', 'active', %s, %s)""",
+                        (license_id, admin_id, now, expires)
+                    )
+                    conn.commit()
+                    logger.info(f"✅ Lifetime license granted to existing admin")
+                else:
+                    logger.info("Admin already has lifetime license")
+                
                 return
             
+            # Create new admin with lifetime license
             hashed = bcrypt.hashpw(ADMIN_PASSWORD.encode(), bcrypt.gensalt())
             admin_id = str(uuid.uuid4())
             
@@ -180,19 +211,20 @@ def create_default_admin():
                 (admin_id, ADMIN_EMAIL, ADMIN_NAME, hashed.decode())
             )
             
-            # Create 7-day trial license
+            # Create LIFETIME license (expires year 2099!)
             license_id = str(uuid.uuid4())
             now = datetime.now(timezone.utc)
-            expires = now + timedelta(days=7)
+            expires = datetime(2099, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
             
             cursor.execute(
                 """INSERT INTO licenses (id, user_id, plan_type, status, starts_at, expires_at)
-                   VALUES (%s, %s, 'trial', 'active', %s, %s)""",
+                   VALUES (%s, %s, 'lifetime', 'active', %s, %s)""",
                 (license_id, admin_id, now, expires)
             )
             
             conn.commit()
-            logger.info(f"✅ Admin created with 7-day trial: {ADMIN_EMAIL} / Password: {ADMIN_PASSWORD}")
+            logger.info(f"✅ Admin created with LIFETIME license: {ADMIN_EMAIL} / Password: {ADMIN_PASSWORD}")
+            logger.info(f"✅ License expires: {expires.isoformat()}")
     except Exception as e:
         logger.error(f"Error creating admin: {e}")
 
@@ -535,10 +567,7 @@ async def mercadopago_webhook(request: Request):
                         user = cursor.fetchone()
                         
                         if user:
-                            # Determine plan type from subscription
-                            plan_type = "monthly"  # Default
-                            # You can add logic to determine plan type from subscription data
-                            
+                            plan_type = "monthly"
                             plan = PLANS[plan_type]
                             license_id = str(uuid.uuid4())
                             now = datetime.now(timezone.utc)
