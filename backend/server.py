@@ -27,7 +27,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # PostgreSQL database URL
-DATABASE_URL = os.getenv('DATABASE_URL', '')
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://usuario:senha@host/database')
 
 # Database helper
 @contextmanager
