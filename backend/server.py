@@ -176,6 +176,7 @@ class Client(BaseModel):
     industries: Dict[str, Any]
     created_at: str
     updated_at: str
+
 # Auth helpers
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -199,10 +200,14 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 # FastAPI app
 app = FastAPI(title="Anota Ganha API")
 
-# CORS
+# CORS - CORRIGIDO!
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://anota-ganha-app-da46.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -482,6 +487,7 @@ async def delete_campaign(campaign_id: str, user_id: str = Depends(verify_token)
         
         conn.commit()
         return {"message": "Campaign deleted successfully"}
+
 # Clients endpoints
 @app.get("/api/campaigns/{campaign_id}/clients")
 async def get_clients(campaign_id: str, user_id: str = Depends(verify_token)):
