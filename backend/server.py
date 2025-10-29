@@ -210,7 +210,6 @@ async def startup_event():
     init_db()
     create_default_admin()
     logger.info("✅ Application started")
-
 # Auth routes
 @app.post("/api/auth/register")
 async def register(user_data: UserCreate):
@@ -269,6 +268,7 @@ async def get_current_user(user_id: str = Depends(verify_token)):
             raise HTTPException(status_code=404, detail="User not found")
         
         return dict(user)
+
 # Sheets endpoints
 @app.get("/api/sheets")
 async def get_sheets(user_id: str = Depends(verify_token)):
@@ -384,26 +384,64 @@ async def create_campaign(sheet_id: str, campaign_data: CampaignCreate, user_id:
         campaign_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
         
-        cursor.execute(
-            """INSERT INTO campaigns (id, sheet_id, name, start_date, end_date, status, industries, created_at, updated_at)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-            (campaign_id, sheet_id, campaign_data.name, campaign_data.start_date, campaign_data.end_date,
-             campaign_data.status, json.dumps(campaign_data.industries), now, now)
-        )
-        conn.commit()
+        # Fix: Garantir que industries é sempre um JSON válido
+        try:
+            industries_data = campaign_data.industries if campaign_data.industries else []
+            industries_json = json.dumps(industries_data)
+        except Exception as e:
+            logger.error(f"Error serializing industries: {str(e)}")
+            industries_json = json.dumps([])
         
-        return {
-            "id": campaign_id,
-            "sheet_id": sheet_id,
-            "name": campaign_data.name,
-            "start_date": campaign_data.start_date,
-            "end_date": campaign_data.end_date,
-            "status": campaign_data.status,
-            "industries": campaign_data.industries,
-            "created_at": now.isoformat(),
-            "updated_at": now.isoformat()
-        }
+        start_date = campaign_data.start_date if campaign_data.start_date else None
+        end_date = campaign_data.end_date if campaign_data.end_date else None
+        status = campaign_data.status if campaign_data.status else "active"
+        
+        try:
+            cursor.execute(
+                """INSERT INTO campaigns (id, sheet_id, name, start_date, end_date, status, industries, created_at, updated_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)""",
+                (campaign_id, sheet_id, campaign_data.name, start_date, end_date,
+                 status, industries_json, now, now)
+            )
+            conn.commit()
+            
+            logger.info(f"Campaign created successfully: {campaign_id}")
+            
+            return {
+                "id": campaign_id,
+                "sheet_id": sheet_id,
+                "name": campaign_data.name,
+                "start_date": start_date,
+                "end_date": end_date,
+                "status": status,
+                "industries": industries_data,
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat()
+            }
+        except Exception as e:
+            conn.rollback()
+            error_msg = str(e)
+            logger.error(f"Error creating campaign: {error_msg}")
+            raise HTTPException(status_code=500, detail=f"Erro ao criar campanha: {error_msg}")
 
+# Rotas alternativas para compatibilidade com frontend
+@app.post("/api/campaigns")
+async def create_campaign_direct(campaign_data: dict, user_id: str = Depends(verify_token)):
+    """Rota alternativa para criar campanha"""
+    if 'sheet_id' not in campaign_data:
+        raise HTTPException(status_code=400, detail="sheet_id is required")
+    
+    sheet_id = campaign_data.pop('sheet_id')
+    
+    campaign_create = CampaignCreate(
+        name=campaign_data.get('name', ''),
+        start_date=campaign_data.get('start_date'),
+        end_date=campaign_data.get('end_date'),
+        status=campaign_data.get('status', 'active'),
+        industries=campaign_data.get('industries', [])
+    )
+    
+    return await create_campaign(sheet_id, campaign_create, user_id)
 @app.get("/api/campaigns/{campaign_id}")
 async def get_campaign(campaign_id: str, user_id: str = Depends(verify_token)):
     with get_db() as conn:
@@ -428,22 +466,57 @@ async def update_campaign(campaign_id: str, campaign_data: CampaignCreate, user_
         cursor = conn.cursor()
         now = datetime.now(timezone.utc)
         
-        cursor.execute("""
-            UPDATE campaigns
-            SET name = %s, start_date = %s, end_date = %s, status = %s, industries = %s, updated_at = %s
-            WHERE id = %s AND sheet_id IN (SELECT id FROM sheets WHERE user_id = %s)
-        """, (campaign_data.name, campaign_data.start_date, campaign_data.end_date, campaign_data.status,
-              json.dumps(campaign_data.industries), now, campaign_id, user_id))
+        try:
+            industries_data = campaign_data.industries if campaign_data.industries else []
+            industries_json = json.dumps(industries_data)
+        except:
+            industries_json = json.dumps([])
         
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Campaign not found")
+        start_date = campaign_data.start_date if campaign_data.start_date else None
+        end_date = campaign_data.end_date if campaign_data.end_date else None
+        status = campaign_data.status if campaign_data.status else "active"
         
-        conn.commit()
-        
-        cursor.execute("SELECT * FROM campaigns WHERE id = %s", (campaign_id,))
-        result = dict(cursor.fetchone())
-        result['industries'] = result['industries'] if result['industries'] else []
-        return result
+        try:
+            cursor.execute("""
+                UPDATE campaigns
+                SET name = %s, start_date = %s, end_date = %s, status = %s, industries = %s::jsonb, updated_at = %s
+                WHERE id = %s AND sheet_id IN (SELECT id FROM sheets WHERE user_id = %s)
+            """, (campaign_data.name, start_date, end_date, status,
+                  industries_json, now, campaign_id, user_id))
+            
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Campaign not found")
+            
+            conn.commit()
+            
+            cursor.execute("SELECT * FROM campaigns WHERE id = %s", (campaign_id,))
+            result = dict(cursor.fetchone())
+            result['industries'] = result['industries'] if result['industries'] else []
+            return result
+        except HTTPException:
+            raise
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Error updating campaign: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Erro ao atualizar campanha: {str(e)}")
+
+@app.put("/api/campaigns")
+async def update_campaign_direct(campaign_data: dict, user_id: str = Depends(verify_token)):
+    """Rota alternativa para atualizar campanha"""
+    if 'id' not in campaign_data:
+        raise HTTPException(status_code=400, detail="campaign id is required")
+    
+    campaign_id = campaign_data.pop('id')
+    
+    campaign_create = CampaignCreate(
+        name=campaign_data.get('name', ''),
+        start_date=campaign_data.get('start_date'),
+        end_date=campaign_data.get('end_date'),
+        status=campaign_data.get('status', 'active'),
+        industries=campaign_data.get('industries', [])
+    )
+    
+    return await update_campaign(campaign_id, campaign_create, user_id)
 
 @app.delete("/api/campaigns/{campaign_id}")
 async def delete_campaign(campaign_id: str, user_id: str = Depends(verify_token)):
@@ -463,6 +536,7 @@ async def delete_campaign(campaign_id: str, user_id: str = Depends(verify_token)
         
         conn.commit()
         return {"message": "Campaign deleted successfully"}
+
 # Clients endpoints
 @app.get("/api/campaigns/{campaign_id}/clients")
 async def get_clients(campaign_id: str, user_id: str = Depends(verify_token)):
@@ -478,109 +552,3 @@ async def get_clients(campaign_id: str, user_id: str = Depends(verify_token)):
         
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Campaign not found")
-        
-        cursor.execute("SELECT * FROM clients WHERE campaign_id = %s ORDER BY created_at DESC", (campaign_id,))
-        clients = []
-        for row in cursor.fetchall():
-            client = dict(row)
-            client['industries'] = client['industries'] if client['industries'] else {}
-            clients.append(client)
-        
-        return clients
-
-@app.post("/api/campaigns/{campaign_id}/clients")
-async def create_client(campaign_id: str, client_data: ClientCreate, user_id: str = Depends(verify_token)):
-    with get_db() as conn:
-        cursor = conn.cursor()
-        
-        # Verify campaign access
-        cursor.execute("""
-            SELECT c.id FROM campaigns c
-            JOIN sheets s ON c.sheet_id = s.id
-            WHERE c.id = %s AND s.user_id = %s
-        """, (campaign_id, user_id))
-        
-        if not cursor.fetchone():
-            raise HTTPException(status_code=404, detail="Campaign not found")
-        
-        client_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc)
-        
-        cursor.execute("""
-            INSERT INTO clients (id, campaign_id, name, cnpj, address, city, neighborhood, notes, industries, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (client_id, campaign_id, client_data.name, client_data.cnpj, client_data.address,
-              client_data.city, client_data.neighborhood, client_data.notes,
-              json.dumps(client_data.industries), now, now))
-        
-        conn.commit()
-        
-        return {
-            "id": client_id,
-            "campaign_id": campaign_id,
-            "name": client_data.name,
-            "cnpj": client_data.cnpj,
-            "address": client_data.address,
-            "city": client_data.city,
-            "neighborhood": client_data.neighborhood,
-            "notes": client_data.notes,
-            "industries": client_data.industries,
-            "created_at": now.isoformat(),
-            "updated_at": now.isoformat()
-        }
-
-@app.put("/api/clients/{client_id}")
-async def update_client(client_id: str, client_data: ClientCreate, user_id: str = Depends(verify_token)):
-    with get_db() as conn:
-        cursor = conn.cursor()
-        now = datetime.now(timezone.utc)
-        
-        cursor.execute("""
-            UPDATE clients
-            SET name = %s, cnpj = %s, address = %s, city = %s, neighborhood = %s, notes = %s, industries = %s, updated_at = %s
-            WHERE id = %s AND campaign_id IN (
-                SELECT c.id FROM campaigns c
-                JOIN sheets s ON c.sheet_id = s.id
-                WHERE s.user_id = %s
-            )
-        """, (client_data.name, client_data.cnpj, client_data.address, client_data.city,
-              client_data.neighborhood, client_data.notes, json.dumps(client_data.industries),
-              now, client_id, user_id))
-        
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Client not found")
-        
-        conn.commit()
-        
-        cursor.execute("SELECT * FROM clients WHERE id = %s", (client_id,))
-        result = dict(cursor.fetchone())
-        result['industries'] = result['industries'] if result['industries'] else {}
-        return result
-
-@app.delete("/api/clients/{client_id}")
-async def delete_client(client_id: str, user_id: str = Depends(verify_token)):
-    with get_db() as conn:
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            DELETE FROM clients
-            WHERE id = %s AND campaign_id IN (
-                SELECT c.id FROM campaigns c
-                JOIN sheets s ON c.sheet_id = s.id
-                WHERE s.user_id = %s
-            )
-        """, (client_id, user_id))
-        
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Client not found")
-        
-        conn.commit()
-        return {"message": "Client deleted successfully"}
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy", "database": "PostgreSQL connected"}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
