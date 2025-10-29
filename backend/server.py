@@ -1,6 +1,6 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from dotenv import load_dotenv
+from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 import os
 import logging
@@ -15,6 +15,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import json
 from contextlib import contextmanager
+import requests
 
 ROOT_DIR = Path(__file__).parent
 
@@ -25,8 +26,40 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# PostgreSQL database URL - HARDCODED
+# PostgreSQL database URL
 DATABASE_URL = 'postgresql://anota_ganha_user:ZJ9wbemhq9szq1llTSl55rRtPbmfxote@dpg-d41887ili9vc739grorg-a/anota_ganha'
+
+# Mercado Pago Configuration
+MERCADO_PAGO_ACCESS_TOKEN = 'APP_USR-6279807309571506-102117-f33e754b9f5b91b7bce0c79c3327d3dd-54275427'
+
+# Plans Configuration
+PLANS = {
+    "monthly": {
+        "name": "Plano Mensal",
+        "price": 35.00,
+        "duration_days": 30,
+        "frequency": 1,
+        "frequency_type": "months",
+        "auto_recurring": True
+    },
+    "yearly_12x": {
+        "name": "Plano 12 Meses",
+        "price": 29.90,
+        "duration_days": 365,
+        "frequency": 1,
+        "frequency_type": "months",
+        "auto_recurring": True,
+        "repetitions": 12
+    },
+    "yearly": {
+        "name": "Plano Anual",
+        "price": 300.00,
+        "duration_days": 365,
+        "frequency": 1,
+        "frequency_type": "years",
+        "auto_recurring": True
+    }
+}
 
 logger.info(f"🔍 DATABASE_URL configured")
 
@@ -53,6 +86,23 @@ def init_db():
                 hashed_password TEXT NOT NULL,
                 is_active BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Licenses table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS licenses (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                plan_type TEXT NOT NULL,
+                status TEXT DEFAULT 'active',
+                starts_at TIMESTAMP NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                subscription_id TEXT,
+                payment_id TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
         
@@ -105,7 +155,7 @@ def init_db():
         conn.commit()
         logger.info("✅ Database initialized successfully")
 
-# Create default admin
+# Create default admin with 7-day trial
 def create_default_admin():
     ADMIN_EMAIL = "admin@anotaganha.com"
     ADMIN_PASSWORD = "Admin@123456"
@@ -116,7 +166,9 @@ def create_default_admin():
             cursor = conn.cursor()
             
             cursor.execute("SELECT id FROM users WHERE email = %s", (ADMIN_EMAIL,))
-            if cursor.fetchone():
+            existing = cursor.fetchone()
+            
+            if existing:
                 logger.info("Admin already exists")
                 return
             
@@ -127,8 +179,20 @@ def create_default_admin():
                 "INSERT INTO users (id, email, full_name, hashed_password, is_active) VALUES (%s, %s, %s, %s, TRUE)",
                 (admin_id, ADMIN_EMAIL, ADMIN_NAME, hashed.decode())
             )
+            
+            # Create 7-day trial license
+            license_id = str(uuid.uuid4())
+            now = datetime.now(timezone.utc)
+            expires = now + timedelta(days=7)
+            
+            cursor.execute(
+                """INSERT INTO licenses (id, user_id, plan_type, status, starts_at, expires_at)
+                   VALUES (%s, %s, 'trial', 'active', %s, %s)""",
+                (license_id, admin_id, now, expires)
+            )
+            
             conn.commit()
-            logger.info(f"✅ Admin created: {ADMIN_EMAIL} / Password: {ADMIN_PASSWORD}")
+            logger.info(f"✅ Admin created with 7-day trial: {ADMIN_EMAIL} / Password: {ADMIN_PASSWORD}")
     except Exception as e:
         logger.error(f"Error creating admin: {e}")
 
@@ -138,7 +202,6 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
 security = HTTPBearer()
-
 # Models
 class UserCreate(BaseModel):
     email: str
@@ -188,6 +251,46 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+# License verification
+def check_license(user_id: str):
+    """Check if user has active license"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM licenses 
+            WHERE user_id = %s AND status = 'active' 
+            ORDER BY expires_at DESC LIMIT 1
+        """, (user_id,))
+        license = cursor.fetchone()
+        
+        if not license:
+            return False, "No active license found"
+        
+        # Check expiration
+        expires_at = license['expires_at']
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        
+        now = datetime.now(timezone.utc)
+        
+        if now > expires_at:
+            # Expire license
+            cursor.execute(
+                "UPDATE licenses SET status = 'expired', updated_at = %s WHERE id = %s",
+                (now, license['id'])
+            )
+            conn.commit()
+            return False, "License expired"
+        
+        return True, license
+
+def verify_license_middleware(user_id: str = Depends(verify_token)):
+    """Middleware to check license for protected routes"""
+    is_valid, result = check_license(user_id)
+    if not is_valid:
+        raise HTTPException(status_code=403, detail=result)
+    return user_id
+
 # FastAPI app
 app = FastAPI(title="Anota Ganha API")
 
@@ -210,6 +313,7 @@ async def startup_event():
     init_db()
     create_default_admin()
     logger.info("✅ Application started")
+
 # Auth routes
 @app.post("/api/auth/register")
 async def register(user_data: UserCreate):
@@ -226,6 +330,18 @@ async def register(user_data: UserCreate):
             "INSERT INTO users (id, email, full_name, hashed_password) VALUES (%s, %s, %s, %s)",
             (user_id, user_data.email, user_data.full_name, hashed.decode())
         )
+        
+        # Create 7-day trial license
+        license_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc)
+        expires = now + timedelta(days=7)
+        
+        cursor.execute(
+            """INSERT INTO licenses (id, user_id, plan_type, status, starts_at, expires_at)
+               VALUES (%s, %s, 'trial', 'active', %s, %s)""",
+            (license_id, user_id, now, expires)
+        )
+        
         conn.commit()
         
         token = create_access_token({"sub": user_id})
@@ -233,7 +349,8 @@ async def register(user_data: UserCreate):
         return {
             "access_token": token,
             "token_type": "bearer",
-            "user": {"id": user_id, "email": user_data.email, "full_name": user_data.full_name}
+            "user": {"id": user_id, "email": user_data.email, "full_name": user_data.full_name},
+            "license": {"plan_type": "trial", "expires_at": expires.isoformat()}
         }
 
 @app.post("/api/auth/login")
@@ -251,10 +368,27 @@ async def login(credentials: UserLogin):
         
         token = create_access_token({"sub": user['id']})
         
+        # Get license info
+        cursor.execute("""
+            SELECT * FROM licenses 
+            WHERE user_id = %s AND status = 'active' 
+            ORDER BY expires_at DESC LIMIT 1
+        """, (user['id'],))
+        license = cursor.fetchone()
+        
+        license_info = None
+        if license:
+            license_info = {
+                "plan_type": license['plan_type'],
+                "status": license['status'],
+                "expires_at": license['expires_at'].isoformat()
+            }
+        
         return {
             "access_token": token,
             "token_type": "bearer",
-            "user": {"id": user['id'], "email": user['email'], "full_name": user['full_name']}
+            "user": {"id": user['id'], "email": user['email'], "full_name": user['full_name']},
+            "license": license_info
         }
 
 @app.get("/api/auth/me")
@@ -267,11 +401,166 @@ async def get_current_user(user_id: str = Depends(verify_token)):
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
-        return dict(user)
+        # Get license
+        cursor.execute("""
+            SELECT * FROM licenses 
+            WHERE user_id = %s AND status = 'active' 
+            ORDER BY expires_at DESC LIMIT 1
+        """, (user_id,))
+        license = cursor.fetchone()
+        
+        result = dict(user)
+        if license:
+            result['license'] = {
+                "plan_type": license['plan_type'],
+                "status": license['status'],
+                "expires_at": license['expires_at'].isoformat()
+            }
+        else:
+            result['license'] = None
+        
+        return result
 
-# Sheets endpoints
+# License and Plans routes
+@app.get("/api/plans")
+async def get_plans():
+    """Get available subscription plans"""
+    return PLANS
+
+@app.get("/api/licenses/status")
+async def get_license_status(user_id: str = Depends(verify_token)):
+    """Get current license status"""
+    is_valid, result = check_license(user_id)
+    
+    if not is_valid:
+        return {"status": "inactive", "message": result}
+    
+    license = result
+    return {
+        "status": "active",
+        "plan_type": license['plan_type'],
+        "starts_at": license['starts_at'].isoformat(),
+        "expires_at": license['expires_at'].isoformat(),
+        "subscription_id": license.get('subscription_id')
+    }
+# Mercado Pago integration
+@app.post("/api/subscriptions/create")
+async def create_subscription(request: Request, user_id: str = Depends(verify_token)):
+    """Create Mercado Pago subscription"""
+    try:
+        body = await request.json()
+        plan_type = body.get('plan_type')
+        
+        if plan_type not in PLANS:
+            raise HTTPException(status_code=400, detail="Invalid plan type")
+        
+        plan = PLANS[plan_type]
+        
+        # Create subscription preference
+        subscription_data = {
+            "reason": plan['name'],
+            "auto_recurring": {
+                "frequency": plan['frequency'],
+                "frequency_type": plan['frequency_type'],
+                "transaction_amount": plan['price'],
+                "currency_id": "BRL"
+            },
+            "back_url": "https://anota-ganha-app-da46.vercel.app/dashboard"
+        }
+        
+        # Add repetitions if exists (12 months plan)
+        if 'repetitions' in plan:
+            subscription_data['auto_recurring']['repetitions'] = plan['repetitions']
+        
+        headers = {
+            "Authorization": f"Bearer {MERCADO_PAGO_ACCESS_TOKEN}",
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.post(
+            "https://api.mercadopago.com/preapproval",
+            json=subscription_data,
+            headers=headers
+        )
+        
+        if response.status_code not in [200, 201]:
+            logger.error(f"Mercado Pago error: {response.text}")
+            raise HTTPException(status_code=500, detail="Error creating subscription")
+        
+        result = response.json()
+        
+        return {
+            "subscription_id": result.get('id'),
+            "init_point": result.get('init_point'),
+            "sandbox_init_point": result.get('sandbox_init_point')
+        }
+        
+    except Exception as e:
+        logger.error(f"Error creating subscription: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/webhooks/mercadopago")
+async def mercadopago_webhook(request: Request):
+    """Handle Mercado Pago webhooks"""
+    try:
+        body = await request.json()
+        logger.info(f"Webhook received: {body}")
+        
+        # Get payment/subscription info
+        topic = body.get('topic') or body.get('type')
+        resource_id = body.get('data', {}).get('id') or body.get('id')
+        
+        if not resource_id:
+            return {"status": "ok"}
+        
+        headers = {"Authorization": f"Bearer {MERCADO_PAGO_ACCESS_TOKEN}"}
+        
+        if topic == "subscription" or topic == "preapproval":
+            # Get subscription details
+            response = requests.get(
+                f"https://api.mercadopago.com/preapproval/{resource_id}",
+                headers=headers
+            )
+            
+            if response.status_code == 200:
+                subscription = response.json()
+                status = subscription.get('status')
+                payer_email = subscription.get('payer_email')
+                
+                if status == 'authorized':
+                    # Find user and activate license
+                    with get_db() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT id FROM users WHERE email = %s", (payer_email,))
+                        user = cursor.fetchone()
+                        
+                        if user:
+                            # Determine plan type from subscription
+                            plan_type = "monthly"  # Default
+                            # You can add logic to determine plan type from subscription data
+                            
+                            plan = PLANS[plan_type]
+                            license_id = str(uuid.uuid4())
+                            now = datetime.now(timezone.utc)
+                            expires = now + timedelta(days=plan['duration_days'])
+                            
+                            cursor.execute(
+                                """INSERT INTO licenses (id, user_id, plan_type, status, starts_at, expires_at, subscription_id)
+                                   VALUES (%s, %s, %s, 'active', %s, %s, %s)""",
+                                (license_id, user['id'], plan_type, now, expires, resource_id)
+                            )
+                            conn.commit()
+                            logger.info(f"License activated for user {user['id']}")
+        
+        return {"status": "ok"}
+        
+    except Exception as e:
+        logger.error(f"Webhook error: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+# Sheets endpoints (with license check)
 @app.get("/api/sheets")
-async def get_sheets(user_id: str = Depends(verify_token)):
+async def get_sheets(user_id: str = Depends(verify_license_middleware)):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM sheets WHERE user_id = %s ORDER BY updated_at DESC", (user_id,))
@@ -279,7 +568,7 @@ async def get_sheets(user_id: str = Depends(verify_token)):
         return sheets
 
 @app.post("/api/sheets")
-async def create_sheet(sheet_data: SheetCreate, user_id: str = Depends(verify_token)):
+async def create_sheet(sheet_data: SheetCreate, user_id: str = Depends(verify_license_middleware)):
     with get_db() as conn:
         cursor = conn.cursor()
         sheet_id = str(uuid.uuid4())
@@ -300,7 +589,7 @@ async def create_sheet(sheet_data: SheetCreate, user_id: str = Depends(verify_to
         }
 
 @app.get("/api/sheets/{sheet_id}")
-async def get_sheet(sheet_id: str, user_id: str = Depends(verify_token)):
+async def get_sheet(sheet_id: str, user_id: str = Depends(verify_license_middleware)):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM sheets WHERE id = %s AND user_id = %s", (sheet_id, user_id))
@@ -312,7 +601,7 @@ async def get_sheet(sheet_id: str, user_id: str = Depends(verify_token)):
         return dict(sheet)
 
 @app.put("/api/sheets/{sheet_id}")
-async def update_sheet(sheet_id: str, sheet_data: SheetCreate, user_id: str = Depends(verify_token)):
+async def update_sheet(sheet_id: str, sheet_data: SheetCreate, user_id: str = Depends(verify_license_middleware)):
     with get_db() as conn:
         cursor = conn.cursor()
         now = datetime.now(timezone.utc)
@@ -331,11 +620,10 @@ async def update_sheet(sheet_id: str, sheet_data: SheetCreate, user_id: str = De
         return dict(cursor.fetchone())
 
 @app.delete("/api/sheets/{sheet_id}")
-async def delete_sheet(sheet_id: str, user_id: str = Depends(verify_token)):
+async def delete_sheet(sheet_id: str, user_id: str = Depends(verify_license_middleware)):
     with get_db() as conn:
         cursor = conn.cursor()
         
-        # Delete associated campaigns and clients
         cursor.execute("SELECT id FROM campaigns WHERE sheet_id = %s", (sheet_id,))
         campaign_ids = [row['id'] for row in cursor.fetchall()]
         
@@ -351,13 +639,12 @@ async def delete_sheet(sheet_id: str, user_id: str = Depends(verify_token)):
         conn.commit()
         return {"message": "Sheet deleted successfully"}
 
-# Campaigns endpoints
+# Campaigns endpoints (with license check)
 @app.get("/api/sheets/{sheet_id}/campaigns")
-async def get_campaigns(sheet_id: str, user_id: str = Depends(verify_token)):
+async def get_campaigns(sheet_id: str, user_id: str = Depends(verify_license_middleware)):
     with get_db() as conn:
         cursor = conn.cursor()
         
-        # Verify sheet ownership
         cursor.execute("SELECT id FROM sheets WHERE id = %s AND user_id = %s", (sheet_id, user_id))
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Sheet not found")
@@ -372,11 +659,10 @@ async def get_campaigns(sheet_id: str, user_id: str = Depends(verify_token)):
         return campaigns
 
 @app.post("/api/sheets/{sheet_id}/campaigns")
-async def create_campaign(sheet_id: str, campaign_data: CampaignCreate, user_id: str = Depends(verify_token)):
+async def create_campaign(sheet_id: str, campaign_data: CampaignCreate, user_id: str = Depends(verify_license_middleware)):
     with get_db() as conn:
         cursor = conn.cursor()
         
-        # Verify sheet ownership
         cursor.execute("SELECT id FROM sheets WHERE id = %s AND user_id = %s", (sheet_id, user_id))
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Sheet not found")
@@ -384,7 +670,6 @@ async def create_campaign(sheet_id: str, campaign_data: CampaignCreate, user_id:
         campaign_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
         
-        # Fix: Garantir que industries é sempre um JSON válido
         try:
             industries_data = campaign_data.industries if campaign_data.industries else []
             industries_json = json.dumps(industries_data)
@@ -424,26 +709,69 @@ async def create_campaign(sheet_id: str, campaign_data: CampaignCreate, user_id:
             logger.error(f"Error creating campaign: {error_msg}")
             raise HTTPException(status_code=500, detail=f"Erro ao criar campanha: {error_msg}")
 
-# Rotas alternativas para compatibilidade com frontend
+# Alternative campaign routes (frontend compatibility)
 @app.post("/api/campaigns")
-async def create_campaign_direct(campaign_data: dict, user_id: str = Depends(verify_token)):
-    """Rota alternativa para criar campanha"""
-    if 'sheet_id' not in campaign_data:
-        raise HTTPException(status_code=400, detail="sheet_id is required")
-    
-    sheet_id = campaign_data.pop('sheet_id')
-    
-    campaign_create = CampaignCreate(
-        name=campaign_data.get('name', ''),
-        start_date=campaign_data.get('start_date'),
-        end_date=campaign_data.get('end_date'),
-        status=campaign_data.get('status', 'active'),
-        industries=campaign_data.get('industries', [])
-    )
-    
-    return await create_campaign(sheet_id, campaign_create, user_id)
+async def create_campaign_direct(campaign_data: dict, user_id: str = Depends(verify_license_middleware)):
+    """Alternative route to create campaign"""
+    try:
+        if 'sheet_id' not in campaign_data and 'sheetId' not in campaign_data:
+            raise HTTPException(status_code=400, detail="sheet_id or sheetId is required")
+        
+        sheet_id = campaign_data.get('sheet_id') or campaign_data.get('sheetId')
+        
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM sheets WHERE id = %s AND user_id = %s", (sheet_id, user_id))
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Sheet not found")
+        
+        campaign_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc)
+        
+        name = campaign_data.get('name', '')
+        if not name:
+            raise HTTPException(status_code=400, detail="Campaign name is required")
+        
+        start_date = campaign_data.get('start_date') or campaign_data.get('startDate')
+        end_date = campaign_data.get('end_date') or campaign_data.get('endDate')
+        status = campaign_data.get('status', 'active')
+        industries = campaign_data.get('industries', [])
+        
+        try:
+            industries_json = json.dumps(industries if industries else [])
+        except:
+            industries_json = json.dumps([])
+        
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """INSERT INTO campaigns (id, sheet_id, name, start_date, end_date, status, industries, created_at, updated_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)""",
+                (campaign_id, sheet_id, name, start_date, end_date, status, industries_json, now, now)
+            )
+            conn.commit()
+        
+        logger.info(f"Campaign created successfully: {campaign_id}")
+        
+        return {
+            "id": campaign_id,
+            "sheet_id": sheet_id,
+            "name": name,
+            "start_date": start_date,
+            "end_date": end_date,
+            "status": status,
+            "industries": industries,
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating campaign: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error creating campaign: {str(e)}")
 @app.get("/api/campaigns/{campaign_id}")
-async def get_campaign(campaign_id: str, user_id: str = Depends(verify_token)):
+async def get_campaign(campaign_id: str, user_id: str = Depends(verify_license_middleware)):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -461,7 +789,7 @@ async def get_campaign(campaign_id: str, user_id: str = Depends(verify_token)):
         return result
 
 @app.put("/api/campaigns/{campaign_id}")
-async def update_campaign(campaign_id: str, campaign_data: CampaignCreate, user_id: str = Depends(verify_token)):
+async def update_campaign(campaign_id: str, campaign_data: CampaignCreate, user_id: str = Depends(verify_license_middleware)):
     with get_db() as conn:
         cursor = conn.cursor()
         now = datetime.now(timezone.utc)
@@ -498,32 +826,61 @@ async def update_campaign(campaign_id: str, campaign_data: CampaignCreate, user_
         except Exception as e:
             conn.rollback()
             logger.error(f"Error updating campaign: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Erro ao atualizar campanha: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error updating campaign: {str(e)}")
 
 @app.put("/api/campaigns")
-async def update_campaign_direct(campaign_data: dict, user_id: str = Depends(verify_token)):
-    """Rota alternativa para atualizar campanha"""
-    if 'id' not in campaign_data:
-        raise HTTPException(status_code=400, detail="campaign id is required")
-    
-    campaign_id = campaign_data.pop('id')
-    
-    campaign_create = CampaignCreate(
-        name=campaign_data.get('name', ''),
-        start_date=campaign_data.get('start_date'),
-        end_date=campaign_data.get('end_date'),
-        status=campaign_data.get('status', 'active'),
-        industries=campaign_data.get('industries', [])
-    )
-    
-    return await update_campaign(campaign_id, campaign_create, user_id)
+async def update_campaign_direct(campaign_data: dict, user_id: str = Depends(verify_license_middleware)):
+    """Alternative route to update campaign"""
+    try:
+        campaign_id = campaign_data.get('id') or campaign_data.get('_id') or campaign_data.get('campaignId')
+        if not campaign_id:
+            raise HTTPException(status_code=400, detail="campaign id is required")
+        
+        name = campaign_data.get('name', '')
+        if not name:
+            raise HTTPException(status_code=400, detail="Campaign name is required")
+        
+        start_date = campaign_data.get('start_date') or campaign_data.get('startDate')
+        end_date = campaign_data.get('end_date') or campaign_data.get('endDate')
+        status = campaign_data.get('status', 'active')
+        industries = campaign_data.get('industries', [])
+        
+        try:
+            industries_json = json.dumps(industries if industries else [])
+        except:
+            industries_json = json.dumps([])
+        
+        now = datetime.now(timezone.utc)
+        
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE campaigns
+                SET name = %s, start_date = %s, end_date = %s, status = %s, industries = %s::jsonb, updated_at = %s
+                WHERE id = %s AND sheet_id IN (SELECT id FROM sheets WHERE user_id = %s)
+            """, (name, start_date, end_date, status, industries_json, now, campaign_id, user_id))
+            
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Campaign not found")
+            
+            conn.commit()
+            
+            cursor.execute("SELECT * FROM campaigns WHERE id = %s", (campaign_id,))
+            result = dict(cursor.fetchone())
+            result['industries'] = result['industries'] if result['industries'] else []
+            return result
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating campaign: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error updating campaign: {str(e)}")
 
 @app.delete("/api/campaigns/{campaign_id}")
-async def delete_campaign(campaign_id: str, user_id: str = Depends(verify_token)):
+async def delete_campaign(campaign_id: str, user_id: str = Depends(verify_license_middleware)):
     with get_db() as conn:
         cursor = conn.cursor()
         
-        # Delete associated clients
         cursor.execute("DELETE FROM clients WHERE campaign_id = %s", (campaign_id,))
         
         cursor.execute("""
@@ -537,13 +894,12 @@ async def delete_campaign(campaign_id: str, user_id: str = Depends(verify_token)
         conn.commit()
         return {"message": "Campaign deleted successfully"}
 
-# Clients endpoints
+# Clients endpoints (with license check)
 @app.get("/api/campaigns/{campaign_id}/clients")
-async def get_clients(campaign_id: str, user_id: str = Depends(verify_token)):
+async def get_clients(campaign_id: str, user_id: str = Depends(verify_license_middleware)):
     with get_db() as conn:
         cursor = conn.cursor()
         
-        # Verify campaign access
         cursor.execute("""
             SELECT c.id FROM campaigns c
             JOIN sheets s ON c.sheet_id = s.id
@@ -563,11 +919,10 @@ async def get_clients(campaign_id: str, user_id: str = Depends(verify_token)):
         return clients
 
 @app.post("/api/campaigns/{campaign_id}/clients")
-async def create_client(campaign_id: str, client_data: ClientCreate, user_id: str = Depends(verify_token)):
+async def create_client(campaign_id: str, client_data: ClientCreate, user_id: str = Depends(verify_license_middleware)):
     with get_db() as conn:
         cursor = conn.cursor()
         
-        # Verify campaign access
         cursor.execute("""
             SELECT c.id FROM campaigns c
             JOIN sheets s ON c.sheet_id = s.id
@@ -609,7 +964,7 @@ async def create_client(campaign_id: str, client_data: ClientCreate, user_id: st
         }
 
 @app.put("/api/clients/{client_id}")
-async def update_client(client_id: str, client_data: ClientCreate, user_id: str = Depends(verify_token)):
+async def update_client(client_id: str, client_data: ClientCreate, user_id: str = Depends(verify_license_middleware)):
     with get_db() as conn:
         cursor = conn.cursor()
         now = datetime.now(timezone.utc)
@@ -642,7 +997,7 @@ async def update_client(client_id: str, client_data: ClientCreate, user_id: str 
         return result
 
 @app.delete("/api/clients/{client_id}")
-async def delete_client(client_id: str, user_id: str = Depends(verify_token)):
+async def delete_client(client_id: str, user_id: str = Depends(verify_license_middleware)):
     with get_db() as conn:
         cursor = conn.cursor()
         
@@ -661,7 +1016,9 @@ async def delete_client(client_id: str, user_id: str = Depends(verify_token)):
         conn.commit()
         return {"message": "Client deleted successfully"}
 
+# Health check with HEAD support (UptimeRobot fix)
 @app.get("/health")
+@app.head("/health")
 async def health_check():
     return {"status": "healthy", "database": "PostgreSQL connected"}
 
