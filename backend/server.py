@@ -1,10 +1,3 @@
-# 📝 CÓDIGO COMPLETO EM 4 PARTES - APAGUE TUDO E COLE!
-
-***
-
-# **PARTE 1/4 - IMPORTS E CONFIGURAÇÃO**
-
-```python
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
