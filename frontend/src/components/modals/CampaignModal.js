@@ -42,12 +42,6 @@ export default function CampaignModal({ isOpen, onClose, onSave, campaign, sheet
       return;
     }
 
-    // Validar sheet_id obrigatório
-    if (!campaign && !sheetId) {
-      alert('Erro: Sheet ID não encontrado');
-      return;
-    }
-
     const industriesWithNumericGoals = formData.industries.map(industry => ({
       ...industry,
       goal: typeof industry.goal === 'number' 
@@ -57,7 +51,6 @@ export default function CampaignModal({ isOpen, onClose, onSave, campaign, sheet
 
     const dataToSave = {
       name: formData.name.trim(),
-      sheet_id: campaign?.sheet_id || sheetId,  // ✅ ADICIONADO!
       start_date: formData.start_date 
         ? new Date(formData.start_date).toISOString() 
         : null,
@@ -68,12 +61,19 @@ export default function CampaignModal({ isOpen, onClose, onSave, campaign, sheet
       industries: industriesWithNumericGoals
     };
 
-    console.log('📤 Enviando dados:', dataToSave); // Debug
+    // ✅ CORREÇÃO: Adicionar sheet_id apenas se existir
+    if (campaign?.sheet_id) {
+      dataToSave.sheet_id = campaign.sheet_id;
+    } else if (sheetId) {
+      dataToSave.sheet_id = sheetId;
+    }
+    // Se não tiver sheet_id, o Dashboard vai criar automaticamente
+
+    console.log('📤 Enviando dados:', dataToSave);
     onSave(dataToSave);
   };
 
   if (!isOpen) return null;
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -120,7 +120,6 @@ export default function CampaignModal({ isOpen, onClose, onSave, campaign, sheet
               />
             </div>
           </div>
-
           <div>
             <label className="block text-sm font-medium mb-1">Status</label>
             <select
@@ -142,7 +141,6 @@ export default function CampaignModal({ isOpen, onClose, onSave, campaign, sheet
             />
           </div>
         </div>
-
         <div className="flex justify-end gap-2 mt-6">
           <button
             onClick={onClose}
