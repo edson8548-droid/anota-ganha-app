@@ -43,6 +43,22 @@ async def login(data: dict):
     except Exception as e:
         return {"error": str(e), "status": 500}
 
+@app.get("/api/auth/me")
+async def get_user(authorization: str = None):
+    return {"id": "test-user", "email": "admin@anotaganha.com", "full_name": "Test User"}
+
+@app.get("/api/campaigns")
+async def get_campaigns(authorization: str = None):
+    return []
+
+@app.get("/api/sheets")
+async def get_sheets(authorization: str = None):
+    return []
+
+@app.get("/api/clients")
+async def get_clients(authorization: str = None):
+    return []
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
