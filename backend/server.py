@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Header
 from starlette.middleware.cors import CORSMiddleware
 import jwt
 from datetime import datetime, timedelta
+from typing import Optional
 
 app = FastAPI(title="Anota Ganha API", version="1.0.0")
 
@@ -44,20 +45,40 @@ async def login(data: dict):
         return {"error": str(e), "status": 500}
 
 @app.get("/api/auth/me")
-async def get_user(authorization: str = None):
-    return {"id": "test-user", "email": "admin@anotaganha.com", "full_name": "Test User"}
+async def get_user(authorization: Optional[str] = Header(None)):
+    try:
+        return {
+            "id": "test-user",
+            "email": "admin@anotaganha.com",
+            "full_name": "Test User"
+        }
+    except Exception as e:
+        return {
+            "id": "test-user",
+            "email": "admin@anotaganha.com",
+            "full_name": "Test User"
+        }
 
 @app.get("/api/campaigns")
-async def get_campaigns(authorization: str = None):
-    return []
+async def get_campaigns(authorization: Optional[str] = Header(None)):
+    try:
+        return []
+    except:
+        return []
 
 @app.get("/api/sheets")
-async def get_sheets(authorization: str = None):
-    return []
+async def get_sheets(authorization: Optional[str] = Header(None)):
+    try:
+        return []
+    except:
+        return []
 
 @app.get("/api/clients")
-async def get_clients(authorization: str = None):
-    return []
+async def get_clients(authorization: Optional[str] = Header(None)):
+    try:
+        return []
+    except:
+        return []
 
 if __name__ == "__main__":
     import uvicorn
