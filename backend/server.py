@@ -157,8 +157,9 @@ async def check_license(user_id: str) -> tuple:
 
 # Health check endpoint
 @app.get("/health")
+@app.head("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint - Supports GET and HEAD"""
     return {"status": "healthy", "database": "PostgreSQL connected"}
 # ==================== CAMPAIGNS ROUTES ====================
 
