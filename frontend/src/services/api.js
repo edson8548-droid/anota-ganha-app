@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL + '/api';
+const API_URL = "https://anota-ganha-backend.onrender.com"
 
 const api = axios.create({
   baseURL: API_URL,
