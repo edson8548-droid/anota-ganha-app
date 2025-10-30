@@ -171,6 +171,8 @@ export default function Dashboard() {
 
   const handleSaveCampaign = async (data) => {
     try {
+      console.log('💾 Salvando campanha com dados:', data); // Debug
+      
       if (editingCampaign) {
         await updateCampaign(editingCampaign.id, data);
         toast.success('Campanha atualizada!');
@@ -195,10 +197,9 @@ export default function Dashboard() {
       setShowCampaignModal(false);
     } catch (error) {
       console.error('Error saving campaign:', error);
-      toast.error('Erro ao salvar campanha');
+      toast.error(error.response?.data?.detail || 'Erro ao salvar campanha');
     }
   };
-
   const syncCampaignProducts = async (campaignId, productNames) => {
     try {
       const response = await getClients({ campaign_id: campaignId });
@@ -589,7 +590,6 @@ export default function Dashboard() {
   }
 
   const headers = getCurrentHeaders();
-
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow-md sticky top-0 z-10">
@@ -930,6 +930,7 @@ export default function Dashboard() {
         onClose={() => setShowCampaignModal(false)}
         onSave={handleSaveCampaign}
         campaign={editingCampaign}
+        sheetId={activeSheet}
       />
 
       <ClientModalIndustries
