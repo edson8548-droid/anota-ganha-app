@@ -110,7 +110,7 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def verify_license_middleware(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
-    """Verify token and check license"""
+    """Verify token and check license - CORRIGIDO"""
     user_data = await verify_token(credentials)
     
     # Check license
@@ -130,9 +130,9 @@ async def verify_license_middleware(credentials: HTTPAuthorizationCredentials = 
         if not result:
             raise HTTPException(status_code=401, detail="User not found")
         
-        # Check if license is valid
-        if result["status"] != "active":
-            raise HTTPException(status_code=403, detail="License inactive")
+        # ✅ CORRIGIDO: Verificar se status existe E se é ativo
+        if not result.get("status") or result.get("status") != "active":
+            raise HTTPException(status_code=403, detail="License inactive or not found")
     
     return user_data["user_id"]
 
@@ -160,7 +160,6 @@ async def check_license(user_id: str) -> tuple:
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "database": "PostgreSQL connected"}
-
 # ==================== CAMPAIGNS ROUTES ====================
 
 @app.post("/api/campaigns")
@@ -442,7 +441,6 @@ async def delete_campaign_direct(campaign_id: str, user_id: str = Depends(verify
     except Exception as e:
         logger.error(f"Error deleting campaign: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error deleting campaign: {str(e)}")
-
 # ==================== SHEETS ROUTES ====================
 
 @app.get("/api/sheets")
@@ -667,7 +665,6 @@ async def delete_client_direct(client_id: str, user_id: str = Depends(verify_lic
     except Exception as e:
         logger.error(f"Error deleting client: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error deleting client: {str(e)}")
-
 # ==================== STATS ROUTES ====================
 
 @app.get("/api/campaigns/{campaign_id}/stats")
@@ -717,6 +714,100 @@ async def get_campaign_stats_by_city(campaign_id: str, user_id: str = Depends(ve
         logger.error(f"Error getting city stats: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting city stats: {str(e)}")
 
+# ==================== AUTH ROUTES ====================
+
+@app.post("/api/auth/login")
+async def login(user_data: UserLogin):
+    """Login user"""
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute(
+                "SELECT * FROM users WHERE email = %s",
+                (user_data.email,)
+            )
+            user = cursor.fetchone()
+            
+            if not user:
+                raise HTTPException(status_code=401, detail="Invalid credentials")
+            
+            # Verify password
+            if not bcrypt.checkpw(user_data.password.encode('utf-8'), user['password'].encode('utf-8')):
+                raise HTTPException(status_code=401, detail="Invalid credentials")
+            
+            # Generate JWT token
+            secret_key = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
+            token = jwt.encode(
+                {
+                    "user_id": user['id'],
+                    "email": user['email'],
+                    "exp": datetime.utcnow() + timedelta(days=30)
+                },
+                secret_key,
+                algorithm="HS256"
+            )
+            
+            logger.info(f"✅ User logged in: {user['email']}")
+            
+            return {
+                "access_token": token,
+                "token_type": "bearer",
+                "user": {
+                    "id": user['id'],
+                    "email": user['email'],
+                    "full_name": user.get('full_name', '')
+                }
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error logging in: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error logging in: {str(e)}")
+
+@app.post("/api/auth/register")
+async def register(user_data: UserCreate):
+    """Register new user"""
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            
+            # Check if user exists
+            cursor.execute("SELECT id FROM users WHERE email = %s", (user_data.email,))
+            if cursor.fetchone():
+                raise HTTPException(status_code=400, detail="Email already registered")
+            
+            # Hash password
+            hashed_password = bcrypt.hashpw(user_data.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            
+            # Create user
+            user_id = str(uuid.uuid4())
+            now = datetime.now(timezone.utc)
+            
+            cursor.execute(
+                """
+                INSERT INTO users (id, email, full_name, password, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (user_id, user_data.email, user_data.full_name, hashed_password, now, now)
+            )
+            conn.commit()
+            
+            logger.info(f"✅ User registered: {user_data.email}")
+            
+            return {
+                "id": user_id,
+                "email": user_data.email,
+                "full_name": user_data.full_name,
+                "message": "User registered successfully"
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error registering user: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error registering user: {str(e)}")
+
 # ==================== ERROR HANDLERS ====================
 
 @app.exception_handler(HTTPException)
@@ -726,6 +817,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         status_code=exc.status_code,
         content={"detail": exc.detail},
     )
+
+# ==================== MAIN ====================
 
 if __name__ == "__main__":
     import uvicorn
