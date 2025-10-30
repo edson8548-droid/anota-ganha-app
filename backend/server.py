@@ -40,7 +40,7 @@ db = client[os.environ['DB_NAME']]
 
 # Helper function to safely execute database operations with timeout
 async def safe_db_operation(operation, timeout=30):
-    \"\"\"Execute database operation with timeout to prevent hanging\"\"\"
+    """Execute database operation with timeout to prevent hanging"""
     try:
         return await asyncio.wait_for(operation, timeout=timeout)
     except asyncio.TimeoutError:
