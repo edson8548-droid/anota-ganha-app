@@ -26,12 +26,11 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],  # PERMITE QUALQUER ORIGEM (para teste)
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # PERMITE TODOS OS MÉTODOS (GET, POST, OPTIONS, etc)
+    allow_headers=["*"],  # PERMITE TODOS OS CABEÇALHOS
 )
-
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
