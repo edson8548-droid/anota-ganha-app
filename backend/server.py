@@ -26,10 +26,11 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permite TODAS as origens
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Permite TODOS os métodos (GET, POST, OPTIONS, etc)
-    allow_headers=["*"],  # Permite TODOS os cabeçalhos
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Configure logging
 logging.basicConfig(
@@ -50,6 +51,7 @@ client = AsyncIOMotorClient(
     retryWrites=True,
     retryReads=True
 )
+
 db = client[os.environ['DB_NAME']]
 
 # Helper function to safely execute database operations with timeout
