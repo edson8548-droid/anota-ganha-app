@@ -1,13 +1,12 @@
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
-# A importação do CORSMiddleware já existe no seu código, o que é ótimo!
-from starlette.middleware.cors import CORSMiddleware 
+from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -18,6 +17,21 @@ import asyncio
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+app = FastAPI() # Cria a instância do aplicativo
+
+# Configuração do CORS
+origins = [
+    "https://anota-ganha-app.vercel.app",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -25,36 +39,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# NOVO: Crie a instância do FastAPI aqui, se ainda não estiver
-app = FastAPI()
-
-# NOVO: Defina de quais domínios você aceitará solicitações
-origins =
-
-# NOVO: Adicione o middleware de CORS ao seu aplicativo
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"], # Permite todos os métodos (GET, POST, etc.)
-    allow_headers=["*"], # Permite todos os cabeçalhos
-)
-
 # MongoDB connection with proper timeout and pooling settings
 mongo_url = os.environ
 client = AsyncIOMotorClient(
     mongo_url,
-    maxPoolSize=50,  # Connection pool size
+    maxPoolSize=50,
     minPoolSize=10,
-    serverSelectionTimeoutMS=5000,  # 5 seconds timeout
-    connectTimeoutMS=10000,  # 10 seconds connect timeout
-    socketTimeoutMS=30000,  # 30 seconds socket timeout
-    retryWrites=True,  # Retry failed writes
-    retryReads=True,  # Retry failed reads
-)
-
-# --- O RESTO DO SEU CÓDIGO DE 2500 LINHAS CONTINUA AQUI ---
-# Suas rotas como @app.post("/api/auth/login") e outras funções continuam normalmente abaixo.
+    serverSelectionTimeoutMS=5000,
+    connectTimeoutMS=10000,
+    socketTimeoutMS=30000,
+    retryWrites=True,
+    retryReads=True
 )
 db = client[os.environ['DB_NAME']]
 
