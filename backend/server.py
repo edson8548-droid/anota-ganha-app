@@ -192,6 +192,7 @@ api_router = APIRouter(prefix="/api")
 
 # Health check endpoint (sem prefixo /api para monitoramento)
 @app.get("/health")
+@app.head("/health")
 async def health_check():
     try:
         # Testar conexão com MongoDB
@@ -2422,6 +2423,15 @@ async def cancel_subscription(
         )
 
 
+# CORS MIDDLEWARE - MUST BE ADDED BEFORE INCLUDING ROUTES
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Include the router in the main app
 app.include_router(api_router)
 
@@ -2432,14 +2442,6 @@ async def startup_event():
     logger.info("Starting background tasks...")
     asyncio.create_task(check_expiring_trials())
     logger.info("Trial expiration checker started")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Configure logging
 logging.basicConfig(
