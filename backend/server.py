@@ -1,7 +1,7 @@
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
@@ -14,39 +14,9 @@ import bcrypt
 import jwt
 import asyncio
 
+# Configure paths and environment
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
-
-app = FastAPI() 
- 
-origins = [
-    "https://anota-ganha-app.vercel.app",   # Your production frontend
-    "http://localhost:3000",                # Local development
-    "http://localhost:5173",                # Vite default port (if using Vite)
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,   # List of allowed origins
-    allow_credentials=True,  # Allow cookies/authentication
-    allow_methods=["*"],     # Allow all HTTP methods (GET, POST, PUT, DELETE, etc.)
-    allow_headers=["*"],     # Allow all headers
-)
-
-# Add health check endpoint for Render
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
-
-@app.head("/health")
-async def health_check_head():
-    return {"status": "healthy"}
-
-# Your existing routes
-@app.post("/api/auth/login")
-async def login():
-    # Your login logic here
-    pass
 
 # Configure logging
 logging.basicConfig(
@@ -55,8 +25,38 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# MongoDB connection with proper timeout and pooling settings
-mongo_url = os.environ
+# ============================================
+# 1. CREATE FASTAPI APP
+# ============================================
+app = FastAPI(title="Anota Ganha API")
+
+# ============================================
+# 2. CONFIGURE CORS (MUST BE FIRST!)
+# ============================================
+origins = [
+    "https://anota-ganha-app.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ============================================
+# 3. DATABASE CONNECTION - FIXED!
+# ============================================
+# CORREÇÃO: Pegar a URL corretamente do ambiente
+mongo_url = os.environ.get('MONGO_URL') or os.environ.get('MONGODB_URI')
+if not mongo_url:
+    logger.error("MONGO_URL ou MONGODB_URI não encontrado nas variáveis de ambiente!")
+    # Usar URL padrão para desenvolvimento local
+    mongo_url = "mongodb://localhost:27017"
+
 client = AsyncIOMotorClient(
     mongo_url,
     maxPoolSize=50,
@@ -68,7 +68,7 @@ client = AsyncIOMotorClient(
     retryReads=True
 )
 
-db = client[os.environ['DB_NAME']]
+db = client[os.environ.get('DB_NAME', 'anota_ganha')]
 
 # Helper function to safely execute database operations with timeout
 async def safe_db_operation(operation, timeout=30):
@@ -82,15 +82,19 @@ async def safe_db_operation(operation, timeout=30):
         logging.error(f"Database operation failed: {str(e)}")
         raise
 
+# ============================================
+# 4. CONFIGURATION
+# ============================================
 # JWT Configuration
 SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+
 # License Configuration
-TRIAL_PERIOD_DAYS = 15  # Período de teste gratuito
-MONTHLY_SIMPLE_PRICE = 35.00  # Preço mensal simples (sem compromisso)
-MONTHLY_PRICE = 29.90  # Preço mensal (12 meses)
-ANNUAL_PRICE = 300.00  # Preço anual à vista
+TRIAL_PERIOD_DAYS = 15
+MONTHLY_SIMPLE_PRICE = 35.00
+MONTHLY_PRICE = 29.90
+ANNUAL_PRICE = 300.00
 
 # Mercado Pago Configuration
 MP_ACCESS_TOKEN = os.environ.get('MP_ACCESS_TOKEN', '')
@@ -103,6 +107,114 @@ SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'edson854_8@hotmail.com')
 
 security = HTTPBearer()
+
+# ============================================
+# 5. PYDANTIC MODELS
+# ============================================
+class User(BaseModel):
+    model_config = ConfigDict(
+        json_encoders={datetime: lambda dt: dt.isoformat() if dt else None},
+        populate_by_name=True
+    )
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
+    email: str
+    name: str
+    cpf: Optional[str] = ""
+    phone: Optional[str] = ""
+    role: str = "user"
+    license_type: str = "trial"
+    trial_started: Optional[datetime] = None
+    license_expiry: Optional[datetime] = None
+    last_payment_date: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class UserRegister(BaseModel):
+    email: str
+    password: str
+    name: Optional[str] = None
+    cpf: Optional[str] = None
+    phone: Optional[str] = None
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: User
+
+# ============================================
+# 6. HELPER FUNCTIONS
+# ============================================
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    except:
+        return False
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Token inválido")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expirado")
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Token inválido")
+    
+    user = await db.users.find_one({"_id": user_id})
+    if user is None:
+        raise HTTPException(status_code=401, detail="Usuário não encontrado")
+    
+    return user
+
+def send_password_reset_email(email: str, reset_token: str) -> bool:
+    """Send password reset email via SendGrid"""
+    if not SENDGRID_API_KEY:
+        logger.warning("SendGrid not configured")
+        return False
+    
+    try:
+        import sendgrid
+        from sendgrid.helpers.mail import Mail
+        
+        sg = sendgrid.SendGridAPIClient(api_key=SENDGRID_API_KEY)
+        reset_link = f"{FRONTEND_URL}/reset-password?token={reset_token}"
+        
+        html_content = f"""
+        <h2>Recuperação de Senha</h2>
+        <p>Você solicitou a recuperação de senha para sua conta no Anota & Ganha Incentivos.</p>
+        <p>Clique no link abaixo para redefinir sua senha (válido por 1 hora):</p>
+        <p><a href="{reset_link}" style="background:#3B82F6;color:white;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;">Redefinir Senha</a></p>
+        <p>Se você não solicitou esta recuperação, ignore este email.</p>
+        """
+        
+        message = Mail(
+            from_email=SENDER_EMAIL,
+            to_emails=email,
+            subject="Recuperação de Senha - Anota & Ganha",
+            html_content=html_content
+        )
+        
+        response = sg.send(message)
+        logger.info(f"Reset email sent to {email} (status: {response.status_code})")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send reset email: {str(e)}")
+        return False
 
 # Helper function to send expiration warning emails
 async def send_trial_expiration_email(user_email: str, days_remaining: int):
@@ -203,137 +315,69 @@ async def check_expiring_trials():
                 
                 if days_remaining in [5, 1, 0] and not user.get(email_sent_field):
                     await send_trial_expiration_email(user['email'], days_remaining)
-                    
                     # Mark as sent
                     await db.users.update_one(
-                        {"email": user['email']},
+                        {"_id": user['_id']},
                         {"$set": {email_sent_field: True}}
                     )
-                    
         except Exception as e:
-            logger.error(f"Error checking expiring trials: {str(e)}")
-            await asyncio.sleep(300)  # Wait 5 minutes on error
+            logger.error(f"Error in trial checker: {str(e)}")
 
-# Create the main app without a prefix
-app = FastAPI()
+# ============================================
+# 7. HEALTH CHECK ENDPOINTS
+# ============================================
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "message": "Anota Ganha API",
+        "status": "running",
+        "version": "1.0.0"
+    }
 
-# Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
 @app.get("/health")
 async def health_check():
-    try:
-        # Testar conexão com MongoDB
-        await db.command('ping')
-        return {
-            "status": "healthy",
-            "database": "connected",
-            "service": "running"
-        }
-    except Exception as e:
-        return {
-            "status": "unhealthy",
-            "database": "disconnected",
-            "error": str(e)
-        }
+    """Health check for Render"""
+    return {"status": "healthy"}
 
+@app.head("/health")
+async def health_check_head():
+    """Health check HEAD method for Render"""
+    return {"status": "healthy"}
 
-# ==================== Models ====================
+# ============================================
+# 8. API ROUTER
+# ============================================
+api_router = APIRouter(prefix="/api")
 
-class User(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    email: str
-    name: Optional[str] = ""
-    cpf: Optional[str] = ""
-    phone: Optional[str] = ""
-    role: str = "user"  # user, admin
-    license_type: str = "trial"  # trial, monthly, annual, expired
-    license_plan: Optional[str] = None  # monthly_30, annual_300
-    license_expiry: Optional[datetime] = None
-    trial_started: Optional[datetime] = None
-    payment_method: Optional[str] = None  # mercadopago, stripe, manual
-    last_payment_date: Optional[datetime] = None
-    subscription_id: Optional[str] = None  # ID do gateway de pagamento
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class UserCreate(BaseModel):
-    email: str
-    name: Optional[str] = ""
-    password: str
-    cpf: Optional[str] = ""
-    phone: Optional[str] = ""
-
-class UserLogin(BaseModel):
-    email: str
-    password: str
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    user: User
-
-# [Outros modelos definidos no código original…]
-
-# ==================== Auth Helpers ====================
-
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
-    try:
-        token = credentials.credentials
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
-        if user_id is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-        
-        user = await db.users.find_one({"id": user_id}, {"_id": 0})
-        if user is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-        return user
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
-    except jwt.JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-
-# ==================== Auth Routes ====================
-
+# ============================================
+# 9. AUTHENTICATION ROUTES
+# ============================================
 @api_router.post("/auth/register", response_model=Token)
-async def register(user_data: UserCreate):
+async def register(user_data: UserRegister):
     # Check if user exists
     existing_user = await db.users.find_one({"email": user_data.email})
     if existing_user:
-        raise HTTPException(status_code=400, detail="Email já está em uso")
+        raise HTTPException(status_code=400, detail="Email já cadastrado")
     
-    # Check if this is the admin email
-    is_admin = user_data.email == "edson854_8@hotmail.com"
+    # Check if this is the first user (admin)
+    user_count = await db.users.count_documents({})
+    is_admin = user_count == 0
     
-    # Create user with 15 day trial (or admin access)
+    # Create trial period
     trial_start = datetime.now(timezone.utc)
-    trial_end = trial_start + timedelta(days=15)
+    trial_end = trial_start + timedelta(days=TRIAL_PERIOD_DAYS)
     
+    # Create user object
     user_obj = User(
         email=user_data.email,
         name=user_data.name or user_data.email.split('@')[0],
         cpf=user_data.cpf or "",
         phone=user_data.phone or "",
         role="admin" if is_admin else "user",
-        license_type="annual" if is_admin else "trial",  # Admin nunca expira
+        license_type="annual" if is_admin else "trial",
         trial_started=trial_start if not is_admin else None,
-        license_expiry=None if is_admin else trial_end  # Admin sem expiração
+        license_expiry=None if is_admin else trial_end
     )
     
     user_dict = user_obj.model_dump()
@@ -354,8 +398,10 @@ async def register(user_data: UserCreate):
         token_type="bearer",
         user=user_obj
     )
+
 @api_router.post("/auth/login", response_model=Token)
 async def login(user_data: UserLogin):
+    """Login endpoint - FIXED"""
     user = await db.users.find_one({"email": user_data.email})
     if not user or not verify_password(user_data.password, user.get('password_hash', '')):
         raise HTTPException(status_code=401, detail="Email ou senha inválidos")
@@ -416,7 +462,6 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 async def forgot_password(email: str):
     user = await db.users.find_one({"email": email})
     if not user:
-        # Don't reveal if email exists
         return {"message": "Se o email existir, você receberá um link de recuperação"}
     
     # Generate reset token (valid for 1 hour)
@@ -469,7 +514,9 @@ async def reset_password(reset_token: str, new_password: str):
     
     return {"message": "Senha alterada com sucesso!"}
 
-# License Management
+# ============================================
+# 10. PLANS ENDPOINT
+# ============================================
 @api_router.get("/plans")
 async def get_plans():
     """Retorna os planos disponíveis"""
@@ -511,23 +558,33 @@ async def get_plans():
         ]
     }
 
+# ============================================
+# 11. LIFECYCLE EVENTS
+# ============================================
 @app.on_event("startup")
 async def startup_event():
     """Start background tasks on application startup"""
+    logger.info("Starting Anota Ganha API...")
+    logger.info(f"MongoDB URL configured: {bool(mongo_url)}")
     logger.info("Starting background tasks...")
     asyncio.create_task(check_expiring_trials())
     logger.info("Trial expiration checker started")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    """Close database connection on shutdown"""
+    logger.info("Shutting down database connection...")
     client.close()
 
+# ============================================
+# 12. INCLUDE ROUTER
+# ============================================
 app.include_router(api_router)
+
+# ============================================
+# 13. RUN SERVER (for local development)
+# ============================================
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run("server:app", host="0.0.0.0", port=port, reload=True)
