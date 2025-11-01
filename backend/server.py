@@ -17,16 +17,36 @@ import asyncio
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-app = FastAPI() # Cria a instância do aplicativo
+app = FastAPI() 
+ [
+    "https://anota-ganha-app.vercel.app",  # Your production frontend
+    "http://localhost:3000",                # Local development
+    "http://localhost:5173",                # Vite default port (if using Vite)
+]
 
-# TESTE: Configuração de CORS mais aberta para depuração
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permite TODAS as origens
-    allow_credentials=True,
-    allow_methods=["*"],  # Permite TODOS os métodos (GET, POST, OPTIONS, etc)
-    allow_headers=["*"],  # Permite TODOS os cabeçalhos
+    allow_origins=origins,  # List of allowed origins
+    allow_credentials=True,  # Allow cookies/authentication
+    allow_methods=["*"],     # Allow all HTTP methods (GET, POST, PUT, DELETE, etc.)
+    allow_headers=["*"],     # Allow all headers
 )
+
+# Add health check endpoint for Render
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+@app.head("/health")
+async def health_check_head():
+    return {"status": "healthy"}
+
+# Your existing routes
+@app.post("/api/auth/login")
+async def login():
+    # Your login logic here
+    pass
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
