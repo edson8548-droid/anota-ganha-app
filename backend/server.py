@@ -18,15 +18,16 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 app = FastAPI() 
- [
-    "https://anota-ganha-app.vercel.app",  # Your production frontend
+ 
+origins = [
+    "https://anota-ganha-app.vercel.app",   # Your production frontend
     "http://localhost:3000",                # Local development
     "http://localhost:5173",                # Vite default port (if using Vite)
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # List of allowed origins
+    allow_origins=origins,   # List of allowed origins
     allow_credentials=True,  # Allow cookies/authentication
     allow_methods=["*"],     # Allow all HTTP methods (GET, POST, PUT, DELETE, etc.)
     allow_headers=["*"],     # Allow all headers
