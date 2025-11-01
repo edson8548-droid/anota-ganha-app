@@ -22,10 +22,10 @@ app = FastAPI() # Cria a instância do aplicativo
 # TESTE: Configuração de CORS mais aberta para depuração
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # PERMITE QUALQUER ORIGEM (para teste)
+    allow_origins=["*"],  # Permite TODAS as origens
     allow_credentials=True,
-    allow_methods=["*"],  # PERMITE TODOS OS MÉTODOS (GET, POST, OPTIONS, etc)
-    allow_headers=["*"],  # PERMITE TODOS OS CABEÇALHOS
+    allow_methods=["*"],  # Permite TODOS os métodos (GET, POST, OPTIONS, etc)
+    allow_headers=["*"],  # Permite TODOS os cabeçalhos
 )
 # Configure logging
 logging.basicConfig(
