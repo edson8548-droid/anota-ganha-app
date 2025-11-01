@@ -19,9 +19,7 @@ load_dotenv(ROOT_DIR / '.env')
 
 app = FastAPI() # Cria a instância do aplicativo
 
-# Configuração do CORS
-origins = [
-    "https://anota-ganha-app.vercel.app",
+# TESTE: Configuração de CORS mais aberta para depuração
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # PERMITE QUALQUER ORIGEM (para teste)
