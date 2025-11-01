@@ -1,10 +1,31 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
-motor
-python-dotenv
-bcrypt
-pyjwt
-python-multipart
-mercadopago
-sendgrid
+# Requirements.txt - Anota Ganha Backend
+# Python 3.11+ recomendado
+
+# FastAPI e servidor
+fastapi==0.115.0
+uvicorn[standard]==0.31.0
+
+# Banco de dados MongoDB
+motor==3.6.0
+pymongo==4.10.1
+
+# Autenticação e segurança
+bcrypt==4.2.0
+PyJWT==2.9.0
+python-multipart==0.0.12
+
+# Modelos e validação
+pydantic==2.9.2
+pydantic-settings==2.5.2
+
+# Variáveis de ambiente
+python-dotenv==1.0.1
+
+# Email (SendGrid) - Opcional
+sendgrid==6.11.0
+
+# HTTP requests - Opcional
+requests==2.32.3
+
+# Timezone
+python-dateutil==2.9.0
