@@ -1,8 +1,31 @@
+# Requirements.txt - Anota Ganha Backend
+# Versões flexíveis para evitar conflitos
 
+# FastAPI e servidor
 fastapi
 uvicorn[standard]
+
+# Banco de dados MongoDB
 motor
+pymongo
+
+# Autenticação e segurança
 bcrypt
 PyJWT
-python-dotenv
+python-multipart
+
+# Modelos e validação
 pydantic
+pydantic-settings
+
+# Variáveis de ambiente
+python-dotenv
+
+# Email (SendGrid) - ADICIONADO!
+sendgrid
+
+# HTTP requests
+requests
+
+# Timezone e datas
+python-dateutil
