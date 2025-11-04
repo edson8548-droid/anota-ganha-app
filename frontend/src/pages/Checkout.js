@@ -1,5 +1,5 @@
 // SUBSTITUA: src/pages/Checkout.js
-// ⭐️ CORREÇÃO: Adiciona "Poller" para ESPERAR o Device ID antes de enviar a requisição.
+// ⭐️ CORREÇÃO: Removido o script 'sdk.mercadopago.com/js/v2' que estava em conflito.
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -11,11 +11,7 @@ import './Checkout.css';
 const BACKEND_URL = "https://anota-ganha-app-production.up.railway.app";
 const MERCADOPAGO_PUBLIC_KEY = "APP_USR-5f6e941d-3514-489a-9241-d8a42099b2d0";
 
-// ⭐️ NOVA FUNÇÃO HELPER: "Poller" para esperar pelo Device ID ⭐️
-/**
- * Tenta obter o deviceId várias vezes antes de desistir.
- * @returns {Promise<string|null>} O valor do deviceId ou null se expirar.
- */
+// ⭐️ FUNÇÃO HELPER: "Poller" para esperar pelo Device ID (Mantida) ⭐️
 const getDeviceIdWithRetry = () => {
   return new Promise((resolve) => {
     const startTime = Date.now();
@@ -24,22 +20,19 @@ const getDeviceIdWithRetry = () => {
     const check = () => {
       const deviceIdInput = document.getElementById('deviceId');
       
-      // Se o input existe E tem um valor
       if (deviceIdInput && deviceIdInput.value) {
         console.log("✅ Device ID capturado com sucesso!");
         resolve(deviceIdInput.value);
       } 
-      // Se o tempo máximo de espera foi atingido
       else if (Date.now() - startTime > maxWaitTime) {
         console.warn("⚠️ Device ID não encontrado após 4s. Continuando sem ele.");
-        resolve(null); // Resolve com null após o timeout
+        resolve(null); 
       } 
-      // Se ainda não encontrou, tenta novamente em 100ms
       else {
         setTimeout(check, 100); 
       }
     };
-    check(); // Inicia a verificação
+    check(); 
   });
 };
 
@@ -65,25 +58,10 @@ const Checkout = () => {
     }
   }, [location, PLANS, navigate]);
 
-  // Carregar SDK do Mercado Pago (Mantido)
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://sdk.mercadopago.com/js/v2';
-    script.async = true;
-    document.body.appendChild(script);
-
-    script.onload = () => {
-      try {
-        window.mpInstance = new window.MercadoPago(MERCADOPAGO_PUBLIC_KEY, { locale: 'pt-BR' });
-      } catch (e) {
-        console.error("Falha ao inicializar MP:", e);
-      }
-    };
-    return () => {
-      if (document.body.contains(script)) { document.body.removeChild(script); }
-    };
-  }, []);
-
+  // ⭐️ EFEITO REMOVIDO ⭐️
+  // O useEffect que carregava 'https://sdk.mercadopago.com/js/v2' foi removido
+  // pois não é necessário para o Checkout Pro e estava a causar conflito.
+  
   // Hook para Carregar o Script de Segurança (Device ID) (Mantido)
   useEffect(() => {
     const securityScript = document.createElement('script');
@@ -112,7 +90,6 @@ const Checkout = () => {
 
     try {
       // ⭐️ PASSO 1: ESPERAR E CAPTURAR O DEVICE ID ⭐️
-      // A função 'await' vai pausar o 'handleCheckout' até o ID ser encontrado ou o tempo esgotar.
       const deviceIdValue = await getDeviceIdWithRetry();
 
       // 2. CHAMAR O BACKEND DO RAILWAY
@@ -128,14 +105,13 @@ const Checkout = () => {
             name: user.displayName || user.email,
             id: user.uid 
           },
-          // Envia o deviceId (seja o valor ou null)
           deviceId: deviceIdValue 
         })
       });
 
       if (!response.ok) {
         const err = await response.json();
-        console.error("Erro do backend (422 ou 500):", err);
+        console.error("Erro do backend (500):", err);
         throw new Error(`Erro do servidor: ${err.detail || response.statusText}`);
       }
 
