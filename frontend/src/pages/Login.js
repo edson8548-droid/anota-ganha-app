@@ -36,7 +36,8 @@ const Login = () => {
     <div className="login-container">
       <div className="login-card">
         <div className="login-header">
-          <h1 className="login-title">Anota & Ganha<br/>Incentivos</h1>
+          {/* ⭐️ ALTERAÇÃO AQUI: ANOTA & GANHE ⭐️ */}
+          <h1 className="login-title">Anota & Ganhe<br/>Incentivos</h1>
           <p className="login-subtitle">Entre na sua conta</p>
         </div>
 
