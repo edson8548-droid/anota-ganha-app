@@ -1,6 +1,5 @@
 // SUBSTITUA: src/pages/Checkout.js
-// VERSÃO FINAL CORRIGIDA: Usa a URL de Produção hardcoded para evitar o erro de navegador/cache.
-// ⭐️ OTIMIZADO: Adicionada a lógica para capturar e enviar o Device ID. ⭐️
+// ⭐️ CORREÇÃO: Carrega o Script de Segurança (Device ID) dinamicamente nesta página.
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -21,7 +20,7 @@ const Checkout = () => {
 
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('credit_card'); // Mantemos o estado, mas o MP gere o método
+  const [paymentMethod, setPaymentMethod] = useState('credit_card');
 
   // Carregar plano selecionado
   useEffect(() => {
@@ -33,7 +32,7 @@ const Checkout = () => {
     }
   }, [location, PLANS, navigate]);
 
-  // Carregar SDK do Mercado Pago (Mantido para inicialização, mas não é usado para o checkout)
+  // Carregar SDK do Mercado Pago (Mantido)
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://sdk.mercadopago.com/js/v2';
@@ -52,6 +51,23 @@ const Checkout = () => {
     };
   }, []);
 
+  // ⭐️ NOVO HOOK: Carrega o Script de Segurança (Device ID) nesta página ⭐️
+  useEffect(() => {
+    const securityScript = document.createElement('script');
+    securityScript.src = 'https://www.mercadopago.com/v2/security.js';
+    // Define o atributo 'view' que é crucial para o script funcionar
+    securityScript.setAttribute('view', 'checkout'); 
+    securityScript.async = true;
+    document.body.appendChild(securityScript);
+
+    return () => {
+      // Limpa o script de segurança ao sair da página
+      if (document.body.contains(securityScript)) {
+        document.body.removeChild(securityScript);
+      }
+    };
+  }, []); // Roda apenas uma vez quando o componente Checkout é montado
+
   // ============================================
   // PROCESSAR PAGAMENTO (FLUXO ROBUSTO E OTIMIZADO)
   // ============================================
@@ -64,13 +80,16 @@ const Checkout = () => {
     setLoading(true);
 
     try {
-      // ⭐️ PASSO 1: CAPTURAR O DEVICE ID PARA APROVAÇÃO ⭐️
-      // O script que adicionámos ao index.html cria um input oculto com id='deviceId'
+      // ⭐️ PASSO 1: CAPTURAR O DEVICE ID ⭐️
+      // Agora o script deve ter tido tempo de injetar o campo
       const deviceIdInput = document.getElementById('deviceId');
       const deviceIdValue = deviceIdInput ? deviceIdInput.value : null;
 
       if (!deviceIdValue) {
+        // Se ainda não encontrou, logamos o aviso, mas tentamos continuar
         console.warn("⚠️ Device ID não encontrado. O script de segurança pode não ter carregado a tempo.");
+      } else {
+        console.log("✅ Device ID capturado com sucesso!");
       }
 
       // 2. CHAMAR O BACKEND DO RAILWAY
@@ -86,15 +105,16 @@ const Checkout = () => {
             name: user.displayName || user.email,
             id: user.uid 
           },
-          // ⭐️ ADICIONAR O DEVICE ID AO PAYLOAD (Chave para mais aprovação) ⭐️
+          // ADICIONAR O DEVICE ID AO PAYLOAD (mesmo que seja null)
           deviceId: deviceIdValue 
         })
       });
 
       if (!response.ok) {
+        // Tenta ler o erro do backend
         const err = await response.json();
-        console.error("Erro do backend:", err);
-        throw new Error('Erro ao criar preferência de pagamento no backend');
+        console.error("Erro do backend (422 ou 500):", err);
+        throw new Error(`Erro do servidor: ${err.detail || response.statusText}`);
       }
 
       const data = await response.json();
