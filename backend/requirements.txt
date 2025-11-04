@@ -1,5 +1,5 @@
-# Requirements.txt - Anota Ganha Backend
-# Versões flexíveis para evitar conflitos
+# SUBSTITUA: backend/requirements.txt
+# Este é o teu ficheiro + o que faltava
 
 # FastAPI e servidor
 fastapi
@@ -8,6 +8,7 @@ uvicorn[standard]
 # Banco de dados MongoDB
 motor
 pymongo
+dnspython # ⭐️ ADICIONADO: Necessário para MongoDB Atlas
 
 # Autenticação e segurança
 bcrypt
@@ -21,7 +22,7 @@ pydantic-settings
 # Variáveis de ambiente
 python-dotenv
 
-# Email (SendGrid) - ADICIONADO!
+# Email (SendGrid)
 sendgrid
 
 # HTTP requests
@@ -29,3 +30,6 @@ requests
 
 # Timezone e datas
 python-dateutil
+
+# Pagamentos (Mercado Pago)
+mercadopago # ⭐️ ADICIONADO
