@@ -1,5 +1,5 @@
 # SUBSTITUA: backend/routes/mercadopago.py
-# ⭐️ OTIMIZADO: Adicionada lógica de Device ID e Category ID para aumentar aprovação.
+# ⭐️ CORREÇÃO: Tornando o deviceId opcional (Optional) para aceitar 'null' do JSON.
 
 import os
 import mercadopago
@@ -9,6 +9,7 @@ import logging
 import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime, timezone
+from typing import Optional # ⭐️ ADICIONADO PARA ROBUSTEZ
 
 # SDKs para E-mail e Firebase
 from sendgrid import SendGridAPIClient
@@ -28,8 +29,8 @@ class UserInfoPayload(BaseModel):
 class PreferencePayload(BaseModel):
     planId: str
     user: UserInfoPayload
-    # ⭐️ OBRIGATÓRIO: Campo para receber o Device ID do Front-end ⭐️
-    deviceId: str = None 
+    # ⭐️ ALTERADO: Usando Optional[str] é a forma mais correta de aceitar 'null'
+    deviceId: Optional[str] = None 
 
 # ============================================
 # FUNÇÕES AUXILIARES DE E-MAIL (Mantidas)
@@ -171,24 +172,21 @@ async def create_preference(payload: PreferencePayload):
     if not sdk: raise HTTPException(status_code=500, detail="Mercado Pago SDK não está configurado")
     try:
         plan_id = payload.planId
-        user_info_dict = payload.user.model_dump() # Converte Pydantic para dict
+        user_info_dict = payload.user.model_dump() 
         plan = PLANS[plan_id]
         frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
-        # ⭐️ 1. DADOS DA PREFERÊNCIA APRIMORADOS (Com Category ID) ⭐️
+        # 1. DADOS DA PREFERÊNCIA (Mantido sem category_id)
         preference_data = {
             "items": [{ 
                 "title": plan["title"], 
                 "unit_price": plan["price"], 
                 "quantity": 1, 
                 "currency_id": "BRL",
-                # ⭐️ Adicionar category_id: Importante para Antifraude! ⭐️
-                "category_id": "services" # 'services' é ideal para assinaturas (SaaS)
             }],
             "payer": { 
                 "name": user_info_dict.get('name', user_info_dict.get('email')), 
                 "email": user_info_dict.get('email')
-                # O MP recomenda adicionar 'identification' (CPF) aqui se usar Checkout Transparente
             },
             "back_urls": { "success": f"{frontend_url}/payment-success", "failure": f"{frontend_url}/payment-failure", "pending": f"{frontend_url}/payment-pending" },
             "payment_methods": { "installments": plan.get("installments", 1) },
@@ -196,15 +194,15 @@ async def create_preference(payload: PreferencePayload):
             "statement_descriptor": "ANOTA&GANHA",
         }
 
-        # ⭐️ 2. OPÇÕES DA REQUISIÇÃO (Enviando o Device ID no Header) ⭐️
-        # Isto é crucial para flexibilizar a aprovação (X-meli-session-id)
+        # 2. OPÇÕES DA REQUISIÇÃO (Enviando o Device ID no Header)
         request_options = {}
-        if payload.deviceId:
+        # ⭐️ Verificação mais robusta: garante que deviceId não é None E não é uma string vazia
+        if payload.deviceId and payload.deviceId.strip():
             request_options["headers"] = {
                 "X-meli-session-id": payload.deviceId
             }
 
-        # 3. Cria a preferência usando os dados E as opções (headers)
+        # 3. Cria a preferência
         preference_response = sdk.preference().create(preference_data, request_options=request_options)
 
         if preference_response["status"] != 201:
@@ -249,18 +247,15 @@ async def webhook(request: Request):
         status = payment_data.get("status")
         external_reference = payment_data.get("external_reference")
 
-        # ⭐️ 1. Obter dados do usuário para o e-mail ⭐️
         user_id = external_reference.split('-')[0] if external_reference else None
         recipient_email = payment_data.get("payer", {}).get("email")
         value = payment_data.get("transaction_amount", 0)
         
-        # Correção: db.collection() é síncrono, não precisa de 'await'
         user_doc_ref = db_firestore.collection('users').document(user_id)
-        user_doc = user_doc_ref.get() # .get() é síncrono
+        user_doc = user_doc_ref.get() 
         
         user_name = user_doc.get('name') if user_doc.exists else (recipient_email.split('@')[0] if recipient_email else "Usuário")
         
-        # 2. Processa se o status for APROVADO
         if status == "approved":
             logger.info(f"✅ Pagamento APROVADO! Ref: {external_reference}")
             
@@ -270,7 +265,6 @@ async def webhook(request: Request):
                 plan_name = PLANS.get(plan_id, {}).get("title", "Plano Desconhecido")
                 
                 subscription_ref = db_firestore.collection('subscriptions').document(user_id)
-                # .set() é síncrono
                 subscription_ref.set({
                     "userId": user_id, "planId": plan_id, "status": "active", 
                     "paymentId": payment_id, "lastPaymentDate": datetime.now(timezone.utc),
@@ -279,15 +273,12 @@ async def webhook(request: Request):
                 
                 logger.info(f"🔥 LICENÇA ATIVADA: Usuário {user_id} para o plano {plan_id}.")
                 
-                # ⭐️ Envia e-mail de SUCESSO ⭐️
                 if recipient_email:
                     send_payment_success_email(recipient_email, user_name, plan_name, value)
         
-        # ⭐️ 3. Processa se o status for RECUSADO ⭐️
         elif status == "rejected":
             logger.info(f"❌ Pagamento REJEITADO. Ref: {external_reference}")
             
-            # ⭐️ Envia e-mail de RECUSA ⭐️
             if recipient_email:
                 send_payment_rejection_email(recipient_email, user_name)
 
