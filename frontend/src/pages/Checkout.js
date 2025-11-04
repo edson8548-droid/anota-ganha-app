@@ -1,5 +1,5 @@
 // SUBSTITUA: src/pages/Checkout.js
-// ⭐️ CORREÇÃO: Removido o script 'sdk.mercadopago.com/js/v2' que estava em conflito.
+// ⭐️ CORREÇÃO: Usa o SDK principal ('sdk.mercadopago.com/js/v2') para obter o Device ID.
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -11,28 +11,43 @@ import './Checkout.css';
 const BACKEND_URL = "https://anota-ganha-app-production.up.railway.app";
 const MERCADOPAGO_PUBLIC_KEY = "APP_USR-5f6e941d-3514-489a-9241-d8a42099b2d0";
 
-// ⭐️ FUNÇÃO HELPER: "Poller" para esperar pelo Device ID (Mantida) ⭐️
-const getDeviceIdWithRetry = () => {
+
+// ⭐️ NOVA FUNÇÃO HELPER: Espera o SDK e obtém o Device ID ⭐️
+/**
+ * Tenta obter o deviceId a partir do SDK (window.mpInstance)
+ * @returns {Promise<string|null>} O valor do deviceId ou null se expirar.
+ */
+const getDeviceIdFromSDK = () => {
   return new Promise((resolve) => {
     const startTime = Date.now();
     const maxWaitTime = 4000; // Espera no máximo 4 segundos
 
     const check = () => {
-      const deviceIdInput = document.getElementById('deviceId');
-      
-      if (deviceIdInput && deviceIdInput.value) {
-        console.log("✅ Device ID capturado com sucesso!");
-        resolve(deviceIdInput.value);
+      // Verifica se a instância do SDK (mpInstance) está pronta E se a função getDeviceID existe
+      if (window.mpInstance && window.mpInstance.getDeviceID) {
+        
+        // Tenta obter o ID. A função pode demorar um pouco para estar pronta.
+        const deviceId = window.mpInstance.getDeviceID();
+        
+        if (deviceId) {
+            console.log("✅ Device ID capturado do SDK:", deviceId);
+            resolve(deviceId);
+        } else {
+            // SDK está pronto, mas a função ainda não retornou um ID, tenta de novo
+            setTimeout(check, 100);
+        }
       } 
+      // Se o tempo máximo de espera foi atingido
       else if (Date.now() - startTime > maxWaitTime) {
-        console.warn("⚠️ Device ID não encontrado após 4s. Continuando sem ele.");
-        resolve(null); 
+        console.warn("⚠️ Instância do MP SDK não carregou após 4s.");
+        resolve(null); // Resolve com null após o timeout
       } 
+      // Se ainda não encontrou, tenta novamente em 100ms
       else {
         setTimeout(check, 100); 
       }
     };
-    check(); 
+    check(); // Inicia a verificação
   });
 };
 
@@ -58,27 +73,36 @@ const Checkout = () => {
     }
   }, [location, PLANS, navigate]);
 
-  // ⭐️ EFEITO REMOVIDO ⭐️
-  // O useEffect que carregava 'https://sdk.mercadopago.com/js/v2' foi removido
-  // pois não é necessário para o Checkout Pro e estava a causar conflito.
-  
-  // Hook para Carregar o Script de Segurança (Device ID) (Mantido)
+  // ⭐️ EFEITO RESTAURADO: Carrega o SDK principal do Mercado Pago ⭐️
   useEffect(() => {
-    const securityScript = document.createElement('script');
-    securityScript.src = 'https://www.mercadopago.com/v2/security.js';
-    securityScript.setAttribute('view', 'checkout'); 
-    securityScript.async = true;
-    document.body.appendChild(securityScript);
+    const script = document.createElement('script');
+    script.src = 'https://sdk.mercadopago.com/js/v2';
+    script.async = true;
+    document.body.appendChild(script);
 
-    return () => {
-      if (document.body.contains(securityScript)) {
-        document.body.removeChild(securityScript);
+    script.onload = () => {
+      try {
+        // Esta é a chave: 'mpInstance' é criada QUANDO o script carrega
+        window.mpInstance = new window.MercadoPago(MERCADOPAGADO_PUBLIC_KEY, { locale: 'pt-BR' });
+        console.log("✅ MP SDK (mpInstance) inicializado.");
+      } catch (e) {
+        console.error("Falha ao inicializar MP:", e);
       }
     };
-  }, []); 
+    return () => {
+      // Limpa ao sair da página
+      if (document.body.contains(script)) { document.body.removeChild(script); }
+      if (window.mpInstance) {
+        delete window.mpInstance;
+      }
+    };
+  }, []); // Vazio, carrega uma vez
+
+  // ⭐️ EFEITO REMOVIDO: O script 'security.js' foi removido.
+  
 
   // ============================================
-  // PROCESSAR PAGAMENTO (AGORA COM "POLLER")
+  // PROCESSAR PAGAMENTO (AGORA COM SDK POLLER)
   // ============================================
   const handleCheckout = async () => {
     if (!selectedPlan || !user) {
@@ -89,8 +113,9 @@ const Checkout = () => {
     setLoading(true);
 
     try {
-      // ⭐️ PASSO 1: ESPERAR E CAPTURAR O DEVICE ID ⭐️
-      const deviceIdValue = await getDeviceIdWithRetry();
+      // ⭐️ PASSO 1: ESPERAR E CAPTURAR O DEVICE ID (do SDK) ⭐️
+      // A função 'await' vai pausar o 'handleCheckout' até o ID ser encontrado ou o tempo esgotar.
+      const deviceIdValue = await getDeviceIdFromSDK();
 
       // 2. CHAMAR O BACKEND DO RAILWAY
       const apiUrl = `${BACKEND_URL}/api/mercadopago/create-preference`;
@@ -105,6 +130,7 @@ const Checkout = () => {
             name: user.displayName || user.email,
             id: user.uid 
           },
+          // Envia o deviceId (seja o valor ou null)
           deviceId: deviceIdValue 
         })
       });
