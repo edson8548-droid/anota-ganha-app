@@ -1,5 +1,5 @@
 # SUBSTITUA: backend/routes/mercadopago.py
-# FINALIZADO: Adicionada lógica de Webhook para ativar licença no Firebase Firestore
+# ⭐️ OTIMIZADO: Adicionada lógica de Device ID e Category ID para aumentar aprovação.
 
 import os
 import mercadopago
@@ -10,53 +10,139 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime, timezone
 
+# SDKs para E-mail e Firebase
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+
 logger = logging.getLogger(__name__)
 
 # ============================================
-# ⭐️ INICIALIZAÇÃO DO FIREBASE ADMIN ⭐️
+# ⭐️ MODELOS PYDANTIC (Schema de Dados) ⭐️
 # ============================================
-def initialize_firebase():
-    """
-    Tenta inicializar o Firebase Admin SDK usando variáveis de ambiente do Railway.
-    """
-    if firebase_admin._apps:
-        return firestore.client()
+
+class UserInfoPayload(BaseModel):
+    id: str
+    email: str
+    name: str
+
+class PreferencePayload(BaseModel):
+    planId: str
+    user: UserInfoPayload
+    # ⭐️ OBRIGATÓRIO: Campo para receber o Device ID do Front-end ⭐️
+    deviceId: str = None 
+
+# ============================================
+# FUNÇÕES AUXILIARES DE E-MAIL (Mantidas)
+# ============================================
+
+def send_payment_success_email(recipient_email: str, user_name: str, plan_name: str, value: float):
+    """ Envia um recibo de confirmação de pagamento (status: approved). """
+    
+    sendgrid_api_key = os.environ.get("SENDGRID_API_KEY")
+    from_email = os.environ.get("FROM_EMAIL", "suporte@anotaganha.com")
+    
+    if not sendgrid_api_key or not from_email: return
 
     try:
-        # A Vercel/Railway precisa da private key numa string JSON/Base64
-        # Assumimos que o utilizador vai adicionar as variáveis FIREBASE_...
+        sg = SendGridAPIClient(sendgrid_api_key)
+        value_brl = f"R$ {value:.2f}".replace('.', ',')
+
+        html_content = f"""
+            <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+                <h2 style="color: #667eea;">✅ Assinatura Ativada com Sucesso!</h2>
+                <p>Olá, <strong>{user_name}</strong>!</p>
+                <p>Obrigado por confiar no Anota & Ganha. O teu pagamento foi confirmado e a tua licença foi ativada.</p>
+                <h3 style="color: #10b981;">Detalhes da Assinatura:</h3>
+                <ul>
+                    <li><strong>Plano:</strong> {plan_name}</li>
+                    <li><strong>Valor Total:</strong> {value_brl}</li>
+                    <li><strong>Status:</strong> Ativo (Acesso Total)</li>
+                </ul>
+                <p>Podes aceder ao teu painel e começar a usar todos os recursos ilimitados agora:</p>
+                <a href="{os.environ.get('FRONTEND_URL')}/dashboard" 
+                   style="display: inline-block; padding: 10px 20px; background-color: #667eea; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                   Aceder ao Dashboard
+                </a>
+                <p style="margin-top: 30px; font-size: 12px; color: #999;">Esta é uma mensagem automática. Por favor, não responda.</p>
+            </div>
+        """
+
+        message = Mail(from_email=from_email, to_emails=recipient_email, subject=f"✅ Confirmação: Assinatura {plan_name} Ativada", html_content=html_content)
+        sg.send(message)
+        logger.info(f"✉️ E-mail de sucesso enviado para {recipient_email}.")
         
-        # ⚠️ IMPORTANTE: TU TENS DE CONFIGURAR ESTAS CHAVES NO RAILWAY
+    except Exception as e:
+        logger.error(f"❌ ERRO ao enviar e-mail de sucesso: {e}")
+
+
+def send_payment_rejection_email(recipient_email: str, user_name: str):
+    """ Envia uma notificação de recusa de pagamento (status: rejected). """
+    
+    sendgrid_api_key = os.environ.get("SENDGRID_API_KEY")
+    from_email = os.environ.get("FROM_EMAIL", "suporte@anotaganha.com")
+    
+    if not sendgrid_api_key or not from_email: return
+
+    try:
+        sg = SendGridAPIClient(sendgrid_api_key)
+        
+        html_content = f"""
+            <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #f99; background: #fff5f5; padding: 20px; border-radius: 8px;">
+                <h2 style="color: #ef4444;">❌ Pagamento Recusado</h2>
+                <p>Olá, <strong>{user_name}</strong>!</p>
+                
+                <p>O Mercado Pago recusou o pagamento da sua assinatura. Nenhum valor foi cobrado no seu cartão ou conta.</p>
+                
+                <h3 style="color: #ca8a04;">O que pode fazer?</h3>
+                <ol>
+                    <li>Verifique se os dados do cartão foram digitados corretamente.</li>
+                    <li>Tente pagar com um **cartão diferente** ou com **PIX**.</li>
+                    <li>Contacte a operadora do seu cartão para verificar se existe algum bloqueio de segurança.</li>
+                </ol>
+                
+                <p>Para tentar novamente, aceda ao seu painel:</p>
+                <a href="{os.environ.get('FRONTEND_URL')}/plans" 
+                   style="display: inline-block; padding: 10px 20px; background-color: #f59e0b; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                   Tentar Outra Forma de Pagamento
+                </a>
+                
+                <p style="margin-top: 30px; font-size: 12px; color: #999;">Se o problema persistir, por favor, contacte o suporte.</p>
+            </div>
+        """
+
+        message = Mail(from_email=from_email, to_emails=recipient_email, subject=f"❌ Problema no Pagamento: Assinatura Recusada", html_content=html_content)
+        sg.send(message)
+        logger.info(f"✉️ E-mail de recusa enviado para {recipient_email}.")
+        
+    except Exception as e:
+        logger.error(f"❌ ERRO ao enviar e-mail de recusa: {e}")
+
+
+# ============================================
+# INICIALIZAÇÃO DO FIREBASE ADMIN (Mantida)
+# ============================================
+def initialize_firebase():
+    if firebase_admin._apps: return firestore.client()
+    try:
         firebase_config = {
             "type": "service_account",
             "project_id": os.environ.get("FIREBASE_PROJECT_ID"),
             "private_key_id": os.environ.get("FIREBASE_PRIVATE_KEY_ID"),
-            "private_key": os.environ.get("FIREBASE_PRIVATE_KEY").replace('\\n', '\n'), # Converte o \n
+            "private_key": os.environ.get("FIREBASE_PRIVATE_KEY").replace('\\n', '\n'),
             "client_email": os.environ.get("FIREBASE_CLIENT_EMAIL"),
             "client_id": os.environ.get("FIREBASE_CLIENT_ID"),
             "token_uri": "https://oauth2.googleapis.com/token"
         }
-        
-        if not firebase_config["project_id"] or not firebase_config["private_key"]:
-             raise ValueError("Variáveis FIREBASE_PROJECT_ID ou FIREBASE_PRIVATE_KEY não configuradas.")
-
+        if not firebase_config["project_id"] or not firebase_config["private_key"]: raise ValueError("Variáveis FIREBASE_... não configuradas.")
         cred = credentials.Certificate(firebase_config)
         firebase_admin.initialize_app(cred)
         logger.info("✅ Firebase Admin SDK inicializado.")
         return firestore.client()
-        
     except Exception as e:
         logger.error(f"❌ ERRO GRAVE: Falha ao inicializar o Firebase Admin: {e}")
         return None
 
-
-# ============================================
-# MODELOS E CONFIGURAÇÃO
-# ============================================
-class PreferencePayload(BaseModel):
-    planId: str
-    user: dict
-
+# ... (Configuração, router, sdk, PLANS mantidos) ...
 router = APIRouter()
 sdk = None
 
@@ -64,9 +150,7 @@ def setup_mercadopago():
     global sdk
     try:
         access_token = os.environ.get("MERCADOPAGO_ACCESS_TOKEN")
-        if not access_token:
-            logger.error("❌ MERCADOPAGO_ACCESS_TOKEN não encontrado no .env")
-            return
+        if not access_token: return
         sdk = mercadopago.SDK(access_token)
         logger.info("✅ Mercado Pago SDK configurado com sucesso.")
     except Exception as e:
@@ -74,68 +158,75 @@ def setup_mercadopago():
         sdk = None
 
 PLANS = {
-  "monthly": { "id": "monthly", "price": 39.00, "title": "Plano Mensal - Anota & Ganha", "description": "Acesso ilimitado por 1 mês" },
-  "annual_installments": { "id": "annual_installments", "price": 394.80, "installments": 12, "title": "Plano Anual Parcelado", "description": "Acesso ilimitado por 1 ano - 12x" },
-  "annual_upfront": { "id": "annual_upfront", "price": 360.00, "title": "Plano Anual à Vista", "description": "Acesso ilimitado por 1 ano" }
+  "monthly": { "id": "monthly", "price": 39.00, "title": "Plano Mensal - Anota & Ganha" },
+  "annual_installments": { "id": "annual_installments", "price": 394.80, "title": "Plano Anual Parcelado" },
+  "annual_upfront": { "id": "annual_upfront", "price": 360.00, "title": "Plano Anual à Vista" }
 }
 
 # ============================================
-# ROTAS DE PREFERÊNCIA (Mantidas)
+# ⭐️ ROTA DE PREFERÊNCIA (OTIMIZADA PARA APROVAÇÃO) ⭐️
 # ============================================
 @router.post("/create-preference")
 async def create_preference(payload: PreferencePayload):
-    if not sdk:
-        raise HTTPException(status_code=500, detail="Mercado Pago SDK não está configurado")
-
+    if not sdk: raise HTTPException(status_code=500, detail="Mercado Pago SDK não está configurado")
     try:
         plan_id = payload.planId
-        user_info = payload.user
+        user_info_dict = payload.user.model_dump() # Converte Pydantic para dict
         plan = PLANS[plan_id]
         frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
+        # ⭐️ 1. DADOS DA PREFERÊNCIA APRIMORADOS (Com Category ID) ⭐️
         preference_data = {
-            "items": [
-                { "title": plan["title"], "description": plan["description"], "unit_price": plan["price"], "quantity": 1, "currency_id": "BRL" }
-            ],
-            "payer": { "name": user_info.get('name', user_info.get('email')), "email": user_info.get('email') },
-            "back_urls": {
-                "success": f"{frontend_url}/payment-success",
-                "failure": f"{frontend_url}/payment-failure",
-                "pending": f"{frontend_url}/payment-pending"
+            "items": [{ 
+                "title": plan["title"], 
+                "unit_price": plan["price"], 
+                "quantity": 1, 
+                "currency_id": "BRL",
+                # ⭐️ Adicionar category_id: Importante para Antifraude! ⭐️
+                "category_id": "services" # 'services' é ideal para assinaturas (SaaS)
+            }],
+            "payer": { 
+                "name": user_info_dict.get('name', user_info_dict.get('email')), 
+                "email": user_info_dict.get('email')
+                # O MP recomenda adicionar 'identification' (CPF) aqui se usar Checkout Transparente
             },
+            "back_urls": { "success": f"{frontend_url}/payment-success", "failure": f"{frontend_url}/payment-failure", "pending": f"{frontend_url}/payment-pending" },
             "payment_methods": { "installments": plan.get("installments", 1) },
-            "external_reference": f"{user_info.get('id')}-{plan_id}-{plan.get('price')}",
+            "external_reference": f"{user_info_dict.get('id')}-{plan_id}-{plan.get('price')}",
             "statement_descriptor": "ANOTA&GANHA",
         }
 
-        preference_response = sdk.preference().create(preference_data)
-        
+        # ⭐️ 2. OPÇÕES DA REQUISIÇÃO (Enviando o Device ID no Header) ⭐️
+        # Isto é crucial para flexibilizar a aprovação (X-meli-session-id)
+        request_options = {}
+        if payload.deviceId:
+            request_options["headers"] = {
+                "X-meli-session-id": payload.deviceId
+            }
+
+        # 3. Cria a preferência usando os dados E as opções (headers)
+        preference_response = sdk.preference().create(preference_data, request_options=request_options)
+
         if preference_response["status"] != 201:
             error_details = preference_response.get("response", {}).get("message", "Nenhum detalhe do erro retornado")
-            logger.error(f"❌ Falha ao criar preferência! Detalhes: {error_details}")
             raise HTTPException(status_code=500, detail=f"Erro ao criar preferência no MP: {error_details}")
-
+            
         preference = preference_response["response"]
-        logger.info(f"✅ Preferência criada: {preference['id']}")
-
-        return {
-            "preferenceId": preference["id"],
-            "initPoint": preference["init_point"],
-            "sandboxInitPoint": preference.get("sandbox_init_point")
-        }
-
+        return { "preferenceId": preference["id"], "initPoint": preference["init_point"], "sandboxInitPoint": preference.get("sandbox_init_point") }
+        
     except Exception as e:
         logger.error(f"❌ Erro grave ao criar preferência: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erro interno do servidor: {str(e)}")
 
+
 # ============================================
-# ⭐️ ROTA: WEBHOOK (LÓGICA DE ATIVAÇÃO) ⭐️
+# ROTA: WEBHOOK (LÓGICA DE ATIVAÇÃO E E-MAIL - Mantida)
 # ============================================
 @router.post("/webhook")
 async def webhook(request: Request):
     if not sdk:
-        logger.error("❌ Webhook falhou: SDK não inicializado.")
-        return {"status": "error", "message": "SDK not initialized"}
+        logger.error("❌ Webhook falhou: SDK MP não inicializado.")
+        return {"status": "error", "message": "SDK MP not initialized"}
     
     db_firestore = initialize_firebase()
     if not db_firestore:
@@ -143,58 +234,65 @@ async def webhook(request: Request):
         return {"status": "error", "message": "Firebase Admin not initialized"}
         
     try:
-        # Pega o body e verifica se é uma notificação do tipo 'payment'
         body = await request.json()
-        if body.get("type") != "payment":
-            return {"status": "ok", "message": "Tipo de evento ignorado"}
+        if body.get("type") != "payment": return {"status": "ok"}
 
         payment_id = body.get("data", {}).get("id")
-        if not payment_id:
-            return {"status": "ok", "message": "Ignorado (sem ID de pagamento)"}
+        if not payment_id: return {"status": "ok"}
 
-        # 1. Busca os detalhes do pagamento no Mercado Pago
         payment_response = sdk.payment().get(payment_id)
         if payment_response["status"] != 200:
             logger.warning("❌ Pagamento não encontrado no MP")
-            return {"status": "ok", "message": "Pagamento não encontrado"}
+            return {"status": "ok"}
 
         payment_data = payment_response["response"]
         status = payment_data.get("status")
-        external_reference = payment_data.get("external_reference") # ex: "user456-monthly-39.00"
+        external_reference = payment_data.get("external_reference")
 
+        # ⭐️ 1. Obter dados do usuário para o e-mail ⭐️
+        user_id = external_reference.split('-')[0] if external_reference else None
+        recipient_email = payment_data.get("payer", {}).get("email")
+        value = payment_data.get("transaction_amount", 0)
+        
+        # Correção: db.collection() é síncrono, não precisa de 'await'
+        user_doc_ref = db_firestore.collection('users').document(user_id)
+        user_doc = user_doc_ref.get() # .get() é síncrono
+        
+        user_name = user_doc.get('name') if user_doc.exists else (recipient_email.split('@')[0] if recipient_email else "Usuário")
+        
         # 2. Processa se o status for APROVADO
         if status == "approved":
             logger.info(f"✅ Pagamento APROVADO! Ref: {external_reference}")
             
-            # Descodifica a referência externa para obter o user_id e plan_id
-            if external_reference:
-                parts = external_reference.split('-')
-                user_id = parts[0]
-                plan_id = parts[1]
+            if user_id:
+                plan_id_parts = external_reference.split('-')
+                plan_id = plan_id_parts[1] if len(plan_id_parts) > 1 else None
+                plan_name = PLANS.get(plan_id, {}).get("title", "Plano Desconhecido")
                 
-                # 3. Atualiza o Firestore (Coleção 'subscriptions')
                 subscription_ref = db_firestore.collection('subscriptions').document(user_id)
-                await subscription_ref.set({
-                    "userId": user_id,
-                    "planId": plan_id,
-                    "status": "active", # Ativa a licença
-                    "paymentId": payment_id,
-                    "lastPaymentDate": datetime.now(timezone.utc),
-                    "updatedAt": datetime.now(timezone.utc),
-                    "trialEndsAt": None, # Remove o trial
+                # .set() é síncrono
+                subscription_ref.set({
+                    "userId": user_id, "planId": plan_id, "status": "active", 
+                    "paymentId": payment_id, "lastPaymentDate": datetime.now(timezone.utc),
+                    "updatedAt": datetime.now(timezone.utc), "trialEndsAt": None,
                 }, merge=True)
                 
                 logger.info(f"🔥 LICENÇA ATIVADA: Usuário {user_id} para o plano {plan_id}.")
                 
-            else:
-                logger.warning("⚠️ Pagamento aprovado, mas sem external_reference para ativar a licença.")
+                # ⭐️ Envia e-mail de SUCESSO ⭐️
+                if recipient_email:
+                    send_payment_success_email(recipient_email, user_name, plan_name, value)
         
-        elif status == "pending":
-            logger.info(f"⏳ Pagamento PENDENTE. Ref: {external_reference}")
-            # Tu podes adicionar lógica aqui para notificar o cliente
-        
+        # ⭐️ 3. Processa se o status for RECUSADO ⭐️
         elif status == "rejected":
             logger.info(f"❌ Pagamento REJEITADO. Ref: {external_reference}")
+            
+            # ⭐️ Envia e-mail de RECUSA ⭐️
+            if recipient_email:
+                send_payment_rejection_email(recipient_email, user_name)
+
+        elif status == "pending":
+            logger.info(f"⏳ Pagamento PENDENTE. Ref: {external_reference}")
 
     except Exception as e:
         logger.error(f"❌ Erro grave no webhook: {e}", exc_info=True)
