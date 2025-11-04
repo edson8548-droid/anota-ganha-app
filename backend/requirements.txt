@@ -33,3 +33,10 @@ python-dateutil
 
 # Pagamentos (Mercado Pago)
 mercadopago # ⭐️ ADICIONADO
+
+# NOVO: backend/requirements.txt
+
+# ... (restante do teu ficheiro) ...
+
+# Firebase Admin SDK para acesso ao Firestore
+firebase-admin
