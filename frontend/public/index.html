@@ -6,7 +6,6 @@
         <meta name="theme-color" content="#2563eb" />
         <meta name="description" content="Sistema de gerenciamento de campanhas de incentivo com controle por indústrias e produtos" />
         
-        <!-- PWA Meta Tags -->
         <link rel="manifest" href="/manifest.json" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -14,20 +13,16 @@
         <meta name="apple-mobile-web-app-title" content="Anota & Ganha" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
         
-        <!-- Prevent browser UI -->
         <meta name="format-detection" content="telephone=no" />
         <meta name="msapplication-tap-highlight" content="no" />
         
         <title>Anota & Ganha Incentivos</title>
+
+        <script src="https://www.mercadopago.com/v2/security.js" view="checkout"></script>
+        
         <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
-        <!--
-        These two scripts have been added for the testing, please do not edit or remove them
-        -->
         <script src="https://unpkg.com/rrweb@latest/dist/rrweb.min.js"></script>
         <script src="https://d2adkz2s9zrlge.cloudfront.net/rrweb-recorder-20250919-1.js"></script>
-        <!--
-        These two scripts have been added for the Visual Edits, please do not edit or remove them
-        -->
         <script>
             // Only load visual edit scripts when inside an iframe and visual edits are enabled
             if (window.self !== window.top && '%REACT_APP_ENABLE_VISUAL_EDITS%' === 'true') {
@@ -52,17 +47,6 @@
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
         <div id="root"></div>
-        <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
-
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
-
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
-        <!-- Emergent badge removed -->
         <script>
             !(function (t, e) {
                 var o, n, p, r;
