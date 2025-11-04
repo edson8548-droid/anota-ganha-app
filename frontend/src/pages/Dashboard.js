@@ -1,958 +1,429 @@
-import React, { useState, useEffect } from 'react';
+// SUBSTITUA: src/pages/Dashboard.js
+// VERSÃO DE TESTE (V5) - Adiciona console.log para debugging
+
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import {
-  getCampaigns,
-  createCampaign,
-  updateCampaign,
-  deleteCampaign,
-  resetCampaign,
-  getSheets,
-  createSheet,
-  updateSheet,
-  deleteSheet,
-  getClients,
-  createClient,
-  updateClient,
-  deleteClient,
-  getCampaignStats,
-  getCampaignStatsByCity
-} from '../services/api';
-import CampaignSelector from '../components/CampaignSelector';
-import CityFilter from '../components/CityFilter';
-import ClientCardIndustries from '../components/ClientCardIndustries';
-import CampaignModal from '../components/modals/CampaignModal';
-import ClientModalIndustries from '../components/modals/ClientModalIndustries';
-import StatsModalIndustries from '../components/modals/StatsModalIndustries';
-import CityStatsModal from '../components/modals/CityStatsModal';
-import AnalyticsDashboard from '../components/AnalyticsDashboard';
-import { LogOut, UserPlus, Settings, Search, Filter, RotateCcw, MapPin, BarChart3, Users } from 'lucide-react';
-import { toast } from 'sonner';
+import { useAuthContext } from '../contexts/AuthContext';
+import { useCampaigns } from '../hooks/useCampaigns';
+import { useClients } from '../hooks/useClients';
+import CreateCampaignModal from '../components/CreateCampaignModal';
+import CreateClientModal from '../components/CreateClientModal';
+import EditClientModal from '../components/EditClientModal';
+import EditClientInfoModal from '../components/EditClientInfoModal';
+import Analytics from '../components/Analytics'; 
+import './Dashboard.css'; 
 
-export default function Dashboard() {
-  const { user, logout } = useAuth();
+// ⭐️ TESTE DE VERSÃO ⭐️
+console.log("--- CARREGADO: Dashboard.js v5 (Filtro Corrigido) ---");
+
+const Dashboard = () => {
   const navigate = useNavigate();
+  const authData = useAuthContext();
+  const user = authData?.user;
+  
+  const { campaigns, loading: campaignsLoading, createCampaign, updateCampaign, deleteCampaign } = useCampaigns();
+  const { clients, loading: clientsLoading, createClient, updateClient, deleteClient } = useClients();
 
-  // State
-  const [campaigns, setCampaigns] = useState([]);
-  const [activeCampaign, setActiveCampaign] = useState(null);
-  const [sheets, setSheets] = useState([]);
-  const [activeSheet, setActiveSheet] = useState(null);
-  const [clients, setClients] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  // Modals
-  const [showCampaignModal, setShowCampaignModal] = useState(false);
-  const [showClientModal, setShowClientModal] = useState(false);
-  const [showStatsModal, setShowStatsModal] = useState(false);
-  const [showCityStatsModal, setShowCityStatsModal] = useState(false);
+  const [selectedCampaignId, setSelectedCampaignId] = useState(null);
+  const [showCreateCampaign, setShowCreateCampaign] = useState(false);
+  const [showCreateClient, setShowCreateClient] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(null); 
+  const [selectedClient, setSelectedClient] = useState(null);
   const [editingCampaign, setEditingCampaign] = useState(null);
-  const [editingClient, setEditingClient] = useState(null);
-  const [statsData, setStatsData] = useState(null);
-  const [cityStatsData, setCityStatsData] = useState(null);
-  const [editingSheet, setEditingSheet] = useState(null);
-  const [showSheetModal, setShowSheetModal] = useState(false);
-
-  // Dropdowns
-  const [showCampaignDropdown, setShowCampaignDropdown] = useState(false);
-  const [showCityDropdown, setShowCityDropdown] = useState(false);
-
-  // Filters
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCity, setSelectedCity] = useState('all');
-  const [selectedBairro, setSelectedBairro] = useState('all');
-  const [selectedIndustry, setSelectedIndustry] = useState('all');
-  const [industryStatus, setIndustryStatus] = useState('all');
-
-  // Tabs
   const [activeTab, setActiveTab] = useState('clients');
-
-  // Load campaigns
-  useEffect(() => {
-    loadCampaigns();
-  }, []);
-
-  // Load sheets when campaign changes
-  useEffect(() => {
-    if (activeCampaign) {
-      loadSheets(activeCampaign);
-      loadClients(null, activeCampaign);
-    }
-  }, [activeCampaign]);
-
-  const loadCampaigns = async () => {
-    try {
-      const response = await getCampaigns();
-      setCampaigns(response.data);
-      if (response.data.length > 0 && !activeCampaign) {
-        setActiveCampaign(response.data[0].id);
-      }
-    } catch (error) {
-      console.error('Error loading campaigns:', error);
-      toast.error('Erro ao carregar campanhas');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadSheets = async (campaignId) => {
-    try {
-      const response = await getSheets(campaignId);
-      setSheets(response.data);
-      if (response.data.length > 0 && !activeSheet) {
-        setActiveSheet(response.data[0].id);
-      }
-    } catch (error) {
-      console.error('Error loading sheets:', error);
-      toast.error('Erro ao carregar cidades');
-    }
-  };
-
-  const loadClients = async (sheetId, campaignId) => {
-    try {
-      const params = { campaign_id: campaignId };
-      if (sheetId) {
-        params.sheet_id = sheetId;
-      }
-
-      const response = await getClients(params);
-      const clientsData = response.data;
-
-      const currentCampaign = campaigns.find(c => c.id === campaignId);
-      const campaignProducts = Object.keys(currentCampaign?.product_goals || {});
-
-      const syncedClients = await Promise.all(clientsData.map(async (client) => {
-        let needsUpdate = false;
-        const updatedProducts = { ...client.products };
-
-        campaignProducts.forEach(productName => {
-          if (!updatedProducts[productName]) {
-            updatedProducts[productName] = { status: '', value: 0 };
-            needsUpdate = true;
-          }
-        });
-
-        Object.keys(updatedProducts).forEach(productName => {
-          if (!campaignProducts.includes(productName)) {
-            delete updatedProducts[productName];
-            needsUpdate = true;
-          }
-        });
-
-        if (needsUpdate) {
-          try {
-            await updateClient(client.id, { products: updatedProducts });
-            return { ...client, products: updatedProducts };
-          } catch (error) {
-            console.error('Error syncing client products:', error);
-            return client;
-          }
-        }
-
-        return client;
-      }));
-
-      setClients(syncedClients);
-    } catch (error) {
-      console.error('Error loading clients:', error);
-      toast.error('Erro ao carregar clientes');
-    }
-  };
-
-  const handleCreateCampaign = () => {
-    setEditingCampaign(null);
-    setShowCampaignModal(true);
-  };
-
-  const handleEditCampaign = (campaign) => {
-    setEditingCampaign(campaign);
-    setShowCampaignModal(true);
-  };
-
-  const handleSaveCampaign = async (data) => {
-    try {
-      console.log('💾 Salvando campanha com dados:', data); // Debug
-      
-      if (editingCampaign) {
-        await updateCampaign(editingCampaign.id, data);
-        toast.success('Campanha atualizada!');
-
-        if (editingCampaign.id === activeCampaign && data.industries) {
-          const allProducts = [];
-          data.industries.forEach(industry => {
-            if (industry.products) {
-              allProducts.push(...industry.products);
-            }
-          });
-          if (allProducts.length > 0) {
-            await syncCampaignProducts(editingCampaign.id, allProducts);
-          }
-        }
-      } else {
-        const response = await createCampaign(data);
-        toast.success('Campanha criada!');
-        setActiveCampaign(response.data.id);
-      }
-      await loadCampaigns();
-      setShowCampaignModal(false);
-    } catch (error) {
-      console.error('Error saving campaign:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao salvar campanha');
-    }
-  };
-  const syncCampaignProducts = async (campaignId, productNames) => {
-    try {
-      const response = await getClients({ campaign_id: campaignId });
-      const allClients = response.data;
-
-      await Promise.all(allClients.map(async (client) => {
-        const updatedProducts = { ...client.products };
-        let needsUpdate = false;
-
-        productNames.forEach(productName => {
-          if (!updatedProducts[productName]) {
-            updatedProducts[productName] = { status: '', value: 0 };
-            needsUpdate = true;
-          }
-        });
-
-        Object.keys(updatedProducts).forEach(productName => {
-          if (!productNames.includes(productName)) {
-            delete updatedProducts[productName];
-            needsUpdate = true;
-          }
-        });
-
-        if (needsUpdate) {
-          await updateClient(client.id, { products: updatedProducts });
-        }
-      }));
-
-      if (activeSheet) {
-        await loadClients(activeSheet, campaignId);
-      }
-
-      toast.success('Produtos sincronizados com todos os clientes!');
-    } catch (error) {
-      console.error('Error syncing campaign products:', error);
-      toast.error('Erro ao sincronizar produtos');
-    }
-  };
-
-  const handleDeleteCampaign = async (campaignId) => {
-    if (!window.confirm('Tem certeza que deseja excluir esta campanha? Todos os dados serão perdidos.')) {
-      return;
-    }
-    try {
-      await deleteCampaign(campaignId);
-      toast.success('Campanha excluída!');
-      if (activeCampaign === campaignId) {
-        setActiveCampaign(null);
-        setActiveSheet(null);
-        setClients([]);
-      }
-      await loadCampaigns();
-    } catch (error) {
-      console.error('Error deleting campaign:', error);
-      toast.error('Erro ao excluir campanha');
-    }
-  };
-
-  const handleResetCampaign = async () => {
-    if (!window.confirm('Tem certeza que deseja resetar esta campanha? Todos os produtos serão marcados como "Não Positivados" e valores zerados.')) {
-      return;
-    }
-    try {
-      await resetCampaign(activeCampaign);
-      toast.success('Campanha resetada com sucesso!');
-      await loadClients(activeSheet, activeCampaign);
-    } catch (error) {
-      console.error('Error resetting campaign:', error);
-      toast.error('Erro ao resetar campanha');
-    }
-  };
-
-  const handleViewStats = async (campaignId) => {
-    try {
-      setShowStatsModal(true);
-    } catch (error) {
-      console.error('Error loading stats:', error);
-      toast.error('Erro ao carregar estatísticas');
-    }
-  };
-
-  const handleViewCityStats = async () => {
-    try {
-      const response = await getCampaignStatsByCity(activeCampaign);
-      setCityStatsData(response.data);
-      setShowCityStatsModal(true);
-    } catch (error) {
-      console.error('Error loading city stats:', error);
-      toast.error('Erro ao carregar estatísticas por cidade');
-    }
-  };
-
-  const handleCreateSheet = () => {
-    if (!activeCampaign) {
-      toast.error('Selecione uma campanha primeiro');
-      return;
-    }
-    setEditingSheet(null);
-    setShowSheetModal(true);
-  };
-
-  const handleEditSheet = (sheet) => {
-    setEditingSheet(sheet);
-    setShowSheetModal(true);
-  };
-
-  const handleSaveSheet = async (data) => {
-    try {
-      if (editingSheet) {
-        await updateSheet(editingSheet.id, data);
-        toast.success('Cidade atualizada!');
-      } else {
-        const response = await createSheet({
-          ...data,
-          campaign_id: activeCampaign,
-          headers: getCurrentHeaders()
-        });
-        toast.success('Cidade criada!');
-        setActiveSheet(response.data.id);
-      }
-      await loadSheets(activeCampaign);
-      setShowSheetModal(false);
-    } catch (error) {
-      console.error('Error saving sheet:', error);
-      toast.error('Erro ao salvar cidade');
-    }
-  };
-
-  const handleDeleteSheet = async (sheetId) => {
-    const sheetToDelete = sheets.find(s => s.id === sheetId);
-    if (!window.confirm(`Tem certeza que deseja excluir a cidade "${sheetToDelete?.name}"?\n\nTodos os clientes desta cidade serão perdidos permanentemente!`)) {
-      return;
-    }
-
-    try {
-      console.log('Deletando sheet:', sheetId);
-      await deleteSheet(sheetId);
-      toast.success(`Cidade "${sheetToDelete?.name}" excluída com sucesso!`);
-
-      if (activeSheet === sheetId) {
-        setActiveSheet(null);
-        setClients([]);
-      }
-
-      await loadSheets(activeCampaign);
-
-      console.log('Sheet excluída com sucesso');
-    } catch (error) {
-      console.error('Error deleting sheet:', error);
-      toast.error(`Erro ao excluir cidade: ${error.response?.data?.detail || error.message}`);
-    }
-  };
-
-  const handleCreateClient = () => {
-    if (!activeCampaign) {
-      toast.error('Selecione uma campanha primeiro');
-      return;
-    }
-
-    setEditingClient(null);
-    setShowClientModal(true);
-  };
-
-  const handleEditClient = (client) => {
-    setEditingClient(client);
-    setShowClientModal(true);
-  };
-
-  const handleSaveClient = async (data) => {
-    try {
-      if (editingClient) {
-        await updateClient(editingClient.id, data);
-        toast.success('Cliente atualizado!');
-        await loadClients(null, activeCampaign);
-      } else {
-        const clientCity = data.CIDADE;
-        let targetSheetId = activeSheet;
-
-        if (clientCity) {
-          const sheetsResponse = await getSheets(activeCampaign);
-          const currentSheets = sheetsResponse.data;
-
-          const citySheet = currentSheets.find(s => s.name.toLowerCase() === clientCity.toLowerCase());
-
-          if (citySheet) {
-            targetSheetId = citySheet.id;
-            console.log(`Usando cidade existente: ${citySheet.name}`);
-          } else {
-            console.log(`Criando nova cidade: ${clientCity}`);
-            const newSheetResponse = await createSheet({
-              campaign_id: activeCampaign,
-              name: clientCity,
-              headers: getCurrentHeaders()
-            });
-            targetSheetId = newSheetResponse.data.id;
-            toast.success(`✨ Nova cidade criada: ${clientCity}`);
-
-            await loadSheets(activeCampaign);
-          }
-
-          if (!activeSheet) {
-            setActiveSheet(targetSheetId);
-          }
-        } else {
-          if (!targetSheetId) {
-            const sheetsResponse = await getSheets(activeCampaign);
-            if (sheetsResponse.data.length > 0) {
-              targetSheetId = sheetsResponse.data[0].id;
-            } else {
-              const newSheetResponse = await createSheet({
-                campaign_id: activeCampaign,
-                name: 'Geral',
-                headers: getCurrentHeaders()
-              });
-              targetSheetId = newSheetResponse.data.id;
-              await loadSheets(activeCampaign);
-            }
-          }
-        }
-
-        await createClient({
-          ...data,
-          sheet_id: targetSheetId,
-          campaign_id: activeCampaign
-        });
-
-        toast.success(`✅ Cliente adicionado${clientCity ? ' em: ' + clientCity : '!'}`);
-
-        await loadSheets(activeCampaign);
-        await loadClients(null, activeCampaign);
-      }
-      setShowClientModal(false);
-    } catch (error) {
-      console.error('Error saving client:', error);
-      toast.error('Erro ao salvar cliente');
-    }
-  };
-
-  const handleDeleteClient = async (clientId) => {
-    if (!window.confirm('Tem certeza que deseja excluir este cliente?')) {
-      return;
-    }
-    try {
-      await deleteClient(clientId);
-      toast.success('Cliente excluído!');
-      await loadClients(activeSheet, activeCampaign);
-    } catch (error) {
-      console.error('Error deleting client:', error);
-      toast.error('Erro ao excluir cliente');
-    }
-  };
-
-  const handleUpdateProduct = async (clientId, industryName, productName, productData) => {
-    try {
-      const client = clients.find(c => c.id === clientId);
-      const updatedIndustries = {
-        ...client.industries,
-        [industryName]: {
-          ...client.industries[industryName],
-          products: {
-            ...client.industries[industryName].products,
-            [productName]: productData
-          }
-        }
-      };
-
-      const hasPositivado = Object.values(updatedIndustries[industryName].products).some(
-        p => p.status?.toLowerCase() === 'positivado'
-      );
-
-      updatedIndustries[industryName].industry_status = hasPositivado ? 'positivado' : '';
-
-      await updateClient(clientId, { 
-        ...client,
-        industries: updatedIndustries 
-      });
-      await loadClients(activeSheet, activeCampaign);
-    } catch (error) {
-      console.error('Error updating product:', error);
-      toast.error('Erro ao atualizar produto');
-    }
-  };
-
-  const getCurrentHeaders = () => {
-    const currentCampaign = campaigns.find(c => c.id === activeCampaign);
-    return Object.keys(currentCampaign?.product_goals || {});
-  };
-
-  const getCurrentSheet = () => {
-    return sheets.find(s => s.id === activeSheet);
-  };
-
-  const getCurrentCampaign = () => {
-    return campaigns.find(c => c.id === activeCampaign);
-  };
-
-  const getIndustries = () => {
-    const currentCampaign = getCurrentCampaign();
-    return currentCampaign?.industries || [];
-  };
-
-  const getBairros = () => {
-    const bairrosSet = new Set();
-    clients.forEach(client => {
-      if (selectedCity !== 'all' && client.CIDADE !== selectedCity) {
-        return;
-      }
-      if (client.BAIRRO && client.BAIRRO.trim()) {
-        bairrosSet.add(client.BAIRRO);
-      }
-    });
-    return Array.from(bairrosSet).sort();
-  };
-
-  const getUniqueCities = () => {
-    const cities = [...new Set(clients.map(c => c.CIDADE).filter(Boolean))];
-    return cities.sort();
-  };
-
-  const uniqueCities = getUniqueCities();
-
-  const filteredClients = clients
-    .map(client => {
-      if (selectedCity !== 'all' && client.CIDADE !== selectedCity) {
-        return null;
-      }
-
-      if (selectedBairro !== 'all' && client.BAIRRO !== selectedBairro) {
-        return null;
-      }
-
-      if (searchTerm && !client.CLIENTE.toLowerCase().includes(searchTerm.toLowerCase())) {
-        return null;
-      }
-
-      let filteredIndustries = { ...client.industries };
-
-      if (selectedIndustry !== 'all') {
-        const industryData = client.industries?.[selectedIndustry];
-        if (!industryData) return null;
-
-        filteredIndustries = { [selectedIndustry]: industryData };
-
-        if (industryStatus !== 'all') {
-          const isIndustryPositivado = industryData.industry_status?.toLowerCase() === 'positivado';
-
-          if (industryStatus === 'positivado' && !isIndustryPositivado) return null;
-          if (industryStatus === 'nao_positivado' && isIndustryPositivado) return null;
-        }
-      } else if (industryStatus !== 'all') {
-        const allIndustries = Object.entries(client.industries || {});
-
-        filteredIndustries = {};
-
-        for (const [industryName, industryData] of allIndustries) {
-          const isIndustryPositivado = industryData.industry_status?.toLowerCase() === 'positivado';
-
-          if (industryStatus === 'positivado' && isIndustryPositivado) {
-            filteredIndustries[industryName] = industryData;
-          } else if (industryStatus === 'nao_positivado' && !isIndustryPositivado) {
-            filteredIndustries[industryName] = industryData;
-          }
-        }
-
-        if (Object.keys(filteredIndustries).length === 0) {
-          return null;
-        }
-      }
-
-      return {
-        ...client,
-        industries: filteredIndustries
-      };
-    })
-    .filter(client => client !== null);
-
+  const [selectedCity, setSelectedCity] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Bug da "indústria nova": Corrigido aqui
+  const selectedCampaign = useMemo(() => {
+    if (!selectedCampaignId) return null;
+    return campaigns.find(c => c.id === selectedCampaignId);
+  }, [selectedCampaignId, campaigns]); 
+
+
+  // ... (Toda a lógica de 'handleLogout', 'handleCreateCampaign', etc. é mantida) ...
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    if (window.confirm('Deseja realmente sair?')) {
+      authData.logout();
+      navigate('/login');
+    }
   };
+  const handleCreateCampaign = async (campaignData) => {
+    try {
+      await createCampaign(campaignData);
+      setShowCreateCampaign(false);
+    } catch (error) { console.error('❌ Erro ao criar campanha:', error); }
+  };
+  const handleEditCampaign = (e, campaign) => {
+    e.stopPropagation(); 
+    setEditingCampaign(campaign);
+    setShowCreateCampaign(true);
+  };
+  const handleUpdateCampaign = async (campaignData) => {
+    try {
+      await updateCampaign(editingCampaign.id, campaignData);
+      setShowCreateCampaign(false);
+      setEditingCampaign(null);
+    } catch (error) { console.error('❌ Erro ao atualizar campanha:', error); }
+  };
+  const handleDeleteCampaign = async (e, campaignId) => {
+    e.stopPropagation(); 
+    if (window.confirm('⚠️ Tem certeza?')) {
+      try {
+        await deleteCampaign(campaignId);
+        if (selectedCampaign?.id === campaignId) {
+          setSelectedCampaignId(null);
+        }
+      } catch (error) { console.error('❌ Erro ao deletar campanha:', error); }
+    }
+  };
+  const handleCreateClient = async (clientData) => {
+    try {
+      if (!selectedCampaign) return;
+      const newClientData = { ...clientData, campaignId: selectedCampaign.id };
+      await createClient(newClientData);
+      setShowCreateClient(false);
+    } catch (error) { console.error('❌ Erro ao criar cliente:', error); }
+  };
+  const handleDeleteClient = async (e, clientId) => {
+    e.stopPropagation();
+    if (window.confirm('⚠️ Tem certeza?')) {
+      try {
+        await deleteClient(clientId);
+      } catch (error) { console.error('❌ Erro ao deletar cliente:', error); }
+    }
+  };
+  const handleOpenEditInfo = (e, client) => {
+    e.stopPropagation();
+    setSelectedClient(client);
+    setShowEditModal('INFO');
+  };
+  const handleOpenEditProducts = (e, client) => {
+    e.stopPropagation();
+    setSelectedClient(client);
+    setShowEditModal('PRODUCTS');
+  };
+  const handleUpdateClient = async (updatedClient) => {
+    try {
+      const { id, ...clientData } = updatedClient;
+      await updateClient(id, clientData);
+      setShowEditModal(null); 
+      setSelectedClient(null);
+    } catch (error) { console.error('❌ Erro ao atualizar cliente:', error); }
+  };
+  const handleCloseModals = () => {
+    setShowEditModal(null);
+    setSelectedClient(null);
+  }
+  const handleWhatsAppSupport = () => {
+    const phoneNumber = '5513997501798';
+    const message = 'Olá, preciso de suporte no Anota & Ganha';
+    const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  };
+  const campaignClients = clients.filter(c => c.campaignId === selectedCampaign?.id);
+  const cities = ['all', ...new Set(campaignClients.map(c => c.CIDADE).filter(Boolean))];
+  const filteredClients = campaignClients.filter(client => {
+    const matchesCity = selectedCity === 'all' || client.CIDADE === selectedCity;
+    const matchesSearch = !searchTerm || 
+      client.CLIENTE?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      client.CNPJ?.includes(searchTerm);
+    return matchesCity && matchesSearch;
+  });
 
-  if (loading) {
+  // ============================================
+  // RENDER: TELA PRINCIPAL (LISTA DE CAMPANHAS)
+  // ============================================
+  const renderMainDashboard = () => {
+    const totalIndustries = campaigns.reduce((acc, c) => acc + Object.keys(c.industries || {}).length, 0);
+    const userInitial = user?.email ? user.email.charAt(0).toUpperCase() : '?';
+
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Carregando...</div>
+      <div className="dashboard-container">
+        {/* Header */}
+        <header className="dashboard-header">
+          <div className="header-content">
+            <div className="header-left">
+              <a className="logo" href="/dashboard"><span className="logo-icon">📊</span>Anota & Ganhe Incentivos</a>
+            </div>
+            <div className="header-actions">
+              <button className="btn-plans-header" onClick={() => navigate('/plans')}>💎 Ver Planos</button>
+              <button className="btn-whatsapp-header" onClick={handleWhatsAppSupport}>💬 Suporte</button>
+              <div className="user-menu">
+                <div className="user-avatar">{userInitial}</div>
+                <div className="user-info">
+                  <span className="user-name">{user?.name || 'Usuário'}</span>
+                  <span className="user-email">{user?.email}</span>
+                </div>
+                <button className="btn-logout" onClick={handleLogout} title="Sair">🚪</button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="dashboard-main">
+          {/* Stats Cards */}
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-card-header"><span className="stat-icon purple">📋</span><span className="stat-label">Campanhas</span></div>
+              <h3 className="stat-value">{campaigns.length}</h3>
+              <p className="stat-description">Total de campanhas criadas</p>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-header"><span className="stat-icon green">👥</span><span className="stat-label">Clientes</span></div>
+              <h3 className="stat-value">{clients.length}</h3>
+              <p className="stat-description">Total de clientes na base</p>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-header"><span className="stat-icon orange">🏭</span><span className="stat-label">Indústrias</span></div>
+              <h3 className="stat-value">{totalIndustries}</h3>
+              <p className="stat-description">Total de indústrias gerenciadas</p>
+            </div>
+          </div>
+
+          {/* Campanhas */}
+          <section className="campaigns-section">
+            <div className="section-header">
+              <h2 className="section-title">Suas Campanhas</h2>
+              <button className="btn-new-campaign" onClick={() => setShowCreateCampaign(true)}>➕ Nova Campanha</button>
+            </div>
+            {campaignsLoading ? (
+              <div className="loading">⏳ Carregando campanhas...</div>
+            ) : campaigns.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">📭</div>
+                <h3 className="empty-title">Nenhuma campanha criada</h3>
+                <p className="empty-description">Crie sua primeira campanha para começar!</p>
+                <button className="btn-new-campaign" onClick={() => setShowCreateCampaign(true)}>➕ Criar Primeira Campanha</button>
+              </div>
+            ) : (
+              <div className="campaigns-grid">
+                {campaigns.map(campaign => {
+                  const industriesList = Object.keys(campaign.industries || {});
+                  const clientCount = clients.filter(c => c.campaignId === campaign.id).length;
+                  return (
+                    <div key={campaign.id} className="campaign-card" onClick={() => setSelectedCampaignId(campaign.id)}>
+                      <div>
+                        <div className="campaign-card-header">
+                          <div className="campaign-card-header-main">
+                            <h3 className="campaign-title">{campaign.name}</h3>
+                            <p className="campaign-date">📅 {new Date(campaign.startDate).toLocaleDateString('pt-BR')} - {new Date(campaign.endDate).toLocaleDateString('pt-BR')}</p>
+                          </div>
+                          <div className="campaign-actions">
+                            <button className="btn-icon btn-edit" onClick={(e) => handleEditCampaign(e, campaign)} title="Editar Campanha">✏️</button>
+                            <button className="btn-icon btn-delete" onClick={(e) => handleDeleteCampaign(e, campaign.id)} title="Deletar Campanha">🗑️</button>
+                          </div>
+                        </div>
+                        <span className={`campaign-status ${campaign.status === 'active' ? 'active' : 'inactive'}`}>
+                          {campaign.status === 'active' ? 'Ativa' : 'Inativa'}
+                        </span>
+                        <div className="campaign-info">
+                          <div className="info-row"><span className="info-label">👥 Clientes</span><span className="info-value">{clientCount}</span></div>
+                          <div className="info-row"><span className="info-label">🏭 Indústrias</span><span className="info-value">{industriesList.length}</span></div>
+                        </div>
+                      </div>
+                      <div className="industries-list">
+                        {industriesList.slice(0, 3).map(name => (<span key={name} className="industry-tag">{name}</span>))}
+                        {industriesList.length > 3 && (<span className="industry-tag">+{industriesList.length - 3}</span>)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </main>
       </div>
     );
-  }
+  };
 
-  const headers = getCurrentHeaders();
-  return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
-      <header className="bg-white dark:bg-gray-800 shadow-md sticky top-0 z-10">
-        <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700">
-          <h1 className="text-lg md:text-2xl font-bold text-blue-600 dark:text-blue-400 truncate">
-            Anota & Ganha Incentivos
-          </h1>
-          <div className="flex items-center space-x-2">
-            {user?.role === 'admin' && (
-              <button
-                onClick={() => navigate('/admin')}
-                className="p-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
-                title="Painel Admin"
-              >
-                🔧
-              </button>
-            )}
+  // ============================================
+  // RENDER: TELA DA CAMPANHA (DETALHES)
+  // ============================================
+  const renderCampaignView = () => {
+    if (!selectedCampaign) {
+      return <div className="loading">⏳ Carregando campanha...</div>;
+    }
 
-            {(user?.license_type === 'trial' || user?.license_type === 'expired') && (
-              <button
-                onClick={() => navigate('/pricing')}
-                className="p-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 animate-pulse"
-                title="Assinar Agora"
-              >
-                ⚡
-              </button>
-            )}
-
-            {user?.license_type !== 'trial' && user?.license_type !== 'expired' && (
-              <button
-                onClick={() => navigate('/my-subscription')}
-                className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                title="Minha Assinatura"
-              >
-                💳
-              </button>
-            )}
-
-            <button
-              onClick={handleLogout}
-              className="p-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-              title="Sair"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+    const campaignPeriod = `${new Date(selectedCampaign.startDate).toLocaleDateString('pt-BR')} - ${new Date(selectedCampaign.endDate).toLocaleDateString('pt-BR')}`;
+    
+    return (
+      <div className="campaign-view">
+        {/* Header */}
+        <header className="campaign-view-header">
+          <div className="campaign-view-header-content">
+            <div className="campaign-view-left">
+              <button className="btn-back" onClick={() => setSelectedCampaignId(null)} title="Voltar">←</button>
+              <div className="campaign-view-info">
+                <h1>{selectedCampaign.name}</h1>
+                <p>📅 {campaignPeriod}  |  👥 {campaignClients.length} Clientes  |  🏭 {Object.keys(selectedCampaign.industries || {}).length} Indústrias</p>
+              </div>
+            </div>
+            <div className="campaign-view-actions">
+              <button className="btn-plans-header" onClick={() => navigate('/plans')}>💎 Ver Planos</button>
+              <button className="btn-edit-campaign" onClick={(e) => handleEditCampaign(e, selectedCampaign)}>✏️ Editar Campanha</button>
+              <button className="btn-whatsapp" onClick={handleWhatsAppSupport}>💬 Suporte</button>
+              <button className="btn-logout" onClick={handleLogout} title="Sair">🚪</button>
+            </div>
+          </div>
+        </header>
+        
+        {/* Tabs */}
+        <div className="tabs-container">
+          <div className="tabs">
+            <button className={`tab ${activeTab === 'clients' ? 'active' : ''}`} onClick={() => setActiveTab('clients')}>👥 Clientes ({filteredClients.length})</button>
+            <button className={`tab ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>📊 Analytics</button>
           </div>
         </div>
 
-        <div className="p-2 space-y-2">
-          <CampaignSelector
-            campaigns={campaigns}
-            activeCampaign={activeCampaign}
-            onSelectCampaign={setActiveCampaign}
-            onCreateCampaign={handleCreateCampaign}
-            onEditCampaign={handleEditCampaign}
-            onDeleteCampaign={handleDeleteCampaign}
-            onViewStats={handleViewStats}
-            showDropdown={showCampaignDropdown}
-            setShowDropdown={setShowCampaignDropdown}
-          />
-
-          {activeCampaign && (
-            <div className="flex border-b border-gray-200 dark:border-gray-700">
-              <button
-                onClick={() => setActiveTab('clients')}
-                className={`flex-1 flex items-center justify-center px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === 'clients'
-                    ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400'
-                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
-                }`}
-              >
-                <Users className="w-4 h-4 mr-2" />
-                Clientes
-              </button>
-              <button
-                onClick={() => setActiveTab('analytics')}
-                className={`flex-1 flex items-center justify-center px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === 'analytics'
-                    ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400'
-                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
-                }`}
-              >
-                <BarChart3 className="w-4 h-4 mr-2" />
-                Analytics
-              </button>
-            </div>
-          )}
-
-          {activeCampaign && activeTab === 'clients' && (
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={handleCreateClient}
-                className="flex-1 min-w-[120px] flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
-                data-testid="add-client-btn"
-              >
-                <UserPlus className="w-4 h-4 mr-1" />
-                Novo Cliente
-              </button>
-
-              {clients.length > 0 && (
-                <>
-                  <button
-                    onClick={() => handleViewStats()}
-                    className="flex-1 min-w-[120px] flex items-center justify-center px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
-                  >
-                    <Settings className="w-4 h-4 mr-1" />
-                    Estatísticas
-                  </button>
-                  <button
-                    onClick={handleViewCityStats}
-                    className="flex-1 min-w-[120px] flex items-center justify-center px-3 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 text-sm"
-                    data-testid="city-stats-btn"
-                  >
-                    <MapPin className="w-4 h-4 mr-1" />
-                    Por Cidade
-                  </button>
-                  <button
-                    onClick={handleResetCampaign}
-                    className="flex-1 min-w-[120px] flex items-center justify-center px-3 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 text-sm"
-                    data-testid="reset-campaign-btn"
-                  >
-                    <RotateCcw className="w-4 h-4 mr-1" />
-                    Resetar
-                  </button>
-                  <button
-                    onClick={() => syncCampaignProducts(activeCampaign, getCurrentHeaders())}
-                    className="flex-1 min-w-[120px] flex items-center justify-center px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm"
-                    title="Sincronizar produtos da campanha com todos os clientes"
-                  >
-                    <Settings className="w-4 h-4 mr-1" />
-                    Sincronizar
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-
-          {activeCampaign && activeTab === 'clients' && uniqueCities.length > 0 && (
-            <CityFilter
-              cities={uniqueCities}
-              selectedCity={selectedCity}
-              onSelectCity={setSelectedCity}
-              showDropdown={showCityDropdown}
-              setShowDropdown={setShowCityDropdown}
-              clientCount={filteredClients.length}
-            />
-          )}
-        </div>
-      </header>
-
-      <main className="p-2 md:p-4">
-        {activeCampaign ? (
-          <div className="max-w-7xl mx-auto">
-            {activeTab === 'clients' ? (
-              <>
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-2 md:p-4 mb-2 md:mb-4">
-                  <h3 className="text-xs md:text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center">
-                    <Filter className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
-                    Filtros
-                  </h3>
-
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-3">
-                    <div className="relative col-span-2">
-                      <Search className="absolute left-2 md:left-3 top-1/2 transform -translate-y-1/2 w-3 h-3 md:w-4 md:h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Buscar..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-8 md:pl-10 pr-2 md:pr-4 py-1.5 md:py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-xs md:text-sm"
-                      />
-                    </div>
-
-                    <select
-                      value={selectedCity}
-                      onChange={(e) => {
-                        setSelectedCity(e.target.value);
-                        setSelectedBairro('all');
-                      }}
-                      className="px-2 md:px-4 py-1.5 md:py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-xs md:text-sm"
-                    >
-                      <option value="all">📍 Cidades</option>
-                      {getUniqueCities().map(city => (
-                        <option key={city} value={city}>{city}</option>
-                      ))}
-                    </select>
-
-                    <select
-                      value={selectedBairro}
-                      onChange={(e) => setSelectedBairro(e.target.value)}
-                      className="px-2 md:px-4 py-1.5 md:py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-xs md:text-sm"
-                      disabled={selectedCity === 'all'}
-                    >
-                      <option value="all">🏘️ Bairros</option>
-                      {getBairros().map(bairro => (
-                        <option key={bairro} value={bairro}>{bairro}</option>
-                      ))}
-                    </select>
-
-                    <select
-                      value={selectedIndustry}
-                      onChange={(e) => {
-                        setSelectedIndustry(e.target.value);
-                        if (e.target.value === 'all') {
-                          setIndustryStatus('all');
-                        }
-                      }}
-                      className="px-2 md:px-4 py-1.5 md:py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-xs md:text-sm"
-                    >
-                      <option value="all">🏭 Indústrias</option>
-                      {getIndustries().map(industry => (
-                        <option key={industry.name} value={industry.name}>{industry.name}</option>
-                      ))}
-                    </select>
-
-                    <select
-                      value={industryStatus}
-                      onChange={(e) => setIndustryStatus(e.target.value)}
-                      className="px-4 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
-                    >
-                      <option value="all">📊 Todos os Status</option>
-                      <option value="positivado">✅ Positivados</option>
-                      <option value="nao_positivado">⭕ Não Positivados</option>
-                    </select>
-                  </div>
-
-                  {(selectedCity !== 'all' || selectedIndustry !== 'all' || industryStatus !== 'all' || searchTerm) && (
-                    <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                      <span className="text-xs text-gray-600 dark:text-gray-400 font-semibold">Filtros ativos:</span>
-
-                      {selectedCity !== 'all' && (
-                        <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-xs flex items-center">
-                          📍 {selectedCity}
-                          <button
-                            onClick={() => setSelectedCity('all')}
-                            className="ml-2 hover:text-blue-600"
-                          >
-                            ✕
-                          </button>
-                        </span>
-                      )}
-
-                      {selectedIndustry !== 'all' && (
-                        <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded-full text-xs flex items-center">
-                          🏭 {selectedIndustry}
-                          <button
-                            onClick={() => setSelectedIndustry('all')}
-                            className="ml-2 hover:text-purple-600"
-                          >
-                            ✕
-                          </button>
-                        </span>
-                      )}
-
-                      {industryStatus !== 'all' && (
-                        <span className="px-3 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full text-xs flex items-center">
-                          {industryStatus === 'positivado' ? '✅ Positivados' : '⭕ Não Positivados'}
-                          <button
-                            onClick={() => setIndustryStatus('all')}
-                            className="ml-2 hover:text-green-600"
-                          >
-                            ✕
-                          </button>
-                        </span>
-                      )}
-
-                      {searchTerm && (
-                        <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-full text-xs flex items-center">
-                          🔍 "{searchTerm}"
-                          <button
-                            onClick={() => setSearchTerm('')}
-                            className="ml-2 hover:text-gray-600"
-                          >
-                            ✕
-                          </button>
-                        </span>
-                      )}
-
-                      <button
-                        onClick={() => {
-                          setSelectedCity('all');
-                          setSelectedIndustry('all');
-                          setIndustryStatus('all');
-                          setSearchTerm('');
-                        }}
-                        className="px-3 py-1 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded-full text-xs hover:bg-red-200 dark:hover:bg-red-800"
-                      >
-                        🗑️ Limpar Todos
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="mt-3 text-sm text-gray-600 dark:text-gray-400">
-                    Exibindo <strong className="text-blue-600 dark:text-blue-400">{filteredClients.length}</strong> de <strong>{clients.length}</strong> clientes
-                  </div>
+        <main className="tab-content">
+          {/* Tab: Clientes */}
+          {activeTab === 'clients' && (
+            <section className="clients-section">
+              {/* Filtros */}
+              <div className="filters">
+                <div className="filter-group" style={{ flex: 2 }}><input type="text" placeholder="🔍 Buscar por Nome ou CNPJ..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/></div>
+                <div className="filter-group">
+                  <select value={selectedCity} onChange={(e) => setSelectedCity(e.target.value)}>
+                    <option value="all">📍 Todas as Cidades</option>
+                    {cities.filter(c => c !== 'all').map(city => (<option key={city} value={city}>{city}</option>))}
+                  </select>
                 </div>
+                <button className="btn-action purple" onClick={() => setShowCreateClient(true)}>➕ Novo Cliente</button>
+              </div>
 
-                {filteredClients.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
-                    {filteredClients.map(client => (
-                      <ClientCardIndustries
-                        key={client.id}
-                        client={client}
-                        campaign={campaigns.find(c => c.id === activeCampaign)}
-                        onEdit={handleEditClient}
-                        onDelete={handleDeleteClient}
-                        onUpdateProduct={handleUpdateProduct}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center bg-white dark:bg-gray-800 rounded-lg shadow p-6 md:p-10">
-                    <h3 className="text-lg md:text-xl font-semibold mb-2">Nenhum cliente encontrado</h3>
-                    <p className="text-sm md:text-base text-gray-500">
-                      {searchTerm || selectedCity !== 'all' || selectedIndustry !== 'all' || industryStatus !== 'all'
-                        ? 'Tente ajustar os filtros' 
-                        : 'Adicione seu primeiro cliente para começar'}
-                    </p>
-                  </div>
-                )}
-              </>
-            ) : (
-              <AnalyticsDashboard campaignId={activeCampaign} />
-            )}
-          </div>
-        ) : (
-          <div className="text-center bg-white dark:bg-gray-800 rounded-lg shadow p-6 md:p-10 max-w-2xl mx-auto">
-            <h3 className="text-lg md:text-xl font-semibold mb-2">Bem-vindo!</h3>
-            <p className="text-sm md:text-base text-gray-500">
-              Crie uma campanha para começar a gerenciar seus clientes
-            </p>
-          </div>
-        )}
-      </main>
+              {/* Lista de Clientes */}
+              {clientsLoading ? (
+                <div className="loading">⏳ Carregando clientes...</div>
+              ) : filteredClients.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-icon">👥</div>
+                  <h3 className="empty-title">Nenhum cliente encontrado</h3>
+                  <p className="empty-description">Adicione clientes ou ajuste os filtros!</p>
+                  <button className="btn-action purple" onClick={() => setShowCreateClient(true)}>➕ Adicionar Primeiro Cliente</button>
+                </div>
+              ) : (
+                <div className="clients-grid">
+                  {filteredClients.map(client => {
+                    const clientIndustries = client.industries || {};
+                    const totalClientValue = Object.values(clientIndustries).reduce((acc, industry) => 
+                      acc + Object.values(industry).reduce((sum, p) => sum + (p.valor || 0), 0)
+                    , 0);
 
-      <CampaignModal
-        isOpen={showCampaignModal}
-        onClose={() => setShowCampaignModal(false)}
-        onSave={handleSaveCampaign}
-        campaign={editingCampaign}
-        sheetId={activeSheet}
-      />
+                    return (
+                      <div key={client.id} className="client-card">
+                        <div>
+                          <div className="client-header">
+                            <div className="client-title-section">
+                              <h3>{client.CLIENTE}</h3>
+                              <p>📍 {client.CIDADE} - {client.ESTADO}</p>
+                            </div>
+                            <div className="client-actions-btns">
+                              <button className="btn-icon btn-edit" onClick={(e) => handleOpenEditInfo(e, client)} title="Editar Informações">✏️</button>
+                              <button className="btn-icon btn-delete" onClick={(e) => handleDeleteClient(e, client.id)} title="Deletar Cliente">🗑️</button>
+                            </div>
+                          </div>
+                          <div className="client-info-grid">
+                            <div className="client-info-item"><strong>CNPJ</strong><span>{client.CNPJ}</span></div>
+                            <div className="client-info-item"><strong>TELEFONE</strong><span>{client.TELEFONE || '--'}</span></div>
+                          </div>
+                          <div className="client-industries">
+                            {Object.keys(selectedCampaign.industries || {}).map(industryName => {
+                              const clientIndustryData = client.industries?.[industryName] || {};
+                              const campaignProducts = selectedCampaign.industries[industryName] || {};
+                              const totalValue = Object.values(clientIndustryData).reduce((sum, p) => sum + (p.valor || 0), 0);
+                              const positivated = Object.values(clientIndustryData).filter(p => p.positivado).length;
+                              const total = Object.keys(campaignProducts).filter(p => p !== 'targetValue').length;
+                              const percentage = total > 0 ? (positivated / total) * 100 : 0;
+                              return (
+                                <div key={industryName} className="industry-section industry-section-clickable" title="Clique para positivar produtos" onClick={(e) => handleOpenEditProducts(e, client)}>
+                                  <strong className="industry-name">🏭 {industryName}</strong>
+                                  <div className="progress-bar"><div className="progress-fill" style={{ width: `${percentage}%` }}/></div>
+                                  <div className="industry-total">
+                                    <span>{positivated}/{total} produtos</span>
+                                    <span>{formatCurrency(totalValue)}</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div className="total-value">
+                          <strong>Valor Total Positivado</strong>
+                          <span>{formatCurrency(totalClientValue)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          )}
 
-      <ClientModalIndustries
-        isOpen={showClientModal}
-        onClose={() => setShowClientModal(false)}
-        onSave={handleSaveClient}
-        client={editingClient}
-        campaign={campaigns.find(c => c.id === activeCampaign)}
-      />
+          {/* Tab: Analytics */}
+          {activeTab === 'analytics' && (
+            <section className="analytics-content">
+              <Analytics
+                campaign={selectedCampaign} // ⭐️ Envia a campanha ATUALIZADA
+                clients={campaignClients} 
+                onClose={() => setActiveTab('clients')}
+              />
+            </section>
+          )}
+        </main>
+      </div>
+    );
+  };
 
-      <StatsModalIndustries
-        isOpen={showStatsModal}
-        onClose={() => setShowStatsModal(false)}
-        campaign={campaigns.find(c => c.id === activeCampaign)}
-        clients={clients}
-      />
+  // ============================================
+  // RENDER PRINCIPAL DO COMPONENTE
+  // ============================================
+  return (
+    <>
+      {!selectedCampaign ? renderMainDashboard() : renderCampaignView()}
 
-      <CityStatsModal
-        isOpen={showCityStatsModal}
-        onClose={() => setShowCityStatsModal(false)}
-        stats={cityStatsData}
-      />
-    </div>
+      {/* MODAIS (Renderizados fora do if/else) */}
+      
+      {showCreateCampaign && (
+        <CreateCampaignModal
+          onClose={() => { setShowCreateCampaign(false); setEditingCampaign(null); }}
+          onSave={editingCampaign ? handleUpdateCampaign : handleCreateCampaign}
+          campaign={editingCampaign}
+        />
+      )}
+      
+      {showCreateClient && (
+        <CreateClientModal
+          onClose={() => setShowCreateClient(false)}
+          onSave={handleCreateClient}
+          campaign={selectedCampaign}
+        />
+      )}
+
+      {showEditModal === 'INFO' && selectedClient && (
+        <EditClientInfoModal
+          isOpen={true}
+          onClose={handleCloseModals}
+          onSave={handleUpdateClient}
+          client={selectedClient}
+        />
+      )}
+
+      {showEditModal === 'PRODUCTS' && selectedClient && (
+        <EditClientModal
+          isOpen={true}
+          onClose={handleCloseModals}
+          onSave={handleUpdateClient}
+          client={selectedClient}
+          campaign={selectedCampaign}
+        />
+      )}
+    </>
   );
-}
+};
+
+export default Dashboard;

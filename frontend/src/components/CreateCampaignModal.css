@@ -1,0 +1,208 @@
+/* ============================================
+   SUBSTITUA: src/components/CreateCampaignModal.css
+   (Adiciona o botão de editar indústria)
+   ============================================ */
+
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9998; padding: 20px;
+  animation: fadeIn-campaign 0.3s ease;
+}
+@keyframes fadeIn-campaign { from { opacity: 0; } to { opacity: 1; } }
+
+.modal-content-campaign {
+  background: white; border-radius: 20px;
+  width: 100%; max-width: 700px;
+  max-height: 90vh; overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  display: flex; flex-direction: column;
+  animation: slideUp-campaign 0.4s ease;
+}
+@keyframes slideUp-campaign { from { opacity: 0; transform: translateY(50px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Header */
+.campaign-modal-header {
+  padding: 24px 24px 20px 24px;
+  display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 2px solid #f3f4f6;
+  flex-shrink: 0;
+}
+.campaign-modal-header h2 {
+  margin: 0; font-size: 24px; font-weight: 700; color: #1f2937;
+}
+.btn-close-campaign {
+  background: #f3f4f6; border: none; font-size: 24px;
+  color: #9ca3af; cursor: pointer; padding: 0;
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; transition: all 0.2s;
+}
+.btn-close-campaign:hover { background: #e5e7eb; color: #111827; }
+
+/* Body */
+.campaign-modal-body {
+  padding: 24px; overflow-y: auto; flex: 1;
+}
+.campaign-form-group { margin-bottom: 20px; }
+.campaign-form-group label {
+  display: block; font-size: 14px; font-weight: 600;
+  color: #374151; margin-bottom: 8px;
+}
+.campaign-form-group input,
+.campaign-form-group select,
+.campaign-form-group textarea {
+  width: 100%; padding: 12px 16px;
+  border: 2px solid #d1d5db; border-radius: 10px;
+  font-size: 15px; color: #111827;
+  background: white; transition: all 0.2s;
+  font-family: inherit;
+}
+.campaign-form-group input:focus,
+.campaign-form-group select:focus,
+.campaign-form-group textarea:focus {
+  outline: none; border-color: #667eea;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+}
+.campaign-form-group input::placeholder { color: #9ca3af; }
+.campaign-dates-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+}
+.campaign-form-group input.error,
+.campaign-form-group select.error {
+  border-color: #ef4444; background: #fef2f2;
+}
+.error-message {
+  color: #ef4444; font-size: 13px;
+  font-weight: 500; margin-top: 6px;
+}
+
+/* Indústrias Adicionadas */
+.industries-list h3 {
+  font-size: 16px; font-weight: 600;
+  color: #1f2937; margin-bottom: 12px;
+}
+.industry-item {
+  background: #f9fafb; border: 2px solid #e5e7eb;
+  border-radius: 12px; padding: 16px; margin-bottom: 12px;
+}
+.industry-header {
+  display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 12px;
+}
+.industry-header-info { flex: 1; }
+.industry-header-info strong {
+  font-size: 1.1rem; color: #667eea; font-weight: 700;
+}
+.industry-target {
+  font-size: 0.95rem; font-weight: 600; color: #10b981;
+  display: block; margin-top: 4px;
+}
+.industry-header-actions { display: flex; align-items: center; gap: 8px; }
+
+/* ⭐️ BOTÃO EDITAR INDÚSTRIA (NOVO) ⭐️ */
+.btn-edit-industry {
+  background: #ede9fe; border: none; color: #7c3aed;
+  width: 30px; height: 30px; border-radius: 50%;
+  cursor: pointer; font-size: 16px; transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center;
+}
+.btn-edit-industry:hover { background: #d8b4fe; }
+
+.btn-remove {
+  background: #fee2e2; border: none; color: #dc2626;
+  width: 30px; height: 30px; border-radius: 50%;
+  cursor: pointer; font-size: 18px; transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center;
+}
+.btn-remove:hover { background: #fecaca; }
+
+.industry-products {
+  font-size: 14px; color: #6b7280; word-break: break-all;
+}
+
+/* Seção Adicionar Indústria */
+.add-industry-section {
+  border-top: 2px solid #f3f4f6;
+  margin-top: 24px; padding-top: 24px;
+}
+.add-industry-section h3 {
+  font-size: 18px; font-weight: 600;
+  color: #1f2937; margin-bottom: 16px;
+}
+.input-with-button { display: flex; gap: 10px; }
+.input-with-button input { flex: 1; min-width: 0; }
+
+.btn-add-product {
+  padding: 0 20px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white; border: none; border-radius: 10px;
+  font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-add-product:hover { opacity: 0.9; }
+
+.products-tags {
+  display: flex; flex-wrap: wrap;
+  gap: 8px; margin-top: 12px;
+}
+.product-tag {
+  background: #e0e7ff; color: #4338ca;
+  padding: 6px 12px; border-radius: 20px;
+  font-size: 14px; font-weight: 600;
+  display: flex; align-items: center; gap: 6px;
+}
+.product-tag button {
+  background: none; border: none; color: #4338ca;
+  font-size: 16px; cursor: pointer; opacity: 0.7;
+}
+.product-tag button:hover { opacity: 1; }
+
+.btn-add-industry {
+  width: 100%; padding: 14px; margin-top: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white; border: none; border-radius: 10px;
+  font-size: 15px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-add-industry:hover { opacity: 0.9; }
+
+/* ⭐️ BOTÃO CANCELAR EDIÇÃO (NOVO) ⭐️ */
+.btn-cancel-edit-industry {
+  width: 100%; padding: 12px; margin-top: 10px;
+  background: #f1f5f9; color: #475569;
+  border: 2px solid #e2e8f0; border-radius: 10px;
+  font-size: 15px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-cancel-edit-industry:hover { background: #e2e8f0; }
+
+/* Footer */
+.campaign-modal-footer {
+  padding: 20px 24px; border-top: 2px solid #f3f4f6;
+  display: flex; justify-content: flex-end; gap: 12px;
+  background: #f9fafb; flex-shrink: 0;
+}
+.btn-cancel-campaign, .btn-save-campaign {
+  padding: 12px 28px; border: none; border-radius: 10px;
+  font-size: 15px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-cancel-campaign {
+  background: #e5e7eb; color: #374151;
+  border: 2px solid #e5e7eb;
+}
+.btn-cancel-campaign:hover { background: #d1d5db; }
+.btn-save-campaign {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white; border: 2px solid #10b981;
+}
+.btn-save-campaign:hover { opacity: 0.9; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .modal-content-campaign { border-radius: 16px; max-height: 95vh; }
+  .campaign-dates-row { grid-template-columns: 1fr; }
+}

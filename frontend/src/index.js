@@ -1,9 +1,15 @@
 import React from "react";
 import ReactDOM from "react-dom";
-import "./index.css";  
-import App from './App';    
+import "./index.css";
+import App from './App';
 import { Toaster } from "sonner";
 
+// ============================================
+// ⭐️ CORREÇÃO APLICADA ⭐️
+// O Service Worker foi desativado para desenvolvimento em localhost
+// para corrigir o bug de "Internal storage".
+// ============================================
+/*
 // Registrar Service Worker para PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -16,6 +22,8 @@ if ('serviceWorker' in navigator) {
       });
   });
 }
+*/
+// ============================================
 
 ReactDOM.render(
   <React.StrictMode>

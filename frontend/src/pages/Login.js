@@ -1,213 +1,103 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuthContext } from '../contexts/AuthContext';
+import './Login.css';
 
-export default function Login() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [formData, setFormData] = useState({
-    email: '',
-    name: '',
-    cpf: '',
-    phone: '',
-    password: '',
-    confirmPassword: '',
-  });
-  const [error, setError] = useState('');
+const Login = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { login } = useAuthContext();
   const navigate = useNavigate();
-  const { login, register } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
 
+    if (!email || !password) {
+      setError('Preencha todos os campos');
+      return;
+    }
+
+    setLoading(true);
     try {
-      if (isLogin) {
-        await login(formData.email, formData.password);
-      } else {
-        // Validar se as senhas coincidem
-        if (formData.password !== formData.confirmPassword) {
-          setError('As senhas não coincidem');
-          setLoading(false);
-          return;
-        }
-        await register(formData.email, formData.name, formData.password, formData.cpf, formData.phone);
-      }
-      navigate('/');
+      await login(email, password);
+      navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Erro ao autenticar');
+      console.error('Erro no login:', err);
+      setError('Email ou senha incorretos');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            Anota & Ganha Incentivos
-          </h1>
-          <p className="text-gray-600">
-            {isLogin ? 'Entre na sua conta' : 'Crie sua conta - 15 dias grátis!'}
-          </p>
+    <div className="login-container">
+      <div className="login-card">
+        <div className="login-header">
+          <h1 className="login-title">Anota & Ganha<br/>Incentivos</h1>
+          <p className="login-subtitle">Entre na sua conta</p>
         </div>
 
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="login-error">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
+        <form onSubmit={handleSubmit} className="login-form">
+          <div className="form-group">
+            <label>E-mail</label>
             <input
               type="email"
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
               placeholder="seu@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
             />
           </div>
 
-          {!isLogin && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nome Completo
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  placeholder="João da Silva"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  CPF
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={formData.cpf}
-                  onChange={(e) =>
-                    setFormData({ ...formData, cpf: e.target.value })
-                  }
-                  placeholder="000.000.000-00"
-                  maxLength={14}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Telefone/WhatsApp
-                </label>
-                <input
-                  type="tel"
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
-                  placeholder="(00) 00000-0000"
-                  maxLength={15}
-                />
-              </div>
-            </>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Senha
-            </label>
+          <div className="form-group">
+            <label>Senha</label>
             <input
               type="password"
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={formData.password}
-              onChange={(e) =>
-                setFormData({ ...formData, password: e.target.value })
-              }
               placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
             />
           </div>
 
-          {!isLogin && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Confirmar Senha
-              </label>
-              <input
-                type="password"
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={formData.confirmPassword}
-                onChange={(e) =>
-                  setFormData({ ...formData, confirmPassword: e.target.value })
-                }
-                placeholder="••••••••"
-              />
-            </div>
-          )}
-
-          {!isLogin && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <p className="text-sm text-green-800">
-                🎉 <strong>15 dias grátis</strong> para testar todas as funcionalidades!
-              </p>
-              <p className="text-xs text-green-600 mt-1">
-                Depois: R$ 35/mês, 12x de R$ 29,90 ou R$ 300/ano
-              </p>
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-blue-300"
-          >
-            {loading ? 'Aguarde...' : isLogin ? 'Entrar' : 'Criar Conta Grátis'}
+          <button type="submit" className="btn-login" disabled={loading}>
+            {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
 
-        <div className="mt-6 text-center space-y-2">
-          <button
-            onClick={() => {
-              setIsLogin(!isLogin);
-              setError('');
-            }}
-            className="text-blue-600 hover:underline block mx-auto"
-          >
-            {isLogin
-              ? 'Não tem conta? Registre-se grátis'
-              : 'Já tem conta? Faça login'}
-          </button>
-          
-          {isLogin && (
-            <Link
-              to="/forgot-password"
-              className="text-gray-600 hover:underline text-sm block"
-            >
-              Esqueceu a senha?
-            </Link>
-          )}
+        <div className="login-footer">
+          <Link to="/register" className="link-register">
+            Não tem conta? Cadastre-se grátis
+          </Link>
+          <Link to="/forgot-password" className="link-forgot">
+            Esqueceu a senha?
+          </Link>
         </div>
       </div>
+
+      {/* Botão WhatsApp Flutuante */}
+      <a 
+        href="https://wa.me/5513997501798?text=Olá,%20preciso%20de%20suporte%20no%20Anota%20%26%20Ganha"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="whatsapp-float"
+        title="Suporte via WhatsApp"
+      >
+        <svg viewBox="0 0 32 32" fill="white" width="28" height="28">
+          <path d="M16 0c-8.837 0-16 7.163-16 16 0 2.825 0.737 5.607 2.137 8.048l-2.137 7.952 7.933-2.127c2.42 1.37 5.173 2.127 8.067 2.127 8.837 0 16-7.163 16-16s-7.163-16-16-16zM16 29.467c-2.482 0-4.908-0.646-7.07-1.87l-0.507-0.292-4.713 1.262 1.262-4.669-0.292-0.508c-1.207-2.100-1.847-4.507-1.847-6.924 0-7.435 6.052-13.487 13.487-13.487s13.487 6.052 13.487 13.487c0 7.435-6.052 13.487-13.487 13.487zM21.12 18.384c-0.366-0.184-2.154-1.062-2.489-1.184s-0.577-0.184-0.82 0.184c-0.243 0.366-0.943 1.184-1.155 1.427s-0.426 0.275-0.791 0.092c-0.366-0.184-1.545-0.57-2.943-1.815-1.087-0.97-1.822-2.166-2.035-2.532s-0.022-0.564 0.161-0.746c0.165-0.165 0.366-0.426 0.548-0.64s0.243-0.366 0.366-0.609c0.122-0.243 0.061-0.458-0.031-0.64s-0.82-1.973-1.124-2.701c-0.296-0.708-0.598-0.611-0.82-0.622-0.212-0.010-0.458-0.012-0.701-0.012s-0.64 0.092-0.976 0.458c-0.335 0.366-1.276 1.247-1.276 3.040s1.307 3.527 1.489 3.771c0.184 0.243 2.579 3.936 6.251 5.519 0.873 0.378 1.555 0.603 2.085 0.771 0.878 0.279 1.677 0.24 2.308 0.145 0.704-0.105 2.154-0.881 2.458-1.733s0.305-1.581 0.214-1.733c-0.092-0.153-0.335-0.243-0.701-0.426z"/>
+        </svg>
+      </a>
     </div>
   );
-}
+};
+
+export default Login;
