@@ -1,5 +1,5 @@
 // SUBSTITUA: src/pages/Checkout.js
-// ⭐️ CORREÇÃO: Carrega o Script de Segurança (Device ID) dinamicamente nesta página.
+// ⭐️ CORREÇÃO: Adiciona "Poller" para ESPERAR o Device ID antes de enviar a requisição.
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -7,9 +7,42 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import './Checkout.css';
 
-// ⭐️ VARIÁVEIS DE PRODUÇÃO (Hardcoded para robustez) ⭐️
+// VARIÁVEIS DE PRODUÇÃO (Mantidas)
 const BACKEND_URL = "https://anota-ganha-app-production.up.railway.app";
 const MERCADOPAGO_PUBLIC_KEY = "APP_USR-5f6e941d-3514-489a-9241-d8a42099b2d0";
+
+// ⭐️ NOVA FUNÇÃO HELPER: "Poller" para esperar pelo Device ID ⭐️
+/**
+ * Tenta obter o deviceId várias vezes antes de desistir.
+ * @returns {Promise<string|null>} O valor do deviceId ou null se expirar.
+ */
+const getDeviceIdWithRetry = () => {
+  return new Promise((resolve) => {
+    const startTime = Date.now();
+    const maxWaitTime = 4000; // Espera no máximo 4 segundos
+
+    const check = () => {
+      const deviceIdInput = document.getElementById('deviceId');
+      
+      // Se o input existe E tem um valor
+      if (deviceIdInput && deviceIdInput.value) {
+        console.log("✅ Device ID capturado com sucesso!");
+        resolve(deviceIdInput.value);
+      } 
+      // Se o tempo máximo de espera foi atingido
+      else if (Date.now() - startTime > maxWaitTime) {
+        console.warn("⚠️ Device ID não encontrado após 4s. Continuando sem ele.");
+        resolve(null); // Resolve com null após o timeout
+      } 
+      // Se ainda não encontrou, tenta novamente em 100ms
+      else {
+        setTimeout(check, 100); 
+      }
+    };
+    check(); // Inicia a verificação
+  });
+};
+
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -22,7 +55,7 @@ const Checkout = () => {
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('credit_card');
 
-  // Carregar plano selecionado
+  // Carregar plano selecionado (Mantido)
   useEffect(() => {
     const planId = location.state?.planId;
     if (planId && PLANS[planId]) {
@@ -51,25 +84,23 @@ const Checkout = () => {
     };
   }, []);
 
-  // ⭐️ NOVO HOOK: Carrega o Script de Segurança (Device ID) nesta página ⭐️
+  // Hook para Carregar o Script de Segurança (Device ID) (Mantido)
   useEffect(() => {
     const securityScript = document.createElement('script');
     securityScript.src = 'https://www.mercadopago.com/v2/security.js';
-    // Define o atributo 'view' que é crucial para o script funcionar
     securityScript.setAttribute('view', 'checkout'); 
     securityScript.async = true;
     document.body.appendChild(securityScript);
 
     return () => {
-      // Limpa o script de segurança ao sair da página
       if (document.body.contains(securityScript)) {
         document.body.removeChild(securityScript);
       }
     };
-  }, []); // Roda apenas uma vez quando o componente Checkout é montado
+  }, []); 
 
   // ============================================
-  // PROCESSAR PAGAMENTO (FLUXO ROBUSTO E OTIMIZADO)
+  // PROCESSAR PAGAMENTO (AGORA COM "POLLER")
   // ============================================
   const handleCheckout = async () => {
     if (!selectedPlan || !user) {
@@ -80,17 +111,9 @@ const Checkout = () => {
     setLoading(true);
 
     try {
-      // ⭐️ PASSO 1: CAPTURAR O DEVICE ID ⭐️
-      // Agora o script deve ter tido tempo de injetar o campo
-      const deviceIdInput = document.getElementById('deviceId');
-      const deviceIdValue = deviceIdInput ? deviceIdInput.value : null;
-
-      if (!deviceIdValue) {
-        // Se ainda não encontrou, logamos o aviso, mas tentamos continuar
-        console.warn("⚠️ Device ID não encontrado. O script de segurança pode não ter carregado a tempo.");
-      } else {
-        console.log("✅ Device ID capturado com sucesso!");
-      }
+      // ⭐️ PASSO 1: ESPERAR E CAPTURAR O DEVICE ID ⭐️
+      // A função 'await' vai pausar o 'handleCheckout' até o ID ser encontrado ou o tempo esgotar.
+      const deviceIdValue = await getDeviceIdWithRetry();
 
       // 2. CHAMAR O BACKEND DO RAILWAY
       const apiUrl = `${BACKEND_URL}/api/mercadopago/create-preference`;
@@ -105,13 +128,12 @@ const Checkout = () => {
             name: user.displayName || user.email,
             id: user.uid 
           },
-          // ADICIONAR O DEVICE ID AO PAYLOAD (mesmo que seja null)
+          // Envia o deviceId (seja o valor ou null)
           deviceId: deviceIdValue 
         })
       });
 
       if (!response.ok) {
-        // Tenta ler o erro do backend
         const err = await response.json();
         console.error("Erro do backend (422 ou 500):", err);
         throw new Error(`Erro do servidor: ${err.detail || response.statusText}`);
