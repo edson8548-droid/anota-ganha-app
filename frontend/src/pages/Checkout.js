@@ -1,5 +1,6 @@
 // SUBSTITUA: src/pages/Checkout.js
-// ⭐️ ATUALIZADO PARA PRODUÇÃO ⭐️
+// VERSÃO FINAL: HARDCODED com a URL de PRODUÇÃO do RAILWAY
+// Corrige o erro de "localhost" no ambiente online.
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -7,7 +8,8 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import './Checkout.css';
 
-// ⭐️ USA A TUA CHAVE PÚBLICA DE PRODUÇÃO ⭐️
+// ⭐️ VARIÁVEIS DE PRODUÇÃO ⭐️
+const BACKEND_URL = "https://anota-ganha-app-production.up.railway.app";
 const MERCADOPAGO_PUBLIC_KEY = "APP_USR-5f6e941d-3514-489a-9241-d8a42099b2d0";
 
 const Checkout = () => {
@@ -72,9 +74,10 @@ const Checkout = () => {
       console.log('📦 Plano:', selectedPlan.id);
       console.log('👤 Usuário:', user.email, 'ID:', user.uid);
 
-      // ⭐️ 1. CHAMAR NOSSO BACKEND FASTAPI ⭐️
-      // (Ainda usa localhost:5000, pois estamos a testar localmente)
-      const response = await fetch('http://localhost:5000/api/mercadopago/create-preference', {
+      // ⭐️ 1. CHAMAR NOSSO BACKEND FASTAPI (URL CORRETA) ⭐️
+      const apiUrl = `${BACKEND_URL}/api/mercadopago/create-preference`;
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
