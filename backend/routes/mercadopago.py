@@ -1,5 +1,5 @@
 # SUBSTITUA: backend/routes/mercadopago.py
-# ⭐️ CORREÇÃO: Tornando o deviceId opcional (Optional) para aceitar 'null' do JSON.
+# ⭐️ CORREÇÃO: Lida com a chamada do SDK de forma segura para evitar o erro 500.
 
 import os
 import mercadopago
@@ -9,7 +9,7 @@ import logging
 import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime, timezone
-from typing import Optional # ⭐️ ADICIONADO PARA ROBUSTEZ
+from typing import Optional # ⭐️ Mantido
 
 # SDKs para E-mail e Firebase
 from sendgrid import SendGridAPIClient
@@ -18,7 +18,7 @@ from sendgrid.helpers.mail import Mail
 logger = logging.getLogger(__name__)
 
 # ============================================
-# ⭐️ MODELOS PYDANTIC (Schema de Dados) ⭐️
+# MODELOS PYDANTIC (Schema de Dados)
 # ============================================
 
 class UserInfoPayload(BaseModel):
@@ -29,7 +29,7 @@ class UserInfoPayload(BaseModel):
 class PreferencePayload(BaseModel):
     planId: str
     user: UserInfoPayload
-    # ⭐️ ALTERADO: Usando Optional[str] é a forma mais correta de aceitar 'null'
+    # ⭐️ Mantido: Aceita 'null' do JSON
     deviceId: Optional[str] = None 
 
 # ============================================
@@ -196,14 +196,18 @@ async def create_preference(payload: PreferencePayload):
 
         # 2. OPÇÕES DA REQUISIÇÃO (Enviando o Device ID no Header)
         request_options = {}
-        # ⭐️ Verificação mais robusta: garante que deviceId não é None E não é uma string vazia
         if payload.deviceId and payload.deviceId.strip():
             request_options["headers"] = {
                 "X-meli-session-id": payload.deviceId
             }
 
-        # 3. Cria a preferência
-        preference_response = sdk.preference().create(preference_data, request_options=request_options)
+        # ⭐️ 3. CORREÇÃO DO ERRO 500: Chama o SDK de forma segura ⭐️
+        if request_options:
+            # Chama com headers, se tivermos o deviceId
+            preference_response = sdk.preference().create(preference_data, request_options=request_options)
+        else:
+            # Chama sem o request_options se o deviceId for null (evita o erro 500)
+            preference_response = sdk.preference().create(preference_data)
 
         if preference_response["status"] != 201:
             error_details = preference_response.get("response", {}).get("message", "Nenhum detalhe do erro retornado")
