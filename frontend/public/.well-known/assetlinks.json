@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.web.anota_ganha_app.twa",
+        "sha256_cert_fingerprints": ["04:87:D9:32:A7:8B:82:7F:20:40:82:D2:B5:E2:F3:25:94:6B:CD:63:67:F3:8A:D6:94:D4:37:1A:C4:CE:CA:F3"]
+      }
+    }]
