@@ -1,27 +1,23 @@
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import { db } from '../config/firebase';
+// ⭐️ CORREÇÃO: O caminho foi atualizado para apontar para o teu ficheiro
+import { db } from '../firebase/config.js';
 
 class ClientsService {
   constructor() {
     this.collectionName = 'clients';
   }
 
-  // Criar novo cliente
+  // Criar novo cliente (Mantido da v2 - Global)
   async createClient(userId, clientData) {
     try {
       if (!userId) {
         throw new Error('ID do usuário não fornecido');
       }
 
-      if (!clientData.campaignId) {
-        throw new Error('ID da campanha não fornecido');
-      }
-
       const clientRef = collection(db, this.collectionName);
       
       const newClient = {
         userId: userId,
-        campaignId: clientData.campaignId,
         CNPJ: clientData.CNPJ || '',
         CLIENTE: clientData.CLIENTE,
         TELEFONE: clientData.TELEFONE || '',
@@ -31,16 +27,14 @@ class ClientsService {
         ESTADO: clientData.ESTADO || '',
         BAIRRO: clientData.BAIRRO || '',
         CEP: clientData.CEP || '',
-        industries: clientData.industries || {},
+        industries: clientData.industries || {}, 
         notes: clientData.notes || '',
         created_at: serverTimestamp(),
         updated_at: serverTimestamp()
       };
 
-      console.log('Criando cliente:', newClient);
-
+      console.log('Criando cliente (v3 - Global):', newClient);
       const docRef = await addDoc(clientRef, newClient);
-      
       console.log('Cliente criado com ID:', docRef.id);
 
       return {
@@ -55,7 +49,7 @@ class ClientsService {
     }
   }
 
-  // Atualizar cliente existente
+  // Atualizar cliente existente (Mantido da v2)
   async updateClient(clientId, clientData) {
     try {
       if (!clientId) {
@@ -79,10 +73,7 @@ class ClientsService {
         updated_at: serverTimestamp()
       };
 
-      console.log('Atualizando cliente:', clientId, updateData);
-
       await updateDoc(clientRef, updateData);
-      
       console.log('Cliente atualizado com sucesso!');
 
       return {
@@ -96,7 +87,7 @@ class ClientsService {
     }
   }
 
-  // Deletar cliente
+  // Deletar cliente (Mantido da v2)
   async deleteClient(clientId) {
     try {
       if (!clientId) {
@@ -105,7 +96,6 @@ class ClientsService {
 
       const clientRef = doc(db, this.collectionName, clientId);
       await deleteDoc(clientRef);
-      
       console.log('Cliente deletado:', clientId);
     } catch (error) {
       console.error('Erro ao deletar cliente:', error);
@@ -113,7 +103,7 @@ class ClientsService {
     }
   }
 
-  // Buscar clientes do usuário (em tempo real)
+  // Buscar clientes do usuário (em tempo real - Mantido da v2)
   subscribeToClients(userId, callback) {
     try {
       if (!userId) {
@@ -137,7 +127,7 @@ class ClientsService {
             });
           });
           
-          console.log('Clientes carregados:', clients.length);
+          console.log('Clientes (Globais) carregados:', clients.length);
           callback(clients);
         },
         (error) => {
