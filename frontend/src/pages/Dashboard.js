@@ -1,5 +1,5 @@
 // SUBSTITUA: src/pages/Dashboard.js
-// VERSÃO DE TESTE (V5) - Adiciona console.log para debugging
+// VERSÃO V9 - Corrige o 'handleCreateClient' para a "Base de Clientes Global"
 
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -11,18 +11,21 @@ import CreateClientModal from '../components/CreateClientModal';
 import EditClientModal from '../components/EditClientModal';
 import EditClientInfoModal from '../components/EditClientInfoModal';
 import Analytics from '../components/Analytics'; 
+// ⭐️ IMPORTAÇÃO NOVA: Precisamos do service para a função de ligar (link)
+import { campaignsService } from '../services/campaigns.service';
 import './Dashboard.css'; 
 
 // ⭐️ TESTE DE VERSÃO ⭐️
-console.log("--- CARREGADO: Dashboard.js v5 (Filtro Corrigido) ---");
+console.log("--- CARREGADO: Dashboard.js v9 (Correção handleCreateClient) ---");
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const authData = useAuthContext();
   const user = authData?.user;
   
+  // ⭐️ NOTA: O useCampaigns não foi modificado, por isso importamos o service acima
   const { campaigns, loading: campaignsLoading, createCampaign, updateCampaign, deleteCampaign } = useCampaigns();
-  const { clients, loading: clientsLoading, createClient, updateClient, deleteClient } = useClients();
+  const { clients, loading: clientsLoading, createClient, updateClient, deleteClient } = useClients(); // (Este hook já é global)
 
   const [selectedCampaignId, setSelectedCampaignId] = useState(null);
   const [showCreateCampaign, setShowCreateCampaign] = useState(false);
@@ -34,14 +37,14 @@ const Dashboard = () => {
   const [selectedCity, setSelectedCity] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Bug da "indústria nova": Corrigido aqui
+  const [expandedClientId, setExpandedClientId] = useState(null);
+
   const selectedCampaign = useMemo(() => {
     if (!selectedCampaignId) return null;
     return campaigns.find(c => c.id === selectedCampaignId);
   }, [selectedCampaignId, campaigns]); 
 
-
-  // ... (Toda a lógica de 'handleLogout', 'handleCreateCampaign', etc. é mantida) ...
+  // ... (Handlers de logout, campanha, modals, etc., mantidos) ...
   const handleLogout = () => {
     if (window.confirm('Deseja realmente sair?')) {
       authData.logout();
@@ -68,7 +71,7 @@ const Dashboard = () => {
   };
   const handleDeleteCampaign = async (e, campaignId) => {
     e.stopPropagation(); 
-    if (window.confirm('⚠️ Tem certeza?')) {
+    if (window.confirm('⚠️ Tem certeza? Ao apagar a campanha, os clientes permanecem na sua base, mas os dados de positivação desta campanha serão perdidos.')) {
       try {
         await deleteCampaign(campaignId);
         if (selectedCampaign?.id === campaignId) {
@@ -77,17 +80,40 @@ const Dashboard = () => {
       } catch (error) { console.error('❌ Erro ao deletar campanha:', error); }
     }
   };
+  
+  // ⭐️⭐️⭐️ CORREÇÃO DE LÓGICA (V9) ⭐️⭐️⭐️
+  // Esta função agora cria o cliente global E liga-o à campanha atual
   const handleCreateClient = async (clientData) => {
     try {
       if (!selectedCampaign) return;
-      const newClientData = { ...clientData, campaignId: selectedCampaign.id };
-      await createClient(newClientData);
-      setShowCreateClient(false);
-    } catch (error) { console.error('❌ Erro ao criar cliente:', error); }
+
+      console.log('[Dashboard] Iniciando processo de 2 passos (Criar + Ligar)');
+      
+      // 1. Cria o cliente global (sem campaignId)
+      // O hook 'createClient' (v2) retorna o ID do novo cliente
+      const newClientId = await createClient(clientData); 
+      
+      if (newClientId) {
+        console.log(`[Dashboard] Passo 1/2: Cliente global ${newClientId} criado.`);
+        
+        // 2. Liga o newClientId à lista 'clientIds' da campanha atual
+        await campaignsService.linkClientToCampaign(selectedCampaign.id, newClientId);
+        
+        console.log(`[Dashboard] Passo 2/2: Cliente ${newClientId} ligado à campanha ${selectedCampaign.id}.`);
+        
+        setShowCreateClient(false);
+      } else {
+        throw new Error('O serviço de criação de cliente não retornou um ID.');
+      }
+    } catch (error) { 
+      console.error('❌ Erro no processo de Criar/Ligar cliente:', error); 
+      alert('Erro ao salvar o cliente. Tente novamente.');
+    }
   };
+  
   const handleDeleteClient = async (e, clientId) => {
     e.stopPropagation();
-    if (window.confirm('⚠️ Tem certeza?')) {
+    if (window.confirm('⚠️ Tem certeza? (Isto apaga o cliente de TODAS as campanhas)')) {
       try {
         await deleteClient(clientId);
       } catch (error) { console.error('❌ Erro ao deletar cliente:', error); }
@@ -124,7 +150,36 @@ const Dashboard = () => {
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
-  const campaignClients = clients.filter(c => c.campaignId === selectedCampaign?.id);
+  
+  const handleToggleClientCard = (e, clientId) => {
+    e.stopPropagation(); 
+    setExpandedClientId(prevId => (prevId === clientId ? null : clientId));
+  };
+  
+  // Lógica de filtro (Mantida da v8)
+  const campaignClients = useMemo(() => {
+    if (!selectedCampaign) return []; 
+    
+    // Suporte Legado (Campanhas antigas com campaignId)
+    const legacyClients = clients.filter(c => c.campaignId === selectedCampaign.id);
+    
+    // Nova lógica (V8/V9): Filtra a base global de clientes pela lista de IDs da campanha
+    const newClients = clients.filter(client => 
+      (selectedCampaign.clientIds || []).includes(client.id)
+    );
+
+    // Junta os dois (para garantir que as campanhas antigas continuam a funcionar)
+    const allCampaignClients = [...legacyClients];
+    newClients.forEach(nc => {
+      if (!allCampaignClients.find(lc => lc.id === nc.id)) {
+        allCampaignClients.push(nc);
+      }
+    });
+
+    return allCampaignClients;
+
+  }, [selectedCampaign, clients]); 
+
   const cities = ['all', ...new Set(campaignClients.map(c => c.CIDADE).filter(Boolean))];
   const filteredClients = campaignClients.filter(client => {
     const matchesCity = selectedCity === 'all' || client.CIDADE === selectedCity;
@@ -204,7 +259,12 @@ const Dashboard = () => {
               <div className="campaigns-grid">
                 {campaigns.map(campaign => {
                   const industriesList = Object.keys(campaign.industries || {});
-                  const clientCount = clients.filter(c => c.campaignId === campaign.id).length;
+                  
+                  // ⭐️ USA A NOVA LÓGICA DE FILTRO PARA A CONTAGEM ⭐️
+                  const clientCount = clients.filter(client => 
+                    (campaign.clientIds || []).includes(client.id) || client.campaignId === campaign.id
+                  ).length;
+                  
                   return (
                     <div key={campaign.id} className="campaign-card" onClick={() => setSelectedCampaignId(campaign.id)}>
                       <div>
@@ -296,7 +356,7 @@ const Dashboard = () => {
                 <button className="btn-action purple" onClick={() => setShowCreateClient(true)}>➕ Novo Cliente</button>
               </div>
 
-              {/* Lista de Clientes */}
+              {/* Lista de Clientes (COM ACORDEÃO) */}
               {clientsLoading ? (
                 <div className="loading">⏳ Carregando clientes...</div>
               ) : filteredClients.length === 0 ? (
@@ -313,13 +373,41 @@ const Dashboard = () => {
                     const totalClientValue = Object.values(clientIndustries).reduce((acc, industry) => 
                       acc + Object.values(industry).reduce((sum, p) => sum + (p.valor || 0), 0)
                     , 0);
+                    
+                    const isExpanded = expandedClientId === client.id;
+                    const totalIndustriesCount = Object.keys(selectedCampaign.industries || {}).length;
 
+                    // LÓGICA DO TROFÉU (Mantida) 
+                    let clientProductsTotalCampaign = 0;
+                    let clientPositivated = 0;
+                    if (client.industries) {
+                      Object.keys(selectedCampaign.industries || {}).forEach(industryName => {
+                        const clientIndustryProducts = client.industries?.[industryName] || {};
+                        const campaignProducts = selectedCampaign.industries[industryName] || {};
+                        const total = Object.keys(campaignProducts).filter(p => p !== 'targetValue').length;
+                        clientProductsTotalCampaign += total;
+
+                        Object.keys(campaignProducts).filter(p => p !== 'targetValue').forEach(productName => {
+                           const productData = clientIndustryProducts[productName];
+                           if (productData?.positivado) {
+                             clientPositivated++;
+                           }
+                        });
+                      });
+                    }
+                    const isComplete = clientProductsTotalCampaign > 0 && clientPositivated === clientProductsTotalCampaign;
+                    
                     return (
                       <div key={client.id} className="client-card">
+                        
+                        {/* 1. Conteúdo Fixo (Sempre visível) */}
                         <div>
                           <div className="client-header">
                             <div className="client-title-section">
-                              <h3>{client.CLIENTE}</h3>
+                              <h3>
+                                {client.CLIENTE}
+                                {isComplete && <span className="icon-complete" title="Cliente 100% completo!">🏆</span>}
+                              </h3>
                               <p>📍 {client.CIDADE} - {client.ESTADO}</p>
                             </div>
                             <div className="client-actions-btns">
@@ -331,31 +419,49 @@ const Dashboard = () => {
                             <div className="client-info-item"><strong>CNPJ</strong><span>{client.CNPJ}</span></div>
                             <div className="client-info-item"><strong>TELEFONE</strong><span>{client.TELEFONE || '--'}</span></div>
                           </div>
-                          <div className="client-industries">
-                            {Object.keys(selectedCampaign.industries || {}).map(industryName => {
-                              const clientIndustryData = client.industries?.[industryName] || {};
-                              const campaignProducts = selectedCampaign.industries[industryName] || {};
-                              const totalValue = Object.values(clientIndustryData).reduce((sum, p) => sum + (p.valor || 0), 0);
-                              const positivated = Object.values(clientIndustryData).filter(p => p.positivado).length;
-                              const total = Object.keys(campaignProducts).filter(p => p !== 'targetValue').length;
-                              const percentage = total > 0 ? (positivated / total) * 100 : 0;
-                              return (
-                                <div key={industryName} className="industry-section industry-section-clickable" title="Clique para positivar produtos" onClick={(e) => handleOpenEditProducts(e, client)}>
-                                  <strong className="industry-name">🏭 {industryName}</strong>
-                                  <div className="progress-bar"><div className="progress-fill" style={{ width: `${percentage}%` }}/></div>
-                                  <div className="industry-total">
-                                    <span>{positivated}/{total} produtos</span>
-                                    <span>{formatCurrency(totalValue)}</span>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
                         </div>
-                        <div className="total-value">
-                          <strong>Valor Total Positivado</strong>
-                          <span>{formatCurrency(totalClientValue)}</span>
+
+                        {/* 2. Conteúdo Colapsável (Indústrias e Total) */}
+                        <div className="client-collapsible-content">
+                          {isExpanded && (
+                            <>
+                              <div className="client-industries">
+                                {Object.keys(selectedCampaign.industries || {}).map(industryName => {
+                                  const clientIndustryData = client.industries?.[industryName] || {};
+                                  const campaignProducts = selectedCampaign.industries[industryName] || {};
+                                  const totalValue = Object.values(clientIndustryData).reduce((sum, p) => sum + (p.valor || 0), 0);
+                                  const positivated = Object.values(clientIndustryData).filter(p => p.positivado).length;
+                                  const total = Object.keys(campaignProducts).filter(p => p !== 'targetValue').length;
+                                  const percentage = total > 0 ? (positivated / total) * 100 : 0;
+                                  return (
+                                    <div key={industryName} className="industry-section industry-section-clickable" title="Clique para positivar produtos" onClick={(e) => handleOpenEditProducts(e, client)}>
+                                      <strong className="industry-name">🏭 {industryName}</strong>
+                                      <div className="progress-bar"><div className="progress-fill" style={{ width: `${percentage}%` }}/></div>
+                                      <div className="industry-total">
+                                        <span>{positivated}/{total} produtos</span>
+                                        <span>{formatCurrency(totalValue)}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              <div className="total-value">
+                                <strong>Valor Total Positivado</strong>
+                                <span>{formatCurrency(totalClientValue)}</span>
+                              </div>
+                            </>
+                          )}
+                          
+                          <button 
+                            type="button" 
+                            className="btn-toggle-client" 
+                            onClick={(e) => handleToggleClientCard(e, client.id)}
+                          >
+                            {isExpanded ? 'Ocultar Indústrias' : `Ver Indústrias (${totalIndustriesCount})`}
+                          </button>
                         </div>
+                        
                       </div>
                     );
                   })}
@@ -368,7 +474,7 @@ const Dashboard = () => {
           {activeTab === 'analytics' && (
             <section className="analytics-content">
               <Analytics
-                campaign={selectedCampaign} // ⭐️ Envia a campanha ATUALIZADA
+                campaign={selectedCampaign} 
                 clients={campaignClients} 
                 onClose={() => setActiveTab('clients')}
               />
@@ -399,7 +505,7 @@ const Dashboard = () => {
       {showCreateClient && (
         <CreateClientModal
           onClose={() => setShowCreateClient(false)}
-          onSave={handleCreateClient}
+          onSave={handleCreateClient} // ⭐️ AGORA CHAMA O NOVO HANDLER (V9)
           campaign={selectedCampaign}
         />
       )}
