@@ -1,5 +1,5 @@
 # SUBSTITUA: backend/routes/mercadopago.py
-# ⭐️ CORREÇÃO: Lida com a chamada do SDK de forma segura para evitar o erro 500.
+# ⭐️ VERSÃO 2: Otimizado para aprovação (Envia CPF e Telefone)
 
 import os
 import mercadopago
@@ -9,7 +9,7 @@ import logging
 import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime, timezone
-from typing import Optional # ⭐️ Mantido
+from typing import Optional 
 
 # SDKs para E-mail e Firebase
 from sendgrid import SendGridAPIClient
@@ -29,7 +29,6 @@ class UserInfoPayload(BaseModel):
 class PreferencePayload(BaseModel):
     planId: str
     user: UserInfoPayload
-    # ⭐️ Mantido: Aceita 'null' do JSON
     deviceId: Optional[str] = None 
 
 # ============================================
@@ -170,13 +169,57 @@ PLANS = {
 @router.post("/create-preference")
 async def create_preference(payload: PreferencePayload):
     if not sdk: raise HTTPException(status_code=500, detail="Mercado Pago SDK não está configurado")
+    
+    # ⭐️ 1. INICIALIZAR O FIREBASE ADMIN (NOVO NESTA ROTA) ⭐️
+    db_firestore = initialize_firebase()
+    if not db_firestore:
+        raise HTTPException(status_code=500, detail="Firebase Admin não inicializado")
+        
     try:
         plan_id = payload.planId
         user_info_dict = payload.user.model_dump() 
+        user_id = user_info_dict.get('id') # ⭐️ ID do utilizador
         plan = PLANS[plan_id]
         frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
-        # 1. DADOS DA PREFERÊNCIA (Mantido sem category_id)
+        # ⭐️ 2. BUSCAR DADOS COMPLETOS DO UTILIZADOR (CPF/TELEFONE) DO FIREBASE ⭐️
+        user_cpf = None
+        user_telefone = None
+        if user_id:
+            try:
+                user_doc_ref = db_firestore.collection('users').document(user_id)
+                user_doc = user_doc_ref.get()
+                if user_doc.exists:
+                    user_data = user_doc.to_dict()
+                    user_cpf = user_data.get('cpf')
+                    user_telefone = user_data.get('telefone')
+                    logger.info(f"✅ Dados do utilizador {user_id} encontrados (CPF: {'Sim' if user_cpf else 'Não'})")
+                else:
+                    logger.warning(f"⚠️ Documento do utilizador {user_id} não encontrado no Firestore.")
+            except Exception as e:
+                logger.error(f"❌ Erro ao buscar dados do utilizador {user_id} no Firestore: {e}")
+
+        # ⭐️ 3. MONTAR O OBJETO 'PAYER' OTIMIZADO ⭐️
+        payer_data = {
+            "name": user_info_dict.get('name', user_info_dict.get('email')),
+            "email": user_info_dict.get('email')
+        }
+
+        # Adiciona CPF (Obrigatório para flexibilização)
+        if user_cpf:
+            payer_data["identification"] = {
+                "type": "CPF",
+                "number": user_cpf # O CPF já deve estar limpo (só dígitos)
+            }
+
+        # Adiciona Telefone (Obrigatório para flexibilização)
+        if user_telefone and len(user_telefone) >= 10:
+            payer_data["phone"] = {
+                "area_code": user_telefone[:2], # Primeiros 2 dígitos (DDD)
+                "number": user_telefone[2:]  # O resto
+            }
+        
+        # 4. DADOS DA PREFERÊNCIA (Usando o 'payer_data' otimizado)
         preference_data = {
             "items": [{ 
                 "title": plan["title"], 
@@ -184,29 +227,24 @@ async def create_preference(payload: PreferencePayload):
                 "quantity": 1, 
                 "currency_id": "BRL",
             }],
-            "payer": { 
-                "name": user_info_dict.get('name', user_info_dict.get('email')), 
-                "email": user_info_dict.get('email')
-            },
+            "payer": payer_data, # ⭐️ USA O NOVO OBJETO 'PAYER'
             "back_urls": { "success": f"{frontend_url}/payment-success", "failure": f"{frontend_url}/payment-failure", "pending": f"{frontend_url}/payment-pending" },
             "payment_methods": { "installments": plan.get("installments", 1) },
-            "external_reference": f"{user_info_dict.get('id')}-{plan_id}-{plan.get('price')}",
+            "external_reference": f"{user_id}-{plan_id}-{plan.get('price')}",
             "statement_descriptor": "ANOTA&GANHA",
         }
 
-        # 2. OPÇÕES DA REQUISIÇÃO (Enviando o Device ID no Header)
+        # 5. OPÇÕES DA REQUISIÇÃO (Device ID - Mantido)
         request_options = {}
         if payload.deviceId and payload.deviceId.strip():
             request_options["headers"] = {
                 "X-meli-session-id": payload.deviceId
             }
 
-        # ⭐️ 3. CORREÇÃO DO ERRO 500: Chama o SDK de forma segura ⭐️
+        # 6. CRIA A PREFERÊNCIA (Mantido)
         if request_options:
-            # Chama com headers, se tivermos o deviceId
             preference_response = sdk.preference().create(preference_data, request_options=request_options)
         else:
-            # Chama sem o request_options se o deviceId for null (evita o erro 500)
             preference_response = sdk.preference().create(preference_data)
 
         if preference_response["status"] != 201:
