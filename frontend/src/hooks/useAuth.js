@@ -1,4 +1,6 @@
-// src/hooks/useAuth.js
+// SUBSTITUA: src/hooks/useAuth.js
+// ⭐️ VERSÃO 3: Adiciona a gravação de CPF e Telefone durante o registo
+
 import { useState, useEffect } from 'react';
 import { 
   signInWithEmailAndPassword,
@@ -16,22 +18,25 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Monitorar estado de autenticação
+  // Monitorar estado de autenticação (Mantido da v2)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          // Buscar dados adicionais do Firestore
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           const userData = userDoc.data();
           
+          const isAdmin = userData?.role === 'admin';
+          console.log(`[Auth] Utilizador ${firebaseUser.email} é Admin? ${isAdmin}`);
+
           setUser({
             uid: firebaseUser.uid,
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
             emailVerified: firebaseUser.emailVerified,
-            ...userData
+            ...userData,
+            isAdmin: isAdmin 
           });
         } catch (err) {
           console.error('Erro ao buscar dados do usuário:', err);
@@ -40,7 +45,8 @@ export const useAuth = () => {
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
-            emailVerified: firebaseUser.emailVerified
+            emailVerified: firebaseUser.emailVerified,
+            isAdmin: false 
           });
         }
       } else {
@@ -52,7 +58,7 @@ export const useAuth = () => {
     return () => unsubscribe();
   }, []);
 
-  // Login
+  // Login (Mantido)
   const login = async (email, password) => {
     try {
       setError(null);
@@ -65,25 +71,27 @@ export const useAuth = () => {
     }
   };
 
-  // Registro
-  const register = async (email, password, name) => {
+  // ⭐️ INÍCIO DA ALTERAÇÃO (PASSO 2) ⭐️
+  // A função agora recebe 'additionalData' (que contém nome, cpf e telefone)
+  const register = async (email, password, additionalData) => {
     try {
       setError(null);
       
-      // Criar usuário
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
-      // Atualizar perfil
+      // Define o nome no perfil de autenticação
       await updateProfile(userCredential.user, {
-        displayName: name
+        displayName: additionalData.name 
       });
 
-      // Criar documento no Firestore
+      // ⭐️ Guarda os dados (incluindo CPF e Telefone) no Firestore
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         email: email,
-        name: name,
-        displayName: name,
-        role: 'user',
+        name: additionalData.name,
+        displayName: additionalData.name,
+        cpf: additionalData.cpf,         // ⭐️ NOVO CAMPO
+        telefone: additionalData.telefone, // ⭐️ NOVO CAMPO
+        role: 'user', 
         license_type: 'trial',
         trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 dias
         created_at: new Date(),
@@ -97,8 +105,9 @@ export const useAuth = () => {
       throw err;
     }
   };
+  // ⭐️ FIM DA ALTERAÇÃO ⭐️
 
-  // Logout
+  // Logout (Mantido)
   const logout = async () => {
     try {
       await signOut(auth);
@@ -110,7 +119,7 @@ export const useAuth = () => {
     }
   };
 
-  // Reset de senha
+  // Reset de senha (Mantido)
   const resetPassword = async (email) => {
     try {
       setError(null);
@@ -123,12 +132,11 @@ export const useAuth = () => {
     }
   };
 
-  // Atualizar perfil
+  // Atualizar perfil (Mantido)
   const updateUserProfile = async (data) => {
     try {
       if (!user) throw new Error('Usuário não autenticado');
       
-      // Atualizar no Firebase Auth
       if (data.displayName || data.photoURL) {
         await updateProfile(auth.currentUser, {
           displayName: data.displayName || user.displayName,
@@ -136,7 +144,6 @@ export const useAuth = () => {
         });
       }
 
-      // Atualizar no Firestore
       await setDoc(doc(db, 'users', user.uid), {
         ...data,
         updated_at: new Date()
@@ -163,7 +170,7 @@ export const useAuth = () => {
   };
 };
 
-// Mensagens de erro amigáveis
+// Mensagens de erro amigáveis (Mantido)
 const getErrorMessage = (errorCode) => {
   const errorMessages = {
     'auth/user-not-found': 'Usuário não encontrado',
