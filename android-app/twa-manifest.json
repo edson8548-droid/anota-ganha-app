@@ -1,0 +1,50 @@
+{
+  "packageId": "app.web.anoteganhe",
+  "host": "anota-ganha-app.web.app",
+  "name": "Anota & Ganhe Incentivos",
+  "launcherName": "Anota Ganhe",
+  "display": "standalone",
+  "themeColor": "#2563EB",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#2563EB",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://anota-ganha-app.web.app/icon-512.png",
+  "maskableIconUrl": "https://anota-ganha-app.web.app/icon-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "C:\\Users\\edson\\Downloads\\anota-ganha-app\\android-app\\android.keystore",
+    "alias": "android"
+  },
+  "appVersionName": "1",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://anota-ganha-app.web.app/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://anota-ganha-app.web.app/",
+  "minSdkVersion": 21,
+  "orientation": "portrait-primary",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "fileHandlers": [],
+  "launchHandlerClientMode": "",
+  "displayOverride": [
+    "standalone",
+    "fullscreen"
+  ],
+  "appVersion": "1"
+}
