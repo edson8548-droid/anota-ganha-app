@@ -1,5 +1,5 @@
 // SUBSTITUA: src/components/Analytics.js
-// VERSÃO DE TESTE (V5) - Adiciona console.log e filtros
+// VERSÃO DE TESTE (V8) - Corrige o bug de cálculo do 'totalPositivated'.
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
@@ -10,7 +10,7 @@ import * as XLSX from 'xlsx';
 import './Analytics.css';
 
 // ⭐️ TESTE DE VERSÃO ⭐️
-console.log("--- CARREGADO: Analytics.js v5 (Filtro Corrigido) ---");
+console.log("--- CARREGADO: Analytics.js v8 (Correção de Cálculo) ---");
 
 
 const Analytics = ({ campaign, clients, onClose }) => {
@@ -56,14 +56,14 @@ const Analytics = ({ campaign, clients, onClose }) => {
       });
     }
 
-    let totalPositivated = 0;
+    let totalPositivated = 0; // ⭐️ O contador global
     let totalValue = 0;
     const clientsAnalysis = [];
     let clientsWithAllProducts = 0;
 
     filteredClients.forEach(client => {
       let clientProductsTotalCampaign = 0;
-      let clientPositivated = 0;
+      let clientPositivated = 0; // O contador local
       let clientValue = 0;
       const missingProducts = {};
       const industryCompletion = {}; 
@@ -82,7 +82,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
           campaignProducts.forEach(productName => {
             const productData = clientIndustryProducts[productName];
             if (productData?.positivado) {
-              clientPositivated++;
+              clientPositivated++; // Incrementa o local
               positivadosInIndustry++;
               industryPositivated = true;
               const value = productData.valor || 0;
@@ -101,6 +101,10 @@ const Analytics = ({ campaign, clients, onClose }) => {
           industryCompletion[industryName] = (totalProductsInIndustry > 0 && positivadosInIndustry === totalProductsInIndustry);
         });
       }
+
+      // ⭐️⭐️⭐️ A CORREÇÃO DO BUG ESTÁ AQUI ⭐️⭐️⭐️
+      // (Soma o total do cliente ao total global)
+      totalPositivated += clientPositivated;
 
       const percentage = clientProductsTotalCampaign > 0 ? (clientPositivated / clientProductsTotalCampaign) * 100 : 0;
       const isComplete = clientProductsTotalCampaign > 0 && clientPositivated === clientProductsTotalCampaign;
@@ -143,7 +147,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
     return {
       totalClients: filteredClients.length, totalProducts, totalPositivated,
       totalValue, clientsWithAllProducts,
-      positivationRate: filteredClients.length > 0 ? (totalPositivated / (totalProducts * filteredClients.length)) * 100 : 0,
+      positivationRate: (totalProducts * filteredClients.length) > 0 ? (totalPositivated / (totalProducts * filteredClients.length)) * 100 : 0, // ⭐️ Cálculo da Taxa também corrigido
       industriesData: Object.values(industriesData),
       industryNames,
       clientsAnalysis, pieDataGeneral, pieDataCities, barDataProducts,
@@ -224,7 +228,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
   return (
     <div className="analytics-container">
       {/* ⭐️ TESTE DE VERSÃO ⭐️ */}
-      <h1 style={{color: 'red', position: 'fixed', top: 0, left: 0, zIndex: 9999}}>V5</h1>
+      <h1 style={{color: 'red', position: 'fixed', top: 0, left: 0, zIndex: 9999}}>V8</h1>
       
       {/* Header */}
       <div className="analytics-header">
@@ -349,11 +353,19 @@ const Analytics = ({ campaign, clients, onClose }) => {
           </div>
         </div>
         
-        {/* ⭐️ FILTRO DE STATUS (RE-ADICIONADO) ⭐️ */}
+        {/* ⭐️ FILTRO DE STATUS (CORRIGIDO PARA SER CLICÁVEL) ⭐️ */}
         <div className="analytics-list-filters">
           <div className="filter-group">
-            <label>Filtrar Status (das indústrias selecionadas acima):</label>
-            <select value={filterCompletion} onChange={(e) => setFilterCompletion(e.target.value)} disabled={numSelectedIndustries === 0}>
+            {/* ⭐️ CORREÇÃO: 'htmlFor' (para o texto ser clicável) ⭐️ */}
+            <label htmlFor="status-filter">Filtrar Status (das indústrias selecionadas acima):</label>
+            
+            {/* ⭐️ CORREÇÃO: 'id' (para ligar ao rótulo) ⭐️ */}
+            <select 
+              id="status-filter" 
+              value={filterCompletion} 
+              onChange={(e) => setFilterCompletion(e.target.value)} 
+              disabled={numSelectedIndustries === 0}
+            >
               <option value="all">Todos (Completos e Incompletos)</option>
               <option value="complete">✅ Apenas 100% Completos</option>
               <option value="incomplete">⏳ Apenas Incompletos</option>
