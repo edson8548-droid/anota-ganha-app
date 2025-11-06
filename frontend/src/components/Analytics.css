@@ -1,6 +1,6 @@
 /* ========================================
    SUBSTITUA: src/components/Analytics.css
-   (Correção do texto da barra + Filtro de Status)
+   (Correção do cabeçalho responsivo)
    ======================================== */
 
 .analytics-container {
@@ -225,13 +225,12 @@
   height: 100%; background: #3b82f6; border-radius: 12px;
   transition: width 0.3s;
 }
-/* ⭐️ CORREÇÃO DE COR DO TEXTO (ILEGÍVEL) ⭐️ */
 .progress-bar-small span {
   position: absolute; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   font-size: 11px; font-weight: 600;
-  color: #1f2937; /* Era '111827', mudei para cinza mais escuro */
-  text-shadow: 0 0 3px white; /* Adiciona sombra para ler sobre a barra azul */
+  color: #1f2937; 
+  text-shadow: 0 0 3px white; 
   z-index: 1;
 }
 
@@ -286,6 +285,30 @@
 
 /* Responsive */
 @media (max-width: 768px) {
+  /* ⭐️ INÍCIO DA CORREÇÃO DO CABEÇALHO (Botões Cortados) ⭐️ */
+  .analytics-header {
+    flex-direction: column; /* Empilha o cabeçalho */
+    align-items: flex-start; /* Alinha tudo à esquerda */
+    gap: 20px; /* Adiciona espaço entre o título e os botões */
+  }
+
+  .analytics-header-right {
+    flex-direction: column; /* Empilha os botões Exportar/Imprimir */
+    width: 100%; /* Faz os botões ocuparem a largura total */
+    gap: 10px; /* Espaço entre os botões */
+  }
+
+  .btn-export,
+  .btn-print {
+    width: 100%; /* Botões com largura total */
+    justify-content: center; /* Centra o texto/ícone nos botões */
+  }
+
+  .analytics-title {
+    font-size: 24px; /* Reduz o título principal */
+  }
+  /* ⭐️ FIM DA CORREÇÃO ⭐️ */
+  
   .analytics-filters { flex-direction: column; }
   .metrics-grid { grid-template-columns: 1fr; }
   .charts-grid { grid-template-columns: 1fr; }
@@ -360,7 +383,7 @@
   accent-color: #667eea;
 }
 
-/* ⭐️ FILTRO DE STATUS (O QUE SUMIU) ⭐️ */
+/* FILTRO DE STATUS (O QUE SUMIU) */
 .analytics-list-filters {
   display: grid;
   grid-template-columns: 1fr;
