@@ -3,8 +3,43 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
 import './Register.css';
 
+// ⭐️ INÍCIO: Funções de Máscara (para formatar os campos) ⭐️
+const formatCPF = (value) => {
+  return value
+    .replace(/\D/g, '') // Remove tudo o que não é dígito
+    .replace(/(\d{3})(\d)/, '$1.$2') // Coloca um ponto após o terceiro dígito
+    .replace(/(\d{3})(\d)/, '$1.$2') // Coloca um ponto após o sexto dígito
+    .replace(/(\d{3})(\d{1,2})/, '$1-$2') // Coloca um hífen após o nono dígito
+    .slice(0, 14); // Limita o tamanho máximo (111.222.333-44)
+};
+
+const formatTelefone = (value) => {
+  let v = value.replace(/\D/g, '');
+  v = v.slice(0, 11); // Limita a 11 dígitos (DDD + 9 dígitos)
+  
+  if (v.length > 10) {
+    // Celular com 9º dígito: (11) 98888-7777
+    v = v.replace(/^(\d\d)(\d{5})(\d{4}).*/, '($1) $2-$3');
+  } else if (v.length > 6) {
+    // Celular/Fixo com 8 dígitos: (11) 8888-7777
+    v = v.replace(/^(\d\d)(\d{4})(\d{4}).*/, '($1) $2-$3');
+  } else if (v.length > 2) {
+    // (11) 8888
+    v = v.replace(/^(\d\d)(\d+)/, '($1) $2');
+  } else {
+    // (11
+    v = v.replace(/^(\d*)/, '($1');
+  }
+  return v;
+};
+// ⭐️ FIM: Funções de Máscara ⭐️
+
 const Register = () => {
   const [name, setName] = useState('');
+  // ⭐️ Adicionados novos estados para os novos campos
+  const [cpf, setCpf] = useState('');
+  const [telefone, setTelefone] = useState('');
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -18,7 +53,8 @@ const Register = () => {
     e.preventDefault();
     setError('');
 
-    if (!name || !email || !password || !confirmPassword) {
+    // ⭐️ Atualizada a validação de campos vazios
+    if (!name || !email || !password || !confirmPassword || !cpf || !telefone) {
       setError('Preencha todos os campos');
       return;
     }
@@ -32,11 +68,33 @@ const Register = () => {
       setError('A senha deve ter no mínimo 6 caracteres');
       return;
     }
+    
+    // ⭐️ Novas validações de CPF e Telefone
+    const cpfDigits = cpf.replace(/\D/g, '');
+    if (cpfDigits.length !== 11) {
+      setError('CPF inválido. Deve conter 11 dígitos.');
+      return;
+    }
+    
+    const telDigits = telefone.replace(/\D/g, '');
+    if (telDigits.length < 10 || telDigits.length > 11) {
+      setError('Telefone inválido. Inclua o DDD (mínimo 10 dígitos).');
+      return;
+    }
 
     setLoading(true);
 
     try {
-      await register(email, password, name);
+      // ⭐️ Prepara os dados adicionais para enviar (limpos, sem máscaras)
+      const additionalData = {
+        name: name,
+        cpf: cpfDigits,
+        telefone: telDigits
+      };
+      
+      // ⭐️ A chamada 'register' agora envia os dados adicionais
+      await register(email, password, additionalData);
+      
       navigate('/dashboard');
     } catch (err) {
       console.error('Erro no registro:', err);
@@ -63,7 +121,7 @@ const Register = () => {
     <div className="register-page">
       <div className="register-container">
         <div className="register-header">
-          <h1>🎯 Anota Ganha</h1>
+          <h1>🎯 Anota & Ganhe</h1>
           <p>Crie sua conta grátis</p>
         </div>
         
@@ -86,6 +144,36 @@ const Register = () => {
               required
             />
           </div>
+          
+          {/* ⭐️ INÍCIO: Novos Campos (CPF e Telefone) ⭐️ */}
+          <div className="form-group">
+            <label htmlFor="cpf">CPF</label>
+            <input
+              id="cpf"
+              type="text" // Usamos "text" para a máscara funcionar
+              placeholder="000.000.000-00"
+              value={cpf}
+              onChange={(e) => setCpf(formatCPF(e.target.value))}
+              disabled={loading}
+              maxLength={14}
+              required
+            />
+          </div>
+          
+          <div className="form-group">
+            <label htmlFor="telefone">Telefone / WhatsApp</label>
+            <input
+              id="telefone"
+              type="tel" // "tel" é bom para telemóveis
+              placeholder="(00) 00000-0000"
+              value={telefone}
+              onChange={(e) => setTelefone(formatTelefone(e.target.value))}
+              disabled={loading}
+              maxLength={15}
+              required
+            />
+          </div>
+          {/* ⭐️ FIM: Novos Campos ⭐️ */}
           
           <div className="form-group">
             <label htmlFor="email">Email</label>
