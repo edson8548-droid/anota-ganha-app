@@ -1,7 +1,7 @@
 /* ============================================
    DASHBOARD - CSS COMPLETO E MODERNO
-   Design: Gradientes, Sombras, Animações
-   Versão: 2.0
+   Versão: 2.3
+   ⭐️ CORREÇÃO: Adiciona Estilo do Troféu 🏆 ⭐️
    ============================================ */
 
 /* ==================== RESET E BASE ==================== */
@@ -11,7 +11,6 @@
   box-sizing: border-box;
 }
 
-/* ⚠️ ATENÇÃO: Renomeei de .dashboard para .dashboard-container para corresponder ao JS */
 .dashboard-container {
   min-height: 100vh;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
@@ -344,9 +343,9 @@
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  display: flex; /* Adicionado */
-  flex-direction: column; /* Adicionado */
-  justify-content: space-between; /* Adicionado */
+  display: flex; 
+  flex-direction: column; 
+  justify-content: space-between; 
 }
 
 .campaign-card::before {
@@ -466,7 +465,7 @@
   gap: 1rem;
   padding-top: 1rem;
   border-top: 2px solid #f3f4f6;
-  margin-bottom: 1.5rem; /* Adicionado */
+  margin-bottom: 1.5rem; 
 }
 
 .info-row {
@@ -552,10 +551,10 @@
 }
 
 /* ==================== CAMPAIGN VIEW ==================== */
-/* ⚠️ ATENÇÃO: Classe .campaign-view adicionada */
 .campaign-view {
   min-height: 100vh;
-  /* background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); */
+  width: 100%;
+  overflow-x: hidden;
 }
 
 .campaign-view-header {
@@ -832,6 +831,10 @@
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  /* ⭐️ Garantir que o card se comporte como flex column ⭐️ */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .client-card::before {
@@ -1132,11 +1135,32 @@
     flex-direction: column;
     gap: 1.5rem;
   }
-
+  
+  /* ⭐️ INÍCIO DA CORREÇÃO DO BUG DE ALINHAMENTO (HEADER) ⭐️ */
+  
   .campaign-view-actions {
     width: 100%;
     justify-content: center;
+    /* ⭐️ CORREÇÃO: Força a quebra de linha dos botões */
+    flex-wrap: wrap; 
   }
+  
+  .campaign-view-left {
+    width: 100%;
+    overflow: hidden; 
+  }
+  
+  .campaign-view-info h1 {
+    font-size: 1.5rem; 
+    word-break: break-word; 
+  }
+  
+  .campaign-view-info p {
+    font-size: 0.9rem; 
+    white-space: normal; 
+    word-break: break-word; 
+  }
+  /* ⭐️ FIM DA CORREÇÃO DO BUG ⭐️ */
 
   .clients-actions {
     flex-direction: column;
@@ -1231,4 +1255,53 @@
   border-color: #10b981;
   background: #f0fdf4;
   transform: scale(1.02);
+}
+
+/* ============================================
+   ⭐️ NOVOS ESTILOS (ACORDEÃO DO CLIENTE) ⭐️
+   ============================================ */
+.client-collapsible-content {
+  /* Este contentor segura o conteúdo que expande */
+  margin-top: 1rem;
+  padding-top: 1.5rem;
+  border-top: 2px solid #f3f4f6;
+}
+
+.btn-toggle-client {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-toggle-client:hover {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+}
+
+/* Estilo do botão quando está no modo "Ocultar" (aberto) */
+.client-collapsible-content > .btn-toggle-client {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.client-collapsible-content > .btn-toggle-client:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+/* =i==========================================
+   ⭐️ NOVO ESTILO (ÍCONE DE TROFÉU) ⭐️
+   ============================================ */
+.icon-complete {
+  margin-left: 8px;
+  font-size: 18px;
 }
