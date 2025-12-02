@@ -40,3 +40,4 @@ mercadopago # ⭐️ ADICIONADO
 
 # Firebase Admin SDK para acesso ao Firestore
 firebase-admin
+werkzeug>=3.1.4 # not directly required, pinned by Snyk to avoid a vulnerability
