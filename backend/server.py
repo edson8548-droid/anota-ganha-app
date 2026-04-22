@@ -13,6 +13,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 # ... (restante dos imports) ...
 from routes.mercadopago import router as mercadopago_router
 from routes.mercadopago import setup_mercadopago
+from routes.license import router as license_router
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import uuid
@@ -93,6 +94,7 @@ api_router = APIRouter(prefix="/api")
 
 # ⭐⭐⭐ ADICIONAR ROTAS DO MERCADO PAGO ⭐⭐⭐
 app.include_router(mercadopago_router, prefix="/api/mercadopago", tags=["Mercado Pago"])
+app.include_router(license_router, prefix="/api/license", tags=["Licença"])
 
 # ==================== Mount Router & Lifecycle ====================
 app.include_router(api_router)
