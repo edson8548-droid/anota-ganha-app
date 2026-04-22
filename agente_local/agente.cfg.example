@@ -1,0 +1,6 @@
+[licenca]
+; Cole aqui a sua Chave de Licença (visível no painel web em "Minha Conta")
+chave = XXXX-XXXX-XXXX-XXXX
+
+; URL do servidor (não altere)
+servidor = https://api.representantes.app
