@@ -206,6 +206,7 @@ const Dashboard = () => {
             </div>
             <div className="header-actions">
               <button className="btn-plans-header" onClick={() => navigate('/plans')}>💎 Ver Planos</button>
+              <button className="btn-plans-header" onClick={() => navigate('/minha-licenca')} style={{background:'#10b981'}}>🔑 Minha Licença</button>
               <button className="btn-whatsapp-header" onClick={handleWhatsAppSupport}>💬 Suporte</button>
               <div className="user-menu">
                 <div className="user-avatar">{userInitial}</div>
@@ -325,6 +326,7 @@ const Dashboard = () => {
             </div>
             <div className="campaign-view-actions">
               <button className="btn-plans-header" onClick={() => navigate('/plans')}>💎 Ver Planos</button>
+              <button className="btn-plans-header" onClick={() => navigate('/minha-licenca')} style={{background:'#10b981'}}>🔑 Minha Licença</button>
               <button className="btn-edit-campaign" onClick={(e) => handleEditCampaign(e, selectedCampaign)}>✏️ Editar Campanha</button>
               <button className="btn-whatsapp" onClick={handleWhatsAppSupport}>💬 Suporte</button>
               <button className="btn-logout" onClick={handleLogout} title="Sair">🚪</button>
