@@ -83,7 +83,7 @@ const Checkout = () => {
     script.onload = () => {
       try {
         // Esta é a chave: 'mpInstance' é criada QUANDO o script carrega
-        window.mpInstance = new window.MercadoPago(MERCADOPAGADO_PUBLIC_KEY, { locale: 'pt-BR' });
+        window.mpInstance = new window.MercadoPago(MERCADOPAGO_PUBLIC_KEY, { locale: 'pt-BR' });
         console.log("✅ MP SDK (mpInstance) inicializado.");
       } catch (e) {
         console.error("Falha ao inicializar MP:", e);
