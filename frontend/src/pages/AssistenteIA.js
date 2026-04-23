@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
 import './AssistenteIA.css';
 
-const API_URL = 'https://anota-ganha-backend.onrender.com';
+const API_URL = 'https://api.venpro.com.br';
 
 const PROMPTS_RAPIDOS = [
   {

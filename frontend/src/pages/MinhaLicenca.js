@@ -4,7 +4,7 @@ import { useAuthContext } from '../contexts/AuthContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { auth } from '../firebase/config';
 
-const API_URL = 'https://anota-ganha-backend.onrender.com';
+const API_URL = 'https://api.venpro.com.br';
 
 const MinhaLicenca = () => {
   const navigate = useNavigate();
