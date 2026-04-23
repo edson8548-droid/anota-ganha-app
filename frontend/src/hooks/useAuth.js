@@ -93,7 +93,7 @@ export const useAuth = () => {
         telefone: additionalData.telefone, // ⭐️ NOVO CAMPO
         role: 'user', 
         license_type: 'trial',
-        trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 dias
+        trial_ends_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 dias
         created_at: new Date(),
         updated_at: new Date()
       });
