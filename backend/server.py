@@ -48,10 +48,12 @@ app.add_middleware(LogCorsPreflightMiddleware)
 
 # ⭐️ URLs PERMITIDAS HARDCODED ⭐️
 origins = [
-    "https://anota-ganha-app.web.app",      # Produção (Firebase Hosting)
-    "https://anota-ganha-app.firebaseapp.com", # Domínio de backup do Firebase
-    "http://localhost:3000",                # Desenvolvimento local
-    "http://localhost:5173",                # Vite
+    "https://venpro.com.br",               # Domínio principal
+    "https://www.venpro.com.br",           # Com www
+    "https://anota-ganha-app.web.app",     # Firebase Hosting (backup)
+    "https://anota-ganha-app.firebaseapp.com",
+    "http://localhost:3000",
+    "http://localhost:5173",
 ]
 
 app.add_middleware(
