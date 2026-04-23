@@ -1,6 +1,3 @@
-// SUBSTITUA: src/components/Analytics.js
-// VERSÃO DE TESTE (V8) - Corrige o bug de cálculo do 'totalPositivated'.
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
@@ -9,8 +6,6 @@ import {
 import * as XLSX from 'xlsx';
 import './Analytics.css';
 
-// ⭐️ TESTE DE VERSÃO ⭐️
-console.log("--- CARREGADO: Analytics.js v8 (Correção de Cálculo) ---");
 
 
 const Analytics = ({ campaign, clients, onClose }) => {
@@ -22,7 +17,6 @@ const Analytics = ({ campaign, clients, onClose }) => {
 
   // Lógica de cálculo principal (useMemo)
   const analytics = useMemo(() => {
-    console.log("Analytics: recalculando com nova campanha ->", campaign?.name);
     if (!campaign || !clients) return null;
 
     const campaignClients = clients; 
@@ -158,7 +152,6 @@ const Analytics = ({ campaign, clients, onClose }) => {
   // Inicializar checkboxes
   useEffect(() => {
     if (analytics && analytics.industryNames) {
-      console.log("Analytics: Atualizando checkboxes de indústria", analytics.industryNames);
       const initialState = {};
       analytics.industryNames.forEach(name => {
         initialState[name] = true;
@@ -211,7 +204,42 @@ const Analytics = ({ campaign, clients, onClose }) => {
     });
   }, [analytics, selectedIndustries, filterCompletion]);
 
-  const exportToExcel = () => { /* ... lógica original ... */ alert('Exportado!'); };
+  const exportToExcel = () => {
+    if (!analytics) return;
+
+    const resumo = [
+      ['Campanha', campaign.name],
+      ['Total de Clientes', analytics.totalClients],
+      ['Produtos Positivados', analytics.totalPositivated],
+      ['Taxa de Positivação', `${analytics.positivationRate.toFixed(1)}%`],
+      ['Valor Total', analytics.totalValue],
+      ['Clientes 100% Completos', analytics.clientsWithAllProducts],
+    ];
+
+    const clientesData = [
+      ['Cliente', 'Cidade', 'CNPJ', 'Positivados', 'Total Produtos', '% Conclusão', 'Valor (R$)', 'Status']
+    ];
+    analytics.clientsAnalysis.forEach(c => {
+      clientesData.push([
+        c.name, c.city || '', c.cnpj || '',
+        c.positivated, c.totalProducts,
+        parseFloat(c.percentage.toFixed(1)),
+        parseFloat(c.value.toFixed(2)),
+        c.isComplete ? '100% Completo' : 'Pendente'
+      ]);
+    });
+
+    const produtosData = [['Indústria', 'Produto', 'Clientes Positivados']];
+    analytics.topProducts.forEach(p => {
+      produtosData.push([p.industry, p.product, p.count]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumo), 'Resumo');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(clientesData), 'Clientes');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(produtosData), 'Top Produtos');
+    XLSX.writeFile(wb, `relatorio_${campaign.name.replace(/\s+/g, '_')}.xlsx`);
+  };
   const handlePrint = () => { window.print(); };
 
   if (!analytics) {
@@ -227,9 +255,6 @@ const Analytics = ({ campaign, clients, onClose }) => {
 
   return (
     <div className="analytics-container">
-      {/* ⭐️ TESTE DE VERSÃO ⭐️ */}
-      <h1 style={{color: 'red', position: 'fixed', top: 0, left: 0, zIndex: 9999}}>V8</h1>
-      
       {/* Header */}
       <div className="analytics-header">
         <div className="analytics-header-left">

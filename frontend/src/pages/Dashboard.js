@@ -1,5 +1,3 @@
-// SUBSTITUA: src/pages/Dashboard.js
-// VERSÃO V9 - Corrige o 'handleCreateClient' para a "Base de Clientes Global"
 
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -15,8 +13,6 @@ import Analytics from '../components/Analytics';
 import { campaignsService } from '../services/campaigns.service';
 import './Dashboard.css'; 
 
-// ⭐️ TESTE DE VERSÃO ⭐️
-console.log("--- CARREGADO: Dashboard.js v9 (Correção handleCreateClient) ---");
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -87,20 +83,10 @@ const Dashboard = () => {
     try {
       if (!selectedCampaign) return;
 
-      console.log('[Dashboard] Iniciando processo de 2 passos (Criar + Ligar)');
-      
-      // 1. Cria o cliente global (sem campaignId)
-      // O hook 'createClient' (v2) retorna o ID do novo cliente
-      const newClientId = await createClient(clientData); 
-      
+      const newClientId = await createClient(clientData);
+
       if (newClientId) {
-        console.log(`[Dashboard] Passo 1/2: Cliente global ${newClientId} criado.`);
-        
-        // 2. Liga o newClientId à lista 'clientIds' da campanha atual
         await campaignsService.linkClientToCampaign(selectedCampaign.id, newClientId);
-        
-        console.log(`[Dashboard] Passo 2/2: Cliente ${newClientId} ligado à campanha ${selectedCampaign.id}.`);
-        
         setShowCreateClient(false);
       } else {
         throw new Error('O serviço de criação de cliente não retornou um ID.');
@@ -202,10 +188,11 @@ const Dashboard = () => {
         <header className="dashboard-header">
           <div className="header-content">
             <div className="header-left">
-              <a className="logo" href="/dashboard"><span className="logo-icon">📊</span>Anota & Ganhe Incentivos</a>
+              <a className="logo" href="/dashboard"><span className="logo-icon">📊</span>Venpro</a>
             </div>
             <div className="header-actions">
               <button className="btn-plans-header" onClick={() => navigate('/plans')}>💎 Ver Planos</button>
+              <button className="btn-plans-header" onClick={() => navigate('/assistente')} style={{background:'#B35C44'}}>🤖 Assistente IA</button>
               <button className="btn-plans-header" onClick={() => navigate('/minha-licenca')} style={{background:'#10b981'}}>🔑 Minha Licença</button>
               <button className="btn-whatsapp-header" onClick={handleWhatsAppSupport}>💬 Suporte</button>
               <div className="user-menu">
@@ -326,6 +313,7 @@ const Dashboard = () => {
             </div>
             <div className="campaign-view-actions">
               <button className="btn-plans-header" onClick={() => navigate('/plans')}>💎 Ver Planos</button>
+              <button className="btn-plans-header" onClick={() => navigate('/assistente')} style={{background:'#B35C44'}}>🤖 Assistente IA</button>
               <button className="btn-plans-header" onClick={() => navigate('/minha-licenca')} style={{background:'#10b981'}}>🔑 Minha Licença</button>
               <button className="btn-edit-campaign" onClick={(e) => handleEditCampaign(e, selectedCampaign)}>✏️ Editar Campanha</button>
               <button className="btn-whatsapp" onClick={handleWhatsAppSupport}>💬 Suporte</button>

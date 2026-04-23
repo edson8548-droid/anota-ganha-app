@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Venpro — Ferramentas para Representantes Comerciais</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  /* ── Paleta 2026: Executivo Premium (pesquisa de mercado) ── */
+  --bg:      #F0EFEB;   /* Cloud Dancer — fundo principal off-white */
+  --bg2:     #FFFFFF;   /* Soft Cream — cards */
+  --bg3:     #E8E6E0;   /* Cloud Dancer escuro — hover / headers */
+  --borda:   #D6D4CE;   /* borda sutil aquecida */
+  --borda2:  #B8B5AD;   /* borda média */
+  --acento:  #B35C44;   /* Terracotta Sophisticated */
+  --acento2: #C96B52;   /* Terracotta hover */
+  --verde:   #1A7A4A;   /* verde escuro — contraste em fundo claro */
+  --amarelo: #7A5C1E;   /* âmbar escuro — contraste em fundo claro */
+  --texto:   #2D2926;   /* Deep Espresso — texto principal */
+  --sub:     #6B6560;   /* cinza quente médio */
+  --sub2:    #9B9690;   /* cinza quente claro */
+  --branco:  #ffffff;
+}
+html { scroll-behavior: smooth; }
+body { font-family: 'Segoe UI', system-ui, Arial, sans-serif; background: var(--bg); color: var(--texto); }
+a { text-decoration: none; color: inherit; }
+
+/* ══ LOGO ══ */
+.logo-wrap { display:flex; align-items:center; gap:10px; }
+.logo-icon {
+  width:34px; height:34px; border-radius:8px;
+  background: linear-gradient(135deg, var(--acento), #D4826C);
+  display:flex; align-items:center; justify-content:center;
+  box-shadow: 0 0 16px rgba(179,92,68,.2);
+  flex-shrink: 0;
+}
+.logo-icon svg { width:18px; height:18px; }
+.logo-text { font-size:21px; font-weight:800; letter-spacing:-0.5px; }
+.logo-ven { color: var(--texto); }
+.logo-pro { color: var(--acento); }
+
+/* ══ NAV ══ */
+nav {
+  position:sticky; top:0; z-index:100;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 6%; height:64px;
+  background: rgba(240,239,235,.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(214,212,206,.9);
+}
+.nav-links { display:flex; gap:30px; }
+.nav-links a {
+  color:var(--sub); font-weight:500; font-size:13px;
+  text-transform:uppercase; letter-spacing:.5px;
+  transition:color .2s;
+}
+.nav-links a:hover { color:var(--texto); }
+.nav-cta {
+  background: var(--acento); color:#fff; border:none;
+  border-radius:8px; padding:10px 22px;
+  font-size:14px; font-weight:700; cursor:pointer;
+  letter-spacing:.3px;
+  transition: background .2s, transform .15s, box-shadow .2s;
+  box-shadow: 0 2px 12px rgba(179,92,68,.2);
+}
+.nav-cta:hover { background:var(--acento2); transform:translateY(-1px); box-shadow: 0 4px 20px rgba(179,92,68,.3); }
+
+/* ══ HERO ══ */
+.hero-wrap {
+  position: relative; overflow: hidden;
+  background: var(--bg);
+}
+/* Glow ambient — tendência 2026 */
+.hero-wrap::before {
+  content:'';
+  position:absolute; top:-120px; left:50%; transform:translateX(-50%);
+  width:900px; height:500px;
+  background: radial-gradient(ellipse at center,
+    rgba(179,92,68,.07) 0%,
+    rgba(179,92,68,.03) 45%,
+    transparent 70%);
+  pointer-events:none;
+}
+.hero {
+  max-width: 1160px; margin:0 auto;
+  padding: 96px 6% 80px;
+  display: flex; gap: 64px; align-items: flex-start; flex-wrap: wrap;
+  position: relative;
+}
+.hero-left { flex:1; min-width:280px; }
+.hero-tag {
+  display:inline-flex; align-items:center; gap:8px;
+  color:var(--acento); font-size:12px; font-weight:700;
+  text-transform:uppercase; letter-spacing:1.2px; margin-bottom:22px;
+}
+.hero-tag::before { content:''; width:20px; height:2px; background:var(--acento); border-radius:2px; }
+.hero h1 {
+  font-size: clamp(36px,4.5vw,58px);
+  font-weight:900; line-height:1.1; margin-bottom:20px;
+}
+.hero h1 em { font-style:normal; color:var(--acento); }
+.hero-sub {
+  font-size:17px; color:var(--sub); line-height:1.75;
+  max-width:480px; margin-bottom:40px;
+}
+.hero-btns { display:flex; gap:14px; flex-wrap:wrap; }
+.btn-pri {
+  background:var(--acento); color:#fff; border:none;
+  border-radius:9px; padding:15px 34px;
+  font-size:16px; font-weight:700; cursor:pointer;
+  box-shadow: 0 4px 24px rgba(179,92,68,.25);
+  transition: background .2s, transform .15s;
+}
+.btn-pri:hover { background:var(--acento2); transform:translateY(-2px); }
+.btn-sec {
+  background:transparent; color:var(--sub);
+  border:1px solid var(--borda); border-radius:9px;
+  padding:14px 28px; font-size:15px; font-weight:600; cursor:pointer;
+  transition: border-color .2s, color .2s;
+}
+.btn-sec:hover { border-color:var(--borda2); color:var(--texto); }
+.hero-stats { display:flex; gap:36px; margin-top:44px; flex-wrap:wrap; }
+.hs-val { font-size:32px; font-weight:900; color:var(--texto); line-height:1; }
+.hs-val b { color:var(--acento); font-weight:900; }
+.hs-lbl { font-size:12px; color:var(--sub); margin-top:4px; }
+
+/* ══ MOCK COTAÇÃO ══ */
+.hero-right { flex:1.1; min-width:300px; }
+.mock {
+  background:var(--bg2); border:1px solid var(--borda);
+  border-radius:16px; overflow:hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.04);
+}
+.mock-bar {
+  background:var(--bg3); padding:12px 18px;
+  display:flex; align-items:center; gap:8px;
+  border-bottom:1px solid var(--borda);
+}
+.dot { width:10px; height:10px; border-radius:50%; }
+.mock-bar-title { font-size:12px; color:var(--sub); margin-left:8px; font-family:monospace; }
+.mock-body { padding:18px; }
+.mock-info { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+.mock-info-l { font-size:12px; color:var(--sub); }
+.mock-info-l b { color:var(--acento); }
+.mock-badge-run {
+  font-size:11px; color:var(--verde);
+  background:rgba(26,122,74,.08); border:1px solid rgba(26,122,74,.18);
+  border-radius:20px; padding:3px 10px;
+}
+table.mt { width:100%; border-collapse:collapse; font-size:12px; }
+table.mt th {
+  color:var(--sub2); text-transform:uppercase;
+  font-size:10px; letter-spacing:.6px;
+  padding:6px 10px; border-bottom:1px solid var(--borda);
+  text-align:left; font-weight:600;
+}
+table.mt td { padding:9px 10px; border-bottom:1px solid rgba(0,0,0,.05); }
+table.mt tr:last-child td { border-bottom:none; }
+table.mt tr:hover td { background:rgba(0,0,0,.02); }
+.td-prod { color:var(--texto); font-weight:500; }
+.td-como { color:var(--sub); font-size:11px; }
+.td-preco { color:var(--acento); font-weight:700; font-size:13px; }
+.tag-ok   { background:rgba(26,122,74,.08);  color:var(--verde); font-size:10px; font-weight:700; border-radius:5px; padding:3px 8px; white-space:nowrap; }
+.tag-fora { background:rgba(100,116,139,.12); color:var(--sub);   font-size:10px; font-weight:700; border-radius:5px; padding:3px 8px; white-space:nowrap; }
+.mock-foot {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  border-top:1px solid var(--borda);
+  background:var(--bg3);
+}
+.mf { padding:14px 16px; border-right:1px solid var(--borda); }
+.mf:last-child { border-right:none; }
+.mf-v { font-size:22px; font-weight:900; line-height:1; }
+.mf-l { font-size:10px; color:var(--sub); margin-top:4px; }
+
+/* ══ SECOES ══ */
+.sec-wrap { padding:80px 6%; }
+.sec-wrap.alt { background:var(--bg2); }
+.sec-inner { max-width:1160px; margin:0 auto; }
+.sec-lbl {
+  color:var(--acento); font-size:12px; font-weight:700;
+  text-transform:uppercase; letter-spacing:1.2px;
+  margin-bottom:12px; display:flex; align-items:center; gap:8px;
+}
+.sec-lbl::before { content:''; width:18px; height:2px; background:var(--acento); }
+.sec-lbl.center { justify-content:center; }
+.sec-lbl.center::before { display:none; }
+.sec-h { font-size:clamp(28px,3vw,42px); font-weight:800; line-height:1.2; margin-bottom:14px; }
+.sec-h.center { text-align:center; }
+.sec-p { color:var(--sub); font-size:16px; line-height:1.7; max-width:540px; margin-bottom:52px; }
+.sec-p.center { text-align:center; margin-left:auto; margin-right:auto; }
+
+/* ══ FEATURES ══ */
+.feat-badge-soon {
+  display:inline-block;
+  font-size:10px; font-weight:700;
+  background:rgba(122,92,30,.08); color:var(--amarelo);
+  border:1px solid rgba(122,92,30,.2);
+  border-radius:20px; padding:3px 10px;
+  letter-spacing:.3px; margin-bottom:12px;
+}
+.feat-badge-live {
+  display:inline-block;
+  font-size:10px; font-weight:700;
+  background:rgba(26,122,74,.08); color:var(--verde);
+  border:1px solid rgba(26,122,74,.2);
+  border-radius:20px; padding:3px 10px;
+  letter-spacing:.3px; margin-bottom:12px;
+}
+.feat-card.soon { opacity:.75; }
+.feat-card.soon:hover { border-color:var(--borda2); transform:none; }
+.feat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:20px; }
+.feat-card {
+  background:var(--bg2); border:1px solid var(--borda);
+  border-radius:14px; padding:30px;
+  transition: border-color .25s, transform .2s;
+}
+.feat-card:hover { border-color:var(--acento); transform:translateY(-4px); }
+.feat-ico {
+  width:50px; height:50px; border-radius:12px;
+  background:rgba(179,92,68,.08);
+  display:flex; align-items:center; justify-content:center;
+  font-size:24px; margin-bottom:18px;
+}
+.feat-h { font-size:17px; font-weight:700; margin-bottom:8px; }
+.feat-p { color:var(--sub); font-size:14px; line-height:1.65; }
+
+/* ══ COMO FUNCIONA ══ */
+.steps { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); border:1px solid var(--borda); border-radius:16px; overflow:hidden; margin-top:0; }
+.step { padding:32px 28px; border-right:1px solid var(--borda); }
+.step:last-child { border-right:none; }
+.step-n { font-size:46px; font-weight:900; color:var(--borda); line-height:1; margin-bottom:16px; transition:color .3s; }
+.step:hover .step-n { color:var(--acento); }
+.step-h { font-size:15px; font-weight:700; margin-bottom:8px; }
+.step-p { color:var(--sub); font-size:13px; line-height:1.65; }
+
+/* ══ PLANOS ══ */
+.planos-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:20px; max-width:780px; margin:0 auto;
+}
+.plano {
+  background:var(--bg); border:1px solid var(--borda);
+  border-radius:16px; padding:36px 32px;
+  position:relative; transition: border-color .2s, transform .2s;
+}
+.plano:hover { border-color:var(--borda2); transform:translateY(-3px); }
+.plano.dest {
+  background: linear-gradient(160deg, rgba(179,92,68,.05) 0%, var(--bg) 60%);
+  border-color:var(--acento);
+}
+.plano.dest:hover { transform:translateY(-3px); }
+.plano-tag {
+  position:absolute; top:-13px; left:50%; transform:translateX(-50%);
+  background:var(--acento); color:#fff;
+  font-size:11px; font-weight:700; border-radius:20px;
+  padding:4px 16px; white-space:nowrap; letter-spacing:.3px;
+}
+.plano-nome { font-size:13px; font-weight:700; color:var(--sub); text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px; }
+.plano-preco { line-height:1; margin-bottom:6px; }
+.plano-preco .cifrao { font-size:20px; font-weight:600; color:var(--sub); vertical-align:top; margin-top:10px; display:inline-block; }
+.plano-preco .valor { font-size:52px; font-weight:900; color:var(--texto); }
+.plano-periodo { font-size:13px; color:var(--sub); margin-bottom:28px; }
+.plano-ul { list-style:none; margin-bottom:28px; }
+.plano-ul li {
+  font-size:14px; padding:8px 0;
+  border-bottom:1px solid var(--borda);
+  display:flex; align-items:center; gap:10px; color:var(--sub);
+}
+.plano-ul li:last-child { border-bottom:none; }
+.plano-ul li .ck { color:var(--verde); font-size:13px; }
+.plano-eco {
+  display:inline-block;
+  background:rgba(26,122,74,.07); border:1px solid rgba(26,122,74,.18);
+  color:var(--verde); font-size:12px; font-weight:700;
+  border-radius:6px; padding:5px 12px; margin-bottom:20px;
+}
+.btn-plan {
+  width:100%; padding:15px; border:none; border-radius:10px;
+  font-size:15px; font-weight:700; cursor:pointer;
+  transition: background .2s, transform .15s;
+}
+.btn-plan.p { background:var(--acento); color:#fff; box-shadow:0 4px 16px rgba(179,92,68,.2); }
+.btn-plan.p:hover { background:var(--acento2); transform:translateY(-1px); }
+.btn-plan.s { background:var(--bg3); color:var(--texto); border:1px solid var(--borda); }
+.btn-plan.s:hover { border-color:var(--borda2); }
+.plano-trial { text-align:center; color:var(--sub); font-size:13px; margin-top:28px; }
+
+/* ══ DEPOIMENTOS ══ */
+.dep-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:20px; }
+.dep {
+  background:var(--bg2); border:1px solid var(--borda);
+  border-radius:14px; padding:28px;
+}
+.dep-stars { color:var(--acento); font-size:14px; letter-spacing:3px; margin-bottom:16px; }
+.dep-txt { font-size:15px; color:var(--sub); line-height:1.7; font-style:italic; margin-bottom:20px; }
+.dep-aut { display:flex; align-items:center; gap:12px; }
+.dep-av {
+  width:40px; height:40px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; font-weight:800; color:#fff;
+}
+.dep-nome { font-size:14px; font-weight:700; color:var(--texto); }
+.dep-cargo { font-size:12px; color:var(--sub); margin-top:2px; }
+
+/* ══ FAQ ══ */
+.faq { max-width:700px; margin:0 auto; display:flex; flex-direction:column; gap:10px; }
+.faq-q {
+  background:var(--bg2); border:1px solid var(--borda);
+  border-radius:12px; padding:18px 22px;
+  font-size:15px; font-weight:600; cursor:pointer;
+  display:flex; justify-content:space-between; align-items:center;
+  transition:background .2s;
+}
+.faq-q:hover { background:var(--bg3); }
+.faq-q span { color:var(--acento); font-size:20px; font-weight:300; line-height:1; }
+.faq-a {
+  background:var(--bg2); border:1px solid var(--borda); border-top:none;
+  border-radius:0 0 12px 12px;
+  padding:0 22px 18px;
+  color:var(--sub); font-size:14px; line-height:1.7;
+  margin-top:-10px;
+  display:none;
+}
+
+/* ══ CTA FINAL ══ */
+.cta-box {
+  max-width:720px; margin:0 auto;
+  background:var(--bg2); border:1px solid var(--borda);
+  border-radius:20px; padding:64px 48px; text-align:center;
+  position:relative; overflow:hidden;
+}
+.cta-box::before {
+  content:'';
+  position:absolute; top:-100px; left:50%; transform:translateX(-50%);
+  width:500px; height:300px;
+  background:radial-gradient(ellipse, rgba(179,92,68,.06), transparent 70%);
+  pointer-events:none;
+}
+.cta-box h2 { font-size:clamp(28px,4vw,42px); font-weight:900; margin-bottom:14px; position:relative; }
+.cta-box p { color:var(--sub); font-size:17px; line-height:1.65; margin-bottom:36px; position:relative; }
+.btn-cta {
+  background:var(--acento); color:#fff; border:none;
+  border-radius:11px; padding:18px 48px;
+  font-size:17px; font-weight:800; cursor:pointer;
+  box-shadow:0 8px 32px rgba(179,92,68,.25);
+  transition: background .2s, transform .15s;
+  position:relative;
+}
+.btn-cta:hover { background:var(--acento2); transform:translateY(-2px); }
+.cta-note { color:var(--sub2); font-size:13px; margin-top:16px; position:relative; }
+
+/* ══ GLOW DIVIDER ══ */
+.glow-div { height:1px; background:linear-gradient(90deg,transparent,rgba(179,92,68,.25),transparent); }
+
+/* ══ FOOTER ══ */
+footer {
+  border-top:1px solid var(--borda); background:var(--bg);
+  padding:36px 6%;
+  display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px;
+}
+.ft-links { display:flex; gap:24px; }
+.ft-links a { font-size:13px; color:var(--sub); transition:color .2s; }
+.ft-links a:hover { color:var(--texto); }
+.ft-copy { font-size:12px; color:var(--sub2); }
+
+@media(max-width:700px){
+  .nav-links { display:none; }
+  .hero { padding:60px 5% 48px; }
+  .step { border-right:none; border-bottom:1px solid var(--borda); }
+  .step:last-child { border-bottom:none; }
+  .cta-box { padding:40px 24px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav>
+  <div class="logo-wrap">
+    <div class="logo-icon">
+      <svg viewBox="0 0 18 18" fill="none">
+        <path d="M2 3.5L9 14.5L16 3.5" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M9 14.5L12.5 8.5" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="logo-text"><span class="logo-ven">Ven</span><span class="logo-pro">pro</span></div>
+  </div>
+  <div class="nav-links">
+    <a href="#recursos">Recursos</a>
+    <a href="#ia">Assistente IA</a>
+    <a href="#como-funciona">Como Funciona</a>
+    <a href="#plano">Plano</a>
+    <a href="#faq">FAQ</a>
+  </div>
+  <button class="nav-cta" onclick="document.getElementById('plano').scrollIntoView({behavior:'smooth'})">Testar Grátis</button>
+</nav>
+
+<!-- ── HERO ── -->
+<div class="hero-wrap">
+<section class="hero">
+  <div class="hero-left">
+    <div class="hero-tag">Resultado real</div>
+    <h1>Veja o sistema<br>em <em>operação.</em></h1>
+    <p class="hero-sub">Uma cotação real processada pelo Venpro. Cada linha identificada por EAN ou similaridade de nome — preço preenchido em segundos.</p>
+    <div class="hero-btns">
+      <button class="btn-pri" onclick="document.getElementById('plano').scrollIntoView({behavior:'smooth'})">Testar 15 dias grátis →</button>
+      <button class="btn-sec" onclick="document.getElementById('como-funciona').scrollIntoView({behavior:'smooth'})">Como funciona</button>
+    </div>
+    <div class="hero-stats">
+      <div><div class="hs-val"><b>95</b>%</div><div class="hs-lbl">taxa de acerto</div></div>
+      <div><div class="hs-val"><b>~3</b> min</div><div class="hs-lbl">por cotação</div></div>
+      <div><div class="hs-val"><b>1100</b>+</div><div class="hs-lbl">produtos na base</div></div>
+    </div>
+  </div>
+
+  <div class="hero-right">
+    <div class="mock">
+      <div class="mock-bar">
+        <div class="dot" style="background:#ff5f57"></div>
+        <div class="dot" style="background:#ffbd2e"></div>
+        <div class="dot" style="background:#28c940"></div>
+        <span class="mock-bar-title">Venpro — Cotação #131 · 949 itens processados</span>
+      </div>
+      <div class="mock-body">
+        <div class="mock-info">
+          <span class="mock-info-l">Mostrando <b>6 de 949</b> itens</span>
+          <span class="mock-badge-run">✓ Processando…</span>
+        </div>
+        <table class="mt">
+          <thead><tr><th>Produto</th><th>Como encontrou</th><th>Preço 28d</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="td-prod">CAFE PILÃO 500G TRAD</td><td class="td-como">EAN exato</td><td class="td-preco">R$ 26,02</td><td><span class="tag-ok">✓ PREENCHIDO</span></td></tr>
+            <tr><td class="td-prod">BISCOITO VITARELA 350G</td><td class="td-como">Nome · 92%</td><td class="td-preco">R$ 4,62</td><td><span class="tag-ok">✓ PREENCHIDO</span></td></tr>
+            <tr><td class="td-prod">REFRESCO TANG ABACAXI</td><td class="td-como">Nome · 100%</td><td class="td-preco">R$ 0,94</td><td><span class="tag-ok">✓ PREENCHIDO</span></td></tr>
+            <tr><td class="td-prod">MIST BOLO D. BENTA CHOC</td><td class="td-como">Sinônimo</td><td class="td-preco">R$ 6,06</td><td><span class="tag-ok">✓ PREENCHIDO</span></td></tr>
+            <tr><td class="td-prod">VEJA MULTIUSO LAVANDA</td><td class="td-como">Nome · 87%</td><td class="td-preco">R$ 3,95</td><td><span class="tag-ok">✓ PREENCHIDO</span></td></tr>
+            <tr><td class="td-prod">CAFE MELITTA 500G TRAD</td><td class="td-como">—</td><td>—</td><td><span class="tag-fora">FORA DA BASE</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="mock-foot">
+        <div class="mf"><div class="mf-v" style="color:var(--verde)">293</div><div class="mf-l">Preços preenchidos</div></div>
+        <div class="mf"><div class="mf-v" style="color:var(--sub)">~3 min</div><div class="mf-l">Tempo total</div></div>
+        <div class="mf"><div class="mf-v" style="color:var(--acento)">656</div><div class="mf-l">Fora da base · exportado</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+</div>
+
+<div class="glow-div"></div>
+
+<!-- ── RECURSOS ── -->
+<div class="sec-wrap alt" id="recursos">
+<div class="sec-inner">
+  <div class="sec-lbl">O que você ganha</div>
+  <h2 class="sec-h">Cinco ferramentas.<br>Uma assinatura.</h2>
+  <p class="sec-p">Tudo que um representante comercial precisa para trabalhar mais rápido, fechar mais pedidos e ganhar mais incentivos — em um lugar só.</p>
+  <div class="feat-grid">
+    <div class="feat-card">
+      <div class="feat-badge-live">● Disponível agora</div>
+      <div class="feat-ico">📊</div>
+      <div class="feat-h">Robô de Cotação</div>
+      <div class="feat-p">Suba sua planilha (Excel ou PDF do atacado) e o Venpro preenche os preços automaticamente — por EAN ou nome, com 95%+ de acerto. Suporta todos os prazos: 7, 14, 21 e 28 dias.</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-badge-live">● Incluído no lançamento</div>
+      <div class="feat-ico">📲</div>
+      <div class="feat-h">Disparo de Ofertas no WhatsApp</div>
+      <div class="feat-p">O agente roda no seu PC com o seu próprio número do WhatsApp. Envia mensagem personalizada + fotos para toda a sua lista de clientes enquanto você faz outra coisa.</div>
+    </div>
+    <div class="feat-card soon">
+      <div class="feat-badge-soon">⏳ Em breve</div>
+      <div class="feat-ico">🎨</div>
+      <div class="feat-h">Criador de Artes</div>
+      <div class="feat-p">Monte artes de oferta com seus produtos e preços. Escolha entre vários temas, adicione seu logo e exporte em PNG ou PDF para usar nas redes sociais e no WhatsApp.</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-badge-live">● Incluído no lançamento</div>
+      <div class="feat-ico">🤖</div>
+      <div class="feat-h">Assistente de Vendas com IA</div>
+      <div class="feat-p">Peça para a IA escrever textos de oferta, responder clientes, criar emails profissionais e sugerir script de negociação. Especializado em representação comercial — fala a língua do RCA.</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-badge-live">● Incluído no lançamento</div>
+      <div class="feat-ico">🏆</div>
+      <div class="feat-h">Gestão de Clientes e Incentivos</div>
+      <div class="feat-p">Organize sua carteira, acompanhe campanhas e monitore seus incentivos de indústria em tempo real. Representantes que acompanham seus incentivos têm <strong style="color:var(--texto)">até 70% mais chance de ganhar</strong> — não deixe dinheiro na mesa por falta de controle.</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ── COMO FUNCIONA ── -->
+<div class="sec-wrap" id="como-funciona">
+<div class="sec-inner">
+  <div class="sec-lbl">Simples de usar</div>
+  <h2 class="sec-h">Pronto em 4 passos.</h2>
+  <p class="sec-p" style="margin-bottom:40px">Configure uma vez, use todo dia. Não precisa de conhecimento técnico.</p>
+  <div class="steps">
+    <div class="step"><div class="step-n">01</div><div class="step-h">Crie sua conta</div><div class="step-p">Cadastro rápido com e-mail. 15 dias grátis sem cartão de crédito.</div></div>
+    <div class="step"><div class="step-n">02</div><div class="step-h">Instale o Agente</div><div class="step-p">Baixe o agente, cole sua chave de licença do painel e rode. Passo a passo incluso.</div></div>
+    <div class="step"><div class="step-n">03</div><div class="step-h">Suba sua cotação</div><div class="step-p">Envie a planilha pelo painel. O Venpro devolve com todos os preços preenchidos em minutos.</div></div>
+    <div class="step"><div class="step-n">04</div><div class="step-h">Dispare as ofertas</div><div class="step-p">O agente envia para sua lista inteira automaticamente, com texto e fotos de oferta.</div></div>
+  </div>
+</div>
+</div>
+
+<!-- ── IA SECTION ── -->
+<style>
+/* Chat mock */
+.ia-wrap { display:grid; grid-template-columns:1fr 1fr; gap:48px; align-items:start; }
+@media(max-width:900px){ .ia-wrap { grid-template-columns:1fr; } }
+.chat-mock {
+  background:var(--bg2); border:1px solid var(--borda);
+  border-radius:16px; overflow:hidden;
+  box-shadow:0 24px 64px rgba(0,0,0,.35);
+}
+.chat-bar {
+  background:var(--bg3); padding:12px 18px;
+  display:flex; align-items:center; gap:10px;
+  border-bottom:1px solid var(--borda);
+}
+.chat-bar-avatar {
+  width:28px; height:28px; border-radius:8px;
+  background:linear-gradient(135deg,var(--acento),#ff7a5c);
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:800; color:#fff; flex-shrink:0;
+}
+.chat-bar-info { flex:1; }
+.chat-bar-nome { font-size:13px; font-weight:700; color:var(--texto); }
+.chat-bar-status { font-size:11px; color:var(--verde); }
+.chat-body { padding:20px; display:flex; flex-direction:column; gap:14px; }
+.msg { max-width:85%; }
+.msg.user { align-self:flex-end; }
+.msg.bot  { align-self:flex-start; }
+.msg-bubble {
+  border-radius:14px; padding:11px 16px;
+  font-size:13px; line-height:1.6;
+}
+.msg.user .msg-bubble {
+  background:rgba(179,92,68,.1); border:1px solid rgba(179,92,68,.18);
+  color:var(--texto); border-bottom-right-radius:4px;
+}
+.msg.bot .msg-bubble {
+  background:var(--bg3); border:1px solid var(--borda);
+  color:var(--sub); border-bottom-left-radius:4px;
+}
+.msg.bot .msg-bubble strong { color:var(--texto); }
+.msg-meta { font-size:10px; color:var(--sub2); margin-top:4px; text-align:right; }
+.msg.bot .msg-meta { text-align:left; }
+.chat-input-area {
+  border-top:1px solid var(--borda); padding:12px 18px;
+  display:flex; gap:10px; align-items:center; background:var(--bg3);
+}
+.chat-input-fake {
+  flex:1; background:var(--bg2); border:1px solid var(--borda);
+  border-radius:8px; padding:9px 14px; font-size:13px; color:var(--sub2);
+}
+.chat-send {
+  width:34px; height:34px; border-radius:8px;
+  background:var(--acento); border:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* Use cases grid */
+.ia-casos { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+@media(max-width:500px){ .ia-casos { grid-template-columns:1fr; } }
+.ia-caso {
+  background:var(--bg2); border:1px solid var(--borda);
+  border-radius:12px; padding:18px;
+  transition: border-color .2s, transform .15s;
+}
+.ia-caso:hover { border-color:var(--acento); transform:translateY(-2px); }
+.ia-caso-ico { font-size:20px; margin-bottom:8px; }
+.ia-caso-h { font-size:13px; font-weight:700; color:var(--texto); margin-bottom:4px; }
+.ia-caso-p { font-size:12px; color:var(--sub); line-height:1.55; }
+.ia-stat-bar {
+  margin-top:28px;
+  background:linear-gradient(135deg, rgba(179,92,68,.06), rgba(179,92,68,.03));
+  border:1px solid rgba(179,92,68,.15);
+  border-radius:14px; padding:20px 24px;
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+}
+.ia-stat-bar .hs-val { font-size:28px; }
+.ia-stat-bar-txt { font-size:13px; color:var(--sub); line-height:1.55; }
+.ia-stat-bar-txt strong { color:var(--texto); }
+</style>
+<div class="sec-wrap" id="ia">
+<div class="sec-inner">
+  <div class="sec-lbl">Inteligência Artificial</div>
+  <h2 class="sec-h">Um vendedor especialista<br>no seu bolso.</h2>
+  <p class="sec-p" style="margin-bottom:48px">O Assistente Venpro foi treinado para entender o dia a dia de um representante comercial. Fala a língua do RCA — não a linguagem genérica de um chatbot qualquer.</p>
+
+  <div class="ia-wrap">
+
+    <!-- Chat mock -->
+    <div class="chat-mock">
+      <div class="chat-bar">
+        <div class="chat-bar-avatar">V</div>
+        <div class="chat-bar-info">
+          <div class="chat-bar-nome">Assistente Venpro</div>
+          <div class="chat-bar-status">● online agora</div>
+        </div>
+      </div>
+      <div class="chat-body">
+
+        <div class="msg user">
+          <div class="msg-bubble">Escreve a oferta da semana pro Silvano — Surf, Trakinas, Mococa, Café Seleto, Sococo, Milho Predileta e Tixan com os preços da cotação de hoje</div>
+          <div class="msg-meta">você · agora</div>
+        </div>
+        <div class="msg bot">
+          <div class="msg-bubble">
+            Olá, Boa tarde, Silvano!<br><br>
+            Passei pra te avisar das ofertas da semana porque tem item com preço muito bom pra fechar hoje. 🚀<br><br>
+            <strong>Destaques:</strong><br>
+            🔥 Lava Roupa pó Surf 800g — <strong>R$ 7,73</strong><br>
+            🧴 Bisc Trakinas todos sabores — <strong>R$ 2,05</strong><br>
+            🥛 Mist Láctea Mococa 395g — <strong>R$ 2,88</strong><br>
+            ⚡ Café Seleto trad 500g — <strong>R$ 19,30</strong><br>
+            🥤 Leite Coco Sococo 200ml — <strong>R$ 4,94</strong><br>
+            🌽 Milho Verde Predileta lt — <strong>R$ 2,15</strong><br>
+            ✨ Tixan sachê 800g — a partir de <strong>R$ 7,57</strong>
+          </div>
+          <div class="msg-meta">Assistente · agora</div>
+        </div>
+
+        <div class="msg user">
+          <div class="msg-bubble">
+            <div style="display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.03);border:1px solid var(--borda);border-radius:10px;padding:10px 14px;margin-bottom:10px;">
+              <div style="width:32px;height:32px;background:rgba(179,92,68,.1);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;">📄</div>
+              <div>
+                <div style="font-size:12px;font-weight:700;color:var(--texto);">pedido_mercadinho_joao.pdf</div>
+                <div style="font-size:10px;color:var(--sub2);">PDF · 84 KB</div>
+              </div>
+            </div>
+            Tira os itens desse pedido e faz as ofertas para enviar para outros clientes
+          </div>
+          <div class="msg-meta">você · agora</div>
+        </div>
+        <div class="msg bot">
+          <div class="msg-bubble">
+            Li o PDF! Encontrei <strong>12 itens</strong>. Separei os 5 com melhor oportunidade de preço para enviar para outros clientes:<br><br>
+            ☕ Café Pilão 500g — <strong>R$ 26,02</strong><br>
+            🧴 Sabão Surf pó 800g — <strong>R$ 7,73</strong><br>
+            🥛 Mist Láctea Mococa 395g — <strong>R$ 2,88</strong><br>
+            🍪 Trakinas todos sabores — <strong>R$ 2,05</strong><br>
+            🫧 Detergente Ypê 500ml — <strong>R$ 2,90</strong><br><br>
+            <em style="color:var(--sub)">Separei os melhores preços do seu pedido pra você fechar hoje. Estoque limitado nessa condição — me confirma a quantidade! 📦</em><br><br>
+            <span style="font-size:11px;color:var(--sub2);">* O robô do WhatsApp adiciona automaticamente o cumprimento e o nome de cada cliente.</span><br><br>
+            <span style="background:rgba(26,122,74,.08);border:1px solid rgba(26,122,74,.2);color:var(--verde);font-size:11px;font-weight:700;border-radius:6px;padding:4px 10px;">✦ Quer que eu gere a arte de oferta para enviar pelo robô do WhatsApp?</span>
+          </div>
+          <div class="msg-meta">Assistente · agora</div>
+        </div>
+
+      </div>
+      <div class="chat-input-area">
+        <button style="background:var(--bg2);border:1px solid var(--borda);border-radius:8px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;" title="Anexar PDF">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M21.44 11.05L12.25 20.24C11.12 21.37 9.59 22 7.99 22C6.39 22 4.86 21.37 3.73 20.24C2.6 19.11 1.97 17.58 1.97 15.98C1.97 14.38 2.6 12.85 3.73 11.72L12.92 2.53C13.68 1.77 14.71 1.34 15.79 1.34C16.87 1.34 17.9 1.77 18.66 2.53C19.42 3.29 19.85 4.32 19.85 5.4C19.85 6.48 19.42 7.51 18.66 8.27L9.46 17.46C9.08 17.84 8.57 18.06 8.03 18.06C7.49 18.06 6.98 17.84 6.6 17.46C6.22 17.08 6 16.57 6 16.03C6 15.49 6.22 14.98 6.6 14.6L15.07 6.14" stroke="var(--sub)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="chat-input-fake">Anexe um PDF ou pergunte qualquer coisa…</div>
+        <button class="chat-send">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2L15 22L11 13M11 13L2 9L22 2" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Use cases -->
+    <div>
+      <p style="font-size:15px; color:var(--sub); margin-bottom:20px; line-height:1.65;">Do texto de oferta ao email para a indústria — peça uma vez, use direto. Economize 40% do tempo que você gasta com tarefas administrativas.</p>
+      <div class="ia-casos">
+        <div class="ia-caso">
+          <div class="ia-caso-ico">💬</div>
+          <div class="ia-caso-h">Texto de oferta WhatsApp</div>
+          <div class="ia-caso-p">Mensagem persuasiva pronta para mandar para toda a carteira em segundos.</div>
+        </div>
+        <div class="ia-caso">
+          <div class="ia-caso-ico">🤝</div>
+          <div class="ia-caso-h">Script de negociação</div>
+          <div class="ia-caso-p">Como responder objeção de preço, prazo e concorrente sem perder o pedido.</div>
+        </div>
+        <div class="ia-caso">
+          <div class="ia-caso-ico">📧</div>
+          <div class="ia-caso-h">Email profissional</div>
+          <div class="ia-caso-p">Relatório de vendas, proposta formal e follow-up para a indústria com linguagem certa.</div>
+        </div>
+        <div class="ia-caso">
+          <div class="ia-caso-ico">💤</div>
+          <div class="ia-caso-h">Reativar cliente inativo</div>
+          <div class="ia-caso-p">Mensagem personalizada para trazer de volta clientes que pararam de comprar.</div>
+        </div>
+        <div class="ia-caso">
+          <div class="ia-caso-ico">🛒</div>
+          <div class="ia-caso-h">Mix ideal por cliente</div>
+          <div class="ia-caso-p">Sugestão de quais produtos oferecer para cada perfil de ponto de venda.</div>
+        </div>
+        <div class="ia-caso">
+          <div class="ia-caso-ico">📋</div>
+          <div class="ia-caso-h">Roteiro de visitas</div>
+          <div class="ia-caso-p">Argumento de venda, pontos de atenção e abordagem certa para cada cliente.</div>
+        </div>
+      </div>
+
+      <div class="ia-stat-bar">
+        <div>
+          <div class="hs-val"><b>40</b>%</div>
+          <div class="hs-lbl">tempo administrativo</div>
+        </div>
+        <div class="ia-stat-bar-txt">
+          Representantes que usam IA para tarefas de escrita e respostas liberam <strong>40% do tempo</strong> para o que realmente gera comissão: estar na rua, visitando e fechando.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<div class="glow-div"></div>
+
+<!-- ── PLANOS ── -->
+<div class="sec-wrap alt" id="plano">
+<div class="sec-inner">
+  <div class="sec-lbl center">Investimento</div>
+  <h2 class="sec-h center">Simples assim.</h2>
+  <p class="sec-p center">Começa grátis. Assina quando quiser. Cancela quando quiser.</p>
+  <div class="planos-grid">
+
+    <div class="plano">
+      <div class="plano-nome">Mensal</div>
+      <div class="plano-preco"><span class="cifrao">R$</span><span class="valor">99</span></div>
+      <div class="plano-periodo">por mês · renovação automática</div>
+      <ul class="plano-ul">
+        <li><span class="ck">✓</span> Robô de cotação ilimitado</li>
+        <li><span class="ck">✓</span> Disparo WhatsApp (seu número)</li>
+        <li><span class="ck">✓</span> Criador de artes de oferta</li>
+        <li><span class="ck">✓</span> Gestão de clientes ilimitada</li>
+        <li><span class="ck">✓</span> Suporte via WhatsApp</li>
+      </ul>
+      <button class="btn-plan s">Assinar Mensal</button>
+    </div>
+
+    <div class="plano dest">
+      <div class="plano-tag">⭐ Melhor custo-benefício</div>
+      <div class="plano-nome">Anual</div>
+      <div class="plano-preco"><span class="cifrao">R$</span><span class="valor">69</span></div>
+      <div class="plano-periodo">por mês · cobrado anualmente (R$ 828/ano)</div>
+      <div class="plano-eco">💰 Economia de R$ 360/ano</div>
+      <ul class="plano-ul">
+        <li><span class="ck">✓</span> Tudo do plano Mensal</li>
+        <li><span class="ck">✓</span> 30% de desconto</li>
+        <li><span class="ck">✓</span> Suporte prioritário</li>
+        <li><span class="ck">✓</span> Novidades em primeira mão</li>
+      </ul>
+      <button class="btn-plan p">Assinar Plano Anual</button>
+    </div>
+
+  </div>
+  <p class="plano-trial">🎁 Todos os planos incluem <strong style="color:var(--texto)">15 dias de trial gratuito</strong> — sem cartão de crédito.</p>
+</div>
+</div>
+
+<!-- ── DEPOIMENTOS ── -->
+<style>
+.dep-vaga {
+  background: transparent;
+  border: 1.5px dashed var(--borda);
+  border-radius: 14px; padding: 28px;
+  display: flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; gap:12px; min-height:170px;
+  opacity:.55;
+}
+.dep-vaga-ico { font-size:28px; color:var(--borda2); }
+.dep-vaga-txt { font-size:13px; color:var(--sub2); line-height:1.55; }
+.dep-vaga-badge {
+  font-size:11px; color:var(--sub2);
+  background:var(--bg3); border:1px solid var(--borda);
+  padding:4px 12px; border-radius:20px; font-weight:600;
+}
+.avalie-banner {
+  margin-top:40px;
+  background:var(--bg2); border:1px solid var(--borda);
+  border-radius:16px; padding:32px 36px;
+  display:flex; align-items:center; justify-content:space-between;
+  gap:24px; flex-wrap:wrap;
+}
+.avalie-left { flex:1; min-width:220px; }
+.avalie-left h3 { font-size:18px; font-weight:800; margin-bottom:6px; }
+.avalie-left p { font-size:14px; color:var(--sub); line-height:1.6; }
+</style>
+<div class="sec-wrap">
+<div class="sec-inner">
+  <div class="sec-lbl">Transparência</div>
+  <h2 class="sec-h">Somos novos — e orgulhosos disso.</h2>
+  <p class="sec-p" style="margin-bottom:40px">O Venpro está sendo lançado. Não vamos inventar avaliações. Use o trial, nos conta como foi — e seu depoimento aparece aqui pra todo mundo ver.</p>
+  <div class="dep-grid">
+    <div class="dep-vaga">
+      <div class="dep-vaga-ico">★★★★★</div>
+      <div class="dep-vaga-txt">Aguardando o primeiro<br>depoimento real.</div>
+      <span class="dep-vaga-badge">Vaga aberta</span>
+    </div>
+    <div class="dep-vaga">
+      <div class="dep-vaga-ico">★★★★★</div>
+      <div class="dep-vaga-txt">Aguardando o segundo<br>depoimento real.</div>
+      <span class="dep-vaga-badge">Vaga aberta</span>
+    </div>
+    <div class="dep-vaga">
+      <div class="dep-vaga-ico">★★★★★</div>
+      <div class="dep-vaga-txt">Aguardando o terceiro<br>depoimento real.</div>
+      <span class="dep-vaga-badge">Vaga aberta</span>
+    </div>
+  </div>
+
+  <div class="avalie-banner">
+    <div class="avalie-left">
+      <h3>Use e avalie. Simples assim.</h3>
+      <p>Experimente o Venpro por 15 dias grátis. Se te ajudou, nos manda uma mensagem e colocamos sua avaliação aqui — com seu nome e cidade. Sua opinião ajuda outros representantes a decidir.</p>
+    </div>
+    <button class="btn-pri" onclick="document.getElementById('plano').scrollIntoView({behavior:'smooth'})">Experimentar grátis →</button>
+  </div>
+</div>
+</div>
+
+<!-- ── FAQ ── -->
+<div class="sec-wrap alt" id="faq">
+<div class="sec-inner">
+  <div class="sec-lbl center">Dúvidas</div>
+  <h2 class="sec-h center" style="margin-bottom:48px">Perguntas frequentes.</h2>
+  <div class="faq">
+    <div>
+      <div class="faq-q" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block';this.querySelector('span').textContent=this.nextElementSibling.style.display==='block'?'−':'+'">O agente WhatsApp usa meu número pessoal? <span>+</span></div>
+      <div class="faq-a">Sim. O agente roda no seu PC e usa o WhatsApp Web com o seu próprio número — sem custo adicional por mensagem e sem precisar de API paga.</div>
+    </div>
+    <div>
+      <div class="faq-q" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block';this.querySelector('span').textContent=this.nextElementSibling.style.display==='block'?'−':'+'">O robô funciona com a tabela do meu atacado? <span>+</span></div>
+      <div class="faq-a">Sim. O Venpro aceita Excel e PDF de qualquer atacado. Um agente normalizador converte automaticamente para o formato padrão — com todos os prazos: 7, 14, 21 e 28 dias.</div>
+    </div>
+    <div>
+      <div class="faq-q" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block';this.querySelector('span').textContent=this.nextElementSibling.style.display==='block'?'−':'+'">O que acontece se eu cancelar? <span>+</span></div>
+      <div class="faq-a">O agente para de funcionar na próxima verificação de licença (a cada 1 hora). Seus dados ficam salvos por 30 dias. Ao renovar, tudo volta automaticamente.</div>
+    </div>
+    <div>
+      <div class="faq-q" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block';this.querySelector('span').textContent=this.nextElementSibling.style.display==='block'?'−':'+'">Meus dados de clientes são seguros? <span>+</span></div>
+      <div class="faq-a">Sim. Cada conta só acessa seus próprios dados. Usamos Firebase com autenticação JWT, criptografia em trânsito e em repouso, em conformidade com a LGPD.</div>
+    </div>
+    <div>
+      <div class="faq-q" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block';this.querySelector('span').textContent=this.nextElementSibling.style.display==='block'?'−':'+'">Preciso de conhecimento técnico para instalar? <span>+</span></div>
+      <div class="faq-a">Não. O painel tem um guia passo a passo com comandos prontos para copiar e colar. A maioria dos usuários configura em menos de 10 minutos.</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ── CTA FINAL ── -->
+<div class="sec-wrap">
+<div class="cta-box">
+  <h2>Comece hoje, grátis.</h2>
+  <p>15 dias para experimentar tudo sem compromisso.<br>Sem cartão de crédito.</p>
+  <button class="btn-cta">Criar minha conta grátis →</button>
+  <p class="cta-note">Sem cartão · Cancele quando quiser · Suporte via WhatsApp</p>
+</div>
+</div>
+
+<!-- ── FOOTER ── -->
+<footer>
+  <div class="logo-wrap">
+    <div class="logo-icon" style="width:28px;height:28px">
+      <svg viewBox="0 0 18 18" fill="none" style="width:14px;height:14px">
+        <path d="M2 3.5L9 14.5L16 3.5" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="logo-text" style="font-size:17px"><span class="logo-ven">Ven</span><span class="logo-pro">pro</span></div>
+  </div>
+  <div class="ft-links">
+    <a href="#">Política de Privacidade</a>
+    <a href="#">Termos de Uso</a>
+    <a href="#">Suporte</a>
+  </div>
+  <div class="ft-copy">© 2026 Venpro.com.br · Todos os direitos reservados.</div>
+</footer>
+
+</body>
+</html>
