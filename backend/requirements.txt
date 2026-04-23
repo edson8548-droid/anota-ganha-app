@@ -40,3 +40,6 @@ mercadopago # ⭐️ ADICIONADO
 
 # Firebase Admin SDK para acesso ao Firestore
 firebase-admin
+
+# IA — Google Gemini Flash
+google-generativeai

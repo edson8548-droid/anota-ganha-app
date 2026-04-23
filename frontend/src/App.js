@@ -15,6 +15,7 @@ import Checkout from './pages/Checkout';
 import PaymentSuccess from './pages/PaymentSuccess';
 import PaymentFailure from './pages/PaymentFailure';
 import MinhaLicenca from './pages/MinhaLicenca';
+import AssistenteIA from './pages/AssistenteIA';
 
 // ⭐️ 1. IMPORTAR A NOVA PÁGINA DE ADMIN
 import AdminDashboard from './pages/AdminDashboard';
@@ -65,6 +66,7 @@ function App() {
             <Route path="/checkout" element={<Checkout />} />
             
             <Route path="/minha-licenca" element={<MinhaLicenca />} />
+            <Route path="/assistente" element={<AssistenteIA />} />
             <Route path="/payment-success" element={<PaymentSuccess />} />
             <Route path="/payment-failure" element={<PaymentFailure />} />
             <Route path="/payment-pending" element={<PaymentFailure />} />
