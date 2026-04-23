@@ -37,7 +37,8 @@ const Login = () => {
       <div className="login-card">
         <div className="login-header">
           {/* ⭐️ ALTERAÇÃO AQUI: ANOTA & GANHE ⭐️ */}
-          <h1 className="login-title">Anota & Ganhe<br/>Incentivos</h1>
+          <h1 className="login-title">Venpro</h1>
+          <p style={{fontSize:'0.85rem', color:'#888', marginTop:'-8px', marginBottom:'4px'}}>Gestão de Incentivos para RCAs</p>
           <p className="login-subtitle">Entre na sua conta</p>
         </div>
 
