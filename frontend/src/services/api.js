@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = "https://anota-ganha-backend.onrender.com"
+const API_URL = "https://api.venpro.com.br"
 
 const api = axios.create({
   baseURL: API_URL,
