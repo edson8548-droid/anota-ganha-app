@@ -15,6 +15,7 @@ from routes.mercadopago import router as mercadopago_router
 from routes.mercadopago import setup_mercadopago
 from routes.license import router as license_router
 from routes.ia import router as ia_router
+from routes.cotacao import router as cotacao_router, init_cotacao
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import uuid
@@ -99,6 +100,7 @@ api_router = APIRouter(prefix="/api")
 app.include_router(mercadopago_router, prefix="/api/mercadopago", tags=["Mercado Pago"])
 app.include_router(license_router, prefix="/api/license", tags=["Licença"])
 app.include_router(ia_router, prefix="/api/ia", tags=["Assistente IA"])
+app.include_router(cotacao_router, prefix="/api/cotacao", tags=["Cotação"])
 
 # ==================== Mount Router & Lifecycle ====================
 app.include_router(api_router)
@@ -107,7 +109,9 @@ app.include_router(api_router)
 async def startup_event():
     logger.info("App started")
     setup_mercadopago()
+    init_cotacao(db)
     logger.info("✅ Mercado Pago integrado em /api/mercadopago")
+    logger.info("✅ Cotação integrado em /api/cotacao")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
