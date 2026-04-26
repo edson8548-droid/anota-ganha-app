@@ -15,7 +15,7 @@ from fastapi.responses import Response
 from motor.motor_asyncio import AsyncIOMotorClient
 import firebase_admin
 from firebase_admin import auth as firebase_auth
-import gridfs
+import gridfs  # vem com pymongo
 
 from services.excel_processor import (
     ler_tabela_mestre,
