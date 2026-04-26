@@ -83,10 +83,10 @@ async def health_check():
 # ==================== MongoDB ====================
 mongo_url = os.environ.get("MONGO_URL") or os.environ.get("DATABASE_URL")
 if not mongo_url:
-    logger.error("MONGO_URL ou DATABASE_URL não configurada no ambiente.")
-    raise ValueError("MONGO_URL ou DATABASE_URL não configurada no ambiente.")
+    logger.warning("MONGO_URL não configurada — rotas que usam MongoDB estarão indisponíveis")
+    mongo_url = "mongodb://localhost:27017/dummy"
 
-client = AsyncIOMotorClient(mongo_url, maxPoolSize=50, minPoolSize=10, serverSelectionTimeoutMS=5000, connectTimeoutMS=10000, socketTimeoutMS=30000, retryWrites=True, retryReads=True)
+client = AsyncIOMotorClient(mongo_url, maxPoolSize=10, serverSelectionTimeoutMS=3000, connectTimeoutMS=5000, socketTimeoutMS=10000)
 db = client[os.environ.get("DB_NAME", "anota_ganha_db")]
 
 # (Restante do código omitido por brevidade, mas deve ser mantido)
