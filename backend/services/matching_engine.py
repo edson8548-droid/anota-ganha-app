@@ -1455,3 +1455,34 @@ def processar_cotacao(itens_cotacao, precos_dict, precos_nome_lista, modo="compl
             results.append({"linha": item.get("linha", 0), "preco": preco, "tipo": tipo})
 
     return results
+
+
+def processar_cotacao_com_ia(itens_cotacao, precos_dict, precos_nome_lista, modo="completo"):
+    """
+    Pipeline completo: 3 camadas de regras + camada Gemini IA para os sem match.
+    """
+    from .gemini_matcher import gemini_match_batch
+
+    results = processar_cotacao(itens_cotacao, precos_dict, precos_nome_lista, modo=modo)
+
+    sem_match_indices = [i for i, r in enumerate(results) if r["tipo"] is None]
+
+    if not sem_match_indices:
+        return results
+
+    itens_para_ia = []
+    for i in sem_match_indices:
+        itens_para_ia.append({
+            "nome": itens_cotacao[i].get("nome", ""),
+            "ean": itens_cotacao[i].get("ean", ""),
+            "linha": itens_cotacao[i].get("linha", 0),
+            "idx_original": i,
+        })
+
+    ia_matches = gemini_match_batch(itens_para_ia, precos_nome_lista)
+
+    for idx, (preco, tipo) in ia_matches.items():
+        results[idx]["preco"] = preco
+        results[idx]["tipo"] = tipo
+
+    return results

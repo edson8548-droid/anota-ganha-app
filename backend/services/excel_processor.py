@@ -8,7 +8,7 @@ from openpyxl.styles import PatternFill
 import tempfile
 import os
 
-from .matching_engine import limpar_ean, normalizar_nome, ordenar_palavras, processar_cotacao
+from .matching_engine import limpar_ean, normalizar_nome, ordenar_palavras, processar_cotacao_com_ia
 
 
 PREENCHIMENTO_IA = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
@@ -226,7 +226,7 @@ def processar_arquivo_cotacao(caminho_cotacao, caminho_mestre, prazo=28, modo="c
     precos_dict, precos_lista = ler_tabela_mestre(caminho_mestre, prazo=prazo)
     itens, header_row = ler_cotacao(caminho_cotacao)
 
-    resultados = processar_cotacao(itens, precos_dict, precos_lista, modo=modo)
+    resultados = processar_cotacao_com_ia(itens, precos_dict, precos_lista, modo=modo)
     caminho_resultado = gerar_excel_resultado(caminho_cotacao, itens, resultados)
 
     stats = {"ean": 0, "descricao": 0, "ia": 0, "sem_match": 0, "total": len(resultados)}
