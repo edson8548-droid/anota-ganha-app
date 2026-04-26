@@ -121,7 +121,7 @@ const Register = () => {
     <div className="register-page">
       <div className="register-container">
         <div className="register-header">
-          <h1>🎯 Anota & Ganhe</h1>
+          <h1>🎯 Venpro</h1>
           <p>Crie sua conta grátis</p>
         </div>
         

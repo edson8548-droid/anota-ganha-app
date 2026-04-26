@@ -129,7 +129,7 @@ const Dashboard = () => {
   }
   const handleWhatsAppSupport = () => {
     const phoneNumber = '5513997501798';
-    const message = 'Olá, preciso de suporte no Anota & Ganha';
+    const message = 'Olá, preciso de suporte no Venpro';
     const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
