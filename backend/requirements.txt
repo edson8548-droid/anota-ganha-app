@@ -43,3 +43,8 @@ firebase-admin
 
 # IA — Google Gemini Flash
 google-generativeai
+
+# Motor de matching — Robô de Cotação
+rapidfuzz
+openpyxl
+pandas
