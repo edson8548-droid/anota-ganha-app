@@ -48,3 +48,6 @@ google-generativeai
 rapidfuzz
 openpyxl
 pandas
+
+# Leitura de PDF (tabelas de preços dos atacadistas)
+pdfplumber
