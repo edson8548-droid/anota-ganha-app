@@ -225,7 +225,7 @@ const Plans = () => {
       {/* Footer */}
       <div className="plans-footer">
         <p>🔒 Pagamento seguro via Mercado Pago</p>
-        <p>✉️ Dúvidas? Entre em contato: suporte@anotaganha.com</p>
+        <p>✉️ Dúvidas? Entre em contato: suporte@venpro.com.br</p>
       </div>
     </div>
   );

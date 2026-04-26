@@ -1,7 +1,7 @@
 import React from 'react';
 import './WhatsAppButton.css';
 
-const WhatsAppButton = ({ phoneNumber = '5513997501798', message = 'Olá, preciso de suporte no Anota & Ganha' }) => {
+const WhatsAppButton = ({ phoneNumber = '5513997501798', message = 'Olá, preciso de suporte no Venpro' }) => {
   const handleClick = () => {
     const encodedMessage = encodeURIComponent(message);
     const whatsappURL = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;

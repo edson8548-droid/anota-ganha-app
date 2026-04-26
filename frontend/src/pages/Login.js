@@ -36,7 +36,7 @@ const Login = () => {
     <div className="login-container">
       <div className="login-card">
         <div className="login-header">
-          {/* ⭐️ ALTERAÇÃO AQUI: ANOTA & GANHE ⭐️ */}
+          {/* ⭐️ ALTERAÇÃO AQUI: VENPRO ⭐️ */}
           <h1 className="login-title">Venpro</h1>
           <p style={{fontSize:'0.85rem', color:'#888', marginTop:'-8px', marginBottom:'4px'}}>Gestão de Incentivos para RCAs</p>
           <p className="login-subtitle">Entre na sua conta</p>
@@ -88,7 +88,7 @@ const Login = () => {
 
       {/* Botão WhatsApp Flutuante */}
       <a 
-        href="https://wa.me/5513997501798?text=Olá,%20preciso%20de%20suporte%20no%20Anota%20%26%20Ganha"
+        href="https://wa.me/5513997501798?text=Olá,%20preciso%20de%20suporte%20no%20Venpro"
         target="_blank"
         rel="noopener noreferrer"
         className="whatsapp-float"
