@@ -51,3 +51,6 @@ pandas
 
 # Leitura de PDF (tabelas de preços dos atacadistas)
 pdfplumber
+cryptography>=46.0.7 # not directly required, pinned by Snyk to avoid a vulnerability
+pdfminer.six>=20251107 # not directly required, pinned by Snyk to avoid a vulnerability
+pillow>=10.3.0 # not directly required, pinned by Snyk to avoid a vulnerability
