@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
+import { gerarTabelaPrazos } from '../services/cotacao.service';
 import './AssistenteIA.css';
 
 const API_URL = 'https://api.venpro.com.br';
@@ -51,6 +52,14 @@ export default function AssistenteIA() {
   const [copiedId, setCopiedId] = useState(null);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+
+  // Estado do modal "Gerar Tabela com Prazos"
+  const [showTabelaModal, setShowTabelaModal] = useState(false);
+  const [tabelaArquivo, setTabelaArquivo] = useState(null);
+  const [pctPrazos, setPctPrazos] = useState({ 7: 0, 14: 0, 21: 0, 28: 0 });
+  const [gerandoTabela, setGerandoTabela] = useState(false);
+  const [tabelaSucesso, setTabelaSucesso] = useState(false);
+  const tabelaInputRef = useRef(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -122,6 +131,26 @@ export default function AssistenteIA() {
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
   };
 
+  const handleGerarTabela = async () => {
+    if (!tabelaArquivo) return;
+    setGerandoTabela(true);
+    setTabelaSucesso(false);
+    try {
+      const blob = await gerarTabelaPrazos(tabelaArquivo, pctPrazos);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'tabela_com_prazos.xlsx';
+      a.click();
+      window.URL.revokeObjectURL(url);
+      setTabelaSucesso(true);
+      setTabelaArquivo(null);
+    } catch (err) {
+      alert('Erro ao gerar tabela: ' + (err.response?.data?.detail || err.message));
+    }
+    setGerandoTabela(false);
+  };
+
   return (
     <div className="ia-page">
       {/* Header */}
@@ -142,7 +171,16 @@ export default function AssistenteIA() {
 
         {/* Sidebar */}
         <div className="ia-sidebar">
-          <div className="ia-sidebar-title">Atalhos rápidos</div>
+          <div className="ia-sidebar-title">Ferramentas</div>
+          <button
+            className="ia-prompt-btn ia-prompt-btn--ferramenta"
+            onClick={() => { setShowTabelaModal(true); setTabelaSucesso(false); }}
+          >
+            📊 Gerar tabela de prazos
+            <span>Aplica % por prazo na sua tabela base</span>
+          </button>
+
+          <div className="ia-sidebar-title" style={{ marginTop: 16 }}>Atalhos rápidos</div>
           {PROMPTS_RAPIDOS.map((p, i) => (
             <button key={i} className="ia-prompt-btn" onClick={() => handlePrompt(p.texto)}>
               {p.label}
@@ -150,6 +188,78 @@ export default function AssistenteIA() {
             </button>
           ))}
         </div>
+
+        {/* Modal: Gerar Tabela de Prazos */}
+        {showTabelaModal && (
+          <div className="ia-modal-overlay" onClick={() => setShowTabelaModal(false)}>
+            <div className="ia-modal" onClick={e => e.stopPropagation()}>
+              <div className="ia-modal-header">
+                <span>📊 Gerar Tabela com Prazos</span>
+                <button className="ia-modal-close" onClick={() => setShowTabelaModal(false)}>✕</button>
+              </div>
+
+              <p className="ia-modal-desc">
+                Suba a planilha base do atacadista e informe o % de aumento para cada prazo.
+                O sistema gera um Excel pronto para subir no Robô de Cotação.
+              </p>
+
+              {/* Upload */}
+              <div
+                className="ia-modal-upload"
+                onClick={() => tabelaInputRef.current?.click()}
+              >
+                {tabelaArquivo
+                  ? <span style={{ color: '#1A7A4A', fontWeight: 600 }}>✓ {tabelaArquivo.name}</span>
+                  : <span>Clique para selecionar a planilha base (.xlsx)</span>
+                }
+                <input
+                  type="file" accept=".xlsx,.xls" ref={tabelaInputRef}
+                  style={{ display: 'none' }}
+                  onChange={e => { setTabelaArquivo(e.target.files[0]); setTabelaSucesso(false); }}
+                />
+              </div>
+
+              {/* % por prazo */}
+              <div className="ia-modal-prazos">
+                {[7, 14, 21, 28].map(p => (
+                  <div key={p} className="ia-modal-prazo-item">
+                    <label>{p} dias</label>
+                    <div className="ia-modal-prazo-input">
+                      <input
+                        type="number"
+                        min="0"
+                        max="99"
+                        step="0.1"
+                        value={pctPrazos[p]}
+                        onChange={e => setPctPrazos(prev => ({ ...prev, [p]: parseFloat(e.target.value) || 0 }))}
+                      />
+                      <span>%</span>
+                    </div>
+                    <div className="ia-modal-prazo-exemplo">
+                      {pctPrazos[p] > 0
+                        ? `R$ 10,00 → R$ ${(10 * (1 + pctPrazos[p] / 100)).toFixed(2).replace('.', ',')}`
+                        : 'sem aumento'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                className="ia-modal-btn"
+                disabled={!tabelaArquivo || gerandoTabela}
+                onClick={handleGerarTabela}
+              >
+                {gerandoTabela ? 'Gerando...' : 'Gerar e baixar tabela'}
+              </button>
+
+              {tabelaSucesso && (
+                <p className="ia-modal-sucesso">
+                  ✓ Tabela gerada! Agora suba o arquivo no Robô de Cotação.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Chat */}
         <div className="ia-chat-wrap">

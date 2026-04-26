@@ -22,6 +22,7 @@ from services.excel_processor import (
     ler_cotacao,
     gerar_excel_resultado,
     processar_arquivo_cotacao,
+    gerar_excel_multiprazos,
 )
 
 logger = logging.getLogger(__name__)
@@ -208,5 +209,49 @@ async def processar_cotacao(
             "Content-Disposition": "attachment; filename=cotacao_preenchida.xlsx",
             "X-Stats": json.dumps(stats),
             "X-Sem-Match": json.dumps(sem_match[:50]),
+        }
+    )
+
+
+@router.post("/gerar-tabela-prazos")
+async def gerar_tabela_prazos(
+    arquivo: UploadFile = File(...),
+    pct_7: float = Form(0.0),
+    pct_14: float = Form(0.0),
+    pct_21: float = Form(0.0),
+    pct_28: float = Form(0.0),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    await get_user_id(credentials)
+
+    conteudo = await arquivo.read()
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    tmp.write(conteudo)
+    tmp.close()
+
+    try:
+        resultado_path = gerar_excel_multiprazos(tmp.name, {
+            7: pct_7,
+            14: pct_14,
+            21: pct_21,
+            28: pct_28,
+        })
+        with open(resultado_path, "rb") as f:
+            resultado_bytes = f.read()
+        os.unlink(resultado_path)
+    except Exception as e:
+        logger.error(f"Erro ao gerar tabela com prazos: {e}")
+        raise HTTPException(500, f"Erro ao gerar tabela: {str(e)}")
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
+
+    return Response(
+        content=resultado_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=tabela_com_prazos.xlsx",
         }
     )
