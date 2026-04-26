@@ -4,7 +4,8 @@ Processador de Excel — leitura de tabelas mestre e cotações, geração de re
 
 import pandas as pd
 import openpyxl
-from openpyxl.styles import PatternFill
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Font, Alignment
 import tempfile
 import os
 
@@ -243,3 +244,104 @@ def processar_arquivo_cotacao(caminho_cotacao, caminho_mestre, prazo=28, modo="c
             stats["descricao"] += 1
 
     return caminho_resultado, stats, sem_match
+
+
+def gerar_excel_multiprazos(caminho_base, percentuais):
+    """
+    Lê o Excel base do atacadista e gera novo Excel com colunas para cada prazo.
+
+    percentuais: {7: 0.0, 14: 2.5, 21: 4.0, 28: 5.5}
+    Retorna: caminho do arquivo gerado (temporário).
+    """
+    wb_in = openpyxl.load_workbook(caminho_base, data_only=True)
+    ws_in = wb_in.active
+
+    # Detectar linha de cabeçalho e colunas relevantes
+    header_row_idx = 1
+    col_nome = 0
+    col_ean = None
+    col_preco = None
+
+    for row_idx in range(1, min(12, ws_in.max_row + 1)):
+        for cell in ws_in[row_idx]:
+            val = str(cell.value).upper().strip() if cell.value else ""
+            if val in ("PRODUTO", "DESCRIÇÃO", "DESCRICAO", "ITEM", "MERCADORIA", "DESC",
+                       "DESCRIÇÃO DO PRODUTO", "DESCRICAO DO PRODUTO"):
+                col_nome = cell.column - 1
+                header_row_idx = row_idx
+            elif val in ("EAN", "COD.BARRAS", "COD BARRAS", "CODIGO DE BARRAS",
+                         "COD BARRA", "CÓDIGO DE BARRAS"):
+                col_ean = cell.column - 1
+                header_row_idx = row_idx
+            elif val in ("PREÇO", "PRECO", "VALOR", "R$", "VALOR UNITÁRIO",
+                         "VALOR UNIT", "PRECO UNIT", "PREÇO UNIT.", "VALOR UNITARIO"):
+                col_preco = cell.column - 1
+                header_row_idx = row_idx
+
+    if col_ean is None:
+        col_ean = 1 if col_nome != 1 else 0
+    if col_preco is None:
+        col_preco = ws_in.max_column - 1
+
+    rows_data = []
+    for row_idx in range(header_row_idx + 1, ws_in.max_row + 1):
+        row = ws_in[row_idx]
+        nome = row[col_nome].value if col_nome < len(row) else None
+        ean_raw = row[col_ean].value if col_ean < len(row) else None
+        preco_raw = row[col_preco].value if col_preco < len(row) else None
+
+        if not nome or not str(nome).strip() or str(nome).strip().upper() in ("NONE", "NAN"):
+            continue
+        try:
+            preco = float(str(preco_raw).replace(",", ".").replace("R$", "").strip())
+        except (ValueError, TypeError):
+            continue
+
+        rows_data.append({
+            "nome": str(nome).strip(),
+            "ean": str(int(float(str(ean_raw)))) if ean_raw and str(ean_raw).strip() not in ("", "None") else "",
+            "preco_base": preco,
+        })
+
+    wb_in.close()
+
+    # Gerar Excel de saída no formato que ler_tabela_mestre espera (header na linha 3, index=2)
+    wb_out = Workbook()
+    ws_out = wb_out.active
+    ws_out.title = "Tabela de Preços"
+
+    ws_out.cell(1, 1).value = "Tabela de Preços com Prazos — gerada pelo Venpro"
+    ws_out.cell(1, 1).font = Font(bold=True, size=11, color="2D2926")
+    # linha 2 vazia (espaçamento)
+
+    prazos = [7, 14, 21, 28]
+    headers = ["PRODUTO", "EAN"] + [f"{p} dias" for p in prazos]
+    header_fill = PatternFill(start_color="B35C44", end_color="B35C44", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF", size=10)
+
+    for col_idx, h in enumerate(headers, 1):
+        cell = ws_out.cell(3, col_idx)
+        cell.value = h
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+
+    for row_idx, item in enumerate(rows_data, 4):
+        ws_out.cell(row_idx, 1).value = item["nome"]
+        ws_out.cell(row_idx, 2).value = item["ean"]
+        for col_offset, prazo in enumerate(prazos, 3):
+            pct = percentuais.get(prazo, 0.0)
+            preco_final = round(item["preco_base"] * (1 + pct / 100), 2)
+            cell = ws_out.cell(row_idx, col_offset)
+            cell.value = preco_final
+            cell.number_format = '#,##0.00'
+
+    ws_out.column_dimensions['A'].width = 48
+    ws_out.column_dimensions['B'].width = 16
+    for letra in ['C', 'D', 'E', 'F']:
+        ws_out.column_dimensions[letra].width = 11
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    wb_out.save(tmp.name)
+    tmp.close()
+    return tmp.name

@@ -310,6 +310,148 @@
   text-align: center;
 }
 
+/* ── Botão ferramenta (destaque) ── */
+.ia-prompt-btn--ferramenta {
+  background: #FDF0EC;
+  border-color: #D4856E;
+  color: var(--ia-acento);
+}
+.ia-prompt-btn--ferramenta:hover {
+  background: #FAE0D8;
+  border-color: var(--ia-acento);
+}
+
+/* ── Modal Gerar Tabela ── */
+.ia-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(45,41,38,.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+.ia-modal {
+  background: var(--ia-card);
+  border: 1px solid var(--ia-borda);
+  border-radius: 16px;
+  padding: 28px;
+  width: 420px;
+  max-width: 92vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,.15);
+}
+.ia-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ia-texto);
+  margin-bottom: 10px;
+}
+.ia-modal-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--ia-sub2);
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.ia-modal-close:hover { background: var(--ia-bg3); }
+.ia-modal-desc {
+  font-size: 13px;
+  color: var(--ia-sub);
+  line-height: 1.55;
+  margin: 0 0 16px;
+}
+.ia-modal-upload {
+  border: 2px dashed var(--ia-borda);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ia-sub2);
+  margin-bottom: 20px;
+  transition: border-color .2s;
+}
+.ia-modal-upload:hover { border-color: var(--ia-acento); }
+
+/* Grid de prazos */
+.ia-modal-prazos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.ia-modal-prazo-item {
+  background: var(--ia-bg);
+  border: 1px solid var(--ia-borda);
+  border-radius: 10px;
+  padding: 12px;
+}
+.ia-modal-prazo-item label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ia-sub);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 6px;
+}
+.ia-modal-prazo-input {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ia-modal-prazo-input input {
+  width: 70px;
+  padding: 6px 8px;
+  border: 1px solid var(--ia-borda);
+  border-radius: 7px;
+  background: var(--ia-card);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ia-acento);
+  text-align: center;
+  outline: none;
+}
+.ia-modal-prazo-input input:focus { border-color: var(--ia-acento); }
+.ia-modal-prazo-input span {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ia-sub);
+}
+.ia-modal-prazo-exemplo {
+  font-size: 10px;
+  color: var(--ia-sub2);
+  margin-top: 5px;
+}
+.ia-modal-btn {
+  width: 100%;
+  padding: 13px;
+  background: var(--ia-acento);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .2s;
+}
+.ia-modal-btn:hover:not(:disabled) { background: var(--ia-acento2); }
+.ia-modal-btn:disabled { background: var(--ia-borda); cursor: not-allowed; }
+.ia-modal-sucesso {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: #1A7A4A;
+  font-weight: 600;
+  text-align: center;
+}
+
 @media (max-width: 768px) {
   .ia-sidebar { display: none; }
   .ia-body { padding: 16px 4%; }
