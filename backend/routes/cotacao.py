@@ -12,14 +12,12 @@ from io import BytesIO
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import Response
-from motor.motor_asyncio import AsyncIOMotorClient
+from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 import firebase_admin
 from firebase_admin import auth as firebase_auth
-import gridfs  # vem com pymongo
 
 from services.excel_processor import (
     ler_tabela_mestre,
-    ler_cotacao,
     gerar_excel_resultado,
     processar_arquivo_cotacao,
     gerar_excel_multiprazos,
@@ -30,15 +28,17 @@ router = APIRouter()
 security = HTTPBearer(auto_error=False)
 
 db = None
-fs = None
 
 MAX_TABELAS = 5
 
 
 def init_cotacao(database):
-    global db, fs
+    global db
     db = database
-    fs = gridfs.GridFS(db)
+
+
+def _bucket():
+    return AsyncIOMotorGridFSBucket(db)
 
 
 async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
@@ -66,9 +66,13 @@ async def upload_tabela(
         raise HTTPException(400, f"Máximo de {MAX_TABELAS} tabelas permitidas")
 
     conteudo = await arquivo.read()
-    grid_id = fs.put(conteudo, filename=arquivo.filename, content_type=arquivo.content_type)
+    bucket = _bucket()
+    grid_id = await bucket.upload_from_stream(
+        arquivo.filename,
+        BytesIO(conteudo),
+        metadata={"content_type": arquivo.content_type},
+    )
 
-    # Contar produtos
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
     tmp.write(conteudo)
     tmp.close()
@@ -78,10 +82,13 @@ async def upload_tabela(
         qtd = len(precos_lista)
     except Exception as e:
         os.unlink(tmp.name)
-        fs.delete(grid_id)
+        await bucket.delete(grid_id)
         raise HTTPException(400, f"Erro ao ler tabela: {str(e)}")
     finally:
-        os.unlink(tmp.name)
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
 
     doc = {
         "user_id": uid,
@@ -146,7 +153,10 @@ async def excluir_tabela(
     doc = await db.tabelas_mestre.find_one({"_id": ObjectId(tabela_id), "user_id": uid})
     if not doc:
         raise HTTPException(404, "Tabela não encontrada")
-    fs.delete(doc["grid_id"])
+    try:
+        await _bucket().delete(doc["grid_id"])
+    except Exception:
+        pass
     await db.tabelas_mestre.delete_one({"_id": ObjectId(tabela_id)})
     return {"ok": True}
 
@@ -167,13 +177,13 @@ async def processar_cotacao(
         raise HTTPException(404, "Tabela mestre não encontrada")
 
     # Baixar tabela mestre do GridFS
-    grid_file = fs.get(doc["grid_id"])
-    conteudo_mestre = grid_file.read()
+    grid_out = await _bucket().open_download_stream(doc["grid_id"])
+    conteudo_mestre = await grid_out.read()
+
     tmp_mestre = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
     tmp_mestre.write(conteudo_mestre)
     tmp_mestre.close()
 
-    # Salvar cotacao
     conteudo_cotacao = await arquivo.read()
     tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
     tmp_cotacao.write(conteudo_cotacao)
@@ -189,18 +199,17 @@ async def processar_cotacao(
         with open(caminho_resultado, "rb") as f:
             resultado_bytes = f.read()
 
-        os.unlink(tmp_mestre.name)
-        os.unlink(tmp_cotacao.name)
         os.unlink(caminho_resultado)
 
     except Exception as e:
+        logger.error(f"Erro ao processar cotação: {e}")
+        raise HTTPException(500, f"Erro ao processar: {str(e)}")
+    finally:
         for p in [tmp_mestre.name, tmp_cotacao.name]:
             try:
                 os.unlink(p)
             except OSError:
                 pass
-        logger.error(f"Erro ao processar cotação: {e}")
-        raise HTTPException(500, f"Erro ao processar: {str(e)}")
 
     return Response(
         content=resultado_bytes,
@@ -232,10 +241,7 @@ async def gerar_tabela_prazos(
 
     try:
         resultado_path = gerar_excel_multiprazos(tmp.name, {
-            7: pct_7,
-            14: pct_14,
-            21: pct_21,
-            28: pct_28,
+            7: pct_7, 14: pct_14, 21: pct_21, 28: pct_28,
         })
         with open(resultado_path, "rb") as f:
             resultado_bytes = f.read()
@@ -252,7 +258,5 @@ async def gerar_tabela_prazos(
     return Response(
         content=resultado_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={
-            "Content-Disposition": "attachment; filename=tabela_com_prazos.xlsx",
-        }
+        headers={"Content-Disposition": "attachment; filename=tabela_com_prazos.xlsx"},
     )
