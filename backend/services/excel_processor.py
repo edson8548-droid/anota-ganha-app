@@ -313,7 +313,7 @@ def _extrair_pdf_com_gemini(caminho_pdf):
     genai.configure(api_key=api_key)
     uploaded = genai.upload_file(caminho_pdf, mime_type="application/pdf")
 
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
     prompt = """Este PDF contém uma tabela de preços de atacadista.
 
 Extraia TODOS os produtos com seus preços. Retorne APENAS JSON válido:
