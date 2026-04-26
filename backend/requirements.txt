@@ -1,53 +1,31 @@
-# SUBSTITUA: backend/requirements.txt
-# Este é o teu ficheiro + o que faltava
-
-# FastAPI e servidor
 fastapi
 uvicorn[standard]
 
-# Banco de dados MongoDB
-motor
-pymongo
-dnspython # ⭐️ ADICIONADO: Necessário para MongoDB Atlas
+# MongoDB — pinado <5 porque pymongo 5.x removeu gridfs.GridFS
+motor==3.3.2
+pymongo==4.6.3
+dnspython
 
-# Autenticação e segurança
 bcrypt
 PyJWT
 python-multipart
 
-# Modelos e validação
 pydantic
 pydantic-settings
 
-# Variáveis de ambiente
 python-dotenv
-
-# Email (SendGrid)
 sendgrid
-
-# HTTP requests
 requests
-
-# Timezone e datas
 python-dateutil
 
-# Pagamentos (Mercado Pago)
-mercadopago # ⭐️ ADICIONADO
+mercadopago
 
-# NOVO: backend/requirements.txt
-
-# ... (restante do teu ficheiro) ...
-
-# Firebase Admin SDK para acesso ao Firestore
 firebase-admin
 
-# IA — Google Gemini Flash
 google-generativeai
 
-# Motor de matching — Robô de Cotação
 rapidfuzz
 openpyxl
 pandas
 
-# Leitura de PDF (tabelas de preços dos atacadistas)
 pdfplumber
