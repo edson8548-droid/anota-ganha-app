@@ -210,10 +210,10 @@ export default function AssistenteIA() {
               >
                 {tabelaArquivo
                   ? <span style={{ color: '#1A7A4A', fontWeight: 600 }}>✓ {tabelaArquivo.name}</span>
-                  : <span>Clique para selecionar a planilha base (.xlsx)</span>
+                  : <span>Clique para selecionar a tabela base (.xlsx ou .pdf)</span>
                 }
                 <input
-                  type="file" accept=".xlsx,.xls" ref={tabelaInputRef}
+                  type="file" accept=".xlsx,.xls,.pdf" ref={tabelaInputRef}
                   style={{ display: 'none' }}
                   onChange={e => { setTabelaArquivo(e.target.files[0]); setTabelaSucesso(false); }}
                 />

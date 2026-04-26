@@ -225,7 +225,8 @@ async def gerar_tabela_prazos(
     await get_user_id(credentials)
 
     conteudo = await arquivo.read()
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    ext = ".pdf" if arquivo.filename.lower().endswith(".pdf") else ".xlsx"
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
     tmp.write(conteudo)
     tmp.close()
 

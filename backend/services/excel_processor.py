@@ -246,17 +246,11 @@ def processar_arquivo_cotacao(caminho_cotacao, caminho_mestre, prazo=28, modo="c
     return caminho_resultado, stats, sem_match
 
 
-def gerar_excel_multiprazos(caminho_base, percentuais):
-    """
-    Lê o Excel base do atacadista e gera novo Excel com colunas para cada prazo.
-
-    percentuais: {7: 0.0, 14: 2.5, 21: 4.0, 28: 5.5}
-    Retorna: caminho do arquivo gerado (temporário).
-    """
-    wb_in = openpyxl.load_workbook(caminho_base, data_only=True)
+def _ler_excel_base(caminho_arquivo):
+    """Lê Excel base do atacadista. Retorna lista de {"nome", "ean", "preco_base"}."""
+    wb_in = openpyxl.load_workbook(caminho_arquivo, data_only=True)
     ws_in = wb_in.active
 
-    # Detectar linha de cabeçalho e colunas relevantes
     header_row_idx = 1
     col_nome = 0
     col_ean = None
@@ -304,15 +298,125 @@ def gerar_excel_multiprazos(caminho_base, percentuais):
         })
 
     wb_in.close()
+    return rows_data
 
-    # Gerar Excel de saída no formato que ler_tabela_mestre espera (header na linha 3, index=2)
+
+def _extrair_pdf_com_gemini(caminho_pdf):
+    """Fallback: usa Gemini para extrair tabela de preços de PDF escaneado/complexo."""
+    import json
+    import google.generativeai as genai
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY não configurada — não é possível processar este PDF")
+
+    genai.configure(api_key=api_key)
+    uploaded = genai.upload_file(caminho_pdf, mime_type="application/pdf")
+
+    model = genai.GenerativeModel("gemini-2.0-flash")
+    prompt = """Este PDF contém uma tabela de preços de atacadista.
+
+Extraia TODOS os produtos com seus preços. Retorne APENAS JSON válido:
+{"produtos": [{"nome": "PRODUTO X 1KG", "ean": "7891234567890", "preco": 4.50}, ...]}
+
+Regras:
+- nome: descrição completa do produto (com marca, gramagem, embalagem)
+- ean: código de barras EAN (13 dígitos). Se não existir, use ""
+- preco: preço como número decimal (use ponto como separador). Se houver colunas de prazo (7d, 14d, 21d, 28d), use o de MENOR prazo (geralmente 7 dias ou à vista)
+- Ignore cabeçalhos, totais, rodapés
+- Não inclua produtos sem nome ou sem preço"""
+
+    response = model.generate_content([uploaded, prompt])
+    text = response.text.strip()
+
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.startswith("json"):
+            text = text[4:]
+        text = text.strip()
+
+    data = json.loads(text)
+    rows_data = []
+    for p in data.get("produtos", []):
+        try:
+            preco = float(str(p.get("preco", 0)).replace(",", "."))
+        except (ValueError, TypeError):
+            continue
+        if not p.get("nome") or preco <= 0:
+            continue
+        rows_data.append({
+            "nome": str(p["nome"]).strip(),
+            "ean": str(p.get("ean", "")).strip(),
+            "preco_base": preco,
+        })
+
+    return rows_data
+
+
+def _ler_pdf_base(caminho_pdf):
+    """Lê PDF de tabela do atacadista. Tenta pdfplumber, fallback para Gemini."""
+    import logging
+    logger_local = logging.getLogger(__name__)
+
+    rows_data = []
+    try:
+        import pdfplumber
+
+        with pdfplumber.open(caminho_pdf) as pdf:
+            for page in pdf.pages:
+                tables = page.extract_tables()
+                for table in tables:
+                    if not table or len(table) < 2:
+                        continue
+
+                    headers = [str(c).upper().strip() if c else "" for c in table[0]]
+                    col_nome = 0
+                    col_ean = None
+                    col_preco = len(headers) - 1
+
+                    for i, h in enumerate(headers):
+                        if any(k in h for k in ("PRODUTO", "DESCRI", "ITEM", "MERCADORIA")):
+                            col_nome = i
+                        elif any(k in h for k in ("EAN", "COD", "BARRAS", "CODIGO")):
+                            col_ean = i
+                        elif any(k in h for k in ("PRECO", "PREÇO", "VALOR", "R$", "UNIT")):
+                            col_preco = i
+
+                    for row in table[1:]:
+                        if not row or len(row) <= col_preco:
+                            continue
+                        nome = str(row[col_nome]).strip() if row[col_nome] else ""
+                        if not nome or nome.upper() in ("NONE", ""):
+                            continue
+                        ean_raw = str(row[col_ean]).strip() if col_ean is not None and col_ean < len(row) and row[col_ean] else ""
+                        preco_raw = str(row[col_preco]).strip() if row[col_preco] else ""
+                        try:
+                            preco = float(preco_raw.replace(",", ".").replace("R$", "").replace(" ", "").strip())
+                        except (ValueError, TypeError):
+                            continue
+                        rows_data.append({
+                            "nome": nome,
+                            "ean": ean_raw,
+                            "preco_base": preco,
+                        })
+    except Exception as e:
+        logger_local.warning(f"pdfplumber falhou: {e}")
+
+    if not rows_data:
+        logger_local.info("Nenhuma tabela extraída pelo pdfplumber — usando Gemini")
+        rows_data = _extrair_pdf_com_gemini(caminho_pdf)
+
+    return rows_data
+
+
+def _gerar_excel_de_dados(rows_data, percentuais):
+    """Gera Excel com colunas por prazo a partir de dados já extraídos."""
     wb_out = Workbook()
     ws_out = wb_out.active
     ws_out.title = "Tabela de Preços"
 
     ws_out.cell(1, 1).value = "Tabela de Preços com Prazos — gerada pelo Venpro"
     ws_out.cell(1, 1).font = Font(bold=True, size=11, color="2D2926")
-    # linha 2 vazia (espaçamento)
 
     prazos = [7, 14, 21, 28]
     headers = ["PRODUTO", "EAN"] + [f"{p} dias" for p in prazos]
@@ -345,3 +449,19 @@ def gerar_excel_multiprazos(caminho_base, percentuais):
     wb_out.save(tmp.name)
     tmp.close()
     return tmp.name
+
+
+def gerar_excel_multiprazos(caminho_base, percentuais):
+    """
+    Orquestrador: aceita Excel (.xlsx/.xls) ou PDF e gera tabela com colunas por prazo.
+    percentuais: {7: 0.0, 14: 2.5, 21: 4.0, 28: 5.5}
+    """
+    if caminho_base.lower().endswith('.pdf'):
+        rows_data = _ler_pdf_base(caminho_base)
+    else:
+        rows_data = _ler_excel_base(caminho_base)
+
+    if not rows_data:
+        raise ValueError("Nenhum produto encontrado no arquivo enviado")
+
+    return _gerar_excel_de_dados(rows_data, percentuais)
