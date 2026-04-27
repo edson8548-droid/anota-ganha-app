@@ -157,7 +157,7 @@ export default function AssistenteIA() {
     setGerandoSeg(0);
     timerRef.current = setInterval(() => setGerandoSeg(s => s + 1), 1000);
     try {
-      const blob = await gerarTabelaPrazos(tabelaArquivo, pctPrazos, () => {});
+      const blob = await gerarTabelaPrazos(tabelaArquivo, pctPrazos, (s) => setGerandoSeg(s));
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -280,6 +280,27 @@ export default function AssistenteIA() {
                   ? `Processando... ${gerandoSeg}s${tabelaArquivo?.name?.toLowerCase().endsWith('.pdf') ? ' (PDF pode levar 1-2 min)' : ''}`
                   : 'Gerar e baixar tabela'}
               </button>
+
+              {(gerandoTabela || tabelaSucesso) && (() => {
+                const pct = tabelaSucesso ? 100 : Math.min(88, Math.round(gerandoSeg / (gerandoSeg + 15) * 100));
+                const color = tabelaSucesso ? '#22c55e' : '#e8412a';
+                const label = tabelaSucesso ? 'Tabela gerada com sucesso!' : `Processando... ${pct}%`;
+                return (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>
+                      <span>{label}</span>
+                      <span>{pct}%</span>
+                    </div>
+                    <div style={{ background: '#0f172a', borderRadius: 8, height: 8, overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%', width: `${pct}%`,
+                        background: `linear-gradient(90deg, ${color}, ${color}cc)`,
+                        borderRadius: 8, transition: 'width 0.6s ease',
+                      }} />
+                    </div>
+                  </div>
+                );
+              })()}
 
               {gerandoTabela && gerandoSeg > 10 && (
                 <p style={{ color: '#94a3b8', fontSize: 12, marginTop: 8, textAlign: 'center' }}>
