@@ -246,59 +246,152 @@ def processar_arquivo_cotacao(caminho_cotacao, caminho_mestre, prazo=28, modo="c
     return caminho_resultado, stats, sem_match
 
 
+def _parse_preco(valor) -> float | None:
+    """Converte string/number para float de preço, retorna None se inválido."""
+    if valor is None:
+        return None
+    try:
+        v = str(valor).replace(",", ".").replace("R$", "").replace(" ", "").strip()
+        f = float(v)
+        return f if f > 0 else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_ean(valor) -> str:
+    if valor is None:
+        return ""
+    try:
+        s = str(int(float(str(valor).strip())))
+        return s if len(s) >= 8 else ""
+    except (ValueError, TypeError):
+        return ""
+
+
 def _ler_excel_base(caminho_arquivo):
-    """Lê Excel base do atacadista. Retorna lista de {"nome", "ean", "preco_base"}."""
-    wb_in = openpyxl.load_workbook(caminho_arquivo, data_only=True)
-    ws_in = wb_in.active
+    """
+    Lê Excel base do atacadista. Retorna lista de {"nome", "ean", "preco_base"}.
+    Estratégia: tenta pandas em múltiplas linhas de header; openpyxl como fallback.
+    """
+    import logging
+    logger_local = logging.getLogger(__name__)
 
-    header_row_idx = 1
-    col_nome = 0
-    col_ean = None
-    col_preco = None
+    NOME_KEYWORDS = ("PRODUTO", "DESCRI", "ITEM", "MERCAD", "NOME DO PROD")
+    EAN_KEYWORDS  = ("EAN", "COD.BARRAS", "COD BARRAS", "CODIGO", "BARRAS", "BARRA", "GTIN")
+    PRECO_KEYWORDS = ("PREÇO", "PRECO", "VALOR", "R$", "UNIT", "28", "21", "14", " 7 ", "7D", "14D", "21D", "28D")
 
-    for row_idx in range(1, min(12, ws_in.max_row + 1)):
-        for cell in ws_in[row_idx]:
-            val = str(cell.value).upper().strip() if cell.value else ""
-            if val in ("PRODUTO", "DESCRIÇÃO", "DESCRICAO", "ITEM", "MERCADORIA", "DESC",
-                       "DESCRIÇÃO DO PRODUTO", "DESCRICAO DO PRODUTO"):
-                col_nome = cell.column - 1
-                header_row_idx = row_idx
-            elif val in ("EAN", "COD.BARRAS", "COD BARRAS", "CODIGO DE BARRAS",
-                         "COD BARRA", "CÓDIGO DE BARRAS"):
-                col_ean = cell.column - 1
-                header_row_idx = row_idx
-            elif val in ("PREÇO", "PRECO", "VALOR", "R$", "VALOR UNITÁRIO",
-                         "VALOR UNIT", "PRECO UNIT", "PREÇO UNIT.", "VALOR UNITARIO"):
-                col_preco = cell.column - 1
-                header_row_idx = row_idx
+    def _detect_cols(cols_upper):
+        col_nome = col_ean = col_preco = None
+        for i, c in enumerate(cols_upper):
+            if col_nome is None and any(k in c for k in NOME_KEYWORDS):
+                col_nome = i
+            if col_ean is None and any(k in c for k in EAN_KEYWORDS):
+                col_ean = i
+            if col_preco is None and any(k in c for k in PRECO_KEYWORDS):
+                col_preco = i
+        return col_nome, col_ean, col_preco
 
-    if col_ean is None:
-        col_ean = 1 if col_nome != 1 else 0
-    if col_preco is None:
-        col_preco = ws_in.max_column - 1
+    def _rows_from_df(df, col_nome, col_ean, col_preco):
+        rows = []
+        for _, row in df.iterrows():
+            nome = str(row.iloc[col_nome]).strip() if col_nome is not None else ""
+            if not nome or nome.upper() in ("NONE", "NAN", ""):
+                continue
+            ean = _parse_ean(row.iloc[col_ean] if col_ean is not None and col_ean < len(row) else None)
+            preco_raw = row.iloc[col_preco] if col_preco is not None and col_preco < len(row) else None
+            preco = _parse_preco(preco_raw)
+            if preco is None:
+                continue
+            rows.append({"nome": nome, "ean": ean, "preco_base": preco})
+        return rows
 
-    rows_data = []
-    for row_idx in range(header_row_idx + 1, ws_in.max_row + 1):
-        row = ws_in[row_idx]
-        nome = row[col_nome].value if col_nome < len(row) else None
-        ean_raw = row[col_ean].value if col_ean < len(row) else None
-        preco_raw = row[col_preco].value if col_preco < len(row) else None
-
-        if not nome or not str(nome).strip() or str(nome).strip().upper() in ("NONE", "NAN"):
-            continue
+    # --- Tentativa 1: pandas com detecção de header ---
+    for hdr in range(0, 15):
         try:
-            preco = float(str(preco_raw).replace(",", ".").replace("R$", "").strip())
-        except (ValueError, TypeError):
+            df = pd.read_excel(caminho_arquivo, header=hdr)
+            if df.empty or len(df.columns) < 2:
+                continue
+            cols_upper = [str(c).upper().strip() for c in df.columns]
+            col_nome, col_ean, col_preco = _detect_cols(cols_upper)
+
+            if col_nome is None:
+                continue  # linha de header não identificada, tenta a próxima
+
+            # Se não achou coluna de preço pelo nome, pega a última coluna numérica
+            if col_preco is None:
+                for i in range(len(df.columns) - 1, -1, -1):
+                    sample = df[df.columns[i]].dropna()
+                    numeric_count = sum(1 for v in sample if _parse_preco(v) is not None)
+                    if numeric_count >= max(3, len(sample) * 0.3):
+                        col_preco = i
+                        break
+
+            if col_preco is None:
+                col_preco = len(df.columns) - 1
+
+            if col_ean is None:
+                col_ean = 1 if col_nome != 1 else 0
+
+            rows = _rows_from_df(df, col_nome, col_ean, col_preco)
+            if rows:
+                logger_local.info(f"_ler_excel_base: {len(rows)} produtos (pandas header={hdr})")
+                return rows
+        except Exception as e:
+            logger_local.debug(f"pandas header={hdr} falhou: {e}")
             continue
 
-        rows_data.append({
-            "nome": str(nome).strip(),
-            "ean": str(int(float(str(ean_raw)))) if ean_raw and str(ean_raw).strip() not in ("", "None") else "",
-            "preco_base": preco,
-        })
+    # --- Tentativa 2: openpyxl direto (fallback para workbooks protegidos/especiais) ---
+    try:
+        wb_in = openpyxl.load_workbook(caminho_arquivo, data_only=True)
+        ws_in = wb_in.active
 
-    wb_in.close()
-    return rows_data
+        header_row_idx = 1
+        col_nome = 0
+        col_ean = None
+        col_preco = None
+
+        for row_idx in range(1, min(20, ws_in.max_row + 1)):
+            for cell in ws_in[row_idx]:
+                val = str(cell.value).upper().strip() if cell.value else ""
+                if col_nome == 0 and any(k in val for k in NOME_KEYWORDS):
+                    col_nome = cell.column - 1
+                    header_row_idx = row_idx
+                elif col_ean is None and any(k in val for k in EAN_KEYWORDS):
+                    col_ean = cell.column - 1
+                elif col_preco is None and any(k in val for k in PRECO_KEYWORDS):
+                    col_preco = cell.column - 1
+
+        if col_ean is None:
+            col_ean = 1 if col_nome != 1 else 0
+        if col_preco is None:
+            col_preco = ws_in.max_column - 1
+
+        rows_data = []
+        for row_idx in range(header_row_idx + 1, ws_in.max_row + 1):
+            row = ws_in[row_idx]
+            nome = row[col_nome].value if col_nome < len(row) else None
+            ean_raw = row[col_ean].value if col_ean < len(row) else None
+            preco_raw = row[col_preco].value if col_preco < len(row) else None
+
+            if not nome or not str(nome).strip() or str(nome).strip().upper() in ("NONE", "NAN"):
+                continue
+            preco = _parse_preco(preco_raw)
+            if preco is None:
+                continue
+            rows_data.append({
+                "nome": str(nome).strip(),
+                "ean": _parse_ean(ean_raw),
+                "preco_base": preco,
+            })
+
+        wb_in.close()
+        if rows_data:
+            logger_local.info(f"_ler_excel_base: {len(rows_data)} produtos (openpyxl fallback)")
+        return rows_data
+
+    except Exception as e:
+        logger_local.error(f"openpyxl fallback falhou: {e}")
+        return []
 
 
 def _extrair_pdf_com_gemini(caminho_pdf):

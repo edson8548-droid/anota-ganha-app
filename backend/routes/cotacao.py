@@ -34,6 +34,9 @@ security = HTTPBearer(auto_error=False)
 
 db = None
 
+# Keep strong references to background tasks so Python's GC doesn't collect them
+_background_tasks: set = set()
+
 MAX_TABELAS = 5
 
 
@@ -361,9 +364,11 @@ async def gerar_tabela_prazos(
         "created_at": datetime.now(timezone.utc),
     })
 
-    asyncio.create_task(_processar_tabela_prazos(job_id, conteudo, ext, {
+    task = asyncio.create_task(_processar_tabela_prazos(job_id, conteudo, ext, {
         7: pct_7, 14: pct_14, 21: pct_21, 28: pct_28,
     }))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
     return {"job_id": job_id}
 
