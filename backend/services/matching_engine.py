@@ -230,11 +230,10 @@ SUBTIPOS_EXCLUSIVOS = [
     {'LN', 'LONGNECK', 'LONG NECK'},
 
     # Creme dental — linha/fórmula são produtos diferentes
-    # Ex: LUMINOUS WHITE ≠ MPA ≠ TOTAL 12 ≠ NATURAL ≠ NEUTRACUCAR
-    {'LUMINOUS WHITE', 'MPA', 'TOTAL 12', 'TOTAL12',
-     'NEUTRACUCAR', 'NEUTRAZUCAR', 'NAT',
-     'SENSITIVE', 'SENSIVEL', 'TRIPLA', 'HERBAL',
-     'WHITENING', 'ANTICARIE', 'MAXFRESH', 'EXTRAFRESH'},
+    # Ex: LUMINOUS WHITE ≠ MPA ≠ TOTAL12 ≠ NEUTRACUCAR ≠ SENSIVEL
+    {'LUMINOUS WHITE', 'MPA', 'TOTAL12', 'NAT',
+     'NEUTRACUCAR', 'SENSIVEL',
+     'TRIPLA ACAO', 'WHITENING', 'ANTICARIE', 'MAXFRESH', 'EXTRAFRESH'},
 ]
 
 # Tamanhos de fralda — mutuamente exclusivos
@@ -726,6 +725,10 @@ def normalizar_nome(nome):
             "ESCOVA DENTAL": "ESC DENT",
             "ESCOVA CABELO": "ESC CAB",
             "ESPONJA LOUCA": "ESP LOUCA",
+            # Creme dental — variantes de grafia para a mesma linha
+            "TOTAL 12": "TOTAL12",
+            "NEUTRAZUCAR": "NEUTRACUCAR",
+            "SENSITIVE": "SENSIVEL",
         }
         for k, v in sinonimos.items():
             nome = nome.replace(k, v)
