@@ -53,6 +53,8 @@ export default function AssistenteIA() {
   const [copiedId, setCopiedId] = useState(null);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   // Estado do modal "Gerar Tabela com Prazos"
   const [showTabelaModal, setShowTabelaModal] = useState(false);
@@ -75,19 +77,26 @@ export default function AssistenteIA() {
     setInput('');
     setLoading(true);
 
-    // histórico no formato que o backend espera (sem o campo time)
-    const history = messages.map(m => ({ role: m.role, content: m.content }));
+    const history = messagesRef.current
+      .filter(m => !m.isError)
+      .map(m => ({ role: m.role, content: m.content }));
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
       const res = await fetch(`${API_URL}/api/ia/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: trimmed, history }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `Erro ${res.status}`);
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || `Erro ${res.status}`);
       }
 
       const data = await res.json();
@@ -97,17 +106,21 @@ export default function AssistenteIA() {
         time: new Date(),
       }]);
     } catch (err) {
+      const msg = err.name === 'AbortError'
+        ? 'Tempo esgotado (30s). Tente novamente.'
+        : (err.message || 'Erro desconhecido');
       setMessages(prev => [...prev, {
         role: 'model',
-        content: `⚠️ Erro ao conectar com o assistente: ${err.message}. Tente novamente.`,
+        content: `⚠️ Erro: ${msg}`,
         time: new Date(),
         isError: true,
       }]);
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
       setTimeout(() => textareaRef.current?.focus(), 100);
     }
-  }, [input, messages, loading]);
+  }, [input, loading]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
