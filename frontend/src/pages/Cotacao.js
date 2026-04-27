@@ -33,6 +33,8 @@ export default function Cotacao() {
   const [resultado, setResultado] = useState(null);
   const [reviewData, setReviewData] = useState(null);
   const [confirmando, setConfirmando] = useState(false);
+  const [processingSeg, setProcessingSeg] = useState(0);
+  const processingTimerRef = useRef(null);
 
   const carregarTabelas = useCallback(async () => {
     setLoading(true);
@@ -78,10 +80,14 @@ export default function Cotacao() {
     setProcessing(true);
     setResultado(null);
     setReviewData(null);
+    setProcessingSeg(0);
+    processingTimerRef.current = setInterval(() => setProcessingSeg(s => s + 1), 1000);
     try {
       const data = await previewCotacao(arquivoCotacao, tabelaSelecionada, modoMatch);
+      clearInterval(processingTimerRef.current);
       setReviewData(data);
     } catch (err) {
+      clearInterval(processingTimerRef.current);
       alert('Erro ao processar: ' + (err.response?.data?.detail || err.message));
     }
     setProcessing(false);
@@ -186,6 +192,7 @@ export default function Cotacao() {
             setReviewData={setReviewData}
             confirmando={confirmando}
             handleConfirmar={handleConfirmar}
+            processingSeg={processingSeg}
           />
         )}
       </div>
@@ -291,7 +298,7 @@ function CotacaoTab({
   tabelas, tabelaSelecionada, setTabelaSelecionada,
   modoMatch, setModoMatch, arquivoCotacao, setArquivoCotacao,
   processing, handleProcessar, resultado, setResultado, cotacaoInputRef,
-  reviewData, setReviewData, confirmando, handleConfirmar,
+  reviewData, setReviewData, confirmando, handleConfirmar, processingSeg,
 }) {
   const cobertura = resultado?.stats
     ? ((resultado.stats.ean + resultado.stats.descricao + resultado.stats.ia) / resultado.stats.total * 100).toFixed(1)
@@ -356,6 +363,41 @@ function CotacaoTab({
                   }}>
             {processing ? 'Processando...' : 'Processar Cotação'}
           </button>
+
+          {/* Barra de progresso */}
+          {(processing || reviewData || resultado) && (() => {
+            let pct, label, color;
+            if (processing) {
+              pct = Math.min(88, Math.round(processingSeg / (processingSeg + 15) * 100));
+              label = `Buscando preços... ${processingSeg}s`;
+              color = '#e8412a';
+            } else if (reviewData) {
+              const com = reviewData.itens.filter(i => i.preco != null).length;
+              pct = Math.round(com / reviewData.itens.length * 100);
+              label = `${com} de ${reviewData.itens.length} itens com preço encontrado`;
+              color = '#22c55e';
+            } else {
+              const { ean = 0, descricao = 0, ia = 0, total = 1 } = resultado.stats;
+              pct = Math.round((ean + descricao + ia) / total * 100);
+              label = `${pct}% de cobertura final`;
+              color = '#22c55e';
+            }
+            return (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>
+                  <span>{label}</span>
+                  <span>{pct}%</span>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 8, height: 10, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', width: `${pct}%`,
+                    background: `linear-gradient(90deg, ${color}, ${color}cc)`,
+                    borderRadius: 8, transition: 'width 0.6s ease',
+                  }} />
+                </div>
+              </div>
+            );
+          })()}
 
           {reviewData && (
             <ReviewMatches
