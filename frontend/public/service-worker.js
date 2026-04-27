@@ -1,4 +1,4 @@
-const CACHE_NAME = 'venpro-app-v1';
+const CACHE_NAME = 'venpro-app-v3';
 const urlsToCache = [
   '/',
   '/index.html',
