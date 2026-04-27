@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FileSpreadsheet, Sparkles, MessageCircle, BarChart3, Puzzle } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useCampaigns } from '../hooks/useCampaigns';
 import { useClients } from '../hooks/useClients';
@@ -188,7 +189,7 @@ const Dashboard = () => {
             </div>
             <div className="header-actions">
               <button className="btn-nav" onClick={() => navigate('/plans')}>Planos</button>
-              <button className="btn-nav" onClick={() => window.open('/assistente', '_blank', 'noopener,noreferrer')}>Assistente IA</button>
+              <button className="btn-nav" onClick={() => window.open('/assistente', '_blank', 'noopener,noreferrer')}>Consultor IA</button>
               <button className="btn-nav btn-notification" onClick={() => window.open('/notificacoes', '_blank', 'noopener,noreferrer')} title="Notificações">🔔</button>
               <button className="btn-nav" onClick={() => navigate('/minha-licenca')}>Licença</button>
               <button className="btn-nav" onClick={handleWhatsAppSupport}>Suporte</button>
@@ -211,21 +212,21 @@ const Dashboard = () => {
             <div className="tools-section-title">Ferramentas</div>
             <div className="tools-grid">
               <div className="tool-card" onClick={() => navigate('/cotacao')}>
-                <div className="tool-card-icon">📊</div>
+                <div className="tool-card-icon"><FileSpreadsheet size={32} /></div>
                 <div className="tool-card-badge live">Disponível</div>
-                <div className="tool-card-title">Robô de Cotação</div>
+                <div className="tool-card-title">Cotação Express</div>
                 <div className="tool-card-desc">Suba sua planilha e receba com todos os preços preenchidos automaticamente — por código de barras ou nome do produto.</div>
               </div>
               <div className="tool-card" onClick={() => navigate('/assistente')}>
-                <div className="tool-card-icon">🤖</div>
+                <div className="tool-card-icon"><Sparkles size={32} /></div>
                 <div className="tool-card-badge live">Disponível</div>
-                <div className="tool-card-title">Assistente IA</div>
+                <div className="tool-card-title">Consultor de Vendas IA</div>
                 <div className="tool-card-desc">Crie textos de oferta, emails profissionais, scripts de negociação e muito mais — especializado em representação comercial.</div>
               </div>
               <div className="tool-card" onClick={() => {}}>
-                <div className="tool-card-icon">📲</div>
+                <div className="tool-card-icon"><MessageCircle size={32} /></div>
                 <div className="tool-card-badge soon">Em breve</div>
-                <div className="tool-card-title">Disparo WhatsApp</div>
+                <div className="tool-card-title">Campanhas WhatsApp</div>
                 <div className="tool-card-desc">Envie ofertas automaticamente para toda sua carteira de clientes com texto e fotos personalizados.</div>
               </div>
               <div className="tool-card" onClick={() => {
@@ -234,9 +235,9 @@ const Dashboard = () => {
                 a.download = 'venpro-cotatudo-extension.zip';
                 a.click();
               }}>
-                <div className="tool-card-icon">🧩</div>
+                <div className="tool-card-icon"><Puzzle size={32} /></div>
                 <div className="tool-card-badge live">Novo</div>
-                <div className="tool-card-title">Extensão Cotatudo</div>
+                <div className="tool-card-title">Cotatudo Automático</div>
                 <div className="tool-card-desc">Baixe a extensão Chrome que preenche cotações no Cotatudo automaticamente com os preços da sua tabela Venpro.</div>
               </div>
               <div className="tool-card" onClick={() => {
@@ -246,9 +247,9 @@ const Dashboard = () => {
                   setShowCreateCampaign(true);
                 }
               }}>
-                <div className="tool-card-icon">🏆</div>
+                <div className="tool-card-icon"><BarChart3 size={32} /></div>
                 <div className="tool-card-badge live">Disponível</div>
-                <div className="tool-card-title">Campanhas e Positivação</div>
+                <div className="tool-card-title">Central de Campanhas</div>
                 <div className="tool-card-desc">Acompanhe campanhas, monitore positivação de clientes e acompanhe seus resultados de indústria em tempo real.</div>
               </div>
             </div>
