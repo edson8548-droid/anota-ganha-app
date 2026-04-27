@@ -232,8 +232,8 @@ const Dashboard = () => {
               }}>
                 <div className="tool-card-icon">🏆</div>
                 <div className="tool-card-badge live">Disponível</div>
-                <div className="tool-card-title">Acompanhamento de Incentivos</div>
-                <div className="tool-card-desc">Acompanhe campanhas, monitore positivação de clientes e acompanhe seus incentivos de indústria em tempo real.</div>
+                <div className="tool-card-title">Campanhas e Positivação</div>
+                <div className="tool-card-desc">Acompanhe campanhas, monitore positivação de clientes e acompanhe seus resultados de indústria em tempo real.</div>
               </div>
             </div>
           </section>

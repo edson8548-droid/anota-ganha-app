@@ -51,7 +51,7 @@ def send_payment_success_email(recipient_email: str, user_name: str, plan_name: 
             <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
                 <h2 style="color: #667eea;">✅ Assinatura Ativada com Sucesso!</h2>
                 <p>Olá, <strong>{user_name}</strong>!</p>
-                <p>Obrigado por confiar no Anota & Ganha. O teu pagamento foi confirmado e a tua licença foi ativada.</p>
+                <p>Obrigado por confiar na Venpro. O teu pagamento foi confirmado e a tua licença foi ativada.</p>
                 <h3 style="color: #10b981;">Detalhes da Assinatura:</h3>
                 <ul>
                     <li><strong>Plano:</strong> {plan_name}</li>
@@ -158,7 +158,7 @@ def setup_mercadopago():
         sdk = None
 
 PLANS = {
-  "monthly": { "id": "monthly", "price": 39.00, "title": "Plano Mensal - Anota & Ganha" },
+  "monthly": { "id": "monthly", "price": 39.00, "title": "Plano Mensal - Venpro" },
   "annual_installments": { "id": "annual_installments", "price": 394.80, "title": "Plano Anual Parcelado" },
   "annual_upfront": { "id": "annual_upfront", "price": 360.00, "title": "Plano Anual à Vista" }
 }
@@ -231,7 +231,7 @@ async def create_preference(payload: PreferencePayload):
             "back_urls": { "success": f"{frontend_url}/payment-success", "failure": f"{frontend_url}/payment-failure", "pending": f"{frontend_url}/payment-pending" },
             "payment_methods": { "installments": plan.get("installments", 1) },
             "external_reference": f"{user_id}-{plan_id}-{plan.get('price')}",
-            "statement_descriptor": "ANOTA&GANHA",
+            "statement_descriptor": "VENPRO",
         }
 
         # 5. OPÇÕES DA REQUISIÇÃO (Device ID - Mantido)

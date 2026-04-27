@@ -1,4 +1,4 @@
-const CACHE_NAME = 'incentivos-app-v1';
+const CACHE_NAME = 'venpro-app-v1';
 const urlsToCache = [
   '/',
   '/index.html',
