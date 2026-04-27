@@ -1,5 +1,4 @@
-# SUBSTITUA: backend/server.py
-# CORRIGIDO: CORS hardcoded para garantir que o Railway o aplica
+# Venpro API — backend/server.py
 
 import os
 import logging
