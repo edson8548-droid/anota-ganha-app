@@ -111,6 +111,15 @@ async def startup_event():
     initialize_firebase()
     setup_mercadopago()
     init_cotacao(db)
+    # Índices MongoDB
+    await db.cotacao_aprendizado.create_index(
+        [("user_id", 1), ("produto_cotacao_norm", 1)],
+        unique=True
+    )
+    await db.cotacao_sessoes.create_index(
+        "created_at",
+        expireAfterSeconds=86400  # sessões expiram em 24h (TTL index)
+    )
     logger.info("✅ Mercado Pago integrado em /api/mercadopago")
     logger.info("✅ Cotação integrado em /api/cotacao")
 
