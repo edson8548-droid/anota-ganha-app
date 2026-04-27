@@ -284,7 +284,16 @@ export default function AssistenteIA() {
               {(gerandoTabela || tabelaSucesso) && (() => {
                 const pct = tabelaSucesso ? 100 : Math.min(88, Math.round(gerandoSeg / (gerandoSeg + 15) * 100));
                 const color = tabelaSucesso ? '#22c55e' : '#e8412a';
-                const label = tabelaSucesso ? 'Tabela gerada com sucesso!' : `Processando... ${pct}%`;
+                let label;
+                if (tabelaSucesso) {
+                  label = 'Tabela gerada com sucesso!';
+                } else if (gerandoSeg >= 120) {
+                  label = `Aguardando servidor... ${gerandoSeg}s (pode levar até 10 min para PDFs)`;
+                } else if (gerandoSeg >= 30) {
+                  label = `Processando planilha... ${gerandoSeg}s`;
+                } else {
+                  label = 'Enviando arquivo...';
+                }
                 return (
                   <div style={{ marginTop: 12 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>
