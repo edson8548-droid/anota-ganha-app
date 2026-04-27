@@ -51,7 +51,7 @@ def _resultados_para_preview(itens, resultados):
             status = "aprovado"
             score = 1.0
         else:
-            # "SIMILAR 80%" ou "APROX 64%"
+            # "SIMILAR 80%", "APROX 64%", ou "IA 75%" (camada Gemini)
             try:
                 score = float(tipo.split()[-1].rstrip('%')) / 100
             except (ValueError, IndexError):
@@ -265,7 +265,7 @@ async def preview_cotacao(
     Não gera Excel — salva sessão no MongoDB para uso posterior pelo /confirmar.
     """
     from bson import ObjectId
-    from services.excel_processor import ler_tabela_mestre, ler_cotacao
+    from services.excel_processor import ler_cotacao
     from services.matching_engine import processar_cotacao_com_ia
 
     uid = await get_user_id(credentials)
@@ -292,12 +292,15 @@ async def preview_cotacao(
         itens, _ = ler_cotacao(tmp_cotacao.name)
         resultados = processar_cotacao_com_ia(itens, precos_dict, precos_lista, modo=modo)
 
-        # Sobrescrever matches com dados aprendidos do usuário
+        # Sobrescrever matches com dados aprendidos do usuário (uma query batched)
+        nomes_norm = [normalizar_nome(item["nome"]) for item in itens]
+        cursor = db.cotacao_aprendizado.find(
+            {"user_id": uid, "produto_cotacao_norm": {"$in": nomes_norm}, "confirmado": True}
+        )
+        aprendizado_map = {doc["produto_cotacao_norm"]: doc async for doc in cursor}
+
         for i, item in enumerate(itens):
-            nome_norm = normalizar_nome(item["nome"])
-            learned = await db.cotacao_aprendizado.find_one(
-                {"user_id": uid, "produto_cotacao_norm": nome_norm, "confirmado": True}
-            )
+            learned = aprendizado_map.get(normalizar_nome(item["nome"]))
             if learned:
                 resultados[i]["preco"] = learned["preco"]
                 resultados[i]["tipo"] = "APRENDIDO"
@@ -305,6 +308,9 @@ async def preview_cotacao(
         preview_items = _resultados_para_preview(itens, resultados)
 
         # Salvar sessão para uso pelo /confirmar
+        if len(conteudo_cotacao) > 14_000_000:
+            raise HTTPException(400, "Arquivo de cotação muito grande (máx 14MB)")
+
         session_id = str(uuid.uuid4())
         await db.cotacao_sessoes.insert_one({
             "_id": session_id,
