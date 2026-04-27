@@ -321,9 +321,14 @@ async def preview_cotacao(
 
     try:
         prazo_efetivo = prazo if prazo > 0 else doc.get("prazo", 28)
-        precos_dict, precos_lista = ler_tabela_mestre(tmp_mestre.name, prazo=prazo_efetivo)
-        itens, _ = ler_cotacao(tmp_cotacao.name)
-        resultados = processar_cotacao_com_ia(itens, precos_dict, precos_lista, modo=modo)
+
+        def _processar_sync():
+            pd, pl = ler_tabela_mestre(tmp_mestre.name, prazo=prazo_efetivo)
+            its, _ = ler_cotacao(tmp_cotacao.name)
+            res = processar_cotacao_com_ia(its, pd, pl, modo=modo)
+            return pd, pl, its, res
+
+        precos_dict, precos_lista, itens, resultados = await asyncio.to_thread(_processar_sync)
 
         # Sobrescrever matches com dados aprendidos do usuário (uma query batched)
         nomes_norm = [normalizar_nome(item["nome"]) for item in itens]
