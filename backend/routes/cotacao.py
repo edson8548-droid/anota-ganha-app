@@ -14,6 +14,8 @@ from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import Response
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
+from pydantic import BaseModel
+from typing import List
 import firebase_admin
 from firebase_admin import auth as firebase_auth
 
@@ -373,4 +375,113 @@ async def gerar_tabela_prazos(
         content=resultado_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=tabela_com_prazos.xlsx"},
+    )
+
+
+class ConfirmarPayload(BaseModel):
+    session_id: str
+    aprovacoes: List[bool]  # um bool por item, na mesma ordem do preview
+
+
+@router.post("/confirmar")
+async def confirmar_cotacao(
+    payload: ConfirmarPayload,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """
+    Recebe aprovações do usuário, salva aprendizado e gera Excel.
+    """
+    uid = await get_user_id(credentials)
+
+    sessao = await db.cotacao_sessoes.find_one({"_id": payload.session_id, "user_id": uid})
+    if not sessao:
+        raise HTTPException(404, "Sessão expirada ou não encontrada. Processe a cotação novamente.")
+
+    itens = sessao["itens"]
+    resultados = sessao["resultados"]
+    cotacao_bytes = sessao["cotacao_bytes"]
+
+    if len(payload.aprovacoes) != len(itens):
+        raise HTTPException(400, "Número de aprovações não corresponde ao número de itens.")
+
+    # Salvar aprendizado para itens com preço (aprovados ou rejeitados)
+    agora = datetime.now(timezone.utc)
+    for i, aprovado in enumerate(payload.aprovacoes):
+        item = itens[i]
+        res = resultados[i]
+        if res.get("preco") is None:
+            continue
+
+        nome_norm = normalizar_nome(item["nome"])
+
+        if aprovado:
+            await db.cotacao_aprendizado.update_one(
+                {"user_id": uid, "produto_cotacao_norm": nome_norm},
+                {"$set": {
+                    "preco": res["preco"],
+                    "confirmado": True,
+                    "updated_at": agora,
+                }},
+                upsert=True,
+            )
+        else:
+            await db.cotacao_aprendizado.update_one(
+                {"user_id": uid, "produto_cotacao_norm": nome_norm},
+                {"$set": {"confirmado": False, "updated_at": agora}},
+                upsert=True,
+            )
+
+    # Gerar Excel com apenas items aprovados preenchidos
+    resultados_filtrados = []
+    for i, res in enumerate(resultados):
+        if payload.aprovacoes[i] and res.get("preco") is not None:
+            resultados_filtrados.append(res)
+        else:
+            resultados_filtrados.append({"linha": res.get("linha", 0), "preco": None, "tipo": None})
+
+    try:
+        tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+        tmp_cotacao.write(cotacao_bytes)
+        tmp_cotacao.close()
+
+        caminho_resultado = gerar_excel_resultado(tmp_cotacao.name, itens, resultados_filtrados)
+        with open(caminho_resultado, "rb") as f:
+            resultado_bytes = f.read()
+        os.unlink(caminho_resultado)
+    except Exception as e:
+        logger.error(f"Erro ao gerar Excel no confirmar: {e}")
+        raise HTTPException(500, f"Erro ao gerar Excel: {str(e)}")
+    finally:
+        try:
+            os.unlink(tmp_cotacao.name)
+        except OSError:
+            pass
+        # Limpar sessão após uso
+        await db.cotacao_sessoes.delete_one({"_id": payload.session_id})
+
+    # Stats apenas dos aprovados
+    stats = {"ean": 0, "descricao": 0, "ia": 0, "aprendido": 0, "sem_match": 0, "total": len(itens)}
+    sem_match = []
+    for item, res, aprovado in zip(itens, resultados, payload.aprovacoes):
+        tipo = res.get("tipo")
+        if not aprovado or res.get("preco") is None:
+            stats["sem_match"] += 1
+            sem_match.append(item["nome"])
+        elif tipo == "EAN":
+            stats["ean"] += 1
+        elif tipo == "APRENDIDO":
+            stats["aprendido"] += 1
+        elif tipo and "IA" in tipo:
+            stats["ia"] += 1
+        else:
+            stats["descricao"] += 1
+
+    return Response(
+        content=resultado_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=cotacao_preenchida.xlsx",
+            "X-Stats": json.dumps(stats),
+            "X-Sem-Match": json.dumps(sem_match[:50]),
+        }
     )
