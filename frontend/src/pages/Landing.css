@@ -221,6 +221,9 @@
 .landing-feature-icon {
   font-size: 32px;
   margin-bottom: 16px;
+  color: #3A85A8;
+  display: flex;
+  align-items: center;
 }
 
 .landing-feature-card h3 {
