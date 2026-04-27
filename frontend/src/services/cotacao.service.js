@@ -38,7 +38,7 @@ export const processarCotacao = async (arquivo, tabelaId, modo = 'completo') => 
   return { blob: response.data, stats, semMatch };
 };
 
-export const gerarTabelaPrazos = async (arquivo, percentuais) => {
+export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress) => {
   const formData = new FormData();
   formData.append('arquivo', arquivo);
   formData.append('pct_7',  parseFloat(percentuais[7])  || 0);
@@ -50,30 +50,50 @@ export const gerarTabelaPrazos = async (arquivo, percentuais) => {
   if (!user) throw new Error('Faça login novamente.');
   const token = await user.getIdToken();
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 150000);
+  const headers = { Authorization: `Bearer ${token}` };
 
-  let response;
-  try {
-    response = await fetch('https://api.venpro.com.br/api/cotacao/gerar-tabela-prazos', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
-      signal: controller.signal,
-    });
-  } catch (err) {
-    if (err.name === 'AbortError') throw new Error('Tempo esgotado (2,5 min). PDFs muito grandes: converta para Excel antes de enviar.');
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
+  // Submit job
+  const submitRes = await fetch('https://api.venpro.com.br/api/cotacao/gerar-tabela-prazos', {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (!submitRes.ok) {
+    const text = await submitRes.text();
+    let msg = `Erro ${submitRes.status}`;
+    try { msg = JSON.parse(text).detail || msg; } catch {}
+    throw new Error(msg);
   }
 
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.detail || `Erro ${response.status}`);
+  const { job_id } = await submitRes.json();
+
+  // Poll for result
+  const maxAttempts = 120;
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    onProgress?.((i + 1) * 2);
+
+    const pollRes = await fetch(`https://api.venpro.com.br/api/cotacao/jobs/${job_id}`, { headers });
+
+    if (!pollRes.ok) {
+      const text = await pollRes.text();
+      let msg = `Erro ${pollRes.status}`;
+      try { msg = JSON.parse(text).detail || msg; } catch {}
+      throw new Error(msg);
+    }
+
+    const contentType = pollRes.headers.get('content-type') || '';
+    if (contentType.includes('json')) {
+      const data = await pollRes.json();
+      if (data.status === 'processing') continue;
+      throw new Error(data.error || 'Erro desconhecido');
+    }
+
+    return pollRes.blob();
   }
 
-  return response.blob();
+  throw new Error('Tempo esgotado (4 min). Arquivo muito grande — converta PDF para Excel antes.');
 };
 
 export const previewCotacao = async (arquivo, tabelaId, modo = 'completo') => {

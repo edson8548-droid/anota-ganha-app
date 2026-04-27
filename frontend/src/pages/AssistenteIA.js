@@ -157,7 +157,7 @@ export default function AssistenteIA() {
     setGerandoSeg(0);
     timerRef.current = setInterval(() => setGerandoSeg(s => s + 1), 1000);
     try {
-      const blob = await gerarTabelaPrazos(tabelaArquivo, pctPrazos);
+      const blob = await gerarTabelaPrazos(tabelaArquivo, pctPrazos, () => {});
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

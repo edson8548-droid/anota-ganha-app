@@ -348,34 +348,92 @@ async def gerar_tabela_prazos(
     pct_28: float = Form(0.0),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    await get_user_id(credentials)
+    uid = await get_user_id(credentials)
 
     conteudo = await arquivo.read()
     ext = ".pdf" if arquivo.filename.lower().endswith(".pdf") else ".xlsx"
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
-    tmp.write(conteudo)
-    tmp.close()
 
+    job_id = str(uuid.uuid4())
+    await db.cotacao_jobs.insert_one({
+        "_id": job_id,
+        "user_id": uid,
+        "status": "processing",
+        "created_at": datetime.now(timezone.utc),
+    })
+
+    asyncio.create_task(_processar_tabela_prazos(job_id, conteudo, ext, {
+        7: pct_7, 14: pct_14, 21: pct_21, 28: pct_28,
+    }))
+
+    return {"job_id": job_id}
+
+
+async def _processar_tabela_prazos(job_id, conteudo, ext, prazos):
     try:
-        resultado_path = await asyncio.wait_for(
-            asyncio.to_thread(gerar_excel_multiprazos, tmp.name, {
-                7: pct_7, 14: pct_14, 21: pct_21, 28: pct_28,
-            }),
-            timeout=120.0,
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+        tmp.write(conteudo)
+        tmp.close()
+
+        resultado_path = await asyncio.to_thread(
+            gerar_excel_multiprazos, tmp.name, prazos
         )
+
         with open(resultado_path, "rb") as f:
             resultado_bytes = f.read()
         os.unlink(resultado_path)
-    except asyncio.TimeoutError:
-        raise HTTPException(504, "Processamento ultrapassou 2 minutos. Para PDFs grandes, converta para Excel (.xlsx) antes de enviar.")
+
+        bucket = _bucket()
+        grid_id = await bucket.upload_from_stream(
+            "tabela_com_prazos.xlsx",
+            BytesIO(resultado_bytes),
+            metadata={"content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+        )
+
+        await db.cotacao_jobs.update_one(
+            {"_id": job_id},
+            {"$set": {"status": "done", "grid_id": grid_id}},
+        )
     except Exception as e:
-        logger.error(f"Erro ao gerar tabela com prazos: {e}")
-        raise HTTPException(500, f"Erro ao gerar tabela: {str(e)}")
+        logger.error(f"Erro ao gerar tabela (job {job_id}): {e}")
+        await db.cotacao_jobs.update_one(
+            {"_id": job_id},
+            {"$set": {"status": "error", "error": str(e)}},
+        )
     finally:
         try:
             os.unlink(tmp.name)
-        except OSError:
+        except (OSError, NameError):
             pass
+
+
+@router.get("/jobs/{job_id}")
+async def get_job_status(
+    job_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    uid = await get_user_id(credentials)
+    job = await db.cotacao_jobs.find_one({"_id": job_id, "user_id": uid})
+    if not job:
+        raise HTTPException(404, "Job não encontrado")
+
+    if job["status"] == "processing":
+        return {"status": "processing"}
+
+    if job["status"] == "error":
+        await db.cotacao_jobs.delete_one({"_id": job_id})
+        raise HTTPException(500, job.get("error", "Erro ao processar tabela"))
+
+    # Done — stream result from GridFS
+    grid_id = job["grid_id"]
+    grid_out = await _bucket().open_download_stream(grid_id)
+    resultado_bytes = await grid_out.read()
+
+    # Clean up
+    try:
+        await _bucket().delete(grid_id)
+    except Exception:
+        pass
+    await db.cotacao_jobs.delete_one({"_id": job_id})
 
     return Response(
         content=resultado_bytes,
