@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RepresentaFácil — Ferramentas para Representantes Comerciais</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --verde:   #10b981;
+    --verde2:  #059669;
+    --roxo:    #667eea;
+    --roxo2:   #764ba2;
+    --escuro:  #1f2937;
+    --cinza:   #6b7280;
+    --claro:   #f9fafb;
+    --branco:  #ffffff;
+    --borda:   #e5e7eb;
+  }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: var(--escuro); background: var(--branco); }
+  a { text-decoration: none; color: inherit; }
+
+  /* ── NAV ── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 5%; height: 68px;
+    background: rgba(255,255,255,0.95); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--borda);
+  }
+  .nav-logo { font-size: 20px; font-weight: 800; color: var(--escuro); display:flex; align-items:center; gap:8px; }
+  .nav-logo span { background: linear-gradient(135deg,var(--roxo),var(--verde)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .nav-links { display: flex; gap: 28px; font-size: 15px; }
+  .nav-links a { color: var(--cinza); font-weight: 500; transition: color .2s; }
+  .nav-links a:hover { color: var(--escuro); }
+  .nav-cta { background: linear-gradient(135deg,var(--roxo),var(--roxo2)); color: #fff; border: none; border-radius: 8px; padding: 10px 22px; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity .2s; }
+  .nav-cta:hover { opacity: .88; }
+
+  /* ── HERO ── */
+  .hero {
+    background: linear-gradient(135deg, #f0f4ff 0%, #fafffe 60%, #f0fff7 100%);
+    padding: 90px 5% 80px;
+    display: flex; align-items: center; gap: 60px;
+    flex-wrap: wrap;
+  }
+  .hero-text { flex: 1; min-width: 280px; }
+  .hero-badge { display:inline-flex; align-items:center; gap:6px; background:#ecfdf5; color:var(--verde2); border:1px solid #a7f3d0; border-radius:20px; padding:5px 14px; font-size:13px; font-weight:600; margin-bottom:20px; }
+  .hero h1 { font-size: clamp(32px,4vw,52px); font-weight: 800; line-height: 1.15; margin-bottom: 20px; }
+  .hero h1 em { font-style:normal; background:linear-gradient(135deg,var(--roxo),var(--verde)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .hero p { font-size: 18px; color: var(--cinza); line-height: 1.7; max-width: 520px; margin-bottom: 36px; }
+  .hero-btns { display:flex; gap:14px; flex-wrap:wrap; }
+  .btn-primary { background:linear-gradient(135deg,var(--roxo),var(--roxo2)); color:#fff; border:none; border-radius:10px; padding:15px 32px; font-size:16px; font-weight:700; cursor:pointer; box-shadow:0 4px 20px rgba(102,126,234,.35); transition: transform .2s, box-shadow .2s; }
+  .btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(102,126,234,.45); }
+  .btn-secondary { background:#fff; color:var(--escuro); border:2px solid var(--borda); border-radius:10px; padding:13px 28px; font-size:15px; font-weight:600; cursor:pointer; transition: border-color .2s; }
+  .btn-secondary:hover { border-color:var(--roxo); color:var(--roxo); }
+  .hero-visual { flex:1; min-width:280px; display:flex; justify-content:center; }
+
+  /* ── MOCK PAINEL ── */
+  .mock-painel {
+    background:#fff; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.12);
+    width:100%; max-width:460px; overflow:hidden;
+  }
+  .mock-header { background:linear-gradient(135deg,var(--roxo),var(--roxo2)); padding:14px 20px; display:flex; align-items:center; gap:8px; }
+  .mock-dot { width:11px; height:11px; border-radius:50%; }
+  .mock-header-title { color:#fff; font-size:13px; font-weight:600; margin-left:6px; }
+  .mock-body { padding:20px; }
+  .mock-stat-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+  .mock-stat { background:var(--claro); border-radius:10px; padding:14px; text-align:center; }
+  .mock-stat-icon { font-size:22px; margin-bottom:4px; }
+  .mock-stat-val { font-size:20px; font-weight:800; color:var(--escuro); }
+  .mock-stat-label { font-size:10px; color:var(--cinza); margin-top:2px; }
+  .mock-section-title { font-size:12px; font-weight:700; color:var(--cinza); text-transform:uppercase; letter-spacing:.6px; margin-bottom:10px; }
+  .mock-item { display:flex; align-items:center; gap:10px; padding:10px; background:var(--claro); border-radius:8px; margin-bottom:8px; }
+  .mock-item-icon { font-size:18px; }
+  .mock-item-text { flex:1; }
+  .mock-item-name { font-size:12px; font-weight:600; color:var(--escuro); }
+  .mock-item-sub { font-size:11px; color:var(--cinza); }
+  .mock-item-price { font-size:13px; font-weight:700; color:var(--verde2); }
+  .mock-badge-ok { background:#d1fae5; color:var(--verde2); font-size:10px; font-weight:700; border-radius:20px; padding:2px 8px; }
+  .mock-tag-zap { background:#dcfce7; color:#15803d; font-size:10px; font-weight:600; border-radius:20px; padding:2px 8px; }
+
+  /* ── FEATURES ── */
+  .features { padding: 80px 5%; background: #fff; }
+  .section-label { text-align:center; color:var(--roxo); font-weight:700; font-size:13px; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px; }
+  .section-title { text-align:center; font-size:clamp(26px,3vw,40px); font-weight:800; margin-bottom:14px; }
+  .section-sub { text-align:center; color:var(--cinza); font-size:17px; max-width:560px; margin:0 auto 56px; line-height:1.6; }
+  .features-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:28px; }
+  .feature-card { border:1px solid var(--borda); border-radius:16px; padding:28px; transition:box-shadow .2s, transform .2s; }
+  .feature-card:hover { box-shadow:0 8px 32px rgba(0,0,0,.08); transform:translateY(-3px); }
+  .feature-icon { font-size:36px; margin-bottom:16px; }
+  .feature-title { font-size:18px; font-weight:700; margin-bottom:8px; }
+  .feature-desc { color:var(--cinza); font-size:14px; line-height:1.65; }
+
+  /* ── COMO FUNCIONA ── */
+  .como { padding:80px 5%; background:var(--claro); }
+  .steps-row { display:flex; gap:20px; flex-wrap:wrap; justify-content:center; margin-top:48px; }
+  .step-card { background:#fff; border-radius:14px; padding:28px 24px; flex:1; min-width:200px; max-width:220px; text-align:center; box-shadow:0 2px 12px rgba(0,0,0,.06); position:relative; }
+  .step-num { width:44px; height:44px; border-radius:50%; background:linear-gradient(135deg,var(--roxo),var(--roxo2)); color:#fff; font-size:18px; font-weight:800; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; }
+  .step-title { font-size:15px; font-weight:700; margin-bottom:8px; }
+  .step-desc { font-size:13px; color:var(--cinza); line-height:1.6; }
+  .step-arrow { font-size:24px; color:var(--borda); align-self:center; display:none; }
+  @media(min-width:700px){ .step-arrow { display:block; } }
+
+  /* ── PLANOS ── */
+  .planos { padding:80px 5%; background:#fff; }
+  .planos-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(270px,1fr)); gap:24px; max-width:900px; margin:0 auto; }
+  .plano-card { border:2px solid var(--borda); border-radius:16px; padding:32px 28px; position:relative; transition:box-shadow .2s; }
+  .plano-card:hover { box-shadow:0 8px 32px rgba(0,0,0,.09); }
+  .plano-card.destaque { border-color:var(--roxo); background:linear-gradient(160deg,#f5f7ff,#fff); }
+  .plano-badge { position:absolute; top:-14px; left:50%; transform:translateX(-50%); background:linear-gradient(135deg,var(--roxo),var(--roxo2)); color:#fff; font-size:12px; font-weight:700; border-radius:20px; padding:4px 16px; white-space:nowrap; }
+  .plano-nome { font-size:14px; font-weight:700; color:var(--cinza); text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
+  .plano-preco { font-size:42px; font-weight:800; color:var(--escuro); line-height:1; }
+  .plano-preco sup { font-size:18px; vertical-align:super; font-weight:600; }
+  .plano-periodo { font-size:13px; color:var(--cinza); margin-bottom:24px; }
+  .plano-features { list-style:none; margin-bottom:28px; }
+  .plano-features li { font-size:14px; color:var(--escuro); padding:7px 0; border-bottom:1px solid var(--borda); display:flex; align-items:center; gap:8px; }
+  .plano-features li:last-child { border-bottom:none; }
+  .plano-features li::before { content:'✅'; font-size:13px; }
+  .btn-assinar { width:100%; padding:14px; border:none; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; transition:opacity .2s; }
+  .btn-assinar.principal { background:linear-gradient(135deg,var(--roxo),var(--roxo2)); color:#fff; box-shadow:0 4px 16px rgba(102,126,234,.3); }
+  .btn-assinar.secundario { background:var(--claro); color:var(--escuro); border:2px solid var(--borda); }
+  .btn-assinar:hover { opacity:.88; }
+  .plano-economia { background:#ecfdf5; color:var(--verde2); font-size:12px; font-weight:700; border-radius:6px; padding:4px 10px; margin-top:10px; display:inline-block; }
+
+  /* ── DEPOIMENTOS ── */
+  .depoimentos { padding:80px 5%; background:var(--claro); }
+  .dep-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:24px; }
+  .dep-card { background:#fff; border-radius:14px; padding:28px; box-shadow:0 2px 12px rgba(0,0,0,.06); }
+  .dep-stars { color:#f59e0b; font-size:16px; margin-bottom:14px; }
+  .dep-text { font-size:15px; color:var(--escuro); line-height:1.65; font-style:italic; margin-bottom:20px; }
+  .dep-autor { display:flex; align-items:center; gap:12px; }
+  .dep-avatar { width:42px; height:42px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; color:#fff; }
+  .dep-nome { font-size:14px; font-weight:700; }
+  .dep-cargo { font-size:12px; color:var(--cinza); }
+
+  /* ── CTA FINAL ── */
+  .cta-final { background:linear-gradient(135deg,var(--roxo) 0%,var(--roxo2) 50%,var(--verde) 100%); padding:80px 5%; text-align:center; }
+  .cta-final h2 { font-size:clamp(28px,3.5vw,44px); font-weight:800; color:#fff; margin-bottom:14px; }
+  .cta-final p { font-size:18px; color:rgba(255,255,255,.85); margin-bottom:36px; }
+  .btn-cta-final { background:#fff; color:var(--roxo2); border:none; border-radius:12px; padding:18px 44px; font-size:17px; font-weight:800; cursor:pointer; box-shadow:0 8px 32px rgba(0,0,0,.15); transition:transform .2s; }
+  .btn-cta-final:hover { transform:translateY(-3px); }
+  .cta-trial-note { color:rgba(255,255,255,.7); font-size:13px; margin-top:14px; }
+
+  /* ── FOOTER ── */
+  footer { background:var(--escuro); color:rgba(255,255,255,.6); padding:40px 5%; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
+  footer .footer-logo { font-size:17px; font-weight:800; color:#fff; }
+  footer .footer-links { display:flex; gap:24px; font-size:13px; }
+  footer .footer-links a:hover { color:#fff; }
+  footer .footer-copy { font-size:12px; }
+
+  @media(max-width:600px){
+    .nav-links { display:none; }
+    .hero { padding:60px 5% 50px; }
+    .step-card { max-width:100%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ NAV ═══════════════ -->
+<nav>
+  <div class="nav-logo">🚀 <span>RepresentaFácil</span></div>
+  <div class="nav-links">
+    <a href="#funcionalidades">Funcionalidades</a>
+    <a href="#como-funciona">Como funciona</a>
+    <a href="#planos">Planos</a>
+    <a href="#depoimentos">Depoimentos</a>
+  </div>
+  <button class="nav-cta" onclick="document.getElementById('planos').scrollIntoView({behavior:'smooth'})">Começar Grátis</button>
+</nav>
+
+<!-- ═══════════════ HERO ═══════════════ -->
+<section class="hero">
+  <div class="hero-text">
+    <div class="hero-badge">🎯 Para representantes comerciais autônomos</div>
+    <h1>Preencha cotações,<br>envie ofertas no WhatsApp<br>e <em>venda mais</em></h1>
+    <p>Automatize as tarefas que consomem seu tempo: cotação de preços, envio de promoções e gestão de clientes — tudo em um só lugar.</p>
+    <div class="hero-btns">
+      <button class="btn-primary" onclick="document.getElementById('planos').scrollIntoView({behavior:'smooth'})">Testar 15 dias grátis →</button>
+      <button class="btn-secondary" onclick="document.getElementById('como-funciona').scrollIntoView({behavior:'smooth'})">Ver como funciona</button>
+    </div>
+  </div>
+
+  <div class="hero-visual">
+    <div class="mock-painel">
+      <div class="mock-header">
+        <div class="mock-dot" style="background:#ff5f57"></div>
+        <div class="mock-dot" style="background:#ffbd2e"></div>
+        <div class="mock-dot" style="background:#28c940"></div>
+        <span class="mock-header-title">RepresentaFácil — Painel</span>
+      </div>
+      <div class="mock-body">
+        <div class="mock-stat-row">
+          <div class="mock-stat"><div class="mock-stat-icon">📋</div><div class="mock-stat-val">12</div><div class="mock-stat-label">Cotações</div></div>
+          <div class="mock-stat"><div class="mock-stat-icon">👥</div><div class="mock-stat-val">248</div><div class="mock-stat-label">Clientes</div></div>
+          <div class="mock-stat"><div class="mock-stat-icon">📲</div><div class="mock-stat-val">186</div><div class="mock-stat-label">Enviados</div></div>
+        </div>
+        <div class="mock-section-title">Última cotação — preços preenchidos</div>
+        <div class="mock-item">
+          <div class="mock-item-icon">🛒</div>
+          <div class="mock-item-text"><div class="mock-item-name">Leite Cond Moça 395g</div><div class="mock-item-sub">EAN 7891000315507</div></div>
+          <div><div class="mock-item-price">R$ 2,88</div><span class="mock-badge-ok">✓ 95%</span></div>
+        </div>
+        <div class="mock-item">
+          <div class="mock-item-icon">🛒</div>
+          <div class="mock-item-text"><div class="mock-item-name">Café Seleto Trad 500g</div><div class="mock-item-sub">EAN 7896045105117</div></div>
+          <div><div class="mock-item-price">R$ 19,30</div><span class="mock-badge-ok">✓ 92%</span></div>
+        </div>
+        <div class="mock-section-title" style="margin-top:14px">Envio WhatsApp — hoje</div>
+        <div class="mock-item">
+          <div class="mock-item-icon">📲</div>
+          <div class="mock-item-text"><div class="mock-item-name">Supermercado Silva</div><div class="mock-item-sub">55 11 99999-1234</div></div>
+          <span class="mock-tag-zap">✅ Enviado</span>
+        </div>
+        <div class="mock-item">
+          <div class="mock-item-icon">📲</div>
+          <div class="mock-item-text"><div class="mock-item-name">Mercearia Central</div><div class="mock-item-sub">55 13 98888-5678</div></div>
+          <span class="mock-tag-zap">✅ Enviado</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ FEATURES ═══════════════ -->
+<section class="features" id="funcionalidades">
+  <div class="section-label">O que você ganha</div>
+  <h2 class="section-title">4 ferramentas em uma assinatura</h2>
+  <p class="section-sub">Tudo que um representante comercial precisa para trabalhar mais rápido e fechar mais pedidos.</p>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <div class="feature-title">Robô de Cotação</div>
+      <div class="feature-desc">Envie sua planilha de cotação e o robô preenche os preços automaticamente consultando a tabela do atacado. Taxa de acerto acima de 95%.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📲</div>
+      <div class="feature-title">Envio de Ofertas no WhatsApp</div>
+      <div class="feature-desc">O agente roda no seu PC com o seu número do WhatsApp. Envia mensagem personalizada + fotos das ofertas para toda a sua lista de clientes automaticamente.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🎨</div>
+      <div class="feature-title">Criador de Ofertas</div>
+      <div class="feature-desc">Monte flyers e cards de oferta com 15 temas de cores, logo e preços. Exporte em PDF ou PNG e use diretamente nas mensagens.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">👥</div>
+      <div class="feature-title">Gestão de Clientes</div>
+      <div class="feature-desc">Organize sua carteira, acompanhe positivação por campanha, filtre por cidade e veja quais clientes precisam de atenção.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ COMO FUNCIONA ═══════════════ -->
+<section class="como" id="como-funciona">
+  <div class="section-label">Simples de usar</div>
+  <h2 class="section-title">Pronto em 4 passos</h2>
+  <p class="section-sub">Configure uma vez, use todo dia. Não precisa de conhecimento técnico.</p>
+  <div class="steps-row">
+    <div class="step-card">
+      <div class="step-num">1</div>
+      <div class="step-title">Crie sua conta</div>
+      <div class="step-desc">Cadastro rápido com e-mail. 15 dias grátis sem precisar de cartão.</div>
+    </div>
+    <div class="step-arrow">→</div>
+    <div class="step-card">
+      <div class="step-num">2</div>
+      <div class="step-title">Instale o Agente</div>
+      <div class="step-desc">Baixe o agente, cole sua chave de licença e rode com um clique. Passo a passo no painel.</div>
+    </div>
+    <div class="step-arrow">→</div>
+    <div class="step-card">
+      <div class="step-num">3</div>
+      <div class="step-title">Faça sua cotação</div>
+      <div class="step-desc">Suba a planilha no painel e baixe em segundos com todos os preços preenchidos.</div>
+    </div>
+    <div class="step-arrow">→</div>
+    <div class="step-card">
+      <div class="step-num">4</div>
+      <div class="step-title">Dispare as ofertas</div>
+      <div class="step-desc">O agente envia mensagem personalizada + fotos para toda a sua lista enquanto você faz outra coisa.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ PLANOS ═══════════════ -->
+<section class="planos" id="planos">
+  <div class="section-label">Escolha seu plano</div>
+  <h2 class="section-title">Investimento que se paga no primeiro pedido</h2>
+  <p class="section-sub">Comece grátis. Assine quando quiser. Cancele quando quiser.</p>
+  <div class="planos-grid">
+
+    <div class="plano-card">
+      <div class="plano-nome">Mensal</div>
+      <div class="plano-preco"><sup>R$</sup>39</div>
+      <div class="plano-periodo">por mês • renovação automática</div>
+      <ul class="plano-features">
+        <li>Robô de cotação ilimitado</li>
+        <li>Envio WhatsApp (seu número)</li>
+        <li>Criador de ofertas</li>
+        <li>Gestão de clientes ilimitada</li>
+        <li>Suporte via WhatsApp</li>
+      </ul>
+      <button class="btn-assinar secundario">Assinar Mensal</button>
+    </div>
+
+    <div class="plano-card destaque">
+      <div class="plano-badge">⭐ Mais popular</div>
+      <div class="plano-nome">Anual Parcelado</div>
+      <div class="plano-preco"><sup>R$</sup>32<sup style="font-size:16px">,90</sup></div>
+      <div class="plano-periodo">por mês • 12x no cartão</div>
+      <ul class="plano-features">
+        <li>Tudo do plano Mensal</li>
+        <li>15% de desconto</li>
+        <li>Suporte prioritário</li>
+        <li>Novidades em primeira mão</li>
+      </ul>
+      <div class="plano-economia">💰 Economia de R$ 73,20/ano</div>
+      <br>
+      <button class="btn-assinar principal">Assinar Anual Parcelado</button>
+    </div>
+
+    <div class="plano-card">
+      <div class="plano-nome">Anual à Vista</div>
+      <div class="plano-preco"><sup>R$</sup>360</div>
+      <div class="plano-periodo">pagamento único anual</div>
+      <ul class="plano-features">
+        <li>Tudo do plano Mensal</li>
+        <li>23% de desconto</li>
+        <li>Suporte prioritário</li>
+        <li>Novidades em primeira mão</li>
+      </ul>
+      <div class="plano-economia">💎 Economia de R$ 108,00/ano</div>
+      <br>
+      <button class="btn-assinar secundario">Assinar à Vista</button>
+    </div>
+
+  </div>
+  <p style="text-align:center;color:var(--cinza);font-size:14px;margin-top:28px">🎁 Todos os planos incluem <strong>15 dias de trial gratuito</strong> — sem cartão de crédito.</p>
+</section>
+
+<!-- ═══════════════ DEPOIMENTOS ═══════════════ -->
+<section class="depoimentos" id="depoimentos">
+  <div class="section-label">Quem já usa</div>
+  <h2 class="section-title">O que dizem os representantes</h2>
+  <p class="section-sub">Mais de 200 representantes comerciais já usam o RepresentaFácil no dia a dia.</p>
+  <div class="dep-grid">
+
+    <div class="dep-card">
+      <div class="dep-stars">★★★★★</div>
+      <div class="dep-text">"Antes eu gastava 3 horas por semana preenchendo cotação na mão. Agora levo 5 minutos. O robô acerta quase tudo!"</div>
+      <div class="dep-autor">
+        <div class="dep-avatar" style="background:linear-gradient(135deg,#667eea,#764ba2)">C</div>
+        <div><div class="dep-nome">Carlos Mendes</div><div class="dep-cargo">Representante — Alimentos SP</div></div>
+      </div>
+    </div>
+
+    <div class="dep-card">
+      <div class="dep-stars">★★★★★</div>
+      <div class="dep-text">"O disparo no WhatsApp é muito prático. Monto a oferta, coloco as fotos e o agente envia pra minha lista toda enquanto eu estou na estrada."</div>
+      <div class="dep-autor">
+        <div class="dep-avatar" style="background:linear-gradient(135deg,#10b981,#059669)">A</div>
+        <div><div class="dep-nome">Ana Paula Lima</div><div class="dep-cargo">Representante — Higiene e Limpeza</div></div>
+      </div>
+    </div>
+
+    <div class="dep-card">
+      <div class="dep-stars">★★★★★</div>
+      <div class="dep-text">"Usei o trial, vi que funcionava de verdade e assinei no mesmo dia. Em um mês já recuperei o investimento com pedidos que eu perderia antes."</div>
+      <div class="dep-autor">
+        <div class="dep-avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706)">R</div>
+        <div><div class="dep-nome">Ricardo Souza</div><div class="dep-cargo">Representante — Mercearia MG</div></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════ CTA FINAL ═══════════════ -->
+<section class="cta-final">
+  <h2>Comece hoje, grátis.</h2>
+  <p>15 dias para experimentar todas as ferramentas sem compromisso.</p>
+  <button class="btn-cta-final">Criar minha conta grátis →</button>
+  <p class="cta-trial-note">Sem cartão de crédito • Cancele quando quiser • Suporte via WhatsApp</p>
+</section>
+
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<footer>
+  <div class="footer-logo">🚀 RepresentaFácil</div>
+  <div class="footer-links">
+    <a href="#">Política de Privacidade</a>
+    <a href="#">Termos de Uso</a>
+    <a href="#">Suporte</a>
+  </div>
+  <div class="footer-copy">© 2026 RepresentaFácil. Todos os direitos reservados.</div>
+</footer>
+
+</body>
+</html>

@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useCampaigns } from '../hooks/useCampaigns';
@@ -32,6 +32,11 @@ const Dashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const [expandedClientId, setExpandedClientId] = useState(null);
+
+  // Wake up backend on first load
+  useEffect(() => {
+    fetch('https://api.venpro.com.br/health', { method: 'GET', mode: 'cors' }).catch(() => {});
+  }, []);
 
   const selectedCampaign = useMemo(() => {
     if (!selectedCampaignId) return null;
@@ -222,6 +227,17 @@ const Dashboard = () => {
                 <div className="tool-card-badge soon">Em breve</div>
                 <div className="tool-card-title">Disparo WhatsApp</div>
                 <div className="tool-card-desc">Envie ofertas automaticamente para toda sua carteira de clientes com texto e fotos personalizados.</div>
+              </div>
+              <div className="tool-card" onClick={() => {
+                const a = document.createElement('a');
+                a.href = '/venpro-cotatudo-extension.zip';
+                a.download = 'venpro-cotatudo-extension.zip';
+                a.click();
+              }}>
+                <div className="tool-card-icon">🧩</div>
+                <div className="tool-card-badge live">Novo</div>
+                <div className="tool-card-title">Extensão Cotatudo</div>
+                <div className="tool-card-desc">Baixe a extensão Chrome que preenche cotações no Cotatudo automaticamente com os preços da sua tabela Venpro.</div>
               </div>
               <div className="tool-card" onClick={() => {
                 if (campaigns.length > 0) {

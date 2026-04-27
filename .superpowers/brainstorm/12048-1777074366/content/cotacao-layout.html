@@ -1,0 +1,78 @@
+<h2>Robô de Cotação — Layout da Página</h2>
+<p class="subtitle">Duas seções: Tabelas Mestre (cadastro) + Cotação (uso diário)</p>
+
+<div class="mockup">
+  <div class="mockup-header">Tela: Robô de Cotação</div>
+  <div class="mockup-body">
+    <!-- Sidebar indicacao -->
+    <div style="display:flex; gap: 0; min-height: 400px;">
+      <div style="width: 200px; background: #0f172a; color: #94a3b8; padding: 16px; font-size: 13px; border-right: 1px solid #1e293b;">
+        <div style="color: #e8412a; font-weight: 700; margin-bottom: 16px; font-size: 16px;">Venpro</div>
+        <div style="padding: 8px; color: #94a3b8; cursor: pointer;">Dashboard</div>
+        <div style="padding: 8px; color: #94a3b8; cursor: pointer;">Assistente IA</div>
+        <div style="padding: 8px; background: #1e293b; color: #fff; border-radius: 6px; font-weight: 600;">📋 Cotação</div>
+        <div style="padding: 8px; color: #94a3b8; cursor: pointer;">Clientes</div>
+        <div style="padding: 8px; color: #94a3b8; cursor: pointer;">Minha Licença</div>
+      </div>
+
+      <!-- Conteudo principal -->
+      <div style="flex: 1; padding: 24px; background: #f8fafc;">
+        <!-- Tabs -->
+        <div style="display: flex; gap: 0; margin-bottom: 24px;">
+          <div style="padding: 10px 20px; background: #0f172a; color: #fff; border-radius: 8px 0 0 8px; font-weight: 600; font-size: 14px;">📊 Minhas Tabelas</div>
+          <div style="padding: 10px 20px; background: #e2e8f0; color: #475569; border-radius: 0 8px 8px 0; font-size: 14px; cursor: pointer;">📄 Nova Cotação</div>
+        </div>
+
+        <!-- Seção: Minhas Tabelas -->
+        <div style="background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+              <h3 style="margin: 0; color: #0f172a;">Tabelas de Preço</h3>
+              <p style="margin: 4px 0 0; color: #64748b; font-size: 13px;">Até 5 planilhas mestre de diferentes atacados</p>
+            </div>
+            <button style="background: #e8412a; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer;">+ Adicionar Tabela</button>
+          </div>
+
+          <!-- Cards de tabelas -->
+          <div style="display: grid; gap: 12px;">
+            <!-- Tabela 1 - ativa -->
+            <div style="border: 2px solid #e8412a; border-radius: 10px; padding: 16px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="background: #e8412a; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">ATIVA</span>
+                  <span style="font-weight: 600; color: #0f172a;">Atacado Bom Jesus</span>
+                </div>
+                <div style="color: #64748b; font-size: 12px; margin-top: 4px;">1.247 produtos · Atualizada 22/04/2026</div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button style="background: #f1f5f9; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">✏️ Renomear</button>
+                <button style="background: #f1f5f9; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">🔄 Substituir</button>
+                <button style="background: #fef2f2; color: #dc2626; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">🗑️</button>
+              </div>
+            </div>
+
+            <!-- Tabela 2 -->
+            <div style="border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-weight: 600; color: #0f172a;">Atacado Central</span>
+                </div>
+                <div style="color: #64748b; font-size: 12px; margin-top: 4px;">892 produtos · Atualizada 18/04/2026</div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button style="background: #f1f5f9; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">✏️ Renomear</button>
+                <button style="background: #f1f5f9; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">🔄 Substituir</button>
+                <button style="background: #fef2f2; color: #dc2626; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">🗑️</button>
+              </div>
+            </div>
+
+            <!-- Tabela 3 - vaga -->
+            <div style="border: 2px dashed #cbd5e1; border-radius: 10px; padding: 16px; text-align: center; color: #94a3b8;">
+              Arraste um Excel ou clique para adicionar (+3 vagas restantes)
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

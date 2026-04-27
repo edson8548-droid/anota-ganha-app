@@ -22,7 +22,7 @@ export default function Cotacao() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [novoNome, setNovoNome] = useState('');
   const [novoArquivo, setNovoArquivo] = useState(null);
-  const [novoPrazo, setNovoPrazo] = useState(28);
+  const [prazoSelecionado, setPrazoSelecionado] = useState(0);
 
   // Cotação state
   const [tabelaSelecionada, setTabelaSelecionada] = useState('');
@@ -53,11 +53,10 @@ export default function Cotacao() {
     if (!novoNome || !novoArquivo) return;
     setUploading(true);
     try {
-      await uploadTabela(novoArquivo, novoNome, novoPrazo);
+      await uploadTabela(novoArquivo, novoNome);
       setShowUploadModal(false);
       setNovoNome('');
       setNovoArquivo(null);
-      setNovoPrazo(28);
       carregarTabelas();
     } catch (err) {
       alert('Erro ao subir tabela: ' + (err.response?.data?.detail || err.message));
@@ -83,7 +82,7 @@ export default function Cotacao() {
     setProcessingSeg(0);
     processingTimerRef.current = setInterval(() => setProcessingSeg(s => s + 1), 1000);
     try {
-      const data = await previewCotacao(arquivoCotacao, tabelaSelecionada, modoMatch);
+      const data = await previewCotacao(arquivoCotacao, tabelaSelecionada, modoMatch, prazoSelecionado);
       clearInterval(processingTimerRef.current);
       setReviewData(data);
     } catch (err) {
@@ -167,8 +166,6 @@ export default function Cotacao() {
             setNovoNome={setNovoNome}
             novoArquivo={novoArquivo}
             setNovoArquivo={setNovoArquivo}
-            novoPrazo={novoPrazo}
-            setNovoPrazo={setNovoPrazo}
             uploading={uploading}
             handleUpload={handleUpload}
             handleExcluir={handleExcluir}
@@ -178,7 +175,7 @@ export default function Cotacao() {
           <CotacaoTab
             tabelas={tabelas}
             tabelaSelecionada={tabelaSelecionada}
-            setTabelaSelecionada={setTabelaSelecionada}
+            setTabelaSelecionada={(id) => { setTabelaSelecionada(id); setPrazoSelecionado(0); }}
             modoMatch={modoMatch}
             setModoMatch={setModoMatch}
             arquivoCotacao={arquivoCotacao}
@@ -193,6 +190,8 @@ export default function Cotacao() {
             confirmando={confirmando}
             handleConfirmar={handleConfirmar}
             processingSeg={processingSeg}
+            prazoSelecionado={prazoSelecionado}
+            setPrazoSelecionado={setPrazoSelecionado}
           />
         )}
       </div>
@@ -203,7 +202,7 @@ export default function Cotacao() {
 function TabelasTab({
   tabelas, loading, showUploadModal, setShowUploadModal,
   novoNome, setNovoNome, novoArquivo, setNovoArquivo,
-  novoPrazo, setNovoPrazo, uploading, handleUpload, handleExcluir, fileInputRef,
+  uploading, handleUpload, handleExcluir, fileInputRef,
 }) {
   return (
     <div style={{ background: '#1e293b', borderRadius: '0 0 12px 12px', padding: 24 }}>
@@ -244,7 +243,11 @@ function TabelasTab({
                   <span style={{ fontWeight: 600, color: '#f1f5f9' }}>{t.nome}</span>
                 </div>
                 <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
-                  {t.qtd_produtos} produtos · Prazo {t.prazo} dias · {new Date(t.data_upload).toLocaleDateString('pt-BR')}
+                  {t.qtd_produtos} produtos · {
+                    t.prazos_disponiveis?.length > 1
+                      ? `Prazos: ${t.prazos_disponiveis.join(', ')} dias`
+                      : `Prazo ${t.prazo} dias`
+                  } · {new Date(t.data_upload).toLocaleDateString('pt-BR')}
                 </div>
               </div>
               <button onClick={() => handleExcluir(t.id, t.nome)}
@@ -265,14 +268,6 @@ function TabelasTab({
             <input value={novoNome} onChange={e => setNovoNome(e.target.value)}
                    placeholder="Ex: Atacado Bom Jesus"
                    style={inputStyle} />
-            <label style={labelStyle}>Prazo (dias)</label>
-            <select value={novoPrazo} onChange={e => setNovoPrazo(Number(e.target.value))}
-                    style={inputStyle}>
-              <option value={7}>7 dias</option>
-              <option value={14}>14 dias</option>
-              <option value={21}>21 dias</option>
-              <option value={28}>28 dias</option>
-            </select>
             <label style={labelStyle}>Arquivo Excel</label>
             <input type="file" accept=".xlsx,.xls" ref={fileInputRef}
                    onChange={e => setNovoArquivo(e.target.files[0])}
@@ -299,7 +294,12 @@ function CotacaoTab({
   modoMatch, setModoMatch, arquivoCotacao, setArquivoCotacao,
   processing, handleProcessar, resultado, setResultado, cotacaoInputRef,
   reviewData, setReviewData, confirmando, handleConfirmar, processingSeg,
+  prazoSelecionado, setPrazoSelecionado,
 }) {
+  const tabelaAtual = tabelas.find(t => t.id === tabelaSelecionada);
+  const prazosDisponiveis = tabelaAtual?.prazos_disponiveis || [];
+  const prazoEfetivo = prazoSelecionado || (prazosDisponiveis.length === 1 ? prazosDisponiveis[0] : 0);
+
   const cobertura = resultado?.stats
     ? ((resultado.stats.ean + resultado.stats.descricao + resultado.stats.ia) / resultado.stats.total * 100).toFixed(1)
     : null;
@@ -323,6 +323,30 @@ function CotacaoTab({
               <option key={t.id} value={t.id}>{t.nome} ({t.qtd_produtos} produtos, prazo {t.prazo}d)</option>
             ))}
           </select>
+
+          {/* Prazo */}
+          {prazosDisponiveis.length > 1 && (
+            <>
+              <label style={labelStyle}>Prazo da tabela</label>
+              <div style={{ display: 'flex', gap: 8, margin: '8px 0 16px', flexWrap: 'wrap' }}>
+                {prazosDisponiveis.map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setPrazoSelecionado(p)}
+                    style={{
+                      padding: '8px 18px', borderRadius: 8, fontWeight: 600, fontSize: 14,
+                      cursor: 'pointer', border: 'none',
+                      background: prazoEfetivo === p ? '#e8412a' : '#334155',
+                      color: prazoEfetivo === p ? '#fff' : '#94a3b8',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {p} dias
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
 
           {/* Modo */}
           <label style={labelStyle}>Modo de preenchimento</label>
@@ -354,14 +378,23 @@ function CotacaoTab({
           </div>
 
           {/* Processar */}
+          {prazosDisponiveis.length > 1 && !prazoEfetivo && (
+            <p style={{ color: '#f59e0b', fontSize: 13, margin: '0 0 8px' }}>
+              ⚠ Selecione o prazo acima antes de processar
+            </p>
+          )}
           <button onClick={handleProcessar}
-                  disabled={!tabelaSelecionada || !arquivoCotacao || processing}
+                  disabled={!tabelaSelecionada || !arquivoCotacao || processing || (prazosDisponiveis.length > 1 && !prazoEfetivo)}
                   style={{
                     ...primaryBtnStyle,
-                    opacity: (!tabelaSelecionada || !arquivoCotacao) ? 0.5 : 1,
+                    opacity: (!tabelaSelecionada || !arquivoCotacao || (prazosDisponiveis.length > 1 && !prazoEfetivo)) ? 0.5 : 1,
                     width: '100%', padding: 14, fontSize: 16,
                   }}>
-            {processing ? 'Processando...' : 'Processar Cotação'}
+            {processing
+              ? 'Processando...'
+              : prazoEfetivo
+                ? `Processar Cotação — ${prazoEfetivo} dias`
+                : 'Processar Cotação'}
           </button>
 
           {/* Barra de progresso */}

@@ -3,11 +3,10 @@ import { auth } from '../firebase/config';
 
 export const listarTabelas = () => api.get('/cotacao/tabelas');
 
-export const uploadTabela = (arquivo, nome, prazo = 28) => {
+export const uploadTabela = (arquivo, nome) => {
   const formData = new FormData();
   formData.append('arquivo', arquivo);
   formData.append('nome', nome);
-  formData.append('prazo', prazo);
   return api.post('/cotacao/tabelas', formData);
 };
 
@@ -114,11 +113,12 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress) => {
   throw new Error('Tempo esgotado (10 min). PDFs grandes demoram mais — converta para Excel (.xlsx) antes de enviar para processar mais rápido.');
 };
 
-export const previewCotacao = async (arquivo, tabelaId, modo = 'completo') => {
+export const previewCotacao = async (arquivo, tabelaId, modo = 'completo', prazo = 0) => {
   const formData = new FormData();
   formData.append('arquivo', arquivo);
   formData.append('tabela_id', tabelaId);
   formData.append('modo', modo);
+  formData.append('prazo', prazo);
 
   const response = await api.post('/cotacao/preview', formData);
   return response.data; // { session_id, itens }
