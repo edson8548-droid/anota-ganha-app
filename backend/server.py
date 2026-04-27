@@ -108,18 +108,25 @@ app.include_router(api_router)
 @app.on_event("startup")
 async def startup_event():
     logger.info("App started")
-    initialize_firebase()
+    try:
+        initialize_firebase()
+        logger.info("✅ Firebase inicializado")
+    except Exception as e:
+        logger.error(f"⚠️  Firebase falhou ao inicializar: {e}")
     setup_mercadopago()
     init_cotacao(db)
-    # Índices MongoDB
-    await db.cotacao_aprendizado.create_index(
-        [("user_id", 1), ("produto_cotacao_norm", 1)],
-        unique=True
-    )
-    await db.cotacao_sessoes.create_index(
-        "created_at",
-        expireAfterSeconds=86400  # sessões expiram em 24h (TTL index)
-    )
+    try:
+        await db.cotacao_aprendizado.create_index(
+            [("user_id", 1), ("produto_cotacao_norm", 1)],
+            unique=True
+        )
+        await db.cotacao_sessoes.create_index(
+            "created_at",
+            expireAfterSeconds=86400
+        )
+        logger.info("✅ Índices MongoDB criados")
+    except Exception as e:
+        logger.warning(f"⚠️  Índices MongoDB: {e}")
     logger.info("✅ Mercado Pago integrado em /api/mercadopago")
     logger.info("✅ Cotação integrado em /api/cotacao")
 
