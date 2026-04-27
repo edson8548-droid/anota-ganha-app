@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
 import { gerarTabelaPrazos } from '../services/cotacao.service';
+import { auth } from '../firebase/config';
 import './AssistenteIA.css';
 
 const API_URL = 'https://api.venpro.com.br';
@@ -136,7 +137,9 @@ export default function AssistenteIA() {
     setGerandoTabela(true);
     setTabelaSucesso(false);
     try {
-      const blob = await gerarTabelaPrazos(tabelaArquivo, pctPrazos);
+      const token = await auth.currentUser?.getIdToken(true);
+      if (!token) throw new Error('Usuário não autenticado');
+      const blob = await gerarTabelaPrazos(tabelaArquivo, pctPrazos, token);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

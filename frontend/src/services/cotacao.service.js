@@ -40,7 +40,7 @@ export const processarCotacao = async (arquivo, tabelaId, modo = 'completo') => 
   return { blob: response.data, stats, semMatch };
 };
 
-export const gerarTabelaPrazos = async (arquivo, percentuais) => {
+export const gerarTabelaPrazos = async (arquivo, percentuais, token) => {
   const formData = new FormData();
   formData.append('arquivo', arquivo);
   formData.append('pct_7',  percentuais[7]  ?? 0);
@@ -49,7 +49,10 @@ export const gerarTabelaPrazos = async (arquivo, percentuais) => {
   formData.append('pct_28', percentuais[28] ?? 0);
 
   const response = await api.post('/cotacao/gerar-tabela-prazos', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    headers: {
+      'Content-Type': 'multipart/form-data',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     responseType: 'blob',
   });
 
