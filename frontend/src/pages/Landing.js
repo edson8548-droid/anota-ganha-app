@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
+import { FileSpreadsheet, Sparkles, MessageCircle, BarChart3 } from 'lucide-react';
 import './Landing.css';
 
 const Landing = () => {
@@ -69,23 +70,23 @@ const Landing = () => {
         <p className="landing-features-sub">Tudo o que um representante comercial precisa, em uma única plataforma.</p>
         <div className="landing-features-grid">
           <div className="landing-feature-card">
-            <div className="landing-feature-icon">📊</div>
-            <h3>Robô de Cotação</h3>
+            <div className="landing-feature-icon"><FileSpreadsheet size={32} /></div>
+            <h3>Cotação Express</h3>
             <p>Suba sua planilha de cotação e receba todos os preços preenchidos automaticamente — por código de barras ou nome do produto.</p>
           </div>
           <div className="landing-feature-card">
-            <div className="landing-feature-icon">🤖</div>
-            <h3>Assistente IA</h3>
+            <div className="landing-feature-icon"><Sparkles size={32} /></div>
+            <h3>Consultor de Vendas IA</h3>
             <p>Crie textos de oferta, emails profissionais, scripts de negociação e muito mais — especializado em representação comercial.</p>
           </div>
           <div className="landing-feature-card">
-            <div className="landing-feature-icon">🏆</div>
-            <h3>Campanhas e Positivação</h3>
+            <div className="landing-feature-icon"><BarChart3 size={32} /></div>
+            <h3>Central de Campanhas</h3>
             <p>Acompanhe campanhas, monitore positivação de clientes e acompanhe seus resultados de indústria em tempo real.</p>
           </div>
           <div className="landing-feature-card">
-            <div className="landing-feature-icon">📲</div>
-            <h3>Disparo WhatsApp</h3>
+            <div className="landing-feature-icon"><MessageCircle size={32} /></div>
+            <h3>Campanhas WhatsApp</h3>
             <p>Envie ofertas automaticamente para toda sua carteira de clientes com texto e fotos personalizados. (Em breve)</p>
           </div>
         </div>
