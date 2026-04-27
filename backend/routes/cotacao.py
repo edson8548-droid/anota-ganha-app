@@ -25,6 +25,7 @@ from services.excel_processor import (
     gerar_excel_resultado,
     processar_arquivo_cotacao,
     gerar_excel_multiprazos,
+    detectar_prazos_disponiveis,
 )
 from services.matching_engine import normalizar_nome
 
@@ -92,7 +93,6 @@ async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(securi
 async def upload_tabela(
     arquivo: UploadFile = File(...),
     nome: str = Form(...),
-    prazo: int = Form(28),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     uid = await get_user_id(credentials)
@@ -115,7 +115,9 @@ async def upload_tabela(
     tmp.close()
 
     try:
-        precos_dict, precos_lista = ler_tabela_mestre(tmp.name, prazo=prazo)
+        prazos_disponiveis = detectar_prazos_disponiveis(tmp.name)
+        prazo_padrao = prazos_disponiveis[-1]  # maior prazo como padrão
+        precos_dict, precos_lista = ler_tabela_mestre(tmp.name, prazo=prazo_padrao)
         qtd = len(precos_lista)
     except Exception as e:
         os.unlink(tmp.name)
@@ -132,7 +134,8 @@ async def upload_tabela(
         "nome": nome,
         "filename": arquivo.filename,
         "grid_id": grid_id,
-        "prazo": prazo,
+        "prazo": prazo_padrao,
+        "prazos_disponiveis": prazos_disponiveis,
         "qtd_produtos": qtd,
         "data_upload": datetime.now(timezone.utc),
     }
@@ -142,6 +145,8 @@ async def upload_tabela(
         "id": str(result.inserted_id),
         "nome": nome,
         "qtd_produtos": qtd,
+        "prazo": prazo_padrao,
+        "prazos_disponiveis": prazos_disponiveis,
         "data_upload": doc["data_upload"].isoformat(),
     }
 
@@ -152,12 +157,14 @@ async def listar_tabelas(credentials: HTTPAuthorizationCredentials = Depends(sec
     collection = db.tabelas_mestre
     tabelas = []
     async for doc in collection.find({"user_id": uid}).sort("data_upload", -1):
+        prazo = doc.get("prazo", 28)
         tabelas.append({
             "id": str(doc["_id"]),
             "nome": doc["nome"],
             "filename": doc["filename"],
             "qtd_produtos": doc["qtd_produtos"],
-            "prazo": doc.get("prazo", 28),
+            "prazo": prazo,
+            "prazos_disponiveis": doc.get("prazos_disponiveis", [prazo]),
             "data_upload": doc["data_upload"].isoformat(),
         })
     return tabelas
@@ -264,6 +271,7 @@ async def preview_cotacao(
     arquivo: UploadFile = File(...),
     tabela_id: str = Form(...),
     modo: str = Form("completo"),
+    prazo: int = Form(0),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     """
@@ -293,8 +301,8 @@ async def preview_cotacao(
     tmp_cotacao.close()
 
     try:
-        prazo = doc.get("prazo", 28)
-        precos_dict, precos_lista = ler_tabela_mestre(tmp_mestre.name, prazo=prazo)
+        prazo_efetivo = prazo if prazo > 0 else doc.get("prazo", 28)
+        precos_dict, precos_lista = ler_tabela_mestre(tmp_mestre.name, prazo=prazo_efetivo)
         itens, _ = ler_cotacao(tmp_cotacao.name)
         resultados = processar_cotacao_com_ia(itens, precos_dict, precos_lista, modo=modo)
 
@@ -322,7 +330,7 @@ async def preview_cotacao(
             "_id": session_id,
             "user_id": uid,
             "tabela_id": tabela_id,
-            "prazo": prazo,
+            "prazo": prazo_efetivo,
             "cotacao_bytes": conteudo_cotacao,
             "itens": itens,
             "resultados": resultados,

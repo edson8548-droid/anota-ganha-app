@@ -12,7 +12,28 @@ import os
 from .matching_engine import limpar_ean, normalizar_nome, ordenar_palavras, processar_cotacao_com_ia
 
 
+import re as _re
+
 PREENCHIMENTO_IA = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+
+
+def detectar_prazos_disponiveis(caminho_arquivo) -> list:
+    """Detecta quais colunas de prazo (7, 14, 21, 28 dias) existem no Excel."""
+    for header in range(0, 10):
+        try:
+            df = pd.read_excel(caminho_arquivo, header=header, nrows=0)
+            encontrados = []
+            for prazo in [7, 14, 21, 28]:
+                for col in df.columns:
+                    nums = _re.findall(r'\b(\d+)\b', str(col))
+                    if str(prazo) in nums:
+                        encontrados.append(prazo)
+                        break
+            if encontrados:
+                return sorted(encontrados)
+        except Exception:
+            continue
+    return [28]
 
 
 def ler_tabela_mestre(caminho_arquivo, header_row=2, col_nome=0, col_ean=1, prazo=28):
