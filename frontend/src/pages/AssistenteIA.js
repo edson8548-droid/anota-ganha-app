@@ -58,10 +58,16 @@ export default function AssistenteIA() {
   // Estado do modal "Gerar Tabela com Prazos"
   const [showTabelaModal, setShowTabelaModal] = useState(false);
   const [tabelaArquivo, setTabelaArquivo] = useState(null);
-  const [pctPrazos, setPctPrazos] = useState({ 7: 0, 14: 0, 21: 0, 28: 0 });
+  const [pctPrazos, setPctPrazos] = useState({ 7: '', 14: '', 21: '', 28: '' });
   const [gerandoTabela, setGerandoTabela] = useState(false);
   const [tabelaSucesso, setTabelaSucesso] = useState(false);
+  const [gerandoSeg, setGerandoSeg] = useState(0);
   const tabelaInputRef = useRef(null);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    fetch('https://api.venpro.com.br/health', { method: 'GET', mode: 'cors' }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -148,6 +154,8 @@ export default function AssistenteIA() {
     if (!tabelaArquivo) return;
     setGerandoTabela(true);
     setTabelaSucesso(false);
+    setGerandoSeg(0);
+    timerRef.current = setInterval(() => setGerandoSeg(s => s + 1), 1000);
     try {
       const blob = await gerarTabelaPrazos(tabelaArquivo, pctPrazos);
       const url = window.URL.createObjectURL(blob);
@@ -159,9 +167,11 @@ export default function AssistenteIA() {
       setTabelaSucesso(true);
       setTabelaArquivo(null);
     } catch (err) {
-      alert('Erro ao gerar tabela: ' + (err.response?.data?.detail || err.message));
+      alert('Erro ao gerar tabela: ' + (err.message || 'Erro desconhecido'));
+    } finally {
+      clearInterval(timerRef.current);
+      setGerandoTabela(false);
     }
-    setGerandoTabela(false);
   };
 
   return (
@@ -243,15 +253,18 @@ export default function AssistenteIA() {
                         min="0"
                         max="99"
                         step="0.01"
-                        value={pctPrazos[p] || ''}
+                        value={pctPrazos[p]}
                         placeholder="0,00"
-                        onChange={e => setPctPrazos(prev => ({ ...prev, [p]: parseFloat(e.target.value) || 0 }))}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setPctPrazos(prev => ({ ...prev, [p]: val === '' ? '' : parseFloat(val) || 0 }));
+                        }}
                       />
                       <span>%</span>
                     </div>
                     <div className="ia-modal-prazo-exemplo">
-                      {pctPrazos[p] > 0
-                        ? `R$ 10,00 → R$ ${(10 * (1 + pctPrazos[p] / 100)).toFixed(2).replace('.', ',')}`
+                      {pctPrazos[p] && parseFloat(pctPrazos[p]) > 0
+                        ? `R$ 10,00 → R$ ${(10 * (1 + parseFloat(pctPrazos[p]) / 100)).toFixed(2).replace('.', ',')}`
                         : 'sem aumento'}
                     </div>
                   </div>
@@ -263,8 +276,16 @@ export default function AssistenteIA() {
                 disabled={!tabelaArquivo || gerandoTabela}
                 onClick={handleGerarTabela}
               >
-                {gerandoTabela ? 'Gerando...' : 'Gerar e baixar tabela'}
+                {gerandoTabela
+                  ? `Processando... ${gerandoSeg}s${tabelaArquivo?.name?.toLowerCase().endsWith('.pdf') ? ' (PDF pode levar 1-2 min)' : ''}`
+                  : 'Gerar e baixar tabela'}
               </button>
+
+              {gerandoTabela && gerandoSeg > 10 && (
+                <p style={{ color: '#94a3b8', fontSize: 12, marginTop: 8, textAlign: 'center' }}>
+                  Aguarde — o servidor está lendo {tabelaArquivo?.name?.toLowerCase().endsWith('.pdf') ? 'o PDF com IA' : 'a planilha'} e montando as colunas de prazo.
+                </p>
+              )}
 
               {tabelaSucesso && (
                 <p className="ia-modal-sucesso">

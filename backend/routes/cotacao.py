@@ -7,6 +7,7 @@ import json
 import tempfile
 import logging
 import uuid
+import asyncio
 from datetime import datetime, timezone
 from io import BytesIO
 
@@ -356,12 +357,17 @@ async def gerar_tabela_prazos(
     tmp.close()
 
     try:
-        resultado_path = gerar_excel_multiprazos(tmp.name, {
-            7: pct_7, 14: pct_14, 21: pct_21, 28: pct_28,
-        })
+        resultado_path = await asyncio.wait_for(
+            asyncio.to_thread(gerar_excel_multiprazos, tmp.name, {
+                7: pct_7, 14: pct_14, 21: pct_21, 28: pct_28,
+            }),
+            timeout=120.0,
+        )
         with open(resultado_path, "rb") as f:
             resultado_bytes = f.read()
         os.unlink(resultado_path)
+    except asyncio.TimeoutError:
+        raise HTTPException(504, "Processamento ultrapassou 2 minutos. Para PDFs grandes, converta para Excel (.xlsx) antes de enviar.")
     except Exception as e:
         logger.error(f"Erro ao gerar tabela com prazos: {e}")
         raise HTTPException(500, f"Erro ao gerar tabela: {str(e)}")

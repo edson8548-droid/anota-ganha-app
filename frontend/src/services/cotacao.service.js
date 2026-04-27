@@ -1,4 +1,5 @@
 import api from './api';
+import { auth } from '../firebase/config';
 
 export const listarTabelas = () => api.get('/cotacao/tabelas');
 
@@ -40,16 +41,39 @@ export const processarCotacao = async (arquivo, tabelaId, modo = 'completo') => 
 export const gerarTabelaPrazos = async (arquivo, percentuais) => {
   const formData = new FormData();
   formData.append('arquivo', arquivo);
-  formData.append('pct_7',  percentuais[7]  ?? 0);
-  formData.append('pct_14', percentuais[14] ?? 0);
-  formData.append('pct_21', percentuais[21] ?? 0);
-  formData.append('pct_28', percentuais[28] ?? 0);
+  formData.append('pct_7',  parseFloat(percentuais[7])  || 0);
+  formData.append('pct_14', parseFloat(percentuais[14]) || 0);
+  formData.append('pct_21', parseFloat(percentuais[21]) || 0);
+  formData.append('pct_28', parseFloat(percentuais[28]) || 0);
 
-  const response = await api.post('/cotacao/gerar-tabela-prazos', formData, {
-    responseType: 'blob',
-  });
+  const user = auth.currentUser;
+  if (!user) throw new Error('Faça login novamente.');
+  const token = await user.getIdToken();
 
-  return response.data;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 150000);
+
+  let response;
+  try {
+    response = await fetch('https://api.venpro.com.br/api/cotacao/gerar-tabela-prazos', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('Tempo esgotado (2,5 min). PDFs muito grandes: converta para Excel antes de enviar.');
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.detail || `Erro ${response.status}`);
+  }
+
+  return response.blob();
 };
 
 export const previewCotacao = async (arquivo, tabelaId, modo = 'completo') => {
@@ -58,9 +82,7 @@ export const previewCotacao = async (arquivo, tabelaId, modo = 'completo') => {
   formData.append('tabela_id', tabelaId);
   formData.append('modo', modo);
 
-  const response = await api.post('/cotacao/preview', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  const response = await api.post('/cotacao/preview', formData);
   return response.data; // { session_id, itens }
 };
 
