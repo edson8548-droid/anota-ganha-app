@@ -1,7 +1,8 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
-import { listarTabelas, uploadTabela, excluirTabela, processarCotacao } from '../services/cotacao.service';
+import { listarTabelas, uploadTabela, excluirTabela, processarCotacao, previewCotacao, confirmarCotacao } from '../services/cotacao.service';
+import ReviewMatches from './ReviewMatches';
 
 const API_URL = 'https://api.venpro.com.br';
 
@@ -30,6 +31,8 @@ export default function Cotacao() {
 
   // Resultado
   const [resultado, setResultado] = useState(null);
+  const [reviewData, setReviewData] = useState(null);
+  const [confirmando, setConfirmando] = useState(false);
 
   const carregarTabelas = useCallback(async () => {
     setLoading(true);
@@ -74,22 +77,33 @@ export default function Cotacao() {
     if (!tabelaSelecionada || !arquivoCotacao) return;
     setProcessing(true);
     setResultado(null);
+    setReviewData(null);
     try {
-      const { blob, stats, semMatch } = await processarCotacao(arquivoCotacao, tabelaSelecionada, modoMatch);
+      const data = await previewCotacao(arquivoCotacao, tabelaSelecionada, modoMatch);
+      setReviewData(data);
+    } catch (err) {
+      alert('Erro ao processar: ' + (err.response?.data?.detail || err.message));
+    }
+    setProcessing(false);
+  };
 
-      // Download
+  const handleConfirmar = async (aprovacoes) => {
+    if (!reviewData) return;
+    setConfirmando(true);
+    try {
+      const { blob, stats, semMatch } = await confirmarCotacao(reviewData.session_id, aprovacoes);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = 'cotacao_preenchida.xlsx';
       a.click();
       window.URL.revokeObjectURL(url);
-
       setResultado({ stats, semMatch });
+      setReviewData(null);
     } catch (err) {
-      alert('Erro ao processar: ' + (err.response?.data?.detail || err.message));
+      alert('Erro ao confirmar: ' + (err.response?.data?.detail || err.message));
     }
-    setProcessing(false);
+    setConfirmando(false);
   };
 
   const handleLogout = () => {
@@ -166,7 +180,12 @@ export default function Cotacao() {
             processing={processing}
             handleProcessar={handleProcessar}
             resultado={resultado}
+            setResultado={setResultado}
             cotacaoInputRef={cotacaoInputRef}
+            reviewData={reviewData}
+            setReviewData={setReviewData}
+            confirmando={confirmando}
+            handleConfirmar={handleConfirmar}
           />
         )}
       </div>
@@ -271,7 +290,8 @@ function TabelasTab({
 function CotacaoTab({
   tabelas, tabelaSelecionada, setTabelaSelecionada,
   modoMatch, setModoMatch, arquivoCotacao, setArquivoCotacao,
-  processing, handleProcessar, resultado, cotacaoInputRef,
+  processing, handleProcessar, resultado, setResultado, cotacaoInputRef,
+  reviewData, setReviewData, confirmando, handleConfirmar,
 }) {
   const cobertura = resultado?.stats
     ? ((resultado.stats.ean + resultado.stats.descricao + resultado.stats.ia) / resultado.stats.total * 100).toFixed(1)
@@ -322,7 +342,7 @@ function CotacaoTab({
                }}>
             {arquivoCotacao ? arquivoCotacao.name : 'Clique para selecionar ou arraste o arquivo'}
             <input type="file" accept=".xlsx,.xls" ref={cotacaoInputRef}
-                   onChange={e => setArquivoCotacao(e.target.files[0])}
+                   onChange={e => { setArquivoCotacao(e.target.files[0]); setReviewData(null); setResultado(null); }}
                    style={{ display: 'none' }} />
           </div>
 
@@ -336,6 +356,14 @@ function CotacaoTab({
                   }}>
             {processing ? 'Processando...' : 'Processar Cotação'}
           </button>
+
+          {reviewData && (
+            <ReviewMatches
+              itens={reviewData.itens}
+              onConfirmar={handleConfirmar}
+              confirmando={confirmando}
+            />
+          )}
 
           {/* Resultado */}
           {resultado && (
