@@ -30,8 +30,8 @@ logger = logging.getLogger(__name__)
 
 # ==================== App ====================
 app = FastAPI(
-    title="Anota & Ganha Incentivos API",
-    description="API para gerenciamento de campanhas e clientes.",
+    title="Venpro API",
+    description="API para ferramentas de representantes comerciais.",
     version="1.0.0",
 )
 
@@ -70,7 +70,7 @@ app.add_middleware(
 # ==================== Health ====================
 @app.get("/")
 async def root():
-    return { "message": "Anota Ganha API", "status": "running", "version": "1.0.0", "mercadopago": "enabled" }
+    return { "message": "Venpro API", "status": "running", "version": "1.0.0", "mercadopago": "enabled" }
 
 @app.get("/health")
 async def health_check():
