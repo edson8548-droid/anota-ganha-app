@@ -432,12 +432,12 @@ async def get_job_status(
 
     if job["status"] == "processing":
         age = (datetime.now(timezone.utc) - job["created_at"]).total_seconds()
-        if age > 600:  # job orphaned by server restart or GC — fail fast
+        if age > 480:  # 8 min — fires before client's 10-min timeout; catches orphaned jobs
             await db.cotacao_jobs.update_one(
                 {"_id": job_id},
-                {"$set": {"status": "error", "error": "Processamento demorou demais. O servidor pode ter reiniciado. Tente novamente."}},
+                {"$set": {"status": "error", "error": "Processamento demorou demais. Tente novamente — para PDF grande, converta para Excel antes."}},
             )
-            raise HTTPException(500, "Processamento demorou demais. O servidor pode ter reiniciado. Tente novamente.")
+            raise HTTPException(500, "Processamento demorou demais. Tente novamente — para PDF grande, converta para Excel antes.")
         return {"status": "processing"}
 
     if job["status"] == "error":
