@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
 import { gerarTabelaPrazos } from '../services/cotacao.service';
-import { auth } from '../firebase/config';
 import './AssistenteIA.css';
 
 const API_URL = 'https://api.venpro.com.br';
@@ -150,9 +149,7 @@ export default function AssistenteIA() {
     setGerandoTabela(true);
     setTabelaSucesso(false);
     try {
-      const token = await auth.currentUser?.getIdToken(true);
-      if (!token) throw new Error('Usuário não autenticado');
-      const blob = await gerarTabelaPrazos(tabelaArquivo, pctPrazos, token);
+      const blob = await gerarTabelaPrazos(tabelaArquivo, pctPrazos);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -245,8 +242,9 @@ export default function AssistenteIA() {
                         type="number"
                         min="0"
                         max="99"
-                        step="0.1"
-                        value={pctPrazos[p]}
+                        step="0.01"
+                        value={pctPrazos[p] || ''}
+                        placeholder="0,00"
                         onChange={e => setPctPrazos(prev => ({ ...prev, [p]: parseFloat(e.target.value) || 0 }))}
                       />
                       <span>%</span>
