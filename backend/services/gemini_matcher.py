@@ -57,21 +57,42 @@ def _build_buscados(itens_sem_match):
     return "\n".join(lines)
 
 
-def _build_disponiveis(precos_nome_lista):
+def _filtrar_candidatos(chunk, precos_nome_lista, max_n=150):
+    """
+    Retorna subconjunto de precos_nome_lista mais relevante para o chunk.
+    Usa overlap de palavras para reduzir de ~1000+ para ~150 candidatos,
+    diminuindo drasticamente o tamanho do prompt e o tempo de resposta do Gemini.
+    """
+    query_words = set()
+    for item in chunk:
+        for w in item["nome"].upper().split():
+            if len(w) >= 4:
+                query_words.add(w)
+
+    scored = []
+    for i, p in enumerate(precos_nome_lista):
+        nome_up = p["orig"].upper()
+        score = sum(1 for w in query_words if w in nome_up)
+        scored.append((score, i, p))
+
+    scored.sort(key=lambda x: -x[0])
+    # Garantir ao menos max_n candidatos (mesmo com score 0)
+    top = scored[:max_n]
+    return [(orig_i, p) for _, orig_i, p in top]
+
+
+def _build_disponiveis_filtrado(candidatos_indexados):
     lines = []
-    for i, item in enumerate(precos_nome_lista):
-        lines.append(f'[{i}] "{item["orig"]}" -> R$ {item["preco"]:.2f}')
+    for display_idx, (_, item) in enumerate(candidatos_indexados):
+        lines.append(f'[{display_idx}] "{item["orig"]}" -> R$ {item["preco"]:.2f}')
     return "\n".join(lines)
 
 
-def gemini_match_batch(itens_sem_match, precos_nome_lista, max_items=60):
+def gemini_match_batch(itens_sem_match, precos_nome_lista, max_items=50):
     """
     Usa Gemini para tentar match dos itens que o motor de regras não encontrou.
-
-    Args:
-        itens_sem_match: lista de {"nome": str, "ean": str, "linha": int, "idx_original": int}
-        precos_nome_lista: lista de {"norm", "ord", "preco", "orig"}
-        max_items: máximo de itens a enviar por chamada (limite de contexto)
+    Pre-filtra os candidatos da tabela para ~150 mais relevantes por chunk,
+    reduzindo o tamanho do prompt de ~20k para ~3k tokens por chamada.
 
     Returns:
         dict {idx_original: (preco, "IA CONFIANCA%")} para matches encontrados
@@ -91,9 +112,11 @@ def gemini_match_batch(itens_sem_match, precos_nome_lista, max_items=60):
 
     for chunk in _chunk_list(itens_sem_match, max_items):
         try:
+            candidatos_indexados = _filtrar_candidatos(chunk, precos_nome_lista, max_n=150)
+
             prompt = PROMPT_TEMPLATE.format(
                 buscados=_build_buscados(chunk),
-                disponiveis=_build_disponiveis(precos_nome_lista),
+                disponiveis=_build_disponiveis_filtrado(candidatos_indexados),
             )
 
             response = model.generate_content(prompt)
@@ -110,19 +133,19 @@ def gemini_match_batch(itens_sem_match, precos_nome_lista, max_items=60):
 
             for m in raw_matches:
                 b_idx = m.get("buscado_idx")
-                d_idx = m.get("disponivel_idx")
+                d_idx = m.get("disponivel_idx")  # display_idx no subconjunto filtrado
                 conf = m.get("confianca", 0)
 
                 if b_idx is None or d_idx is None or conf < 70:
                     continue
-                if b_idx >= len(chunk) or d_idx >= len(precos_nome_lista):
+                if b_idx >= len(chunk) or d_idx >= len(candidatos_indexados):
                     continue
 
                 item_buscado = chunk[b_idx]
-                item_disponivel = precos_nome_lista[d_idx]
+                orig_idx, item_disponivel = candidatos_indexados[d_idx]
                 matches[item_buscado["idx_original"]] = (
                     item_disponivel["preco"],
-                    f"IA {int(conf)}%"
+                    f"IA {int(conf)}%",
                 )
 
         except json.JSONDecodeError as e:
