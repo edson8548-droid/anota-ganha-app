@@ -12,7 +12,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 # ... (restante dos imports) ...
 from routes.mercadopago import router as mercadopago_router
-from routes.mercadopago import setup_mercadopago
+from routes.mercadopago import setup_mercadopago, initialize_firebase
 from routes.license import router as license_router
 from routes.ia import router as ia_router
 from routes.cotacao import router as cotacao_router, init_cotacao
@@ -108,6 +108,7 @@ app.include_router(api_router)
 @app.on_event("startup")
 async def startup_event():
     logger.info("App started")
+    initialize_firebase()
     setup_mercadopago()
     init_cotacao(db)
     logger.info("✅ Mercado Pago integrado em /api/mercadopago")
