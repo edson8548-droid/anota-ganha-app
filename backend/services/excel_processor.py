@@ -8,11 +8,42 @@ from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment
 import tempfile
 import os
+import io
+import zipfile
+import re as _re
 
 from .matching_engine import limpar_ean, normalizar_nome, ordenar_palavras, processar_cotacao_com_ia
 
 
-import re as _re
+def _xlsx_safe_bytes(caminho_arquivo):
+    """
+    Retorna BytesIO do xlsx com styles.xml corrigido.
+    Alguns arquivos gerados por sistemas ERP têm indent > 255 que quebra o openpyxl.
+    """
+    try:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(caminho_arquivo) as zin, \
+             zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+                data = zin.read(item.filename)
+                if item.filename == 'xl/styles.xml':
+                    try:
+                        styles = data.decode('utf-8', errors='replace')
+                        styles = _re.sub(
+                            r'indent="(\d+)"',
+                            lambda m: 'indent="255"' if int(m.group(1)) > 255 else m.group(0),
+                            styles,
+                        )
+                        data = styles.encode('utf-8')
+                    except Exception:
+                        pass
+                zout.writestr(item, data)
+        buf.seek(0)
+        return buf
+    except Exception:
+        # Não é um zip válido ou outro erro — devolve o arquivo original como BytesIO
+        with open(caminho_arquivo, 'rb') as f:
+            return io.BytesIO(f.read())
 
 PREENCHIMENTO_IA = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
@@ -36,89 +67,157 @@ def detectar_prazos_disponiveis(caminho_arquivo) -> list:
     return [28]
 
 
-def ler_tabela_mestre(caminho_arquivo, header_row=2, col_nome=0, col_ean=1, prazo=28):
+def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, prazo=28):
     """
-    Le Excel de tabela de precos mestre.
+    Lê Excel de tabela de preços mestre. Auto-detecta linha de cabeçalho e coluna do prazo.
     Retorna: (precos_dict, precos_nome_lista)
     """
-    df = pd.read_excel(caminho_arquivo, header=header_row)
+    buf = _xlsx_safe_bytes(caminho_arquivo)
 
-    col_preco = None
-    for col in df.columns:
-        col_str = str(col).replace(" dias", "").replace(" DIAS", "").strip()
-        if str(prazo) in col_str:
-            col_preco = col
-            break
-    if col_preco is None:
-        col_preco = df.columns[-1]
+    _NOME_KW = ("PRODUTO", "DESCRI", "ITEM", "MERCAD")
+
+    df_final = None
+    col_nome_final = None
+    col_ean_final = None
+    col_preco_final = None
+
+    for hdr in range(0, 12):
+        try:
+            buf.seek(0)
+            df = pd.read_excel(buf, header=hdr)
+            if df.empty or len(df.columns) < 2:
+                continue
+
+            cols = df.columns
+            cols_str = [str(c) for c in cols]
+            cols_up = [c.upper() for c in cols_str]
+
+            # Coluna de preço pelo prazo: número exato como palavra
+            c_preco = None
+            for i, c in enumerate(cols_str):
+                nums = _re.findall(r'\b(\d+)\b', c)
+                if str(prazo) in nums:
+                    c_preco = cols[i]
+                    break
+
+            # Coluna de nome
+            c_nome = None
+            for i, c in enumerate(cols_up):
+                if any(k in c for k in _NOME_KW):
+                    c_nome = cols[i]
+                    break
+
+            # Coluna de EAN
+            c_ean = None
+            for i, c in enumerate(cols_up):
+                if any(k in c for k in ("EAN", "COD", "BARRAS", "BARRA", "GTIN")):
+                    c_ean = cols[i]
+                    break
+
+            if c_nome is not None and c_preco is not None:
+                df_final = df
+                col_nome_final = c_nome
+                col_ean_final = c_ean
+                col_preco_final = c_preco
+                break
+        except Exception:
+            continue
+
+    # Fallback: last header tried, use last column as price
+    if df_final is None:
+        try:
+            buf.seek(0)
+            df_final = pd.read_excel(buf, header=2)
+            col_nome_final = df_final.columns[0]
+            col_ean_final = df_final.columns[1] if len(df_final.columns) > 1 else None
+            col_preco_final = df_final.columns[-1]
+        except Exception:
+            return {}, []
 
     precos = {}
     precos_nome_lista = []
 
-    for _, row in df.iterrows():
-        ean = limpar_ean(row.iloc[col_ean])
-        nome_bruto = str(row.iloc[col_nome])
+    for _, row in df_final.iterrows():
+        nome_bruto = str(row[col_nome_final]) if col_nome_final is not None else ""
+        if not nome_bruto or nome_bruto.strip().upper() in ("NONE", "NAN", ""):
+            continue
+
+        ean_raw = row[col_ean_final] if col_ean_final is not None else None
+        ean = limpar_ean(ean_raw)
+
         try:
-            preco = float(row[col_preco])
-            if ean:
-                precos[ean] = preco
-            nome_norm = normalizar_nome(nome_bruto)
-            precos_nome_lista.append({
-                'norm': nome_norm,
-                'ord': ordenar_palavras(nome_norm),
-                'preco': preco,
-                'orig': nome_bruto
-            })
+            preco = float(str(row[col_preco_final]).replace(",", ".").replace("R$", "").strip())
+            if preco <= 0:
+                continue
         except (ValueError, TypeError):
             continue
+
+        if ean:
+            precos[ean] = preco
+        nome_norm = normalizar_nome(nome_bruto)
+        precos_nome_lista.append({
+            'norm': nome_norm,
+            'ord': ordenar_palavras(nome_norm),
+            'preco': preco,
+            'orig': nome_bruto,
+        })
 
     return precos, precos_nome_lista
 
 
 def ler_cotacao(caminho_arquivo):
     """
-    Le Excel de cotacao (anexo 2) que o RCA sobe.
-    Tenta openpyxl primeiro, fallback para pandas.
+    Lê Excel de cotação enviado pelo RCA.
+    Corrige automaticamente xlsx com XML inválido (indent > 255).
+    Usa detecção parcial de cabeçalhos para tolerar variações de nome.
     Retorna: (itens, header_row)
     """
+    _NOME_KW  = ("PRODUTO", "DESCRI", "ITEM", "MERCAD")
+    _EAN_KW   = ("EAN", "COD.BARRAS", "COD BARRAS", "CODIGO DE BARRAS",
+                 "CÓDIGO DE BARRAS", "CÓDIGO BARRAS", "COD BARRA", "GTIN", "BARRAS")
+    _PRECO_KW = ("PREÇO", "PRECO", "VALOR UNIT", "VALOR UNI", "VALOR", "R$",
+                 "PRECO UNIT", "PREÇO UNIT", "UNIT")
+
+    def _match_nome(val):
+        return any(k in val for k in _NOME_KW)
+
+    def _match_ean(val):
+        return any(k in val for k in _EAN_KW)
+
+    def _match_preco(val):
+        return any(k in val for k in _PRECO_KW)
+
     itens = []
     header_row = 1
 
-    # Tentar com openpyxl para preservar linhas
+    # --- Tentativa 1: openpyxl com correção de stylesheet ---
     try:
-        wb = openpyxl.load_workbook(caminho_arquivo, data_only=True)
+        buf = _xlsx_safe_bytes(caminho_arquivo)
+        wb = openpyxl.load_workbook(buf, data_only=True)
         ws = wb.active
 
         col_ean = None
         col_nome = None
         col_preco = None
-        header_row = None
+        found_header = None
 
         for row_idx in range(1, min(16, ws.max_row + 1)):
             for cell in ws[row_idx]:
                 val = str(cell.value).upper().strip() if cell.value else ""
                 if not val:
                     continue
-                if val in ("EAN", "COD.BARRAS", "COD BARRAS", "CODIGO DE BARRAS",
-                           "COD. BARRAS", "CÓDIGO DE BARRAS", "COD BARRA"):
-                    col_ean = cell.column - 1
-                    header_row = row_idx
-                elif val in ("PRODUTO", "DESCRIÇÃO", "DESCRICAO", "ITEM",
-                             "DESCRIÇÃO DO PRODUTO", "DESCRICAO DO PRODUTO",
-                             "MERCADORIA", "DESC"):
+                if col_nome is None and _match_nome(val):
                     col_nome = cell.column - 1
-                    header_row = row_idx
-                elif val in ("PREÇO", "PRECO", "VALOR UNITÁRIO", "VALOR UNITARIO",
-                             "VALOR", "R$", "PREÇO UNIT.", "PRECO UNIT"):
+                    found_header = row_idx
+                elif col_ean is None and _match_ean(val):
+                    col_ean = cell.column - 1
+                    found_header = found_header or row_idx
+                elif col_preco is None and _match_preco(val):
                     col_preco = cell.column - 1
-                    header_row = row_idx
+                    found_header = found_header or row_idx
 
-        if not header_row:
-            header_row = 1
-            col_nome = 0
-            col_ean = 1
-            col_preco = ws.max_column - 1
-
+        if found_header:
+            header_row = found_header
         if col_nome is None:
             col_nome = 0
         if col_ean is None:
@@ -128,10 +227,9 @@ def ler_cotacao(caminho_arquivo):
 
         for row_idx in range(header_row + 1, ws.max_row + 1):
             row = ws[row_idx]
-            ean_val = row[col_ean].value if col_ean < len(row) else None
+            ean_val  = row[col_ean].value  if col_ean  < len(row) else None
             nome_val = row[col_nome].value if col_nome < len(row) else None
-
-            if nome_val and str(nome_val).strip():
+            if nome_val and str(nome_val).strip() and str(nome_val).strip().upper() not in ("NONE", "NAN"):
                 itens.append({
                     "ean": str(ean_val) if ean_val else "",
                     "nome": str(nome_val),
@@ -140,49 +238,52 @@ def ler_cotacao(caminho_arquivo):
                 })
 
         wb.close()
-        return itens, header_row
-
+        if itens:
+            return itens, header_row
     except Exception:
-        pass  # Fallback para pandas
+        pass
 
-    # Fallback: ler com pandas (nao preserva linhas exatas mas funciona)
+    # --- Tentativa 2: pandas com correção de stylesheet ---
     try:
-        for hdr in range(0, 5):
+        buf = _xlsx_safe_bytes(caminho_arquivo)
+        for hdr in range(0, 8):
             try:
-                df = pd.read_excel(caminho_arquivo, header=hdr)
+                df = pd.read_excel(buf, header=hdr)
+                buf.seek(0)
                 cols_upper = [str(c).upper().strip() for c in df.columns]
 
-                col_nome = None
-                col_ean = None
-                col_preco = None
-
+                col_nome = col_ean = col_preco = None
                 for i, c in enumerate(cols_upper):
-                    if c in ("PRODUTO", "DESCRIÇÃO", "DESCRICAO", "ITEM", "MERCADORIA", "DESC"):
+                    if col_nome is None and _match_nome(c):
                         col_nome = i
-                    elif c in ("EAN", "COD.BARRAS", "COD BARRAS", "CODIGO"):
+                    elif col_ean is None and _match_ean(c):
                         col_ean = i
-                    elif c in ("PREÇO", "PRECO", "VALOR", "R$"):
+                    elif col_preco is None and _match_preco(c):
                         col_preco = i
 
-                if col_nome is not None:
-                    header_row = hdr + 1
-                    if col_ean is None:
-                        col_ean = col_nome + 1
-                    if col_preco is None:
-                        col_preco = len(df.columns) - 1
+                if col_nome is None:
+                    continue
 
-                    for idx, row in df.iterrows():
-                        nome_val = row.iloc[col_nome]
-                        ean_val = row.iloc[col_ean] if col_ean < len(row) else ""
-                        if nome_val and str(nome_val).strip() and str(nome_val).strip() != "nan":
-                            itens.append({
-                                "ean": str(ean_val) if ean_val and str(ean_val) != "nan" else "",
-                                "nome": str(nome_val),
-                                "linha": header_row + idx + 2,
-                                "col_preco": col_preco,
-                            })
+                header_row = hdr + 1
+                if col_ean is None:
+                    col_ean = col_nome + 1
+                if col_preco is None:
+                    col_preco = len(df.columns) - 1
+
+                for idx, row in df.iterrows():
+                    nome_val = row.iloc[col_nome]
+                    ean_val  = row.iloc[col_ean] if col_ean < len(row) else ""
+                    if nome_val and str(nome_val).strip() and str(nome_val).strip() != "nan":
+                        itens.append({
+                            "ean": str(ean_val) if ean_val and str(ean_val) != "nan" else "",
+                            "nome": str(nome_val),
+                            "linha": header_row + idx + 2,
+                            "col_preco": col_preco,
+                        })
+                if itens:
                     break
             except Exception:
+                buf.seek(0)
                 continue
     except Exception:
         pass
@@ -198,7 +299,8 @@ def gerar_excel_resultado(caminho_original, itens, resultados):
     Retorna caminho do arquivo gerado.
     """
     try:
-        wb = openpyxl.load_workbook(caminho_original)
+        buf = _xlsx_safe_bytes(caminho_original)
+        wb = openpyxl.load_workbook(buf)
         ws = wb.active
 
         for item, res in zip(itens, resultados):
