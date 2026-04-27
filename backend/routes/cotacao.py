@@ -6,6 +6,7 @@ import os
 import json
 import tempfile
 import logging
+import uuid
 from datetime import datetime, timezone
 from io import BytesIO
 
@@ -22,6 +23,7 @@ from services.excel_processor import (
     processar_arquivo_cotacao,
     gerar_excel_multiprazos,
 )
+from services.matching_engine import normalizar_nome
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -35,6 +37,35 @@ MAX_TABELAS = 5
 def init_cotacao(database):
     global db
     db = database
+
+
+def _resultados_para_preview(itens, resultados):
+    """Converte itens + resultados do matching para formato de preview da UI."""
+    preview = []
+    for item, res in zip(itens, resultados):
+        tipo = res.get("tipo")
+        if tipo is None:
+            status = "sem_match"
+            score = None
+        elif tipo == "EAN" or tipo == "APRENDIDO":
+            status = "aprovado"
+            score = 1.0
+        else:
+            # "SIMILAR 80%" ou "APROX 64%"
+            try:
+                score = float(tipo.split()[-1].rstrip('%')) / 100
+            except (ValueError, IndexError):
+                score = 0.0
+            status = "pendente"
+
+        preview.append({
+            "nome_cotacao": item["nome"],
+            "preco": res.get("preco"),
+            "tipo": tipo,
+            "score": score,
+            "status": status,
+        })
+    return preview
 
 
 def _bucket():
@@ -220,6 +251,83 @@ async def processar_cotacao(
             "X-Sem-Match": json.dumps(sem_match[:50]),
         }
     )
+
+
+@router.post("/preview")
+async def preview_cotacao(
+    arquivo: UploadFile = File(...),
+    tabela_id: str = Form(...),
+    modo: str = Form("completo"),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """
+    Executa matching e retorna JSON com resultados para revisão.
+    Não gera Excel — salva sessão no MongoDB para uso posterior pelo /confirmar.
+    """
+    from bson import ObjectId
+    from services.excel_processor import ler_tabela_mestre, ler_cotacao
+    from services.matching_engine import processar_cotacao_com_ia
+
+    uid = await get_user_id(credentials)
+
+    doc = await db.tabelas_mestre.find_one({"_id": ObjectId(tabela_id), "user_id": uid})
+    if not doc:
+        raise HTTPException(404, "Tabela mestre não encontrada")
+
+    grid_out = await _bucket().open_download_stream(doc["grid_id"])
+    conteudo_mestre = await grid_out.read()
+
+    tmp_mestre = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    tmp_mestre.write(conteudo_mestre)
+    tmp_mestre.close()
+
+    conteudo_cotacao = await arquivo.read()
+    tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    tmp_cotacao.write(conteudo_cotacao)
+    tmp_cotacao.close()
+
+    try:
+        prazo = doc.get("prazo", 28)
+        precos_dict, precos_lista = ler_tabela_mestre(tmp_mestre.name, prazo=prazo)
+        itens, _ = ler_cotacao(tmp_cotacao.name)
+        resultados = processar_cotacao_com_ia(itens, precos_dict, precos_lista, modo=modo)
+
+        # Sobrescrever matches com dados aprendidos do usuário
+        for i, item in enumerate(itens):
+            nome_norm = normalizar_nome(item["nome"])
+            learned = await db.cotacao_aprendizado.find_one(
+                {"user_id": uid, "produto_cotacao_norm": nome_norm, "confirmado": True}
+            )
+            if learned:
+                resultados[i]["preco"] = learned["preco"]
+                resultados[i]["tipo"] = "APRENDIDO"
+
+        preview_items = _resultados_para_preview(itens, resultados)
+
+        # Salvar sessão para uso pelo /confirmar
+        session_id = str(uuid.uuid4())
+        await db.cotacao_sessoes.insert_one({
+            "_id": session_id,
+            "user_id": uid,
+            "tabela_id": tabela_id,
+            "prazo": prazo,
+            "cotacao_bytes": conteudo_cotacao,
+            "itens": itens,
+            "resultados": resultados,
+            "created_at": datetime.now(timezone.utc),
+        })
+
+    except Exception as e:
+        logger.error(f"Erro no preview: {e}")
+        raise HTTPException(500, f"Erro ao processar: {str(e)}")
+    finally:
+        for p in [tmp_mestre.name, tmp_cotacao.name]:
+            try:
+                os.unlink(p)
+            except OSError:
+                pass
+
+    return {"session_id": session_id, "itens": preview_items}
 
 
 @router.post("/gerar-tabela-prazos")
