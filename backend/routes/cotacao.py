@@ -374,8 +374,11 @@ async def _processar_tabela_prazos(job_id, conteudo, ext, prazos):
         tmp.write(conteudo)
         tmp.close()
 
-        resultado_path = await asyncio.to_thread(
-            gerar_excel_multiprazos, tmp.name, prazos
+        logger.info(f"[Job {job_id}] Iniciando processamento ({ext}, {len(conteudo)} bytes)")
+
+        resultado_path = await asyncio.wait_for(
+            asyncio.to_thread(gerar_excel_multiprazos, tmp.name, prazos),
+            timeout=540,  # 9 minutes max
         )
 
         with open(resultado_path, "rb") as f:
@@ -392,6 +395,12 @@ async def _processar_tabela_prazos(job_id, conteudo, ext, prazos):
         await db.cotacao_jobs.update_one(
             {"_id": job_id},
             {"$set": {"status": "done", "grid_id": grid_id}},
+        )
+    except asyncio.TimeoutError:
+        logger.error(f"[Job {job_id}] Timeout (9 min)")
+        await db.cotacao_jobs.update_one(
+            {"_id": job_id},
+            {"$set": {"status": "error", "error": "Processamento demorou demais. Para PDFs grandes, converta para Excel (.xlsx) antes de enviar."}},
         )
     except Exception as e:
         logger.error(f"Erro ao gerar tabela (job {job_id}): {e}")

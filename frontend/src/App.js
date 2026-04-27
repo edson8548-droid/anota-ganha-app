@@ -9,6 +9,7 @@ import { SubscriptionProvider } from './contexts/SubscriptionContext';
 // Páginas Normais
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Plans from './pages/Plans';
 import Checkout from './pages/Checkout';
@@ -52,12 +53,13 @@ function App() {
       <SubscriptionProvider>
         <Router>
           <Routes>
-            {/* Rota raiz */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            {/* Rota raiz — Landing page */}
+            <Route path="/" element={<Landing />} />
             
             {/* Autenticação */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<Login />} />
             
             {/* Aplicação */}
             <Route path="/dashboard" element={<Dashboard />} />
@@ -84,7 +86,7 @@ function App() {
             />
             
             {/* Rota 404 */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Router>
       </SubscriptionProvider>

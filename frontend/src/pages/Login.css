@@ -1,49 +1,70 @@
-/* Login - Exatamente igual ao App Antigo */
+/* Login — Tema Venpro (Charcoal + Teal) */
 
 .login-container {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #2B2D31;
   padding: 20px;
   position: relative;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .login-card {
-  background: white;
-  border-radius: 24px;
-  padding: 48px 40px;
+  background: #363940;
+  border: 1px solid #4A4D52;
+  border-radius: 20px;
+  padding: 44px 36px;
   width: 100%;
-  max-width: 440px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
 .login-header {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 36px;
 }
 
-.login-title {
-  font-size: 32px;
-  font-weight: 700;
-  color: #2d3748;
-  margin: 0 0 12px 0;
-  line-height: 1.2;
+.login-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.login-logo-icon {
+  width: 38px;
+  height: 38px;
+  margin-right: 4px;
+}
+
+.login-logo-ven {
+  font-size: 30px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+}
+
+.login-logo-pro {
+  font-size: 30px;
+  font-weight: 800;
+  color: #3A85A8;
+  letter-spacing: -0.5px;
 }
 
 .login-subtitle {
-  font-size: 16px;
-  color: #718096;
+  font-size: 15px;
+  color: #A0A3A8;
   margin: 0;
 }
 
 .login-error {
-  background: #fee;
-  border: 1px solid #fcc;
-  color: #c33;
+  background: rgba(220, 53, 69, 0.12);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  color: #ff6b7a;
   padding: 12px 16px;
-  border-radius: 8px;
+  border-radius: 10px;
   margin-bottom: 20px;
   font-size: 14px;
   text-align: center;
@@ -54,65 +75,71 @@
 }
 
 .form-group {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .form-group label {
   display: block;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: #2d3748;
-  margin-bottom: 8px;
+  color: #A0A3A8;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .form-group input {
   width: 100%;
-  padding: 14px 16px;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
+  padding: 13px 16px;
+  border: 1px solid #4A4D52;
+  border-radius: 10px;
   font-size: 15px;
-  color: #2d3748;
-  transition: all 0.3s;
-  background: #f7fafc;
+  color: #E1E1E1;
+  background: #2B2D31;
+  transition: border-color 0.2s;
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: #667eea;
-  background: white;
+  border-color: #3A85A8;
+  background: #2f3238;
 }
 
 .form-group input::placeholder {
-  color: #a0aec0;
+  color: #6B6E74;
 }
 
 .form-group input:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .btn-login {
   width: 100%;
-  padding: 16px;
-  background: #667eea;
-  color: white;
+  padding: 14px;
+  background: #3A85A8;
+  color: #ffffff;
   border: none;
-  border-radius: 12px;
+  border-radius: 10px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.3s;
-  margin-top: 8px;
+  transition: all 0.2s;
+  margin-top: 4px;
 }
 
 .btn-login:hover:not(:disabled) {
-  background: #5568d3;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  background: #31708E;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(58, 133, 168, 0.35);
+}
+
+.btn-login:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .btn-login:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
   transform: none;
 }
@@ -121,81 +148,73 @@
   text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #4A4D52;
 }
 
 .link-register {
-  color: #667eea;
-  font-size: 15px;
+  color: #3A85A8;
+  font-size: 14px;
   font-weight: 600;
   text-decoration: none;
-  transition: all 0.2s;
+  transition: color 0.2s;
 }
 
 .link-register:hover {
-  color: #5568d3;
+  color: #5aa8c8;
   text-decoration: underline;
 }
 
 .link-forgot {
-  color: #718096;
-  font-size: 14px;
+  color: #6B6E74;
+  font-size: 13px;
   text-decoration: none;
-  transition: all 0.2s;
+  transition: color 0.2s;
 }
 
 .link-forgot:hover {
-  color: #4a5568;
+  color: #A0A3A8;
   text-decoration: underline;
 }
 
-/* Botão WhatsApp Flutuante */
+/* WhatsApp Float */
 .whatsapp-float {
   position: fixed;
   bottom: 30px;
   right: 30px;
-  width: 60px;
-  height: 60px;
+  width: 56px;
+  height: 56px;
   background: #25d366;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 20px rgba(37, 211, 102, 0.5);
+  box-shadow: 0 4px 20px rgba(37, 211, 102, 0.4);
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.2s;
   z-index: 1000;
   text-decoration: none;
 }
 
 .whatsapp-float:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 30px rgba(37, 211, 102, 0.7);
-}
-
-.whatsapp-float:active {
-  transform: scale(0.95);
+  box-shadow: 0 6px 30px rgba(37, 211, 102, 0.6);
 }
 
 /* Responsive */
 @media (max-width: 480px) {
   .login-card {
-    padding: 40px 24px;
-    border-radius: 20px;
+    padding: 36px 24px;
+    border-radius: 16px;
   }
-
-  .login-title {
-    font-size: 28px;
+  .login-logo-ven, .login-logo-pro {
+    font-size: 26px;
   }
-
-  .login-subtitle {
-    font-size: 15px;
-  }
-
   .whatsapp-float {
     bottom: 20px;
     right: 20px;
-    width: 56px;
-    height: 56px;
+    width: 50px;
+    height: 50px;
   }
 }

@@ -47,17 +47,30 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress) => {
   formData.append('pct_28', parseFloat(percentuais[28]) || 0);
 
   const user = auth.currentUser;
-  if (!user) throw new Error('Faça login novamente.');
-  const token = await user.getIdToken();
+  if (!user) {
+    // Wait for Firebase to initialize (up to 5s)
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  const userFinal = auth.currentUser;
+  if (!userFinal) throw new Error('Faça login novamente.');
+  const token = await userFinal.getIdToken();
 
   const headers = { Authorization: `Bearer ${token}` };
 
+  // Wake up backend before sending the file
+  try { await fetch('https://api.venpro.com.br/health', { mode: 'cors' }); } catch {}
+
   // Submit job
-  const submitRes = await fetch('https://api.venpro.com.br/api/cotacao/gerar-tabela-prazos', {
-    method: 'POST',
-    headers,
-    body: formData,
-  });
+  let submitRes;
+  try {
+    submitRes = await fetch('https://api.venpro.com.br/api/cotacao/gerar-tabela-prazos', {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+  } catch (err) {
+    throw new Error('Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.');
+  }
 
   if (!submitRes.ok) {
     const text = await submitRes.text();
@@ -68,18 +81,23 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress) => {
 
   const { job_id } = await submitRes.json();
 
-  // Poll for result
-  const maxAttempts = 120;
+  // Poll for result (up to 10 minutes)
+  const maxAttempts = 200;
   for (let i = 0; i < maxAttempts; i++) {
-    await new Promise(r => setTimeout(r, 2000));
-    onProgress?.((i + 1) * 2);
+    await new Promise(r => setTimeout(r, 3000));
+    onProgress?.((i + 1) * 3);
 
-    const pollRes = await fetch(`https://api.venpro.com.br/api/cotacao/jobs/${job_id}`, { headers });
+    try {
+      var pollRes = await fetch(`https://api.venpro.com.br/api/cotacao/jobs/${job_id}`, { headers });
+    } catch {
+      continue; // network glitch, retry
+    }
 
     if (!pollRes.ok) {
       const text = await pollRes.text();
       let msg = `Erro ${pollRes.status}`;
       try { msg = JSON.parse(text).detail || msg; } catch {}
+      if (pollRes.status === 404) continue; // job not found yet, retry
       throw new Error(msg);
     }
 
@@ -93,7 +111,7 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress) => {
     return pollRes.blob();
   }
 
-  throw new Error('Tempo esgotado (4 min). Arquivo muito grande — converta PDF para Excel antes.');
+  throw new Error('Tempo esgotado (10 min). PDFs grandes demoram mais — converta para Excel (.xlsx) antes de enviar para processar mais rápido.');
 };
 
 export const previewCotacao = async (arquivo, tabelaId, modo = 'completo') => {
