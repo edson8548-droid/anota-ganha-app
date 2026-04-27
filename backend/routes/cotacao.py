@@ -611,6 +611,7 @@ class CotatudoItem(BaseModel):
 class CotatudoPayload(BaseModel):
     tabela_id: str
     prazo: int = 28
+    modo: str = "completo"
     itens: List[CotatudoItem]
 
 
@@ -652,7 +653,7 @@ async def match_cotatudo(
         if not itens_para_match:
             return {"precos": [], "stats": {"preenchidos": 0, "total": 0, "nao_encontrados": 0}}
 
-        resultados = processar_cotacao_com_ia(itens_para_match, precos_dict, precos_lista, modo="completo")
+        resultados = processar_cotacao_com_ia(itens_para_match, precos_dict, precos_lista, modo=payload.modo)
 
         nomes_norm = [normalizar_nome(it["nome"]) for it in itens_para_match]
         cursor = db.cotacao_aprendizado.find(

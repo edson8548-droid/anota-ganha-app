@@ -4,6 +4,7 @@ const VENPRO_URL = 'https://venpro.com.br';
 const statusEl = document.getElementById('status');
 const tabelasEl = document.getElementById('tabelas');
 const prazoEl = document.getElementById('prazo');
+const modoEl = document.getElementById('modo');
 const btnEl = document.getElementById('btnPreencher');
 const resultsEl = document.getElementById('results');
 
@@ -90,6 +91,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
 btnEl.addEventListener('click', async () => {
   const tabelaId = tabelasEl.value;
   const prazo = parseInt(prazoEl.value);
+  const modo = modoEl.value;
 
   if (!tabelaId) {
     setStatus('Selecione uma tabela.', 'err');
@@ -133,6 +135,7 @@ btnEl.addEventListener('click', async () => {
       body: JSON.stringify({
         tabela_id: tabelaId,
         prazo: prazo,
+        modo: modo,
         itens: extractResult.items,
       }),
     });

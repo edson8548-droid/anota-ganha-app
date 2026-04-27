@@ -350,39 +350,73 @@ function CotacaoTab({
 
           {/* Modo */}
           <label style={labelStyle}>Modo de preenchimento</label>
-          <div style={{ display: 'flex', gap: 16, margin: '8px 0 16px' }}>
+          <div style={{ display: 'flex', gap: 16, margin: '8px 0 16px', flexWrap: 'wrap' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', cursor: 'pointer', fontSize: 14 }}>
               <input type="radio" value="ean" checked={modoMatch === 'ean'}
                      onChange={e => setModoMatch(e.target.value)} />
-              EAN apenas (100% certeza)
+              EAN apenas
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', cursor: 'pointer', fontSize: 14 }}>
               <input type="radio" value="completo" checked={modoMatch === 'completo'}
                      onChange={e => setModoMatch(e.target.value)} />
               Completo (EAN + descrição + IA)
             </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', cursor: 'pointer', fontSize: 14 }}>
+              <input type="radio" value="cotatudo" checked={modoMatch === 'cotatudo'}
+                     onChange={e => setModoMatch(e.target.value)} />
+              Cotatudo (site)
+            </label>
           </div>
 
-          {/* Upload cotação */}
-          <label style={labelStyle}>Cotação (Excel)</label>
-          <div onClick={() => cotacaoInputRef.current?.click()}
-               style={{
-                 border: '2px dashed #334155', borderRadius: 10, padding: 24,
-                 textAlign: 'center', cursor: 'pointer', marginBottom: 16,
-                 color: arquivoCotacao ? '#22c55e' : '#64748b',
-               }}>
-            {arquivoCotacao ? arquivoCotacao.name : 'Clique para selecionar ou arraste o arquivo'}
-            <input type="file" accept=".xlsx,.xls" ref={cotacaoInputRef}
-                   onChange={e => { setArquivoCotacao(e.target.files[0]); setReviewData(null); setResultado(null); }}
-                   style={{ display: 'none' }} />
-          </div>
+          {/* Cotatudo instructions */}
+          {modoMatch === 'cotatudo' ? (
+            <div style={{
+              background: '#0f172a', borderRadius: 10, padding: 20,
+              border: '1px solid #334155', marginBottom: 16,
+            }}>
+              <h3 style={{ color: '#3A85A8', marginTop: 0, fontSize: 16, marginBottom: 12 }}>
+                Como preencher cotação no Cotatudo
+              </h3>
+              <ol style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.8, paddingLeft: 20, margin: 0 }}>
+                <li>Instale a <strong style={{ color: '#f1f5f9' }}>Extensão Venpro</strong> (link no Dashboard)</li>
+                <li>Mantenha esta aba do <strong style={{ color: '#f1f5f9' }}>Venpro</strong> aberta e logada</li>
+                <li>Abra o <strong style={{ color: '#f1f5f9' }}>cotatudo.com.br</strong> em outra aba</li>
+                <li>Faça login e <strong style={{ color: '#f1f5f9' }}>abra sua cotação</strong></li>
+                <li>Clique no ícone <strong style={{ color: '#3A85A8' }}>Venpro</strong> na barra do Chrome</li>
+                <li>Selecione a tabela e prazo, clique <strong style={{ color: '#f1f5f9' }}>"Preencher Cotação"</strong></li>
+              </ol>
+              <div style={{ marginTop: 16, padding: '12px 16px', background: '#1e293b', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 20 }}>🧩</span>
+                <span style={{ color: '#94a3b8', fontSize: 13 }}>
+                  Não tem a extensão? Baixe no Dashboard → <strong style={{ color: '#3A85A8' }}>Extensão Cotatudo</strong>
+                </span>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Upload cotação */}
+              <label style={labelStyle}>Cotação (Excel)</label>
+              <div onClick={() => cotacaoInputRef.current?.click()}
+                   style={{
+                     border: '2px dashed #334155', borderRadius: 10, padding: 24,
+                     textAlign: 'center', cursor: 'pointer', marginBottom: 16,
+                     color: arquivoCotacao ? '#22c55e' : '#64748b',
+                   }}>
+                {arquivoCotacao ? arquivoCotacao.name : 'Clique para selecionar ou arraste o arquivo'}
+                <input type="file" accept=".xlsx,.xls" ref={cotacaoInputRef}
+                       onChange={e => { setArquivoCotacao(e.target.files[0]); setReviewData(null); setResultado(null); }}
+                       style={{ display: 'none' }} />
+              </div>
+            </>
+          )}
 
           {/* Processar */}
-          {prazosDisponiveis.length > 1 && !prazoEfetivo && (
+          {modoMatch !== 'cotatudo' && prazoSelecionado === 0 && !prazoEfetivo && prazosDisponiveis.length > 1 && (
             <p style={{ color: '#f59e0b', fontSize: 13, margin: '0 0 8px' }}>
               ⚠ Selecione o prazo acima antes de processar
             </p>
           )}
+          {modoMatch !== 'cotatudo' && (
           <button onClick={handleProcessar}
                   disabled={!tabelaSelecionada || !arquivoCotacao || processing || (prazosDisponiveis.length > 1 && !prazoEfetivo)}
                   style={{
@@ -396,6 +430,7 @@ function CotacaoTab({
                 ? `Processar Cotação — ${prazoEfetivo} dias`
                 : 'Processar Cotação'}
           </button>
+          )}
 
           {/* Barra de progresso */}
           {(processing || reviewData || resultado) && (() => {
