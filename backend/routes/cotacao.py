@@ -158,13 +158,32 @@ async def listar_tabelas(credentials: HTTPAuthorizationCredentials = Depends(sec
     tabelas = []
     async for doc in collection.find({"user_id": uid}).sort("data_upload", -1):
         prazo = doc.get("prazo", 28)
+        prazos_disponiveis = doc.get("prazos_disponiveis")
+
+        # Tabelas antigas não têm prazos_disponiveis — detectar e gravar agora
+        if not prazos_disponiveis:
+            try:
+                grid_out = await _bucket().open_download_stream(doc["grid_id"])
+                conteudo = await grid_out.read()
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+                tmp.write(conteudo)
+                tmp.close()
+                prazos_disponiveis = await asyncio.to_thread(detectar_prazos_disponiveis, tmp.name)
+                os.unlink(tmp.name)
+                await collection.update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": {"prazos_disponiveis": prazos_disponiveis}},
+                )
+            except Exception:
+                prazos_disponiveis = [prazo]
+
         tabelas.append({
             "id": str(doc["_id"]),
             "nome": doc["nome"],
             "filename": doc["filename"],
             "qtd_produtos": doc["qtd_produtos"],
             "prazo": prazo,
-            "prazos_disponiveis": doc.get("prazos_disponiveis", [prazo]),
+            "prazos_disponiveis": prazos_disponiveis,
             "data_upload": doc["data_upload"].isoformat(),
         })
     return tabelas
