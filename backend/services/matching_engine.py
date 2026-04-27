@@ -16,7 +16,7 @@ except ImportError:
     rfprocess = None
     _USE_RAPIDFUZZ = False
 
-TAXA_SIMILARIDADE = 0.75
+TAXA_SIMILARIDADE = 0.82  # era 0.75
 
 # ─────────────────────────────────────────────
 # CONSTANTES DE CATEGORIAS E TRAVAS
@@ -228,6 +228,13 @@ SUBTIPOS_EXCLUSIVOS = [
 
     # Cerveja — embalagem mutuamente exclusiva (PDF)
     {'LN', 'LONGNECK', 'LONG NECK'},
+
+    # Creme dental — linha/fórmula são produtos diferentes
+    # Ex: LUMINOUS WHITE ≠ MPA ≠ TOTAL 12 ≠ NATURAL ≠ NEUTRACUCAR
+    {'LUMINOUS WHITE', 'MPA', 'TOTAL 12', 'TOTAL12',
+     'NEUTRACUCAR', 'NEUTRAZUCAR', 'NAT',
+     'SENSITIVE', 'SENSIVEL', 'TRIPLA', 'HERBAL',
+     'WHITENING', 'ANTICARIE', 'MAXFRESH', 'EXTRAFRESH'},
 ]
 
 # Tamanhos de fralda — mutuamente exclusivos
