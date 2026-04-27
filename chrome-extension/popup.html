@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 320px;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: #2B2D31;
+      color: #E1E1E1;
+      padding: 16px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .header svg { width: 28px; height: 28px; }
+    .header-ven { font-size: 20px; font-weight: 800; color: #fff; }
+    .header-pro { font-size: 20px; font-weight: 800; color: #3A85A8; }
+    .header-sub { font-size: 11px; color: #A0A3A8; margin-top: -2px; }
+
+    .status {
+      background: #363940;
+      border: 1px solid #4A4D52;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .status.ok { border-color: #2ECC8A; color: #2ECC8A; }
+    .status.err { border-color: #ff6b7a; color: #ff6b7a; }
+    .status.info { border-color: #3A85A8; color: #3A85A8; }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: #A0A3A8;
+      margin-bottom: 4px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    select {
+      width: 100%;
+      padding: 9px 10px;
+      background: #2B2D31;
+      border: 1px solid #4A4D52;
+      border-radius: 6px;
+      color: #E1E1E1;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 11px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-bottom: 8px;
+    }
+    .btn-primary {
+      background: #3A85A8;
+      color: #fff;
+    }
+    .btn-primary:hover { background: #31708E; }
+    .btn-primary:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .results {
+      background: #363940;
+      border: 1px solid #4A4D52;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.5;
+      display: none;
+    }
+    .results .ok { color: #2ECC8A; }
+    .results .warn { color: #E8A830; }
+    .results .err { color: #ff6b7a; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <svg viewBox="0 0 18 18" fill="none">
+      <path d="M2 3.5L9 14.5L16 3.5" stroke="#3A85A8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M9 14.5L12.5 8.5" stroke="rgba(58,133,168,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    <span class="header-ven">Ven</span><span class="header-pro">pro</span>
+  </div>
+  <div class="header-sub">Preencher cotação Cotatudo</div>
+
+  <div id="status" class="status info">Verificando página...</div>
+
+  <label>Tabela de preços</label>
+  <select id="tabelas" disabled>
+    <option value="">Carregando...</option>
+  </select>
+
+  <label>Prazo</label>
+  <select id="prazo">
+    <option value="7">7 dias</option>
+    <option value="14">14 dias</option>
+    <option value="21">21 dias</option>
+    <option value="28" selected>28 dias</option>
+  </select>
+
+  <button id="btnPreencher" class="btn btn-primary" disabled>
+    Preencher Cotação
+  </button>
+
+  <div id="results" class="results"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

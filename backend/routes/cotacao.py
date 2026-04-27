@@ -431,6 +431,13 @@ async def get_job_status(
         raise HTTPException(404, "Job não encontrado")
 
     if job["status"] == "processing":
+        age = (datetime.now(timezone.utc) - job["created_at"]).total_seconds()
+        if age > 600:  # job orphaned by server restart or GC — fail fast
+            await db.cotacao_jobs.update_one(
+                {"_id": job_id},
+                {"$set": {"status": "error", "error": "Processamento demorou demais. O servidor pode ter reiniciado. Tente novamente."}},
+            )
+            raise HTTPException(500, "Processamento demorou demais. O servidor pode ter reiniciado. Tente novamente.")
         return {"status": "processing"}
 
     if job["status"] == "error":
@@ -563,3 +570,101 @@ async def confirmar_cotacao(
             "X-Sem-Match": json.dumps(sem_match[:50]),
         }
     )
+
+
+# ==================== Cotatudo Chrome Extension ====================
+
+class CotatudoItem(BaseModel):
+    idx: int
+    ean: str | None = None
+    nome: str = ""
+    filled: bool = False
+
+
+class CotatudoPayload(BaseModel):
+    tabela_id: str
+    prazo: int = 28
+    itens: List[CotatudoItem]
+
+
+@router.post("/match-cotatudo")
+async def match_cotatudo(
+    payload: CotatudoPayload,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """
+    Recebe itens extraídos do Cotatudo pela extensão Chrome,
+    faz matching com a tabela mestre e retorna preços para preencher.
+    """
+    from bson import ObjectId
+    from services.matching_engine import processar_cotacao_com_ia
+
+    uid = await get_user_id(credentials)
+
+    doc = await db.tabelas_mestre.find_one({"_id": ObjectId(payload.tabela_id), "user_id": uid})
+    if not doc:
+        raise HTTPException(404, "Tabela mestre não encontrada")
+
+    grid_out = await _bucket().open_download_stream(doc["grid_id"])
+    conteudo_mestre = await grid_out.read()
+
+    tmp_mestre = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    tmp_mestre.write(conteudo_mestre)
+    tmp_mestre.close()
+
+    try:
+        prazo = payload.prazo
+        precos_dict, precos_lista = ler_tabela_mestre(tmp_mestre.name, prazo=prazo)
+
+        itens_para_match = [
+            {"nome": it.nome, "ean": it.ean or "", "linha": it.idx}
+            for it in payload.itens
+            if not it.filled and it.nome
+        ]
+
+        if not itens_para_match:
+            return {"precos": [], "stats": {"preenchidos": 0, "total": 0, "nao_encontrados": 0}}
+
+        resultados = processar_cotacao_com_ia(itens_para_match, precos_dict, precos_lista, modo="completo")
+
+        nomes_norm = [normalizar_nome(it["nome"]) for it in itens_para_match]
+        cursor = db.cotacao_aprendizado.find(
+            {"user_id": uid, "produto_cotacao_norm": {"$in": nomes_norm}, "confirmado": True}
+        )
+        aprendizado_map = {d["produto_cotacao_norm"]: d async for d in cursor}
+
+        precos = []
+        preenchidos = 0
+        nao_encontrados = 0
+
+        for i, item in enumerate(itens_para_match):
+            res = resultados[i]
+            learned = aprendizado_map.get(normalizar_nome(item["nome"]))
+            if learned:
+                res["preco"] = learned["preco"]
+                res["tipo"] = "APRENDIDO"
+
+            if res.get("preco") is not None:
+                preco_str = f"{res['preco']:.2f}".replace(".", ",")
+                precos.append({"idx": item["idx"], "price": preco_str})
+                preenchidos += 1
+            else:
+                nao_encontrados += 1
+
+        return {
+            "precos": precos,
+            "stats": {
+                "preenchidos": preenchidos,
+                "total": len(itens_para_match),
+                "nao_encontrados": nao_encontrados,
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Erro no match-cotatudo: {e}")
+        raise HTTPException(500, f"Erro ao processar: {str(e)}")
+    finally:
+        try:
+            os.unlink(tmp_mestre.name)
+        except OSError:
+            pass
