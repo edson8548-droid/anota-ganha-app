@@ -19,6 +19,7 @@ import MinhaLicenca from './pages/MinhaLicenca';
 import AssistenteIA from './pages/AssistenteIA';
 import Cotacao from './pages/Cotacao';
 import Disparador from './pages/Disparador';
+import ForgotPassword from './pages/ForgotPassword';
 
 // ⭐️ 1. IMPORTAR A NOVA PÁGINA DE ADMIN
 import AdminDashboard from './pages/AdminDashboard';
@@ -60,7 +61,7 @@ function App() {
             {/* Autenticação */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             
             {/* Aplicação */}
             <Route path="/dashboard" element={<Dashboard />} />
