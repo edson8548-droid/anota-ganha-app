@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { FileSpreadsheet, Sparkles, MessageCircle, BarChart3, Puzzle, Send } from 'lucide-react';
+import { FileSpreadsheet, Sparkles, BarChart3, Send } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useCampaigns } from '../hooks/useCampaigns';
 import { useClients } from '../hooks/useClients';
@@ -241,17 +241,6 @@ const Dashboard = () => {
                 <div className="tool-card-badge live">Disponível</div>
                 <div className="tool-card-title">Disparador WhatsApp</div>
                 <div className="tool-card-desc">Envie ofertas em massa para toda sua carteira de clientes com texto e fotos personalizados via WhatsApp Web.</div>
-              </div>
-              <div className="tool-card" onClick={() => {
-                const a = document.createElement('a');
-                a.href = '/venpro-cotatudo-extension.zip';
-                a.download = 'venpro-cotatudo-extension.zip';
-                a.click();
-              }}>
-                <div className="tool-card-icon"><Puzzle size={32} /></div>
-                <div className="tool-card-badge live">Novo</div>
-                <div className="tool-card-title">Cotatudo Automático</div>
-                <div className="tool-card-desc">Baixe a extensão Chrome que preenche cotações no Cotatudo automaticamente com os preços da sua tabela Venpro.</div>
               </div>
               <div className="tool-card" onClick={() => {
                 if (campaigns.length > 0) {
