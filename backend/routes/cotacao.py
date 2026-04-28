@@ -646,8 +646,7 @@ async def match_cotatudo(
     tmp_mestre.close()
 
     try:
-        prazo = payload.prazo
-        precos_dict, precos_lista = ler_tabela_mestre(tmp_mestre.name, prazo=prazo)
+        prazo_efetivo = payload.prazo if payload.prazo > 0 else doc.get("prazo", 28)
 
         itens_para_match = [
             {"nome": it.nome, "ean": it.ean or "", "linha": it.idx}
@@ -658,7 +657,11 @@ async def match_cotatudo(
         if not itens_para_match:
             return {"precos": [], "stats": {"preenchidos": 0, "total": 0, "nao_encontrados": 0}}
 
-        resultados = processar_cotacao_com_ia(itens_para_match, precos_dict, precos_lista, modo=payload.modo)
+        def _match_sync():
+            pd, pl = ler_tabela_mestre(tmp_mestre.name, prazo=prazo_efetivo)
+            return pd, pl, processar_cotacao_com_ia(itens_para_match, pd, pl, modo=payload.modo)
+
+        precos_dict, precos_lista, resultados = await asyncio.to_thread(_match_sync)
 
         nomes_norm = [normalizar_nome(it["nome"]) for it in itens_para_match]
         cursor = db.cotacao_aprendizado.find(
@@ -679,7 +682,7 @@ async def match_cotatudo(
 
             if res.get("preco") is not None:
                 preco_str = f"{res['preco']:.2f}".replace(".", ",")
-                precos.append({"idx": item["idx"], "price": preco_str})
+                precos.append({"idx": item["linha"], "price": preco_str})
                 preenchidos += 1
             else:
                 nao_encontrados += 1
