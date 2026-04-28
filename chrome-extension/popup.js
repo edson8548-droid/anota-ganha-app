@@ -10,6 +10,14 @@ const progressWrap = document.getElementById('progressWrap');
 const progressBar  = document.getElementById('progressBar');
 const progressText = document.getElementById('progressText');
 const progressPct  = document.getElementById('progressPct');
+const stuckWrap    = document.getElementById('stuckWrap');
+const cancelWrap   = document.getElementById('cancelWrap');
+const btnRetomar   = document.getElementById('btnRetomar');
+const btnCancelar  = document.getElementById('btnCancelar');
+const btnParar     = document.getElementById('btnParar');
+
+// ── Stuck threshold: se ts > 3 min sem atualizar, considera travado ────────
+const STUCK_MS = 3 * 60 * 1000;
 
 function setStatus(text, type = 'info') {
   statusEl.textContent = text;
@@ -23,18 +31,53 @@ function setProgress(pct, label) {
   progressText.textContent = label;
 }
 
+function showStuck(state) {
+  stuckWrap.style.display = 'block';
+  cancelWrap.style.display = 'none';
+  btnEl.disabled = true;
+  btnEl.textContent = 'Pausado';
+  setStatus(`Pausado em ${state.pct}% — PC dormiu ou erro`, 'err');
+}
+
+function showRunning() {
+  stuckWrap.style.display = 'none';
+  cancelWrap.style.display = 'block';
+  btnEl.disabled = true;
+  btnEl.textContent = 'Processando...';
+}
+
+function resetUI() {
+  progressWrap.style.display = 'none';
+  stuckWrap.style.display = 'none';
+  cancelWrap.style.display = 'none';
+  resultsEl.style.display = 'none';
+  btnEl.disabled = false;
+  btnEl.textContent = 'Preencher Cotação';
+  setStatus('Pronto.', 'ok');
+}
+
 function applyState(state) {
   if (!state) return;
 
   if (state.status === 'processing') {
-    btnEl.disabled = true;
-    btnEl.textContent = 'Processando...';
+    const stuck = state.ts && (Date.now() - state.ts) > STUCK_MS;
     setProgress(state.pct, `${state.processados} / ${state.total} itens`);
-    setStatus(`Processando... ${state.pct}%`, 'info');
-    resultsEl.style.display = 'none';
+    if (stuck) {
+      showStuck(state);
+    } else {
+      showRunning();
+      setStatus(`Processando... ${state.pct}%`, 'info');
+    }
+  }
+
+  if (state.status === 'paused') {
+    setProgress(state.pct || 0, `${state.processados} / ${state.total} itens`);
+    showStuck(state);
   }
 
   if (state.status === 'done') {
+    stuckWrap.style.display = 'none';
+    cancelWrap.style.display = 'none';
     btnEl.disabled = false;
     btnEl.textContent = 'Preencher Cotação';
     setProgress(100, `${state.processados} / ${state.total} itens`);
@@ -54,7 +97,7 @@ function applyState(state) {
   }
 }
 
-// Listen for progress updates from background while popup is open
+// ── Listen for live updates from background ────────────────────────────────
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.action === 'progressUpdate') {
     chrome.runtime.sendMessage({ action: 'getProcessingState' }, (r) => {
@@ -63,7 +106,27 @@ chrome.runtime.onMessage.addListener((msg) => {
   }
 });
 
-// Get Firebase token
+// ── Retomar (continua do lote onde parou) ──────────────────────────────────
+btnRetomar.addEventListener('click', () => {
+  stuckWrap.style.display = 'none';
+  cancelWrap.style.display = 'block';
+  btnEl.disabled = true;
+  btnEl.textContent = 'Processando...';
+  setStatus('Retomando processamento...', 'info');
+  chrome.runtime.sendMessage({ action: 'resumeProcessing' });
+});
+
+// ── Cancelar durante processamento ────────────────────────────────────────
+function cancelAndReset() {
+  chrome.runtime.sendMessage({ action: 'clearProcessingState' }, () => {
+    resetUI();
+    loadTabelas();
+  });
+}
+btnCancelar.addEventListener('click', cancelAndReset);
+btnParar.addEventListener('click', cancelAndReset);
+
+// ── Token ──────────────────────────────────────────────────────────────────
 async function getToken() {
   try {
     const resp = await new Promise((resolve, reject) => {
@@ -73,35 +136,23 @@ async function getToken() {
       });
     });
     return resp?.token;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-// Fetch tabelas from Venpro API
-async function fetchTabelas(token) {
-  const resp = await fetch(`${API_URL}/cotacao/tabelas`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!resp.ok) throw new Error(`Erro ${resp.status}`);
-  return resp.json();
-}
-
-// Load tabelas
+// ── Load tabelas ───────────────────────────────────────────────────────────
 async function loadTabelas() {
   try {
     const token = await getToken();
-    if (!token) {
-      setStatus('Faça login no venpro.com.br primeiro.', 'err');
-      return;
-    }
+    if (!token) { setStatus('Faça login no venpro.com.br primeiro.', 'err'); return; }
 
-    const tabelas = await fetchTabelas(token);
+    const resp = await fetch(`${API_URL}/cotacao/tabelas`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!resp.ok) throw new Error(`Erro ${resp.status}`);
+    const tabelas = await resp.json();
+
     tabelasEl.innerHTML = '';
-
     if (tabelas.length === 0) {
       tabelasEl.innerHTML = '<option value="">Nenhuma tabela cadastrada</option>';
-      setStatus('Nenhuma tabela encontrada. Cadastre no Venpro.', 'err');
+      setStatus('Nenhuma tabela encontrada.', 'err');
       return;
     }
 
@@ -113,14 +164,14 @@ async function loadTabelas() {
     });
 
     tabelasEl.disabled = false;
-    btnEl.disabled = false;
+    if (btnEl.textContent === 'Preencher Cotação') btnEl.disabled = false;
     setStatus(`${tabelas.length} tabela(s) disponível(is).`, 'ok');
-  } catch (err) {
+  } catch {
     setStatus('Erro ao carregar tabelas. Faça login no Venpro.', 'err');
   }
 }
 
-// On popup open: restore state if processing is in progress
+// ── On popup open ──────────────────────────────────────────────────────────
 chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
   const url = tabs[0]?.url || '';
   if (!url.includes('cotatudo.com.br')) {
@@ -129,22 +180,18 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     return;
   }
 
-  // Check if there's an ongoing or completed processing
   chrome.runtime.sendMessage({ action: 'getProcessingState' }, (r) => {
-    if (r?.state && (r.state.status === 'processing' || r.state.status === 'done')) {
-      applyState(r.state);
-      if (r.state.status !== 'processing') {
-        setStatus('Página Cotatudo detectada. Carregando tabelas...', 'info');
-        loadTabelas();
-      }
-    } else {
-      setStatus('Página Cotatudo detectada. Carregando tabelas...', 'info');
-      loadTabelas();
+    const state = r?.state;
+    if (state && (state.status === 'processing' || state.status === 'paused' || state.status === 'done')) {
+      applyState(state);
     }
+    // Always load tabelas so selector is ready
+    setStatus('Carregando tabelas...', 'info');
+    loadTabelas();
   });
 });
 
-// Fill button click — delegates all processing to background
+// ── Fill button ────────────────────────────────────────────────────────────
 btnEl.addEventListener('click', async () => {
   const tabelaId = tabelasEl.value;
   const prazo    = parseInt(prazoEl.value);
@@ -160,7 +207,6 @@ btnEl.addEventListener('click', async () => {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-    // Ensure content script is loaded
     let extractResult;
     try {
       extractResult = await chrome.tabs.sendMessage(tab.id, { action: 'extractItems' });
@@ -171,9 +217,7 @@ btnEl.addEventListener('click', async () => {
         await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ['content.css'] });
         await new Promise(r => setTimeout(r, 300));
         extractResult = await chrome.tabs.sendMessage(tab.id, { action: 'extractItems' });
-      } else {
-        throw e;
-      }
+      } else { throw e; }
     }
 
     if (!extractResult.items || extractResult.items.length === 0) {
@@ -183,12 +227,11 @@ btnEl.addEventListener('click', async () => {
       return;
     }
 
-    // Clear previous state and hand off to background
     await new Promise(r => chrome.runtime.sendMessage({ action: 'clearProcessingState' }, r));
 
     setProgress(0, `0 / ${extractResult.items.length} itens`);
-    setStatus(`Enviando ${extractResult.items.length} itens para o background...`, 'info');
-    btnEl.textContent = 'Processando...';
+    showRunning();
+    setStatus(`Processando ${extractResult.items.length} itens...`, 'info');
 
     chrome.runtime.sendMessage({
       action: 'startBatchProcessing',
