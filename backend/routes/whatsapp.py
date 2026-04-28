@@ -1,5 +1,6 @@
 """
 Rotas do Disparador WhatsApp — campanha ativa por usuário.
+Armazenamento de fotos via MongoDB GridFS (sem Firebase Storage).
 """
 import os
 import re
@@ -11,19 +12,31 @@ from typing import Optional
 
 import pandas as pd
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel
 import firebase_admin
-from firebase_admin import auth as firebase_auth, firestore, storage as fb_storage
+from firebase_admin import auth as firebase_auth, firestore
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 security = HTTPBearer(auto_error=False)
 
 COLLECTION = 'whatsapp_campaigns'
-STORAGE_PREFIX = 'whatsapp_offers'
 MAX_PHOTOS = 20
 MAX_TOTAL_BYTES = 50 * 1024 * 1024  # 50 MB
+
+_db = None
+
+
+def init_whatsapp(database):
+    global _db
+    _db = database
+
+
+def _gridfs():
+    return AsyncIOMotorGridFSBucket(_db, bucket_name="whatsapp_photos")
 
 
 async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
@@ -39,7 +52,6 @@ async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(securi
 
 
 def _fs():
-    """Return Firestore client (synchronous — wrap calls in asyncio.to_thread)."""
     return firestore.client()
 
 
@@ -81,7 +93,6 @@ def normalize_phone(raw: str) -> Optional[str]:
 
 
 def parse_csv_contacts(content: bytes) -> tuple[list[dict], int]:
-    """Parse CSV bytes → (contacts list, invalid_count)."""
     df = None
     for enc in ('utf-8-sig', 'utf-8', 'latin1'):
         try:
@@ -118,41 +129,44 @@ def parse_csv_contacts(content: bytes) -> tuple[list[dict], int]:
     return contacts, invalidos
 
 
-# ── Firebase Storage helpers ──────────────────────────────────────────────────
+# ── GridFS photo helpers ──────────────────────────────────────────────────────
 
-def _get_bucket():
-    """Returns the default Firebase Storage bucket."""
-    return fb_storage.bucket()
-
-
-def _upload_photo_sync(uid: str, filename: str, content: bytes, content_type: str) -> str:
-    import urllib.parse
+async def _upload_photo(filename: str, content: bytes, content_type: str) -> str:
+    """Upload photo to MongoDB GridFS, return backend-served URL."""
+    if _db is None:
+        raise RuntimeError("Banco de dados não inicializado")
     safe = re.sub(r'[^a-zA-Z0-9._-]', '_', filename)
-    path = f"{STORAGE_PREFIX}/{uid}/{uuid.uuid4().hex}_{safe}"
-    bucket = _get_bucket()
-    blob = bucket.blob(path)
-    # Attach a download token so the URL works without Firebase Security Rules changes
-    token = uuid.uuid4().hex
-    blob.metadata = {"firebaseStorageDownloadTokens": token}
-    blob.upload_from_string(content, content_type=content_type)
-    encoded = urllib.parse.quote(path, safe='')
-    return (
-        f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}"
-        f"/o/{encoded}?alt=media&token={token}"
+    grid_id = await _gridfs().upload_from_stream(
+        safe,
+        io.BytesIO(content),
+        metadata={"content_type": content_type},
     )
+    return f"https://api.venpro.com.br/api/whatsapp/fotos/{grid_id}"
 
 
-def _delete_photo_sync(download_url: str):
-    """Delete a blob given its Firebase Storage download URL."""
+async def _delete_photo(url: str):
+    """Delete photo from GridFS given its backend URL."""
     try:
-        import urllib.parse
-        path = urllib.parse.unquote(download_url.split("/o/", 1)[-1].split("?")[0])
-        _get_bucket().blob(path).delete()
+        from bson import ObjectId
+        grid_id_str = url.split("/fotos/")[-1].split("?")[0]
+        await _gridfs().delete(ObjectId(grid_id_str))
     except Exception:
-        pass  # best-effort
+        pass
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@router.get("/fotos/{grid_id}")
+async def servir_foto(grid_id: str):
+    """Serve photo from GridFS — public endpoint used by Chrome extension."""
+    from bson import ObjectId
+    try:
+        grid_out = await _gridfs().open_download_stream(ObjectId(grid_id))
+        content_type = (grid_out.metadata or {}).get("content_type", "image/jpeg")
+        return StreamingResponse(grid_out, media_type=content_type)
+    except Exception:
+        raise HTTPException(404, "Foto não encontrada")
+
 
 @router.get("/campanha")
 async def get_campanha(uid: str = Depends(get_user_id)):
@@ -202,9 +216,7 @@ async def upload_fotos(
         allowed = ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')
         if arq.content_type not in allowed:
             raise HTTPException(400, f"Tipo não permitido: {arq.content_type}")
-        url = await asyncio.to_thread(
-            _upload_photo_sync, uid, arq.filename, content, arq.content_type
-        )
+        url = await _upload_photo(arq.filename, content, arq.content_type)
         new_urls.append(url)
 
     all_urls = existing + new_urls
@@ -217,7 +229,7 @@ async def deletar_fotos(uid: str = Depends(get_user_id)):
     camp = await _get_campaign(uid)
     urls = camp.get("photoUrls", [])
     for url in urls:
-        await asyncio.to_thread(_delete_photo_sync, url)
+        await _delete_photo(url)
     await _set_campaign(uid, {"photoUrls": []})
     return {"deleted": len(urls)}
 
@@ -272,7 +284,7 @@ async def sugerir_mensagem_ia(payload: IaMensagemPayload, uid: str = Depends(get
     def _generate():
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash-lite",
+            model_name="gemini-2.0-flash",
             system_instruction=_IA_PROMPT,
         )
         chat = model.start_chat()
