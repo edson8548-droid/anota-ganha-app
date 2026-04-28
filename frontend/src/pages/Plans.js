@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
+import api from '../services/api';
 import './Plans.css';
 
 const Plans = () => {
@@ -14,7 +15,24 @@ const Plans = () => {
   const authData = useAuthContext();
   const user = authData?.user;
 
-  const [loading, setLoading] = useState(null); // ID do plano em loading
+  const [loading, setLoading] = useState(null);
+  const [couponCode, setCouponCode] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponLoading(true);
+    try {
+      const res = await api.post('/license/apply-coupon', { coupon_code: couponCode.trim() });
+      toast.success(res.data.message);
+      setCouponCode('');
+      window.location.reload();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Erro ao aplicar cupom');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
 
   // ============================================
   // CALCULAR DIAS RESTANTES DO TRIAL
@@ -89,6 +107,40 @@ const Plans = () => {
           </div>
         </div>
       )}
+
+      {/* Coupon */}
+      <div style={{
+        background: '#1e293b', borderRadius: 12, padding: '20px 24px',
+        marginBottom: 24, display: 'flex', gap: 12, alignItems: 'center',
+        flexWrap: 'wrap',
+      }}>
+        <span style={{ color: '#94a3b8', fontSize: 14, fontWeight: 600 }}>
+          Tem um cupom?
+        </span>
+        <input
+          value={couponCode}
+          onChange={e => setCouponCode(e.target.value)}
+          placeholder="Digite o código do cupom"
+          style={{
+            flex: 1, minWidth: 200, padding: '10px 14px', borderRadius: 8,
+            border: '1px solid #334155', background: '#0f172a', color: '#f1f5f9',
+            fontSize: 14, outline: 'none',
+          }}
+          onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
+        />
+        <button
+          onClick={handleApplyCoupon}
+          disabled={!couponCode.trim() || couponLoading}
+          style={{
+            padding: '10px 20px', borderRadius: 8, border: 'none',
+            background: couponLoading ? '#4A4D52' : '#3A85A8', color: '#fff',
+            fontWeight: 600, fontSize: 14, cursor: couponLoading ? 'not-allowed' : 'pointer',
+            opacity: !couponCode.trim() ? 0.5 : 1,
+          }}
+        >
+          {couponLoading ? 'Aplicando...' : 'Aplicar'}
+        </button>
+      </div>
 
       {/* Plans Grid */}
       <div className="plans-grid">
