@@ -67,7 +67,7 @@ function extractCotatudoItems() {
     for (const txt of cellTexts) {
       const t = txt.trim();
       if (!t) continue;
-      const cleaned = t.replace(/(?i)(CX|FD)\d+R?\$?\s*$/, '').trim();
+      const cleaned = t.replace(/(CX|FD)\d+R?\$?\s*$/i, '').trim();
       if (cleaned.length < 4) continue;
       if (cleaned.replace(/[.,]/g, '').replace(/^\d+$/, '')) continue;
       if (/^\d{7,14}$/.test(cleaned)) continue;
