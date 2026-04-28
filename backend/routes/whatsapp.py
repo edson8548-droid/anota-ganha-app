@@ -126,21 +126,28 @@ def _get_bucket():
 
 
 def _upload_photo_sync(uid: str, filename: str, content: bytes, content_type: str) -> str:
+    import urllib.parse
     safe = re.sub(r'[^a-zA-Z0-9._-]', '_', filename)
     path = f"{STORAGE_PREFIX}/{uid}/{uuid.uuid4().hex}_{safe}"
     bucket = _get_bucket()
     blob = bucket.blob(path)
+    # Attach a download token so the URL works without Firebase Security Rules changes
+    token = uuid.uuid4().hex
+    blob.metadata = {"firebaseStorageDownloadTokens": token}
     blob.upload_from_string(content, content_type=content_type)
-    blob.make_public()
-    return blob.public_url
+    encoded = urllib.parse.quote(path, safe='')
+    return (
+        f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}"
+        f"/o/{encoded}?alt=media&token={token}"
+    )
 
 
-def _delete_photo_sync(public_url: str):
-    """Delete a blob given its public URL."""
+def _delete_photo_sync(download_url: str):
+    """Delete a blob given its Firebase Storage download URL."""
     try:
-        bucket = _get_bucket()
-        path = public_url.split(f"{bucket.name}/", 1)[-1]
-        bucket.blob(path).delete()
+        import urllib.parse
+        path = urllib.parse.unquote(download_url.split("/o/", 1)[-1].split("?")[0])
+        _get_bucket().blob(path).delete()
     except Exception:
         pass  # best-effort
 
