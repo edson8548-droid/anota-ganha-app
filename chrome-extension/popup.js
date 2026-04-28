@@ -1,5 +1,4 @@
 const API_URL = 'https://api.venpro.com.br/api';
-const VENPRO_URL = 'https://venpro.com.br';
 
 const statusEl = document.getElementById('status');
 const tabelasEl = document.getElementById('tabelas');
@@ -13,10 +12,8 @@ function setStatus(text, type = 'info') {
   statusEl.className = `status ${type}`;
 }
 
-// Get Firebase token from Venpro cookies/storage
+// Get Firebase token from Venpro's context
 async function getToken() {
-  // Try to get token from localStorage (Firebase stores it there)
-  // The user needs to be logged in on venpro.com.br
   try {
     const resp = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ action: 'getToken' }, (response) => {
@@ -56,7 +53,7 @@ async function loadTabelas() {
 
     if (tabelas.length === 0) {
       tabelasEl.innerHTML = '<option value="">Nenhuma tabela cadastrada</option>';
-      setStatus('Nenhuma tabela de preços encontrada. Cadastre no Venpro.', 'err');
+      setStatus('Nenhuma tabela encontrada. Cadastre no Venpro.', 'err');
       return;
     }
 
@@ -84,6 +81,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     loadTabelas();
   } else {
     setStatus('Abra uma cotação no cotatudo.com.br primeiro.', 'err');
+    tabelasEl.innerHTML = '<option value="">Necessário estar no Cotatudo</option>';
   }
 });
 
@@ -110,7 +108,6 @@ btnEl.addEventListener('click', async () => {
       return;
     }
 
-    // Send message to content script to extract items and fill
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
     // Step 1: Extract items from Cotatudo table
@@ -123,7 +120,7 @@ btnEl.addEventListener('click', async () => {
       return;
     }
 
-    setStatus(`Enviando ${extractResult.items.length} itens para matching...`, 'info');
+    setStatus(`Enviando ${extractResult.items.length} itens para busca de preços...`, 'info');
 
     // Step 2: Send items to Venpro API for matching
     const matchResp = await fetch(`${API_URL}/cotacao/match-cotatudo`, {
@@ -159,8 +156,8 @@ btnEl.addEventListener('click', async () => {
     resultsEl.style.display = 'block';
     const { preenchidos, total, nao_encontrados } = matchData.stats;
     resultsEl.innerHTML = `
-      <div class="ok">✅ ${preenchidos} preços preenchidos</div>
-      ${nao_encontrados > 0 ? `<div class="warn">⚠️ ${nao_encontrados} não encontrados</div>` : ''}
+      <div class="ok">Preenchidos: ${preenchidos} preços</div>
+      ${nao_encontrados > 0 ? `<div class="warn">Não encontrados: ${nao_encontrados}</div>` : ''}
       <div style="margin-top:4px; color:#A0A3A8;">Total: ${total} itens processados</div>
     `;
     setStatus('Preenchimento concluído!', 'ok');
