@@ -3,7 +3,11 @@
 .plans-page {
   min-height: 100vh;
   background: #2B2D31;
-  padding: 40px 20px;
+  padding: 0;
+}
+
+.plans-content {
+  padding: 0 20px 40px;
 }
 
 /* ============================================

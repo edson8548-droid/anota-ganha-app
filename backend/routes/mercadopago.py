@@ -135,7 +135,8 @@ def initialize_firebase():
         }
         if not firebase_config["project_id"] or not firebase_config["private_key"]: raise ValueError("Variáveis FIREBASE_... não configuradas.")
         cred = credentials.Certificate(firebase_config)
-        firebase_admin.initialize_app(cred)
+        storage_bucket = os.environ.get("FIREBASE_STORAGE_BUCKET", "anota-ganha-app.firebasestorage.app")
+        firebase_admin.initialize_app(cred, {"storageBucket": storage_bucket})
         logger.info("✅ Firebase Admin SDK inicializado.")
         return firestore.client()
     except Exception as e:
