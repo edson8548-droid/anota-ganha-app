@@ -13,6 +13,8 @@ api.interceptors.request.use(async (config) => {
   if (currentUser) {
     const token = await currentUser.getIdToken();
     config.headers.Authorization = `Bearer ${token}`;
+    // Save token for Chrome extension
+    localStorage.setItem('venpro_ext_token', token);
   }
   return config;
 });

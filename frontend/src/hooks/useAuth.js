@@ -22,6 +22,12 @@ export const useAuth = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        // Save token for Chrome extension
+        try {
+          const token = await firebaseUser.getIdToken();
+          localStorage.setItem('venpro_ext_token', token);
+        } catch (e) {}
+
         try {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           const userData = userDoc.data();

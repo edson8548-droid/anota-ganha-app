@@ -14,7 +14,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 import firebase_admin
 from firebase_admin import firestore, auth as firebase_auth
@@ -45,6 +45,10 @@ class ValidateRequest(BaseModel):
 class GenerateKeyRequest(BaseModel):
     user_id: str
     firebase_token: str  # Firebase ID token para verificar autenticidade
+
+
+class CouponRequest(BaseModel):
+    coupon_code: str
 
 
 # ─── POST /api/license/validate ────────────────────────────────────────────────
@@ -192,3 +196,98 @@ async def regenerate_license_key(
 
     logger.info(f"Chave regenerada: {user_id}")
     return {"license_key": nova_chave, "message": "Nova chave gerada. Atualize o arquivo agente.cfg."}
+
+
+# ─── POST /api/license/apply-coupon ─────────────────────────────────────────
+
+@router.post("/apply-coupon")
+async def apply_coupon(
+    payload: CouponRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """
+    Aplica um cupom de desconto — estende o trial para N dias.
+    Chamado pelo painel web quando o usuário digita o código.
+    """
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Token obrigatório")
+
+    try:
+        decoded = firebase_auth.verify_id_token(credentials.credentials)
+        user_id = decoded.get("uid")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+    code = payload.coupon_code.strip().upper()
+    if not code:
+        raise HTTPException(status_code=400, detail="Código do cupom não pode ser vazio")
+
+    db = get_db()
+
+    # Busca cupom
+    coupon_ref = db.collection("coupons").document(code)
+    coupon_doc = coupon_ref.get()
+
+    if not coupon_doc.exists:
+        raise HTTPException(status_code=404, detail="Cupom não encontrado")
+
+    coupon = coupon_doc.to_dict()
+    now = datetime.now(timezone.utc)
+
+    # Validações
+    if not coupon.get("active", False):
+        raise HTTPException(status_code=400, detail="Cupom desativado")
+
+    if coupon.get("used_count", 0) >= coupon.get("max_uses", 0):
+        raise HTTPException(status_code=400, detail="Cupom esgotado")
+
+    expires_at = coupon.get("expires_at")
+    if expires_at:
+        if hasattr(expires_at, "timestamp"):
+            expires_at = datetime.fromtimestamp(expires_at.timestamp(), tz=timezone.utc)
+        if now > expires_at:
+            raise HTTPException(status_code=400, detail="Cupom expirado")
+
+    # Tudo ok — aplica o cupom
+    days_free = coupon.get("days_free", 30)
+    new_trial_end = now + timedelta(days=days_free)
+
+    # Cria ou estende subscription
+    sub_ref = db.collection("subscriptions").document(user_id)
+    sub_doc = sub_ref.get()
+
+    if sub_doc.exists:
+        sub = sub_doc.to_dict()
+        current_end = sub.get("trialEndsAt")
+        if current_end and hasattr(current_end, "timestamp"):
+            current_end = datetime.fromtimestamp(current_end.timestamp(), tz=timezone.utc)
+
+        # Se trial ainda ativo, estende a partir do fim atual
+        if sub.get("status") == "trialing" and current_end and current_end > now:
+            new_trial_end = current_end + timedelta(days=days_free)
+
+        sub_ref.update({
+            "status": "trialing",
+            "trialEndsAt": new_trial_end,
+            "coupon_code": code,
+            "updatedAt": now,
+        })
+    else:
+        sub_ref.set({
+            "userId": user_id,
+            "status": "trialing",
+            "trialEndsAt": new_trial_end,
+            "coupon_code": code,
+            "updatedAt": now,
+        })
+
+    # Incrementa uso do cupom
+    coupon_ref.update({"used_count": firestore.Increment(1)})
+
+    logger.info(f"Cupom {code} aplicado para {user_id}: +{days_free} dias (até {new_trial_end})")
+    return {
+        "success": True,
+        "message": f"Cupom aplicado! +{days_free} dias grátis.",
+        "days_free": days_free,
+        "trial_ends_at": new_trial_end.isoformat(),
+    }
