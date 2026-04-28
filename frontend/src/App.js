@@ -18,6 +18,7 @@ import PaymentFailure from './pages/PaymentFailure';
 import MinhaLicenca from './pages/MinhaLicenca';
 import AssistenteIA from './pages/AssistenteIA';
 import Cotacao from './pages/Cotacao';
+import Disparador from './pages/Disparador';
 
 // ⭐️ 1. IMPORTAR A NOVA PÁGINA DE ADMIN
 import AdminDashboard from './pages/AdminDashboard';
@@ -71,6 +72,7 @@ function App() {
             <Route path="/minha-licenca" element={<MinhaLicenca />} />
             <Route path="/assistente" element={<AssistenteIA />} />
             <Route path="/cotacao" element={<Cotacao />} />
+            <Route path="/disparador-whatsapp" element={<Disparador />} />
             <Route path="/payment-success" element={<PaymentSuccess />} />
             <Route path="/payment-failure" element={<PaymentFailure />} />
             <Route path="/payment-pending" element={<PaymentFailure />} />
