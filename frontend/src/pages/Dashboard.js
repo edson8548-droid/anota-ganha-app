@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { FileSpreadsheet, Sparkles, MessageCircle, BarChart3, Puzzle } from 'lucide-react';
+import { FileSpreadsheet, Sparkles, MessageCircle, BarChart3, Puzzle, Send } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useCampaigns } from '../hooks/useCampaigns';
 import { useClients } from '../hooks/useClients';
@@ -236,11 +236,11 @@ const Dashboard = () => {
                 <div className="tool-card-title">Consultor de Vendas IA</div>
                 <div className="tool-card-desc">Crie textos de oferta, emails profissionais, scripts de negociação e muito mais — especializado em representação comercial.</div>
               </div>
-              <div className="tool-card" onClick={() => {}}>
-                <div className="tool-card-icon"><MessageCircle size={32} /></div>
-                <div className="tool-card-badge soon">Em breve</div>
-                <div className="tool-card-title">Campanhas WhatsApp</div>
-                <div className="tool-card-desc">Envie ofertas automaticamente para toda sua carteira de clientes com texto e fotos personalizados.</div>
+              <div className="tool-card" onClick={() => navigate('/disparador-whatsapp')}>
+                <div className="tool-card-icon"><Send size={32} /></div>
+                <div className="tool-card-badge live">Disponível</div>
+                <div className="tool-card-title">Disparador WhatsApp</div>
+                <div className="tool-card-desc">Envie ofertas em massa para toda sua carteira de clientes com texto e fotos personalizados via WhatsApp Web.</div>
               </div>
               <div className="tool-card" onClick={() => {
                 const a = document.createElement('a');
