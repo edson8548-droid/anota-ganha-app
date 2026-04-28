@@ -151,7 +151,7 @@ const MinhaLicenca = () => {
             <div style={s.extCard}>
               <div style={s.extIcon}>💬</div>
               <div style={{ flex: 1 }}>
-                <div style={s.extName}>Disparador WhatsApp</div>
+                <div style={s.extName}>Campanhas WhatsApp</div>
                 <div style={s.extDesc}>Dispara ofertas para sua carteira de clientes via WhatsApp Web.</div>
               </div>
               <a href="/venpro-whatsapp-extension.zip" download style={s.btnDownload}>
@@ -162,7 +162,7 @@ const MinhaLicenca = () => {
           </div>
 
           <div style={s.installHint}>
-            <strong>Como instalar:</strong> Baixe o arquivo ZIP → abra <code style={s.code}>chrome://extensions</code> no Chrome → ative <em>Modo do desenvolvedor</em> → clique <em>Carregar sem compactação</em> → selecione a pasta extraída.
+            <strong>Como instalar:</strong> Baixe o ZIP → extraia → abra <code style={s.code}>chrome://extensions</code> no Chrome → ative <em>Modo do desenvolvedor</em> → clique <em>Carregar sem compactação</em> → selecione a pasta que contém o arquivo <code style={s.code}>manifest.json</code>.
           </div>
         </div>
 
