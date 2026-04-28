@@ -106,7 +106,7 @@ def gemini_match_batch(itens_sem_match, precos_nome_lista, max_items=50):
         return {}
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_name="gemini-2.5-flash-lite")
+    model = genai.GenerativeModel(model_name="gemini-2.0-flash")
 
     matches = {}
 

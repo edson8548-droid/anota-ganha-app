@@ -15,7 +15,7 @@ from routes.mercadopago import setup_mercadopago, initialize_firebase
 from routes.license import router as license_router
 from routes.ia import router as ia_router
 from routes.cotacao import router as cotacao_router, init_cotacao
-from routes.whatsapp import router as whatsapp_router
+from routes.whatsapp import router as whatsapp_router, init_whatsapp
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import uuid
@@ -116,6 +116,7 @@ async def startup_event():
         logger.error(f"⚠️  Firebase falhou ao inicializar: {e}")
     setup_mercadopago()
     init_cotacao(db)
+    init_whatsapp(db)
     try:
         await db.cotacao_aprendizado.create_index(
             [("user_id", 1), ("produto_cotacao_norm", 1)],
