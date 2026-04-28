@@ -50,40 +50,36 @@ export const PLANS = {
   },
   monthly: {
     id: 'monthly',
-    name: 'Mensal',
-    displayName: '📦 Plano Mensal',
-    price: 39.00,
+    name: 'Venpro',
+    displayName: '🚀 Venpro',
+    price: 99.90,
     period: 'monthly',
     duration: 'por mês',
     billingCycle: 'Cobrado mensalmente',
-    mercadoPagoPreapprovalPlanId: null, // Será preenchido após criar no MP
+    mercadoPagoPreapprovalPlanId: null,
     limits: {
       campaigns: 999999,
       clients: 999999,
       industries: 999999
     },
     features: [
-      'Campanhas ilimitadas',
-      'Clientes ilimitados',
-      'Indústrias ilimitadas',
-      'Suporte completo',
-      'Analytics completo',
-      'Renovação automática'
+      'Cotação Express — planilha preenchida automática',
+      'Disparador WhatsApp — envio em massa',
+      'Consultor de Vendas IA',
+      'Extensão Cotatudo Automático',
+      'Central de Campanhas e Clientes',
+      'Suporte via WhatsApp',
     ],
-    highlight: false
+    highlight: true
   },
   annual_installments: {
     id: 'annual_installments',
-    name: 'Anual Parcelado',
-    displayName: '🚀 Anual Parcelado',
-    price: 394.80,
-    pricePerMonth: 32.90,
-    installments: 12,
-    period: 'annual',
-    duration: 'por ano',
-    billingCycle: '12x de R$ 32,90 no cartão',
-    savings: 73.20, // vs mensal (39*12 - 394.80)
-    savingsPercent: 15.7,
+    name: 'Venpro',
+    displayName: '🚀 Venpro',
+    price: 99.90,
+    period: 'monthly',
+    duration: 'por mês',
+    billingCycle: 'Cobrado mensalmente',
     mercadoPagoPreapprovalPlanId: null,
     limits: {
       campaigns: 999999,
@@ -91,26 +87,23 @@ export const PLANS = {
       industries: 999999
     },
     features: [
-      'Campanhas ilimitadas',
-      'Clientes ilimitados',
-      'Indústrias ilimitadas',
-      'Suporte completo',
-      'Analytics completo',
-      'Renovação automática',
-      'Economia de R$ 73,20/ano'
+      'Cotação Express — planilha preenchida automática',
+      'Disparador WhatsApp — envio em massa',
+      'Consultor de Vendas IA',
+      'Extensão Cotatudo Automático',
+      'Central de Campanhas e Clientes',
+      'Suporte via WhatsApp',
     ],
-    highlight: true // Destacar como melhor opção
+    highlight: true
   },
   annual_upfront: {
     id: 'annual_upfront',
-    name: 'Anual à Vista',
-    displayName: '💎 Anual à Vista',
-    price: 360.00,
-    period: 'annual',
-    duration: 'por ano',
-    billingCycle: 'Pagamento único anual',
-    savings: 108.00, // vs mensal (39*12 - 360)
-    savingsPercent: 23.1,
+    name: 'Venpro',
+    displayName: '🚀 Venpro',
+    price: 99.90,
+    period: 'monthly',
+    duration: 'por mês',
+    billingCycle: 'Cobrado mensalmente',
     mercadoPagoPreapprovalPlanId: null,
     limits: {
       campaigns: 999999,
@@ -118,13 +111,12 @@ export const PLANS = {
       industries: 999999
     },
     features: [
-      'Campanhas ilimitadas',
-      'Clientes ilimitados',
-      'Indústrias ilimitadas',
-      'Suporte completo',
-      'Analytics completo',
-      'Renovação automática',
-      'Economia de R$ 108,00/ano',
+      'Cotação Express — planilha preenchida automática',
+      'Disparador WhatsApp — envio em massa',
+      'Consultor de Vendas IA',
+      'Extensão Cotatudo Automático',
+      'Central de Campanhas e Clientes',
+      'Suporte via WhatsApp',
       '💰 Melhor custo-benefício!'
     ],
     highlight: false
