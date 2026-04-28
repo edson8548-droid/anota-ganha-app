@@ -8,7 +8,7 @@
   background: #2B2D31;
   padding: 20px;
   position: relative;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
 .login-card {
@@ -200,6 +200,41 @@
 .whatsapp-float:hover {
   transform: scale(1.1);
   box-shadow: 0 6px 30px rgba(37, 211, 102, 0.6);
+}
+
+/* Inline validation */
+.form-group input.input-error {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+.form-group input.input-valid {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+}
+
+.field-error {
+  font-size: 12px;
+  color: #f87171;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.field-error::before {
+  content: '!';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  background: #ef4444;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 800;
+  flex-shrink: 0;
 }
 
 /* Responsive */

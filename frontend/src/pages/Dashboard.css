@@ -27,7 +27,7 @@
 .dashboard-container {
   min-height: 100vh;
   background: var(--bg);
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   color: var(--texto);
 }
 
@@ -928,4 +928,56 @@
 .client-card,
 .tool-card {
   animation: fadeIn .4s ease-out;
+}
+
+/* ==================== CAMPAIGNS QUICK LIST ==================== */
+.campaigns-quick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.campaign-quick-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card-bg);
+  border: 1px solid var(--borda-c);
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  gap: 12px;
+}
+
+.campaign-quick-card:hover {
+  border-color: var(--acento);
+  background: rgba(58, 133, 168, 0.04);
+}
+
+.cqc-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.cqc-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-c);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cqc-meta {
+  font-size: 12px;
+  color: var(--sub-c);
+  margin-top: 3px;
+}
+
+.cqc-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
 }

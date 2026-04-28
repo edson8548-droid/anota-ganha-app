@@ -1,8 +1,72 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAuthContext } from '../contexts/AuthContext';
 import { gerarTabelaPrazos } from '../services/cotacao.service';
 import './AssistenteIA.css';
+
+function processInline(str, keyPrefix) {
+  const parts = str.split(/(\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`)/);
+  return parts.map((part, i) => {
+    const k = `${keyPrefix}-${i}`;
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4)
+      return <strong key={k}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith('*') && part.endsWith('*') && part.length > 2 && !part.startsWith('**'))
+      return <em key={k}>{part.slice(1, -1)}</em>;
+    if (part.startsWith('`') && part.endsWith('`') && part.length > 2)
+      return <code key={k} className="ia-md-code">{part.slice(1, -1)}</code>;
+    return part;
+  });
+}
+
+function renderMarkdown(text) {
+  const lines = text.split('\n');
+  const result = [];
+  let listBuffer = [];
+  let listType = null;
+
+  const flushList = (key) => {
+    if (!listBuffer.length) return;
+    const Tag = listType === 'ol' ? 'ol' : 'ul';
+    result.push(
+      <Tag key={`list-${key}`} className="ia-md-list">
+        {listBuffer.map((item, i) => (
+          <li key={i}>{processInline(item, `li-${key}-${i}`)}</li>
+        ))}
+      </Tag>
+    );
+    listBuffer = [];
+    listType = null;
+  };
+
+  lines.forEach((line, i) => {
+    const trimmed = line.trim();
+
+    const bulletMatch = trimmed.match(/^[-•*] (.+)/);
+    const numberedMatch = trimmed.match(/^\d+\. (.+)/);
+
+    if (bulletMatch) {
+      if (listType !== 'ul') { flushList(i); listType = 'ul'; }
+      listBuffer.push(bulletMatch[1]);
+    } else if (numberedMatch) {
+      if (listType !== 'ol') { flushList(i); listType = 'ol'; }
+      listBuffer.push(numberedMatch[1]);
+    } else {
+      flushList(i);
+      if (trimmed === '') {
+        if (result.length > 0) result.push(<br key={`br-${i}`} />);
+      } else if (trimmed.startsWith('### ') || trimmed.startsWith('## ')) {
+        const txt = trimmed.replace(/^#{2,3} /, '');
+        result.push(<p key={i} className="ia-md-heading">{processInline(txt, `h-${i}`)}</p>);
+      } else {
+        result.push(<p key={i} className="ia-md-p">{processInline(trimmed, `p-${i}`)}</p>);
+      }
+    }
+  });
+
+  flushList('final');
+  return result;
+}
 
 const API_URL = 'https://api.venpro.com.br';
 
@@ -49,6 +113,7 @@ export default function AssistenteIA() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const lastUserTextRef = useRef('');
   const [copiedId, setCopiedId] = useState(null);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -77,6 +142,7 @@ export default function AssistenteIA() {
     const trimmed = (text || input).trim();
     if (!trimmed || loading) return;
 
+    lastUserTextRef.current = trimmed;
     const userMsg = { role: 'user', content: trimmed, time: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
@@ -116,9 +182,10 @@ export default function AssistenteIA() {
         : (err.message || 'Erro desconhecido');
       setMessages(prev => [...prev, {
         role: 'model',
-        content: `⚠️ Erro: ${msg}`,
+        content: msg,
         time: new Date(),
         isError: true,
+        retryText: lastUserTextRef.current,
       }]);
     } finally {
       clearTimeout(timeoutId);
@@ -167,7 +234,7 @@ export default function AssistenteIA() {
       setTabelaSucesso(true);
       setTabelaArquivo(null);
     } catch (err) {
-      alert('Erro ao gerar tabela: ' + (err.message || 'Erro desconhecido'));
+      toast.error('Erro ao gerar tabela: ' + (err.message || 'Erro desconhecido'));
     } finally {
       clearInterval(timerRef.current);
       setGerandoTabela(false);
@@ -338,9 +405,27 @@ export default function AssistenteIA() {
             ) : (
               messages.map((msg, idx) => (
                 <div key={idx} className={`ia-msg ${msg.role === 'user' ? 'user' : 'bot'}`}>
-                  <div className="ia-bubble">{msg.content}</div>
+                  <div className={`ia-bubble${msg.isError ? ' ia-bubble--error' : ''}`}>
+                    {msg.role === 'user'
+                      ? msg.content
+                      : msg.isError
+                        ? <span className="ia-error-text">⚠ {msg.content}</span>
+                        : renderMarkdown(msg.content)
+                    }
+                  </div>
                   <div className="ia-msg-footer">
                     <span className="ia-msg-time">{formatTime(msg.time)}</span>
+                    {msg.role === 'model' && msg.isError && msg.retryText && (
+                      <button
+                        className="ia-retry-btn"
+                        onClick={() => {
+                          setMessages(prev => prev.filter((_, i) => i !== idx));
+                          sendMessage(msg.retryText);
+                        }}
+                      >
+                        Tentar novamente
+                      </button>
+                    )}
                     {msg.role === 'model' && !msg.isError && (
                       <button
                         className={`ia-copy-btn ${copiedId === idx ? 'copied' : ''}`}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import './CreateClientModal.css';
 
 const CreateClientModal = ({ onClose, onSave, campaign }) => {
@@ -86,7 +87,7 @@ const CreateClientModal = ({ onClose, onSave, campaign }) => {
 
   const handleSearchCNPJ = async () => {
     if (!cnpj || cnpj.length !== 14) {
-      alert('⚠️ Digite um CNPJ válido com 14 dígitos');
+      toast.warning('⚠️ Digite um CNPJ válido com 14 dígitos');
       return;
     }
 
@@ -116,10 +117,10 @@ const CreateClientModal = ({ onClose, onSave, campaign }) => {
         CEP: data.cep || ''
       });
 
-      alert('✅ Dados encontrados com sucesso!');
+      toast.success('✅ Dados encontrados com sucesso!');
     } catch (error) {
       console.error('❌ Erro ao buscar CNPJ:', error);
-      alert('⚠️ Erro ao buscar CNPJ: ' + error.message + '\n\nPreencha os dados manualmente.');
+      toast.warning('⚠️ Erro ao buscar CNPJ: ' + error.message + '\n\nPreencha os dados manualmente.');
     } finally {
       setSearchingCNPJ(false);
     }
@@ -186,17 +187,17 @@ const CreateClientModal = ({ onClose, onSave, campaign }) => {
     console.log('💾 Tentando salvar cliente...');
     
     if (!cnpj) {
-      alert('⚠️ Digite o CNPJ do cliente');
+      toast.warning('⚠️ Digite o CNPJ do cliente');
       return;
     }
 
     if (!clientData.CLIENTE) {
-      alert('⚠️ Busque o CNPJ ou preencha o nome do cliente');
+      toast.warning('⚠️ Busque o CNPJ ou preencha o nome do cliente');
       return;
     }
 
     if (!clientData.CIDADE) {
-      alert('⚠️ Preencha a cidade do cliente');
+      toast.warning('⚠️ Preencha a cidade do cliente');
       return;
     }
 

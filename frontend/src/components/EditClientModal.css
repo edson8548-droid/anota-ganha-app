@@ -57,7 +57,7 @@
 
 /* ==================== MODAL HEADER ==================== */
 .modal-header-edit {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #3A85A8 0%, #31708E 100%);
   padding: 2rem 2.5rem;
   display: flex;
   justify-content: space-between;
@@ -146,12 +146,12 @@
 }
 
 .modal-body-edit::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(180deg, #3A85A8 0%, #31708E 100%);
   border-radius: 10px;
 }
 
 .modal-body-edit::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #764ba2 0%, #667eea 100%);
+  background: linear-gradient(180deg, #31708E 0%, #3A85A8 100%);
 }
 
 /* ==================== SECTIONS ==================== */
@@ -216,8 +216,8 @@
 .form-group-edit input:focus,
 .form-group-edit select:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  border-color: #3A85A8;
+  box-shadow: 0 0 0 4px rgba(58, 133, 168, 0.1);
 }
 
 .input-disabled {
@@ -237,8 +237,8 @@
 }
 
 .industry-card-edit:hover {
-  border-color: #667eea;
-  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.1);
+  border-color: #3A85A8;
+  box-shadow: 0 10px 30px rgba(58, 133, 168, 0.1);
   transform: translateY(-5px);
 }
 
@@ -254,7 +254,7 @@
 .industry-info-edit h4 {
   font-size: 1.3rem;
   font-weight: 700;
-  color: #667eea;
+  color: #3A85A8;
   margin-bottom: 0.3rem;
 }
 
@@ -266,20 +266,20 @@
 
 .btn-select-all {
   padding: 0.7rem 1.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #3A85A8 0%, #31708E 100%);
   color: white;
   border: none;
   border-radius: 12px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 15px rgba(58, 133, 168, 0.3);
   font-size: 0.9rem;
 }
 
 .btn-select-all:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 20px rgba(58, 133, 168, 0.4);
 }
 
 /* ==================== PROGRESS BAR ==================== */
@@ -360,13 +360,13 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(90deg, #3A85A8 0%, #31708E 100%);
   transform: scaleX(0);
   transition: transform 0.3s ease;
 }
 
 .product-card-edit:hover {
-  border-color: #667eea;
+  border-color: #3A85A8;
   transform: translateY(-5px);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
 }
@@ -435,7 +435,7 @@
 }
 
 .checkbox-label-edit:hover .checkbox-custom-design {
-  border-color: #667eea;
+  border-color: #3A85A8;
 }
 
 .product-name-edit {
@@ -523,8 +523,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 1.25rem 1.5rem;
-  background: linear-gradient(135deg, #667eea10 0%, #764ba210 100%);
-  border: 2px solid #667eea30;
+  background: linear-gradient(135deg, #3A85A810 0%, #31708E10 100%);
+  border: 2px solid #3A85A830;
   border-radius: 14px;
   font-weight: 700;
 }
@@ -555,17 +555,17 @@
 
 .textarea-edit:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  border-color: #3A85A8;
+  box-shadow: 0 0 0 4px rgba(58, 133, 168, 0.1);
 }
 
 /* ==================== TOTAL SECTION ==================== */
 .total-section-edit {
   margin: 2rem 0;
   padding: 2rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #3A85A8 0%, #31708E 100%);
   border-radius: 20px;
-  box-shadow: 0 15px 40px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 15px 40px rgba(58, 133, 168, 0.3);
   position: relative;
   overflow: hidden;
 }

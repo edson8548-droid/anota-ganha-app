@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { FileSpreadsheet, Sparkles, MessageCircle, BarChart3, Puzzle } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
@@ -10,6 +11,7 @@ import CreateClientModal from '../components/CreateClientModal';
 import EditClientModal from '../components/EditClientModal';
 import EditClientInfoModal from '../components/EditClientInfoModal';
 import Analytics from '../components/Analytics';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { campaignsService } from '../services/campaigns.service';
 import './Dashboard.css';
 
@@ -33,6 +35,11 @@ const Dashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const [expandedClientId, setExpandedClientId] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null });
+
+  const showConfirm = (title, description, onConfirm) =>
+    setConfirmDialog({ open: true, title, description, onConfirm });
+  const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false }));
 
   // Wake up backend on first load
   useEffect(() => {
@@ -45,10 +52,10 @@ const Dashboard = () => {
   }, [selectedCampaignId, campaigns]);
 
   const handleLogout = () => {
-    if (window.confirm('Deseja realmente sair?')) {
+    showConfirm('Sair', 'Deseja realmente sair?', () => {
       authData.logout();
       navigate('/login');
-    }
+    });
   };
   const handleCreateCampaign = async (campaignData) => {
     try {
@@ -68,16 +75,18 @@ const Dashboard = () => {
       setEditingCampaign(null);
     } catch (error) { console.error('Erro ao atualizar campanha:', error); }
   };
-  const handleDeleteCampaign = async (e, campaignId) => {
+  const handleDeleteCampaign = (e, campaignId) => {
     e.stopPropagation();
-    if (window.confirm('Tem certeza? Ao apagar a campanha, os clientes permanecem na sua base, mas os dados de positivação desta campanha serão perdidos.')) {
-      try {
-        await deleteCampaign(campaignId);
-        if (selectedCampaign?.id === campaignId) {
-          setSelectedCampaignId(null);
-        }
-      } catch (error) { console.error('Erro ao deletar campanha:', error); }
-    }
+    showConfirm(
+      'Apagar campanha',
+      'Os clientes permanecem na sua base, mas os dados de positivação desta campanha serão perdidos.',
+      async () => {
+        try {
+          await deleteCampaign(campaignId);
+          if (selectedCampaign?.id === campaignId) setSelectedCampaignId(null);
+        } catch (error) { console.error('Erro ao deletar campanha:', error); }
+      }
+    );
   };
 
   const handleCreateClient = async (clientData) => {
@@ -92,17 +101,21 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Erro no processo de Criar/Ligar cliente:', error);
-      alert('Erro ao salvar o cliente. Tente novamente.');
+      toast.warning('Erro ao salvar o cliente. Tente novamente.');
     }
   };
 
-  const handleDeleteClient = async (e, clientId) => {
+  const handleDeleteClient = (e, clientId) => {
     e.stopPropagation();
-    if (window.confirm('Tem certeza? (Isto apaga o cliente de TODAS as campanhas)')) {
-      try {
-        await deleteClient(clientId);
-      } catch (error) { console.error('Erro ao deletar cliente:', error); }
-    }
+    showConfirm(
+      'Apagar cliente',
+      'Isto apaga o cliente de TODAS as campanhas. Esta ação não pode ser desfeita.',
+      async () => {
+        try {
+          await deleteClient(clientId);
+        } catch (error) { console.error('Erro ao deletar cliente:', error); }
+      }
+    );
   };
   const handleOpenEditInfo = (e, client) => {
     e.stopPropagation();
@@ -254,6 +267,72 @@ const Dashboard = () => {
               </div>
             </div>
           </section>
+
+          {/* Campanhas */}
+          <section className="tools-section">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="tools-section-title">Minhas Campanhas</div>
+              <button
+                className="btn-action teal"
+                style={{ fontSize: 13, padding: '7px 16px' }}
+                onClick={() => setShowCreateCampaign(true)}
+              >
+                + Nova
+              </button>
+            </div>
+
+            {campaignsLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                {[1, 2].map(i => (
+                  <div key={i} className="campaign-quick-card" style={{ pointerEvents: 'none' }}>
+                    <div className="cqc-main">
+                      <span className="skeleton" style={{ display: 'block', height: 15, width: '55%', marginBottom: 8 }} />
+                      <span className="skeleton" style={{ display: 'block', height: 11, width: '38%' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : campaigns.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">📊</div>
+                <h3 className="empty-title">Nenhuma campanha ainda</h3>
+                <p className="empty-description">Crie sua primeira campanha para começar a acompanhar positivação.</p>
+                <button className="btn-action teal" onClick={() => setShowCreateCampaign(true)}>+ Criar Campanha</button>
+              </div>
+            ) : (
+              <div className="campaigns-quick-list">
+                {campaigns.map(c => {
+                  const start = new Date(c.startDate).toLocaleDateString('pt-BR');
+                  const end = new Date(c.endDate).toLocaleDateString('pt-BR');
+                  const industriesCount = Object.keys(c.industries || {}).length;
+                  return (
+                    <div
+                      key={c.id}
+                      className="campaign-quick-card"
+                      onClick={() => setSelectedCampaignId(c.id)}
+                    >
+                      <div className="cqc-main">
+                        <div className="cqc-name">{c.name}</div>
+                        <div className="cqc-meta">{start} – {end} · {industriesCount} indústria{industriesCount !== 1 ? 's' : ''}</div>
+                      </div>
+                      <div className="cqc-actions">
+                        <button
+                          className="btn-icon btn-edit"
+                          title="Editar"
+                          onClick={(e) => handleEditCampaign(e, c)}
+                        >✏️</button>
+                        <button
+                          className="btn-icon btn-delete"
+                          title="Apagar"
+                          onClick={(e) => handleDeleteCampaign(e, c.id)}
+                        >🗑️</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         </main>
       </div>
     );
@@ -314,7 +393,15 @@ const Dashboard = () => {
               </div>
 
               {clientsLoading ? (
-                <div className="loading">Carregando clientes...</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="client-card" style={{ pointerEvents: 'none' }}>
+                      <span className="skeleton" style={{ display: 'block', height: 16, width: '50%', marginBottom: 10 }} />
+                      <span className="skeleton" style={{ display: 'block', height: 12, width: '35%', marginBottom: 8 }} />
+                      <span className="skeleton" style={{ display: 'block', height: 11, width: '65%' }} />
+                    </div>
+                  ))}
+                </div>
               ) : filteredClients.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-icon">👥</div>
@@ -470,6 +557,14 @@ const Dashboard = () => {
           campaign={selectedCampaign}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        onConfirm={() => { confirmDialog.onConfirm?.(); closeConfirm(); }}
+        onCancel={closeConfirm}
+      />
     </>
   );
 };

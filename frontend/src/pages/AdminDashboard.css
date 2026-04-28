@@ -4,7 +4,7 @@
 .admin-dashboard {
   background-color: #f4f7f6;
   min-height: 100vh;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
 .admin-header {
@@ -38,7 +38,7 @@
 }
 
 .btn-admin-nav {
-  background-color: #667eea;
+  background-color: #3A85A8;
   color: white;
 }
 .btn-admin-nav:hover { background-color: #5a6dda; }
@@ -68,7 +68,7 @@
   padding: 1.5rem;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  border-left: 5px solid #667eea;
+  border-left: 5px solid #3A85A8;
 }
 
 .metric-value {

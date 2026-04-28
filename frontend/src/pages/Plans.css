@@ -2,7 +2,7 @@
 
 .plans-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #2B2D31;
   padding: 40px 20px;
 }
 
@@ -70,7 +70,7 @@
 }
 
 .trial-banner {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #3A85A8 0%, #31708E 100%);
   color: white;
 }
 
@@ -149,7 +149,7 @@
   top: -15px;
   left: 50%;
   transform: translateX(-50%);
-  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  background: linear-gradient(135deg, #3A85A8 0%, #31708E 100%);
   color: white;
   padding: 8px 24px;
   border-radius: 20px;
@@ -278,7 +278,7 @@
 .btn-select-plan {
   width: 100%;
   padding: 16px;
-  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  background: linear-gradient(135deg, #3A85A8 0%, #31708E 100%);
   color: white;
   border: none;
   border-radius: 12px;

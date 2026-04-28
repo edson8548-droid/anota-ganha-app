@@ -10,10 +10,11 @@ import './Analytics.css';
 
 const Analytics = ({ campaign, clients, onClose }) => {
   const [selectedCity, setSelectedCity] = useState('todas');
-  
+
   // Estados dos filtros
   const [selectedIndustries, setSelectedIndustries] = useState({});
-  const [filterCompletion, setFilterCompletion] = useState('all'); 
+  const [filterCompletion, setFilterCompletion] = useState('all');
+  const [missingDialog, setMissingDialog] = useState(null);
 
   // Lógica de cálculo principal (useMemo)
   const analytics = useMemo(() => {
@@ -254,6 +255,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
   const COLORS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899'];
 
   return (
+    <>
     <div className="analytics-container">
       {/* Header */}
       <div className="analytics-header">
@@ -431,19 +433,9 @@ const Analytics = ({ campaign, clients, onClose }) => {
                     <td className="value-cell">R$ {client.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                     <td>
                       {Object.keys(client.missingProducts).length > 0 ? (
-                        <button 
+                        <button
                           className="btn-view-missing"
-                          onClick={() => {
-                            let message = `Produtos faltantes para ${client.name}:\n\n`;
-                            Object.keys(client.missingProducts).forEach(industry => {
-                              if(client.missingProducts[industry].length > 0) {
-                                message += `${industry}:\n`;
-                                message += client.missingProducts[industry].map(p => `  • ${p}`).join('\n');
-                                message += '\n\n';
-                              }
-                            });
-                            alert(message);
-                          }}
+                          onClick={() => setMissingDialog({ name: client.name, products: client.missingProducts })}
                         >
                           Ver {Object.values(client.missingProducts).flat().length}
                         </button>
@@ -488,6 +480,54 @@ const Analytics = ({ campaign, clients, onClose }) => {
         </div>
       ))}
     </div>
+
+    {/* Modal produtos faltantes */}
+    {missingDialog && (
+      <div style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', zIndex: 1000,
+      }} onClick={() => setMissingDialog(null)}>
+        <div style={{
+          background: '#363940', border: '1px solid #4A4D52', borderRadius: 16,
+          padding: 28, width: 420, maxWidth: '90vw', maxHeight: '80vh',
+          display: 'flex', flexDirection: 'column',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+        }} onClick={e => e.stopPropagation()}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div>
+              <div style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>Produtos faltantes</div>
+              <div style={{ color: '#6B6E74', fontSize: 12, marginTop: 2 }}>{missingDialog.name}</div>
+            </div>
+            <button onClick={() => setMissingDialog(null)} style={{
+              background: 'none', border: 'none', color: '#6B6E74', fontSize: 20,
+              cursor: 'pointer', lineHeight: 1, padding: '2px 6px',
+            }}>×</button>
+          </div>
+          <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {Object.entries(missingDialog.products).filter(([, prods]) => prods.length > 0).map(([industry, prods]) => (
+              <div key={industry}>
+                <div style={{ color: '#3A85A8', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>{industry}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {prods.map((p, i) => (
+                    <div key={i} style={{ color: '#A0A3A8', fontSize: 13, paddingLeft: 12, borderLeft: '2px solid #4A4D52' }}>
+                      {p}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => setMissingDialog(null)} style={{
+            marginTop: 20, padding: '10px', background: '#4A4D52', color: '#E1E1E1',
+            border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer',
+          }}>
+            Fechar
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 
