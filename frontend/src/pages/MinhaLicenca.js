@@ -20,6 +20,10 @@ const MinhaLicenca = () => {
   const [erro, setErro] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null });
 
+  const [cupomCodigo, setCupomCodigo] = useState('');
+  const [cupomLoading, setCupomLoading] = useState(false);
+  const [cupomMsg, setCupomMsg] = useState(null); // { tipo: 'ok'|'err', texto: '' }
+
   const showConfirm = (title, description, onConfirm) =>
     setConfirmDialog({ open: true, title, description, onConfirm });
   const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false }));
@@ -85,6 +89,29 @@ const MinhaLicenca = () => {
     );
   };
 
+  const aplicarCupom = async () => {
+    if (!cupomCodigo.trim()) return;
+    setCupomLoading(true);
+    setCupomMsg(null);
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const resp = await fetch(`${API_URL}/api/license/apply-coupon`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coupon_code: cupomCodigo.trim() }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.detail || 'Erro ao aplicar cupom');
+      setCupomMsg({ tipo: 'ok', texto: data.message || 'Cupom aplicado! Seu acesso foi estendido.' });
+      setCupomCodigo('');
+      window.location.reload();
+    } catch (e) {
+      setCupomMsg({ tipo: 'err', texto: e.message });
+    } finally {
+      setCupomLoading(false);
+    }
+  };
+
   const handleLogout = () => {
     showConfirm('Sair', 'Deseja realmente sair?', () => { logout(); navigate('/login'); });
   };
@@ -133,6 +160,45 @@ const MinhaLicenca = () => {
             <button onClick={() => navigate('/plans')} style={styles.btnPlanos}>
               💎 Ver Planos e Assinar
             </button>
+          )}
+        </div>
+
+        {/* Card: Cupom Promocional */}
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>🎟 Cupom Promocional</h2>
+          <p style={styles.cardDesc}>Tem um cupom? Insira abaixo para ativar ou estender seu acesso.</p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              placeholder="Ex: TESTE-RCA-2026"
+              value={cupomCodigo}
+              onChange={e => setCupomCodigo(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === 'Enter' && aplicarCupom()}
+              disabled={cupomLoading}
+              style={{
+                flex: 1, minWidth: 180, padding: '11px 16px',
+                background: '#2B2D31', border: '1px solid #4A4D52',
+                borderRadius: 8, color: '#E1E1E1', fontSize: 15,
+                fontFamily: 'monospace', letterSpacing: 1,
+              }}
+            />
+            <button
+              onClick={aplicarCupom}
+              disabled={cupomLoading || !cupomCodigo.trim()}
+              style={{ ...styles.btnPlanos, marginTop: 0, opacity: cupomLoading || !cupomCodigo.trim() ? 0.5 : 1 }}
+            >
+              {cupomLoading ? 'Aplicando...' : 'Aplicar'}
+            </button>
+          </div>
+          {cupomMsg && (
+            <div style={{
+              marginTop: 12, padding: '10px 16px', borderRadius: 8, fontSize: 14,
+              background: cupomMsg.tipo === 'ok' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+              border: `1px solid ${cupomMsg.tipo === 'ok' ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+              color: cupomMsg.tipo === 'ok' ? '#10b981' : '#f87171',
+            }}>
+              {cupomMsg.tipo === 'ok' ? '✅ ' : '❌ '}{cupomMsg.texto}
+            </div>
           )}
         </div>
 
