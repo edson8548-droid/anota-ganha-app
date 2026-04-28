@@ -133,6 +133,16 @@
     <div style="background:#363940; border-radius:6px; height:8px; overflow:hidden; border:1px solid #4A4D52;">
       <div id="progressBar" style="height:100%; background:#3A85A8; border-radius:6px; width:0%; transition:width 0.4s ease;"></div>
     </div>
+    <div id="stuckWrap" style="display:none; margin-top:8px; display:none;">
+      <div style="font-size:11px; color:#E8A830; margin-bottom:6px;">⚠ Processamento pausado (PC dormiu ou erro)</div>
+      <div style="display:flex; gap:6px;">
+        <button id="btnRetomar" class="btn btn-primary" style="flex:1; padding:7px; font-size:12px;">Retomar</button>
+        <button id="btnCancelar" class="btn" style="flex:1; padding:7px; font-size:12px; background:#363940; border:1px solid #4A4D52; color:#E1E1E1;">Recomeçar</button>
+      </div>
+    </div>
+    <div id="cancelWrap" style="display:none; margin-top:6px; text-align:right;">
+      <button id="btnParar" style="background:none; border:none; color:#A0A3A8; font-size:11px; cursor:pointer; text-decoration:underline;">Cancelar e recomeçar</button>
+    </div>
   </div>
 
   <div id="results" class="results"></div>
