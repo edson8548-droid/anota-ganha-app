@@ -291,3 +291,52 @@ async def apply_coupon(
         "days_free": days_free,
         "trial_ends_at": new_trial_end.isoformat(),
     }
+
+
+class CreateCouponRequest(BaseModel):
+    code: str
+    description: str = ""
+    max_uses: int = 10
+    days_free: int = 30
+    expires_at: Optional[str] = None  # ISO format
+
+
+@router.post("/admin/create-coupon")
+async def admin_create_coupon(
+    payload: CreateCouponRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Token obrigatório")
+
+    try:
+        decoded = firebase_auth.verify_id_token(credentials.credentials)
+        user_id = decoded.get("uid")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+    db = get_db()
+    user_doc = db.collection("users").document(user_id).get()
+    if not user_doc.exists or user_doc.to_dict().get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Apenas admins podem criar cupons")
+
+    code = payload.code.strip().upper()
+    now = datetime.now(timezone.utc)
+
+    coupon_data = {
+        "code": code,
+        "description": payload.description,
+        "max_uses": payload.max_uses,
+        "used_count": 0,
+        "days_free": payload.days_free,
+        "active": True,
+        "created_at": now,
+    }
+
+    if payload.expires_at:
+        coupon_data["expires_at"] = datetime.fromisoformat(payload.expires_at.replace("Z", "+00:00"))
+
+    db.collection("coupons").document(code).set(coupon_data)
+
+    logger.info(f"Cupom criado: {code} por admin {user_id}")
+    return {"success": True, "message": f"Cupom {code} criado com {payload.max_uses} usos de {payload.days_free} dias"}
