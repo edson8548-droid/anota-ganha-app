@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { width:100%; font-family:'Segoe UI',Tahoma,sans-serif; background:#2B2D31; color:#E1E1E1; padding:16px; }
+    .header { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+    .header svg { width:24px; height:24px; }
+    .header-ven { font-size:18px; font-weight:800; color:#fff; }
+    .header-pro { font-size:18px; font-weight:800; color:#3A85A8; }
+    .header-sub { font-size:11px; color:#A0A3A8; margin-bottom:14px; }
+    .status { background:#363940; border:1px solid #4A4D52; border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:13px; line-height:1.4; }
+    .status.ok { border-color:#2ECC8A; color:#2ECC8A; }
+    .status.err { border-color:#ff6b7a; color:#ff6b7a; }
+    .status.info { border-color:#3A85A8; color:#3A85A8; }
+    .info-row { font-size:13px; color:#A0A3A8; margin-bottom:6px; }
+    .info-row span { color:#E1E1E1; font-weight:600; }
+    label { display:block; font-size:12px; color:#A0A3A8; margin-bottom:4px; font-weight:600; text-transform:uppercase; letter-spacing:0.3px; }
+    .pause-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; }
+    .pause-row input { width:60px; padding:6px 8px; background:#2B2D31; border:1px solid #4A4D52; border-radius:6px; color:#E1E1E1; font-size:13px; text-align:center; }
+    .btn { width:100%; padding:11px; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; transition:background 0.2s; margin-bottom:8px; }
+    .btn-primary { background:#25D366; color:#fff; }
+    .btn-primary:hover { background:#1ebe57; }
+    .btn-primary:disabled { opacity:0.4; cursor:not-allowed; }
+    .btn-danger { background:#363940; border:1px solid #ff6b7a; color:#ff6b7a; }
+    .btn-secondary { background:#363940; border:1px solid #4A4D52; color:#E1E1E1; }
+    #progressWrap { display:none; margin-bottom:10px; }
+    .prog-labels { display:flex; justify-content:space-between; font-size:11px; color:#A0A3A8; margin-bottom:5px; }
+    .prog-track { background:#363940; border-radius:6px; height:8px; overflow:hidden; border:1px solid #4A4D52; }
+    #progressBar { height:100%; background:#25D366; border-radius:6px; width:0%; transition:width 0.4s ease; }
+    #stuckWrap { display:none; margin-top:8px; }
+    .stuck-msg { font-size:11px; color:#E8A830; margin-bottom:6px; }
+    .stuck-btns { display:flex; gap:6px; }
+    .stuck-btns .btn { flex:1; padding:7px; font-size:12px; margin-bottom:0; }
+    #cancelWrap { display:none; margin-top:6px; text-align:right; }
+    #btnParar { background:none; border:none; color:#A0A3A8; font-size:11px; cursor:pointer; text-decoration:underline; }
+    #invalidosWrap { font-size:12px; color:#E8A830; margin-top:4px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <svg viewBox="0 0 18 18" fill="none">
+      <path d="M2 3.5L9 14.5L16 3.5" stroke="#3A85A8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="header-ven">Ven</span><span class="header-pro">pro</span>
+  </div>
+  <div class="header-sub">Disparador WhatsApp</div>
+
+  <div id="status" class="status info">Carregando campanha...</div>
+
+  <div id="campaignInfo" style="display:none;">
+    <div class="info-row">Contatos: <span id="infoContatos">0</span></div>
+    <div class="info-row">Fotos: <span id="infoFotos">0</span></div>
+    <div class="info-row">Mensagem: <span id="infoMensagem">—</span></div>
+
+    <label style="margin-top:12px;">Pausa entre envios (segundos)</label>
+    <div class="pause-row">
+      <input id="pausaMin" type="number" value="60" min="10" max="300"> seg
+      a <input id="pausaMax" type="number" value="90" min="10" max="300"> seg
+    </div>
+
+    <button id="btnDisparar" class="btn btn-primary" disabled>Iniciar Disparo</button>
+  </div>
+
+  <div id="progressWrap">
+    <div class="prog-labels">
+      <span id="progressText">Enviando...</span>
+      <span id="progressPct">0%</span>
+    </div>
+    <div class="prog-track"><div id="progressBar"></div></div>
+    <div id="invalidosWrap"></div>
+    <div id="stuckWrap">
+      <div class="stuck-msg">⚠ Disparo pausado (PC dormiu ou erro)</div>
+      <div class="stuck-btns">
+        <button id="btnRetomar" class="btn btn-primary">Retomar</button>
+        <button id="btnCancelar" class="btn btn-secondary">Recomeçar</button>
+      </div>
+    </div>
+    <div id="cancelWrap">
+      <button id="btnParar">Cancelar e recomeçar</button>
+    </div>
+  </div>
+
+  <script src="panel.js"></script>
+</body>
+</html>

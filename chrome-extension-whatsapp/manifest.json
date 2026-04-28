@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Venpro — Disparador WhatsApp",
+  "version": "1.0.0",
+  "description": "Dispara ofertas para clientes via WhatsApp Web com sua campanha Venpro.",
+  "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel"],
+  "host_permissions": [
+    "https://web.whatsapp.com/*",
+    "https://venpro.com.br/*",
+    "https://www.venpro.com.br/*",
+    "https://anota-ganha-app.web.app/*",
+    "https://anota-ganha-app.firebaseapp.com/*",
+    "https://api.venpro.com.br/*",
+    "https://storage.googleapis.com/*",
+    "https://firebasestorage.googleapis.com/*"
+  ],
+  "action": {
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "panel.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://venpro.com.br/*",
+        "https://www.venpro.com.br/*",
+        "https://anota-ganha-app.web.app/*",
+        "https://anota-ganha-app.firebaseapp.com/*"
+      ],
+      "js": ["venpro-content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
