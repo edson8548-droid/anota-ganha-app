@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { FileSpreadsheet, Send, Sparkles, Puzzle, BarChart3, MessageCircle } from 'lucide-react';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import api from '../services/api';
@@ -41,12 +42,12 @@ const Plans = () => {
   };
 
   const features = [
-    { icon: '📊', text: 'Cotação Express — planilha preenchida automaticamente' },
-    { icon: '💬', text: 'Disparador WhatsApp — envio em massa para sua carteira' },
-    { icon: '✨', text: 'Consultor de Vendas IA — textos, ofertas e scripts' },
-    { icon: '🧩', text: 'Extensão Cotatudo Automático' },
-    { icon: '📋', text: 'Central de Campanhas e Clientes' },
-    { icon: '🛟', text: 'Suporte via WhatsApp' },
+    { icon: <FileSpreadsheet size={22} color="#3A85A8" />, text: 'Cotação Express — planilha preenchida automaticamente' },
+    { icon: <Send size={22} color="#3A85A8" />, text: 'Campanhas WhatsApp — envio em massa para sua carteira' },
+    { icon: <Sparkles size={22} color="#3A85A8" />, text: 'Consultor de Vendas IA — textos, ofertas e scripts' },
+    { icon: <Puzzle size={22} color="#3A85A8" />, text: 'Extensão Cotatudo Automático' },
+    { icon: <BarChart3 size={22} color="#3A85A8" />, text: 'Central de Campanhas e Clientes' },
+    { icon: <MessageCircle size={22} color="#3A85A8" />, text: 'Suporte via WhatsApp' },
   ];
 
   const assinaturaAtiva = currentPlan?.id === 'monthly' && !isTrialActive;
