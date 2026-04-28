@@ -1,5 +1,11 @@
-.disparador-page { max-width: 700px; margin: 0 auto; padding: 24px 16px; }
-.disparador-page h1 { font-size: 22px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; }
+.disparador-page {
+  min-height: 100vh;
+  background: #2B2D31;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  color: #E1E1E1;
+}
+.disparador-page h1 { font-size: 22px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; color: #ffffff; }
+.disp-inner { max-width: 700px; margin: 0 auto; padding: 24px 16px 40px; }
 
 .disp-block {
   background: #1e2124;

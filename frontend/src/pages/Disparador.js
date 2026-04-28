@@ -105,11 +105,32 @@ export default function Disparador() {
     }
   };
 
-  if (loading) return <div className="disparador-page"><p>Carregando...</p></div>;
+  if (loading) return (
+    <div className="disparador-page">
+      <div className="disp-inner"><p style={{ color: '#A0A3A8' }}>Carregando...</p></div>
+    </div>
+  );
 
   return (
     <div className="disparador-page">
-      <h1><Send size={22} /> Disparador WhatsApp</h1>
+
+      {/* Header padrão */}
+      <header style={{
+        background: 'rgba(43,45,49,0.95)', backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid #4A4D52', padding: '0 24px', height: 64,
+        display: 'flex', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10,
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: 700, margin: '0 auto' }}>
+          <button onClick={() => navigate('/dashboard')} style={{ background: 'none', border: '1px solid #4A4D52', borderRadius: 8, padding: '6px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#A0A3A8' }}>
+            ← Dashboard
+          </button>
+          <span style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Send size={16} /> Campanhas WhatsApp
+          </span>
+        </div>
+      </header>
+
+      <div className="disp-inner">
 
       {/* BLOCO 1 — Contatos */}
       <div className="disp-block">
@@ -192,7 +213,7 @@ export default function Disparador() {
           Abrir WhatsApp Web →
         </a>
         <p style={{ fontSize: 11, color: '#a0a3a8', marginTop: 6 }}>
-          Depois clique no ícone da extensão "Venpro Disparador" para iniciar o envio.
+          Depois clique no ícone da extensão "Venpro Campanhas" para iniciar o envio.
         </p>
       </div>
 
@@ -202,9 +223,11 @@ export default function Disparador() {
           download
           style={{ fontSize: 12, color: '#3a85a8' }}
         >
-          ⬇ Baixar extensão Venpro Disparador
+          ⬇ Baixar extensão Venpro Campanhas
         </a>
       </div>
+
+      </div>{/* /disp-inner */}
     </div>
   );
 }

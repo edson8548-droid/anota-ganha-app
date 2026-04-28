@@ -56,13 +56,21 @@ const Plans = () => {
     <div className="plans-page">
 
       {/* Header */}
-      <div className="plans-header">
-        <button className="btn-back" onClick={() => navigate('/dashboard')}>← Voltar</button>
-        <div className="plans-header-content">
-          <h1>Assine o Venpro</h1>
-          <p className="plans-subtitle">Todas as ferramentas em um único plano.</p>
+      <header style={{
+        background: 'rgba(43,45,49,0.95)', backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid #4A4D52', padding: '0 24px', height: 64,
+        display: 'flex', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10,
+        marginBottom: 32,
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: 720, margin: '0 auto' }}>
+          <button onClick={() => navigate('/dashboard')} style={{ background: 'none', border: '1px solid #4A4D52', borderRadius: 8, padding: '6px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#A0A3A8' }}>
+            ← Dashboard
+          </button>
+          <span style={{ fontSize: 15, fontWeight: 700, color: '#ffffff' }}>Planos</span>
         </div>
-      </div>
+      </header>
+
+      <div className="plans-content">
 
       {/* Trial Banner */}
       {isTrialActive && (
@@ -141,6 +149,7 @@ const Plans = () => {
         <p>✉️ Dúvidas? Entre em contato: suporte@venpro.com.br</p>
       </div>
 
+      </div>{/* /plans-content */}
     </div>
   );
 };
@@ -154,6 +163,7 @@ const couponBox = {
   display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap',
   background: '#363940', border: '1px solid #4A4D52', borderRadius: 12,
   padding: '16px 20px', marginBottom: 28,
+  maxWidth: 440, width: '100%', margin: '0 auto 28px',
 };
 const couponInput = {
   flex: 1, minWidth: 160, padding: '10px 14px', borderRadius: 8,
