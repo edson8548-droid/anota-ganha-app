@@ -111,7 +111,21 @@ btnEl.addEventListener('click', async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
     // Step 1: Extract items from Cotatudo table
-    const extractResult = await chrome.tabs.sendMessage(tab.id, { action: 'extractItems' });
+    // If content script not loaded (tab was open before extension install), inject it now
+    let extractResult;
+    try {
+      extractResult = await chrome.tabs.sendMessage(tab.id, { action: 'extractItems' });
+    } catch (e) {
+      if (e.message && e.message.includes('Could not establish connection')) {
+        setStatus('Injetando script na página...', 'info');
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+        await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ['content.css'] });
+        await new Promise(r => setTimeout(r, 300));
+        extractResult = await chrome.tabs.sendMessage(tab.id, { action: 'extractItems' });
+      } else {
+        throw e;
+      }
+    }
 
     if (!extractResult.items || extractResult.items.length === 0) {
       setStatus('Nenhum item encontrado na tabela. Abra a cotação.', 'err');
