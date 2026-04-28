@@ -15,6 +15,7 @@ from routes.mercadopago import setup_mercadopago, initialize_firebase
 from routes.license import router as license_router
 from routes.ia import router as ia_router
 from routes.cotacao import router as cotacao_router, init_cotacao
+from routes.whatsapp import router as whatsapp_router
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import uuid
@@ -100,6 +101,7 @@ app.include_router(mercadopago_router, prefix="/api/mercadopago", tags=["Mercado
 app.include_router(license_router, prefix="/api/license", tags=["Licença"])
 app.include_router(ia_router, prefix="/api/ia", tags=["Assistente IA"])
 app.include_router(cotacao_router, prefix="/api/cotacao", tags=["Cotação"])
+app.include_router(whatsapp_router, prefix="/api/whatsapp", tags=["WhatsApp"])
 
 # ==================== Mount Router & Lifecycle ====================
 app.include_router(api_router)
