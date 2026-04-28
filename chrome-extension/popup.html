@@ -125,6 +125,16 @@
     Preencher Cotação
   </button>
 
+  <div id="progressWrap" style="display:none; margin-bottom:10px;">
+    <div style="display:flex; justify-content:space-between; font-size:11px; color:#A0A3A8; margin-bottom:5px;">
+      <span id="progressText">Processando...</span>
+      <span id="progressPct">0%</span>
+    </div>
+    <div style="background:#363940; border-radius:6px; height:8px; overflow:hidden; border:1px solid #4A4D52;">
+      <div id="progressBar" style="height:100%; background:#3A85A8; border-radius:6px; width:0%; transition:width 0.4s ease;"></div>
+    </div>
+  </div>
+
   <div id="results" class="results"></div>
 
   <script src="popup.js"></script>
