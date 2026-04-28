@@ -1,12 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Venpro — Preencher Cotatudo",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Preenche cotações no Cotatudo automaticamente com preços da sua tabela Venpro.",
-  "permissions": ["activeTab", "scripting"],
+  "permissions": ["activeTab", "scripting", "tabs", "storage"],
   "host_permissions": [
     "https://www.cotatudo.com.br/*",
     "https://venpro.com.br/*",
+    "https://www.venpro.com.br/*",
+    "https://anota-ganha-app.web.app/*",
+    "https://anota-ganha-app.firebaseapp.com/*",
     "https://api.venpro.com.br/*"
   ],
   "action": {
