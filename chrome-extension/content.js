@@ -62,18 +62,16 @@ function extractCotatudoItems() {
     }
     const ean = extractEAN(row);
 
-    // Extract product name
+    // Extract product name — pick first cell with at least 3 letters
     let nome = '';
     for (const txt of cellTexts) {
       const t = txt.trim();
-      if (!t) continue;
-      const cleaned = t.replace(/(CX|FD)\d+R?\$?\s*$/i, '').trim();
-      if (cleaned.length < 4) continue;
-      if (cleaned.replace(/[.,]/g, '').replace(/^\d+$/, '')) continue;
-      if (/^\d{7,14}$/.test(cleaned)) continue;
-      if (/^(FD|CX|R\$|\d+\s*(UN|CX|PC|KG|G|ML|L))$/i.test(cleaned)) continue;
-      if (/[A-Za-zÀ-ú]{3}/.test(cleaned)) {
-        nome = cleaned;
+      if (t.length < 4) continue;
+      if (/^\d{7,14}$/.test(t)) continue;                              // EAN
+      if (/^[\d.,\s]+$/.test(t)) continue;                             // pure number/price
+      if (/^(FD|CX|R\$|\d+\s*(UN|CX|PC|KG|G|ML|L))$/i.test(t)) continue; // packaging
+      if (/[A-Za-zÀ-ú]{3}/.test(t)) {
+        nome = t.replace(/(CX|FD)\d+R?\$?\s*$/i, '').trim();
         break;
       }
     }
@@ -104,8 +102,9 @@ function fillCotatudoPrices(prices) {
       window.HTMLInputElement.prototype, 'value'
     ).set;
     nativeInputValueSetter.call(input, item.price);
+    input.dispatchEvent(new Event('input',  { bubbles: true }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('blur',   { bubbles: true }));
     count++;
   }
   return count;
