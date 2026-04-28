@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Venpro — Preencher Cotatudo",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Preenche cotações no Cotatudo automaticamente com preços da sua tabela Venpro.",
   "permissions": ["activeTab", "scripting", "tabs", "storage"],
   "host_permissions": [
