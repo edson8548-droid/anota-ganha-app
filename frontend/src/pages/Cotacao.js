@@ -128,33 +128,37 @@ export default function Cotacao() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0f172a' }}>
+    <div style={{ minHeight: '100vh', background: '#2B2D31' }}>
       {/* Header */}
       <header style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '0 24px', height: 60, borderBottom: '1px solid #1e293b',
-        background: 'rgba(15,23,42,0.95)', backdropFilter: 'blur(12px)',
+        padding: '0 24px', height: 60, borderBottom: '1px solid #4A4D52',
+        background: 'rgba(43,45,49,0.97)', backdropFilter: 'blur(12px)',
         position: 'sticky', top: 0, zIndex: 10,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
-             onClick={() => navigate('/dashboard')}>
-          <svg viewBox="0 0 18 18" fill="none" width="28" height="28">
-            <path d="M2 3.5L9 14.5L16 3.5" stroke="#3A85A8" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M9 14.5L12.5 8.5" stroke="rgba(58,133,168,0.6)" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-          <span style={{ fontWeight: 800, fontSize: 18, color: '#fff', letterSpacing: '-0.3px' }}>
-            <span>Ven</span><span style={{ color: '#3A85A8' }}>pro</span>
-          </span>
-          <span style={{ color: '#334155', fontSize: 14 }}>|</span>
-          <span style={{ color: '#64748b', fontSize: 14, fontWeight: 500 }}>Cotação</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => navigate('/dashboard')} style={{
+            background: 'none', border: '1px solid #4A4D52', borderRadius: 8,
+            padding: '6px 14px', fontSize: 13, fontWeight: 600,
+            color: '#A0A3A8', cursor: 'pointer',
+          }}>← Voltar</button>
+          <div style={{ width: 1, height: 20, background: '#4A4D52' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <svg viewBox="0 0 18 18" fill="none" width="24" height="24">
+              <path d="M2 3.5L9 14.5L16 3.5" stroke="#3A85A8" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M9 14.5L12.5 8.5" stroke="rgba(58,133,168,0.6)" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <span style={{ fontWeight: 800, fontSize: 17, color: '#fff' }}>
+              Ven<span style={{ color: '#3A85A8' }}>pro</span>
+            </span>
+            <span style={{ color: '#A0A3A8', fontSize: 13, fontWeight: 500 }}>Cotação Express</span>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button onClick={() => navigate('/assistente')}
-                  style={navBtnStyle}>IA</button>
-          <button onClick={() => navigate('/minha-licenca')}
-                  style={navBtnStyle}>Licença</button>
+          <button onClick={() => navigate('/assistente')} style={navBtnStyle}>IA</button>
+          <button onClick={() => navigate('/minha-licenca')} style={navBtnStyle}>Licença</button>
           <button onClick={handleLogout}
-                  style={{ ...navBtnStyle, color: '#ef4444', borderColor: '#7f1d1d' }}>Sair</button>
+                  style={{ ...navBtnStyle, color: '#ef4444', borderColor: 'rgba(239,68,68,.3)' }}>Sair</button>
         </div>
       </header>
 
@@ -231,11 +235,11 @@ function TabelasTab({
   uploading, handleUpload, handleExcluir, fileInputRef,
 }) {
   return (
-    <div style={{ background: '#1e293b', borderRadius: '0 0 12px 12px', padding: 24 }}>
+    <div style={{ background: '#363940', borderRadius: '0 0 12px 12px', padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
-          <h2 style={{ color: '#f1f5f9', margin: 0, fontSize: 18 }}>Tabelas de Preço</h2>
-          <p style={{ color: '#64748b', fontSize: 13, margin: '4px 0 0' }}>
+          <h2 style={{ color: '#E1E1E1', margin: 0, fontSize: 18 }}>Tabelas de Preço</h2>
+          <p style={{ color: '#6B6E74', fontSize: 13, margin: '4px 0 0' }}>
             Até 5 planilhas de diferentes atacados
           </p>
         </div>
@@ -249,7 +253,7 @@ function TabelasTab({
         <div style={{ display: 'grid', gap: 12, marginTop: 8 }}>
           {[1, 2, 3].map(i => (
             <div key={i} style={{
-              border: '1px solid #334155', borderRadius: 10, padding: 16,
+              border: '1px solid #4A4D52', borderRadius: 10, padding: 16,
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             }}>
               <div style={{ flex: 1 }}>
@@ -261,7 +265,7 @@ function TabelasTab({
           ))}
         </div>
       ) : tabelas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>
+        <div style={{ textAlign: 'center', padding: 40, color: '#6B6E74' }}>
           <p style={{ fontSize: 16 }}>Nenhuma tabela cadastrada</p>
           <p style={{ fontSize: 13 }}>Clique em "+ Adicionar Tabela" para começar</p>
         </div>
@@ -269,19 +273,19 @@ function TabelasTab({
         <div style={{ display: 'grid', gap: 12 }}>
           {tabelas.map((t, idx) => (
             <div key={t.id} style={{
-              border: idx === 0 ? '2px solid #e8412a' : '1px solid #334155',
+              border: idx === 0 ? '2px solid #3A85A8' : '1px solid #4A4D52',
               borderRadius: 10, padding: 16,
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {idx === 0 && <span style={{
-                    background: '#e8412a', color: '#fff', padding: '2px 8px',
+                    background: '#3A85A8', color: '#fff', padding: '2px 8px',
                     borderRadius: 4, fontSize: 11, fontWeight: 700,
                   }}>ATIVA</span>}
-                  <span style={{ fontWeight: 600, color: '#f1f5f9' }}>{t.nome}</span>
+                  <span style={{ fontWeight: 600, color: '#E1E1E1' }}>{t.nome}</span>
                 </div>
-                <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
+                <div style={{ color: '#6B6E74', fontSize: 12, marginTop: 4 }}>
                   {t.qtd_produtos} produtos · {
                     t.prazos_disponiveis?.length > 1
                       ? `Prazos: ${t.prazos_disponiveis.join(', ')} dias`
@@ -302,7 +306,7 @@ function TabelasTab({
       {showUploadModal && (
         <div style={modalOverlayStyle}>
           <div style={modalContentStyle}>
-            <h3 style={{ color: '#f1f5f9', marginTop: 0 }}>Adicionar Tabela</h3>
+            <h3 style={{ color: '#E1E1E1', marginTop: 0 }}>Adicionar Tabela</h3>
             <label style={labelStyle}>Nome da tabela</label>
             <input value={novoNome} onChange={e => setNovoNome(e.target.value)}
                    placeholder="Ex: Atacado Bom Jesus"
@@ -345,11 +349,11 @@ function CotacaoTab({
     : null;
 
   return (
-    <div style={{ background: '#1e293b', borderRadius: '0 0 12px 12px', padding: 24 }}>
-      <h2 style={{ color: '#f1f5f9', marginTop: 0, fontSize: 18 }}>Nova Cotação</h2>
+    <div style={{ background: '#363940', borderRadius: '0 0 12px 12px', padding: 24 }}>
+      <h2 style={{ color: '#E1E1E1', marginTop: 0, fontSize: 18 }}>Nova Cotação</h2>
 
       {tabelas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>
+        <div style={{ textAlign: 'center', padding: 40, color: '#6B6E74' }}>
           <p>Cadastre uma tabela de preço primeiro (aba "Minhas Tabelas")</p>
         </div>
       ) : (
@@ -376,8 +380,8 @@ function CotacaoTab({
                     style={{
                       padding: '8px 18px', borderRadius: 8, fontWeight: 600, fontSize: 14,
                       cursor: 'pointer', border: 'none',
-                      background: prazoEfetivo === p ? '#e8412a' : '#334155',
-                      color: prazoEfetivo === p ? '#fff' : '#94a3b8',
+                      background: prazoEfetivo === p ? '#3A85A8' : '#45484e',
+                      color: prazoEfetivo === p ? '#fff' : '#A0A3A8',
                       transition: 'all 0.15s',
                     }}
                   >
@@ -391,12 +395,12 @@ function CotacaoTab({
           {/* Onde preencher */}
           <label style={labelStyle}>Onde preencher</label>
           <div style={{ display: 'flex', gap: 16, margin: '8px 0 16px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', cursor: 'pointer', fontSize: 14 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#E1E1E1', cursor: 'pointer', fontSize: 14 }}>
               <input type="radio" name="canal" value="excel" checked={canalPreenchimento === 'excel'}
                      onChange={() => setCanalPreenchimento('excel')} />
               Excel (arquivo)
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', cursor: 'pointer', fontSize: 14 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#E1E1E1', cursor: 'pointer', fontSize: 14 }}>
               <input type="radio" name="canal" value="cotatudo" checked={canalPreenchimento === 'cotatudo'}
                      onChange={() => setCanalPreenchimento('cotatudo')} />
               Cotatudo (site)
@@ -406,12 +410,12 @@ function CotacaoTab({
           {/* Como buscar preços */}
           <label style={labelStyle}>Modo de busca</label>
           <div style={{ display: 'flex', gap: 16, margin: '8px 0 16px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', cursor: 'pointer', fontSize: 14 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#E1E1E1', cursor: 'pointer', fontSize: 14 }}>
               <input type="radio" name="modo" value="ean" checked={modoMatch === 'ean'}
                      onChange={e => setModoMatch(e.target.value)} />
               EAN apenas (100% certeza)
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', cursor: 'pointer', fontSize: 14 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#E1E1E1', cursor: 'pointer', fontSize: 14 }}>
               <input type="radio" name="modo" value="completo" checked={modoMatch === 'completo'}
                      onChange={e => setModoMatch(e.target.value)} />
               Completo (EAN + descrição + IA)
@@ -421,26 +425,30 @@ function CotacaoTab({
           {/* Conteúdo baseado no canal */}
           {canalPreenchimento === 'cotatudo' ? (
             <div style={{
-              background: '#0f172a', borderRadius: 10, padding: 20,
-              border: '1px solid #334155', marginBottom: 16,
+              background: '#2B2D31', borderRadius: 10, padding: 20,
+              border: '1px solid #4A4D52', marginBottom: 16,
             }}>
               <h3 style={{ color: '#3A85A8', marginTop: 0, fontSize: 16, marginBottom: 12 }}>
                 Como preencher no Cotatudo
               </h3>
-              <ol style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.8, paddingLeft: 20, margin: 0 }}>
-                <li>Instale a <strong style={{ color: '#f1f5f9' }}>Extensão Venpro</strong> (card no Dashboard)</li>
-                <li>Mantenha esta aba do <strong style={{ color: '#f1f5f9' }}>Venpro</strong> aberta e logada</li>
-                <li>Abra o <strong style={{ color: '#f1f5f9' }}>cotatudo.com.br</strong> em outra aba</li>
-                <li>Faça login e <strong style={{ color: '#f1f5f9' }}>abra sua cotação</strong></li>
+              <ol style={{ color: '#A0A3A8', fontSize: 14, lineHeight: 1.8, paddingLeft: 20, margin: 0 }}>
+                <li>Instale a <strong style={{ color: '#E1E1E1' }}>Extensão Venpro</strong> (card no Dashboard)</li>
+                <li>Mantenha esta aba do <strong style={{ color: '#E1E1E1' }}>Venpro</strong> aberta e logada</li>
+                <li>Abra o <strong style={{ color: '#E1E1E1' }}>cotatudo.com.br</strong> em outra aba</li>
+                <li>Faça login e <strong style={{ color: '#E1E1E1' }}>abra sua cotação</strong></li>
                 <li>Clique no ícone <strong style={{ color: '#3A85A8' }}>Venpro</strong> na barra do Chrome</li>
-                <li>Na extensão, escolha <strong style={{ color: '#f1f5f9' }}>tabela</strong>, <strong style={{ color: '#f1f5f9' }}>prazo</strong> e <strong style={{ color: '#f1f5f9' }}>modo ({modoMatch === 'ean' ? 'EAN' : 'Completo'})</strong></li>
-                <li>Clique <strong style={{ color: '#f1f5f9' }}>"Preencher Cotação"</strong></li>
+                <li>Na extensão, escolha <strong style={{ color: '#E1E1E1' }}>tabela</strong>, <strong style={{ color: '#E1E1E1' }}>prazo</strong> e <strong style={{ color: '#E1E1E1' }}>modo ({modoMatch === 'ean' ? 'EAN' : 'Completo'})</strong></li>
+                <li>Clique <strong style={{ color: '#E1E1E1' }}>"Preencher Cotação"</strong></li>
               </ol>
-              <div style={{ marginTop: 16, padding: '12px 16px', background: '#1e293b', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ marginTop: 16, padding: '12px 16px', background: '#363940', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 20 }}>🧩</span>
-                <span style={{ color: '#94a3b8', fontSize: 13 }}>
-                  Não tem a extensão? Baixe no Dashboard → <strong style={{ color: '#3A85A8' }}>Extensão Cotatudo</strong>
-                </span>
+                <a
+                  href="/venpro-cotatudo-extension.zip"
+                  download
+                  style={{ color: '#3A85A8', fontSize: 13, textDecoration: 'none', fontWeight: 600 }}
+                >
+                  ⬇ Baixar Extensão Cotatudo
+                </a>
               </div>
             </div>
           ) : (
@@ -449,9 +457,9 @@ function CotacaoTab({
               <label style={labelStyle}>Cotação (Excel)</label>
               <div onClick={() => cotacaoInputRef.current?.click()}
                    style={{
-                     border: '2px dashed #334155', borderRadius: 10, padding: 24,
+                     border: '2px dashed #4A4D52', borderRadius: 10, padding: 24,
                      textAlign: 'center', cursor: 'pointer', marginBottom: 16,
-                     color: arquivoCotacao ? '#22c55e' : '#64748b',
+                     color: arquivoCotacao ? '#22c55e' : '#6B6E74',
                    }}>
                 {arquivoCotacao ? arquivoCotacao.name : 'Clique para selecionar ou arraste o arquivo'}
                 <input type="file" accept=".xlsx,.xls" ref={cotacaoInputRef}
@@ -491,7 +499,7 @@ function CotacaoTab({
             if (processing) {
               pct = Math.min(88, Math.round(processingSeg / (processingSeg + 15) * 100));
               label = `Buscando preços... ${processingSeg}s`;
-              color = '#e8412a';
+              color = '#3A85A8';
             } else if (reviewData) {
               const com = reviewData.itens.filter(i => i.preco != null).length;
               pct = Math.round(com / reviewData.itens.length * 100);
@@ -505,11 +513,11 @@ function CotacaoTab({
             }
             return (
               <div style={{ marginTop: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#A0A3A8', marginBottom: 4 }}>
                   <span>{label}</span>
                   <span>{pct}%</span>
                 </div>
-                <div style={{ background: '#0f172a', borderRadius: 8, height: 10, overflow: 'hidden' }}>
+                <div style={{ background: '#2B2D31', borderRadius: 8, height: 10, overflow: 'hidden' }}>
                   <div style={{
                     height: '100%', width: `${pct}%`,
                     background: `linear-gradient(90deg, ${color}, ${color}cc)`,
@@ -531,9 +539,9 @@ function CotacaoTab({
           {/* Resultado */}
           {resultado && (
             <div style={{
-              marginTop: 20, background: '#0f172a', borderRadius: 10, padding: 20,
+              marginTop: 20, background: '#2B2D31', borderRadius: 10, padding: 20,
             }}>
-              <h3 style={{ color: '#f1f5f9', marginTop: 0 }}>Resultado</h3>
+              <h3 style={{ color: '#E1E1E1', marginTop: 0 }}>Resultado</h3>
               <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 16 }}>
                 <StatCard label="Cobertura" value={`${cobertura}%`}
                           color={parseFloat(cobertura) > 70 ? '#22c55e' : '#eab308'} />
@@ -542,16 +550,16 @@ function CotacaoTab({
                 <StatCard label="IA" value={resultado.stats.ia || 0} color="#f59e0b" />
                 <StatCard label="Sem match" value={resultado.stats.sem_match || 0} color="#ef4444" />
               </div>
-              <p style={{ color: '#64748b', fontSize: 13 }}>
+              <p style={{ color: '#6B6E74', fontSize: 13 }}>
                 Download iniciado automaticamente. Itens preenchidos por IA ficam em amarelo no Excel.
               </p>
               {resultado.semMatch?.length > 0 && (
                 <div style={{ marginTop: 12 }}>
-                  <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 8 }}>Itens não encontrados:</p>
+                  <p style={{ color: '#A0A3A8', fontSize: 13, marginBottom: 8 }}>Itens não encontrados:</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     {resultado.semMatch.map((item, i) => (
                       <span key={i} style={{
-                        background: '#334155', color: '#94a3b8', padding: '2px 8px',
+                        background: '#45484e', color: '#A0A3A8', padding: '2px 8px',
                         borderRadius: 4, fontSize: 11,
                       }}>{item}</span>
                     ))}
@@ -569,68 +577,68 @@ function CotacaoTab({
 function StatCard({ label, value, color }) {
   return (
     <div style={{
-      background: '#1e293b', borderRadius: 8, padding: '12px 16px',
+      background: '#363940', borderRadius: 8, padding: '12px 16px',
       textAlign: 'center', minWidth: 80,
     }}>
       <div style={{ color, fontSize: 20, fontWeight: 700 }}>{value}</div>
-      <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>{label}</div>
+      <div style={{ color: '#6B6E74', fontSize: 11, marginTop: 2 }}>{label}</div>
     </div>
   );
 }
 
 // Styles
 const navBtnStyle = {
-  background: 'none', border: '1px solid #334155', color: '#94a3b8',
+  background: 'none', border: '1px solid #4A4D52', color: '#A0A3A8',
   padding: '6px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer',
 };
 
 const tabActiveStyle = {
-  background: '#1e293b', color: '#fff', border: 'none',
+  background: '#363940', color: '#E1E1E1', border: 'none',
   padding: '10px 20px', borderRadius: '8px 8px 0 0', fontWeight: 600,
   fontSize: 14, cursor: 'pointer',
 };
 
 const tabInactiveStyle = {
-  background: '#0f172a', color: '#64748b', border: 'none',
+  background: 'transparent', color: '#6B6E74', border: 'none',
   padding: '10px 20px', borderRadius: '8px 8px 0 0',
   fontSize: 14, cursor: 'pointer',
 };
 
 const primaryBtnStyle = {
-  background: '#e8412a', color: '#fff', border: 'none',
+  background: '#3A85A8', color: '#fff', border: 'none',
   padding: '10px 20px', borderRadius: 8, fontWeight: 600,
   fontSize: 14, cursor: 'pointer',
 };
 
 const secondaryBtnStyle = {
-  background: '#334155', color: '#94a3b8', border: 'none',
+  background: '#45484e', color: '#A0A3A8', border: 'none',
   padding: '10px 20px', borderRadius: 8,
   fontSize: 14, cursor: 'pointer',
 };
 
 const deleteBtnStyle = {
-  background: '#1c1525', color: '#ef4444', border: '1px solid #7f1d1d',
+  background: 'rgba(239,68,68,.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,.3)',
   padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
 };
 
 const labelStyle = {
-  display: 'block', color: '#94a3b8', fontSize: 13, fontWeight: 600,
+  display: 'block', color: '#A0A3A8', fontSize: 13, fontWeight: 600,
   marginBottom: 4, marginTop: 12,
 };
 
 const inputStyle = {
   width: '100%', padding: '10px 12px', borderRadius: 8,
-  border: '1px solid #334155', background: '#0f172a', color: '#f1f5f9',
+  border: '1px solid #4A4D52', background: '#2B2D31', color: '#E1E1E1',
   fontSize: 14, boxSizing: 'border-box',
 };
 
 const modalOverlayStyle = {
   position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-  background: 'rgba(0,0,0,0.7)', display: 'flex',
+  background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex',
   alignItems: 'center', justifyContent: 'center', zIndex: 100,
 };
 
 const modalContentStyle = {
-  background: '#1e293b', borderRadius: 12, padding: 24, width: 400,
+  background: '#363940', border: '1px solid #4A4D52', borderRadius: 12, padding: 24, width: 400,
   maxWidth: '90vw',
 };
