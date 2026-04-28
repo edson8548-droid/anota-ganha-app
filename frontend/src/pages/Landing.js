@@ -64,6 +64,28 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Stats */}
+      <section className="landing-stats">
+        <div className="landing-stats-grid">
+          <div className="landing-stat">
+            <span className="landing-stat-num">1.100+</span>
+            <span className="landing-stat-label">Produtos mapeados</span>
+          </div>
+          <div className="landing-stat">
+            <span className="landing-stat-num">95%</span>
+            <span className="landing-stat-label">Taxa de acerto médio</span>
+          </div>
+          <div className="landing-stat">
+            <span className="landing-stat-num">3 min</span>
+            <span className="landing-stat-label">Por cotação processada</span>
+          </div>
+          <div className="landing-stat">
+            <span className="landing-stat-num">100%</span>
+            <span className="landing-stat-label">Focado em RCA</span>
+          </div>
+        </div>
+      </section>
+
       {/* Features */}
       <section className="landing-features">
         <h2 className="landing-features-title">Ferramentas que trabalham por você</h2>

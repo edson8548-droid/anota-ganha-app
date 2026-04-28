@@ -2,7 +2,9 @@
 // ADICIONADA LÓGICA PARA EDITAR INDÚSTRIA EXISTENTE
 
 import React, { useState, useEffect } from 'react';
-import './CreateCampaignModal.css'; 
+import { toast } from 'sonner';
+import ConfirmDialog from './ConfirmDialog';
+import './CreateCampaignModal.css';
 
 const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
   const [formData, setFormData] = useState({
@@ -24,6 +26,11 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
 
   const [currentProduct, setCurrentProduct] = useState('');
   const [errors, setErrors] = useState({});
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null });
+
+  const showConfirm = (title, description, onConfirm) =>
+    setConfirmDialog({ open: true, title, description, onConfirm });
+  const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false }));
 
   // ============================================
   // CARREGAR DADOS DA CAMPANHA (SE FOR EDIÇÃO)
@@ -78,7 +85,7 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
   const handleAddProduct = () => {
     if (!currentProduct.trim()) return;
     if (currentIndustry.products.includes(currentProduct.trim())) {
-      alert('⚠️ Este produto já foi adicionado');
+      toast.warning('⚠️ Este produto já foi adicionado');
       return;
     }
     setCurrentIndustry(prev => ({
@@ -97,9 +104,9 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
 
   // FUNÇÃO ATUALIZADA (AGORA FAZ ADD OU UPDATE)
   const handleSaveIndustry = () => {
-    if (!currentIndustry.name.trim()) { alert('⚠️ Digite o nome da indústria'); return; }
-    if (currentIndustry.products.length === 0) { alert('⚠️ Adicione pelo menos um produto'); return; }
-    if (currentIndustry.targetValue <= 0) { alert('⚠️ Digite um valor de meta válido'); return; }
+    if (!currentIndustry.name.trim()) { toast.warning('⚠️ Digite o nome da indústria'); return; }
+    if (currentIndustry.products.length === 0) { toast.warning('⚠️ Adicione pelo menos um produto'); return; }
+    if (currentIndustry.targetValue <= 0) { toast.warning('⚠️ Digite um valor de meta válido'); return; }
 
     if (editingIndustry) {
       // MODO UPDATE
@@ -135,12 +142,12 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
   };
 
   const handleRemoveIndustry = (industryId) => {
-    if (window.confirm('Tem certeza que deseja remover esta indústria?')) {
+    showConfirm('Remover indústria', 'Tem certeza que deseja remover esta indústria?', () => {
       setFormData(prev => ({
         ...prev,
         industries: prev.industries.filter(ind => ind.id !== industryId)
       }));
-    }
+    });
   };
 
   // ============================================
@@ -164,7 +171,7 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (editingIndustry) {
-      alert('⚠️ Termine de editar a indústria antes de salvar a campanha.');
+      toast.warning('⚠️ Termine de editar a indústria antes de salvar a campanha.');
       return;
     }
     if (!validate()) return;
@@ -343,6 +350,14 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
           </div>
         </form>
       </div>
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        onConfirm={() => { confirmDialog.onConfirm?.(); closeConfirm(); }}
+        onCancel={closeConfirm}
+      />
     </div>
   );
 };

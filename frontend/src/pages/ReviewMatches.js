@@ -57,7 +57,8 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 400 }}>
         {itens.map((item, idx) => {
           const badge = badgeInfo(item);
           const aprovado = aprovacoes[idx];
@@ -119,6 +120,7 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );

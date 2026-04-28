@@ -1,86 +1,92 @@
-/* NOVO FICHEIRO: src/pages/PaymentSuccess.css */
-
 .payment-status-page {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: #2B2D31;
   padding: 20px;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
 .payment-status-card {
-  background: white;
+  background: #363940;
+  border: 1px solid #4A4D52;
   border-radius: 24px;
-  padding: 50px;
-  max-width: 600px;
+  padding: 50px 44px;
+  max-width: 560px;
   width: 100%;
   text-align: center;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
   animation: fadeIn-status 0.5s ease-out;
 }
 
 @keyframes fadeIn-status {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .status-icon {
-  width: 100px;
-  height: 100px;
+  width: 90px;
+  height: 90px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 50px;
-  margin: 0 auto 30px;
-  color: white;
+  font-size: 44px;
+  margin: 0 auto 28px;
 }
 
 .status-icon.success {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.15);
+  border: 2px solid rgba(16, 185, 129, 0.4);
+  box-shadow: 0 8px 32px rgba(16, 185, 129, 0.2);
 }
 
 .status-icon.failure {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.12);
+  border: 2px solid rgba(239, 68, 68, 0.3);
+  box-shadow: 0 8px 32px rgba(239, 68, 68, 0.15);
 }
 
 .status-title {
-  font-size: 32px;
+  font-size: 26px;
   font-weight: 700;
-  color: #1f2937;
-  margin: 0 0 15px 0;
+  color: #ffffff;
+  margin: 0 0 12px;
 }
 
 .status-message {
-  font-size: 18px;
-  color: #6b7280;
+  font-size: 15px;
+  color: #A0A3A8;
   line-height: 1.6;
-  margin: 0 0 30px 0;
+  margin: 0 0 20px;
 }
 
 .btn-back-dashboard {
-  padding: 16px 32px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  display: inline-block;
+  margin-top: 8px;
+  padding: 14px 32px;
+  background: #3A85A8;
+  color: #ffffff;
   border: none;
-  border-radius: 12px;
-  font-size: 16px;
+  border-radius: 10px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.3s;
-  box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+  transition: all 0.2s;
 }
 
 .btn-back-dashboard:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 15px 35px rgba(102, 126, 234, 0.4);
+  background: #31708E;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(58, 133, 168, 0.35);
+}
+
+@media (max-width: 480px) {
+  .payment-status-card {
+    padding: 36px 24px;
+  }
+  .status-title {
+    font-size: 22px;
+  }
 }

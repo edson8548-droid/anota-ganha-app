@@ -3,7 +3,7 @@
 .landing {
   min-height: 100vh;
   background: #2B2D31;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   color: #E1E1E1;
   overflow-x: hidden;
 }
@@ -176,6 +176,68 @@
 .landing-btn-cta-ghost:hover {
   border-color: #3A85A8;
   color: #3A85A8;
+}
+
+/* Stats */
+.landing-stats {
+  border-top: 1px solid #4A4D52;
+  border-bottom: 1px solid #4A4D52;
+  background: rgba(54, 57, 64, 0.5);
+  padding: 40px 24px;
+}
+
+.landing-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.landing-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0 24px;
+  border-right: 1px solid #4A4D52;
+}
+
+.landing-stat:last-child {
+  border-right: none;
+}
+
+.landing-stat-num {
+  font-size: 36px;
+  font-weight: 800;
+  color: #3A85A8;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.landing-stat-label {
+  font-size: 13px;
+  color: #A0A3A8;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+@media (max-width: 600px) {
+  .landing-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .landing-stat {
+    padding: 16px 12px;
+    border-right: none;
+    border-bottom: 1px solid #4A4D52;
+  }
+  .landing-stat:nth-child(2),
+  .landing-stat:last-child {
+    border-bottom: none;
+  }
+  .landing-stat-num {
+    font-size: 28px;
+  }
 }
 
 /* Features */

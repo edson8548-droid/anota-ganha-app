@@ -123,7 +123,7 @@
   gap: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
-.metric-purple { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.metric-purple { background: linear-gradient(135deg, #3A85A8 0%, #31708E 100%); }
 .metric-green { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
 .metric-blue { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
 .metric-orange { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
@@ -348,8 +348,8 @@
 }
 .industry-filter-controls button:hover {
   background: #f3f4f6;
-  border-color: #667eea;
-  color: #667eea;
+  border-color: #3A85A8;
+  color: #3A85A8;
 }
 .industry-filter-controls span {
   font-size: 13px;
@@ -375,12 +375,12 @@
   transition: all 0.2s;
 }
 .filter-checkbox-label:hover {
-  border-color: #667eea;
+  border-color: #3A85A8;
 }
 .filter-checkbox-label input[type="checkbox"] {
   width: 16px;
   height: 16px;
-  accent-color: #667eea;
+  accent-color: #3A85A8;
 }
 
 /* FILTRO DE STATUS (O QUE SUMIU) */

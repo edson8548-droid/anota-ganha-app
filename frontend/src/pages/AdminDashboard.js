@@ -5,7 +5,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { adminService } from '../services/admin.service';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import './AdminDashboard.css'; // Vamos criar este ficheiro CSS a seguir
+import ConfirmDialog from '../components/ConfirmDialog';
+import './AdminDashboard.css';
 
 const AdminDashboard = () => {
   const { logout } = useAuthContext();
@@ -14,6 +15,11 @@ const AdminDashboard = () => {
   const [allUsers, setAllUsers] = useState([]);
   const [allSubscriptions, setAllSubscriptions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null });
+
+  const showConfirm = (title, description, onConfirm) =>
+    setConfirmDialog({ open: true, title, description, onConfirm });
+  const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false }));
 
   // Carregar todos os dados
   useEffect(() => {
@@ -66,10 +72,7 @@ const AdminDashboard = () => {
   }, [allUsers, allSubscriptions]);
 
   const handleLogout = () => {
-    if (window.confirm('Deseja realmente sair?')) {
-      logout();
-      navigate('/login');
-    }
+    showConfirm('Sair', 'Deseja realmente sair?', () => { logout(); navigate('/login'); });
   };
 
   const formatDate = (date) => {
@@ -148,6 +151,14 @@ const AdminDashboard = () => {
           </div>
         </div>
       </main>
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        onConfirm={() => { confirmDialog.onConfirm?.(); closeConfirm(); }}
+        onCancel={closeConfirm}
+      />
     </div>
   );
 };

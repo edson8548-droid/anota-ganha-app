@@ -1,8 +1,10 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAuthContext } from '../contexts/AuthContext';
 import { listarTabelas, uploadTabela, excluirTabela, processarCotacao, previewCotacao, confirmarCotacao } from '../services/cotacao.service';
 import ReviewMatches from './ReviewMatches';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const API_URL = 'https://api.venpro.com.br';
 
@@ -27,6 +29,7 @@ export default function Cotacao() {
   // Cotação state
   const [tabelaSelecionada, setTabelaSelecionada] = useState('');
   const [modoMatch, setModoMatch] = useState('completo');
+  const [canalPreenchimento, setCanalPreenchimento] = useState('excel');
   const [arquivoCotacao, setArquivoCotacao] = useState(null);
 
   // Resultado
@@ -35,6 +38,11 @@ export default function Cotacao() {
   const [confirmando, setConfirmando] = useState(false);
   const [processingSeg, setProcessingSeg] = useState(0);
   const processingTimerRef = useRef(null);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null });
+
+  const showConfirm = (title, description, onConfirm) =>
+    setConfirmDialog({ open: true, title, description, onConfirm });
+  const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false }));
 
   const carregarTabelas = useCallback(async () => {
     setLoading(true);
@@ -59,19 +67,20 @@ export default function Cotacao() {
       setNovoArquivo(null);
       carregarTabelas();
     } catch (err) {
-      alert('Erro ao subir tabela: ' + (err.response?.data?.detail || err.message));
+      toast.error('Erro ao subir tabela: ' + (err.response?.data?.detail || err.message));
     }
     setUploading(false);
   };
 
-  const handleExcluir = async (id, nome) => {
-    if (!window.confirm(`Excluir tabela "${nome}"?`)) return;
-    try {
-      await excluirTabela(id);
-      carregarTabelas();
-    } catch (err) {
-      alert('Erro ao excluir: ' + err.message);
-    }
+  const handleExcluir = (id, nome) => {
+    showConfirm('Excluir tabela', `Excluir a tabela "${nome}"? Esta ação não pode ser desfeita.`, async () => {
+      try {
+        await excluirTabela(id);
+        carregarTabelas();
+      } catch (err) {
+        toast.error('Erro ao excluir: ' + err.message);
+      }
+    });
   };
 
   const handleProcessar = async () => {
@@ -87,7 +96,7 @@ export default function Cotacao() {
       setReviewData(data);
     } catch (err) {
       clearInterval(processingTimerRef.current);
-      alert('Erro ao processar: ' + (err.response?.data?.detail || err.message));
+      toast.error('Erro ao processar: ' + (err.response?.data?.detail || err.message));
     }
     setProcessing(false);
   };
@@ -106,16 +115,16 @@ export default function Cotacao() {
       setResultado({ stats, semMatch });
       setReviewData(null);
     } catch (err) {
-      alert('Erro ao confirmar: ' + (err.response?.data?.detail || err.message));
+      toast.error('Erro ao confirmar: ' + (err.response?.data?.detail || err.message));
     }
     setConfirmando(false);
   };
 
   const handleLogout = () => {
-    if (window.confirm('Deseja realmente sair?')) {
+    showConfirm('Sair', 'Deseja realmente sair?', () => {
       localStorage.removeItem('token');
       navigate('/login');
-    }
+    });
   };
 
   return (
@@ -123,14 +132,21 @@ export default function Cotacao() {
       {/* Header */}
       <header style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '16px 24px', borderBottom: '1px solid #1e293b',
+        padding: '0 24px', height: 60, borderBottom: '1px solid #1e293b',
+        background: 'rgba(15,23,42,0.95)', backdropFilter: 'blur(12px)',
+        position: 'sticky', top: 0, zIndex: 10,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ color: '#e8412a', fontWeight: 700, fontSize: 20, cursor: 'pointer' }}
-                onClick={() => navigate('/dashboard')}>
-            Venpro
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
+             onClick={() => navigate('/dashboard')}>
+          <svg viewBox="0 0 18 18" fill="none" width="28" height="28">
+            <path d="M2 3.5L9 14.5L16 3.5" stroke="#3A85A8" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M9 14.5L12.5 8.5" stroke="rgba(58,133,168,0.6)" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          <span style={{ fontWeight: 800, fontSize: 18, color: '#fff', letterSpacing: '-0.3px' }}>
+            <span>Ven</span><span style={{ color: '#3A85A8' }}>pro</span>
           </span>
-          <span style={{ color: '#94a3b8', fontSize: 14 }}>Cotação</span>
+          <span style={{ color: '#334155', fontSize: 14 }}>|</span>
+          <span style={{ color: '#64748b', fontSize: 14, fontWeight: 500 }}>Cotação</span>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button onClick={() => navigate('/assistente')}
@@ -138,7 +154,7 @@ export default function Cotacao() {
           <button onClick={() => navigate('/minha-licenca')}
                   style={navBtnStyle}>Licença</button>
           <button onClick={handleLogout}
-                  style={{ ...navBtnStyle, color: '#ef4444' }}>Sair</button>
+                  style={{ ...navBtnStyle, color: '#ef4444', borderColor: '#7f1d1d' }}>Sair</button>
         </div>
       </header>
 
@@ -178,6 +194,8 @@ export default function Cotacao() {
             setTabelaSelecionada={(id) => { setTabelaSelecionada(id); setPrazoSelecionado(0); }}
             modoMatch={modoMatch}
             setModoMatch={setModoMatch}
+            canalPreenchimento={canalPreenchimento}
+            setCanalPreenchimento={setCanalPreenchimento}
             arquivoCotacao={arquivoCotacao}
             setArquivoCotacao={setArquivoCotacao}
             processing={processing}
@@ -195,6 +213,14 @@ export default function Cotacao() {
           />
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        onConfirm={() => { confirmDialog.onConfirm?.(); closeConfirm(); }}
+        onCancel={closeConfirm}
+      />
     </div>
   );
 }
@@ -220,7 +246,20 @@ function TabelasTab({
       </div>
 
       {loading ? (
-        <p style={{ color: '#64748b', textAlign: 'center' }}>Carregando...</p>
+        <div style={{ display: 'grid', gap: 12, marginTop: 8 }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} style={{
+              border: '1px solid #334155', borderRadius: 10, padding: 16,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <div style={{ flex: 1 }}>
+                <span className="skeleton-dark" style={{ display: 'block', height: 16, width: '45%', marginBottom: 8 }} />
+                <span className="skeleton-dark" style={{ display: 'block', height: 12, width: '60%' }} />
+              </div>
+              <span className="skeleton-dark" style={{ display: 'block', height: 28, width: 70, borderRadius: 6 }} />
+            </div>
+          ))}
+        </div>
       ) : tabelas.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>
           <p style={{ fontSize: 16 }}>Nenhuma tabela cadastrada</p>
@@ -291,7 +330,8 @@ function TabelasTab({
 
 function CotacaoTab({
   tabelas, tabelaSelecionada, setTabelaSelecionada,
-  modoMatch, setModoMatch, arquivoCotacao, setArquivoCotacao,
+  modoMatch, setModoMatch, canalPreenchimento, setCanalPreenchimento,
+  arquivoCotacao, setArquivoCotacao,
   processing, handleProcessar, resultado, setResultado, cotacaoInputRef,
   reviewData, setReviewData, confirmando, handleConfirmar, processingSeg,
   prazoSelecionado, setPrazoSelecionado,
@@ -348,42 +388,53 @@ function CotacaoTab({
             </>
           )}
 
-          {/* Modo */}
-          <label style={labelStyle}>Modo de preenchimento</label>
-          <div style={{ display: 'flex', gap: 16, margin: '8px 0 16px', flexWrap: 'wrap' }}>
+          {/* Onde preencher */}
+          <label style={labelStyle}>Onde preencher</label>
+          <div style={{ display: 'flex', gap: 16, margin: '8px 0 16px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', cursor: 'pointer', fontSize: 14 }}>
-              <input type="radio" value="ean" checked={modoMatch === 'ean'}
-                     onChange={e => setModoMatch(e.target.value)} />
-              EAN apenas
+              <input type="radio" name="canal" value="excel" checked={canalPreenchimento === 'excel'}
+                     onChange={() => setCanalPreenchimento('excel')} />
+              Excel (arquivo)
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', cursor: 'pointer', fontSize: 14 }}>
-              <input type="radio" value="completo" checked={modoMatch === 'completo'}
-                     onChange={e => setModoMatch(e.target.value)} />
-              Completo (EAN + descrição + IA)
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', cursor: 'pointer', fontSize: 14 }}>
-              <input type="radio" value="cotatudo" checked={modoMatch === 'cotatudo'}
-                     onChange={e => setModoMatch(e.target.value)} />
+              <input type="radio" name="canal" value="cotatudo" checked={canalPreenchimento === 'cotatudo'}
+                     onChange={() => setCanalPreenchimento('cotatudo')} />
               Cotatudo (site)
             </label>
           </div>
 
-          {/* Cotatudo instructions */}
-          {modoMatch === 'cotatudo' ? (
+          {/* Como buscar preços */}
+          <label style={labelStyle}>Modo de busca</label>
+          <div style={{ display: 'flex', gap: 16, margin: '8px 0 16px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', cursor: 'pointer', fontSize: 14 }}>
+              <input type="radio" name="modo" value="ean" checked={modoMatch === 'ean'}
+                     onChange={e => setModoMatch(e.target.value)} />
+              EAN apenas (100% certeza)
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', cursor: 'pointer', fontSize: 14 }}>
+              <input type="radio" name="modo" value="completo" checked={modoMatch === 'completo'}
+                     onChange={e => setModoMatch(e.target.value)} />
+              Completo (EAN + descrição + IA)
+            </label>
+          </div>
+
+          {/* Conteúdo baseado no canal */}
+          {canalPreenchimento === 'cotatudo' ? (
             <div style={{
               background: '#0f172a', borderRadius: 10, padding: 20,
               border: '1px solid #334155', marginBottom: 16,
             }}>
               <h3 style={{ color: '#3A85A8', marginTop: 0, fontSize: 16, marginBottom: 12 }}>
-                Como preencher cotação no Cotatudo
+                Como preencher no Cotatudo
               </h3>
               <ol style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.8, paddingLeft: 20, margin: 0 }}>
-                <li>Instale a <strong style={{ color: '#f1f5f9' }}>Extensão Venpro</strong> (link no Dashboard)</li>
+                <li>Instale a <strong style={{ color: '#f1f5f9' }}>Extensão Venpro</strong> (card no Dashboard)</li>
                 <li>Mantenha esta aba do <strong style={{ color: '#f1f5f9' }}>Venpro</strong> aberta e logada</li>
                 <li>Abra o <strong style={{ color: '#f1f5f9' }}>cotatudo.com.br</strong> em outra aba</li>
                 <li>Faça login e <strong style={{ color: '#f1f5f9' }}>abra sua cotação</strong></li>
                 <li>Clique no ícone <strong style={{ color: '#3A85A8' }}>Venpro</strong> na barra do Chrome</li>
-                <li>Selecione a tabela e prazo, clique <strong style={{ color: '#f1f5f9' }}>"Preencher Cotação"</strong></li>
+                <li>Na extensão, escolha <strong style={{ color: '#f1f5f9' }}>tabela</strong>, <strong style={{ color: '#f1f5f9' }}>prazo</strong> e <strong style={{ color: '#f1f5f9' }}>modo ({modoMatch === 'ean' ? 'EAN' : 'Completo'})</strong></li>
+                <li>Clique <strong style={{ color: '#f1f5f9' }}>"Preencher Cotação"</strong></li>
               </ol>
               <div style={{ marginTop: 16, padding: '12px 16px', background: '#1e293b', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 20 }}>🧩</span>
@@ -394,7 +445,7 @@ function CotacaoTab({
             </div>
           ) : (
             <>
-              {/* Upload cotação */}
+              {/* Upload cotação Excel */}
               <label style={labelStyle}>Cotação (Excel)</label>
               <div onClick={() => cotacaoInputRef.current?.click()}
                    style={{
@@ -410,26 +461,28 @@ function CotacaoTab({
             </>
           )}
 
-          {/* Processar */}
-          {modoMatch !== 'cotatudo' && prazoSelecionado === 0 && !prazoEfetivo && prazosDisponiveis.length > 1 && (
-            <p style={{ color: '#f59e0b', fontSize: 13, margin: '0 0 8px' }}>
-              ⚠ Selecione o prazo acima antes de processar
-            </p>
-          )}
-          {modoMatch !== 'cotatudo' && (
-          <button onClick={handleProcessar}
-                  disabled={!tabelaSelecionada || !arquivoCotacao || processing || (prazosDisponiveis.length > 1 && !prazoEfetivo)}
-                  style={{
-                    ...primaryBtnStyle,
-                    opacity: (!tabelaSelecionada || !arquivoCotacao || (prazosDisponiveis.length > 1 && !prazoEfetivo)) ? 0.5 : 1,
-                    width: '100%', padding: 14, fontSize: 16,
-                  }}>
-            {processing
-              ? 'Processando...'
-              : prazoEfetivo
-                ? `Processar Cotação — ${prazoEfetivo} dias`
-                : 'Processar Cotação'}
-          </button>
+          {/* Processar — só no modo Excel */}
+          {canalPreenchimento === 'excel' && (
+            <>
+              {prazosDisponiveis.length > 1 && !prazoEfetivo && (
+                <p style={{ color: '#f59e0b', fontSize: 13, margin: '0 0 8px' }}>
+                  Selecione o prazo acima antes de processar
+                </p>
+              )}
+              <button onClick={handleProcessar}
+                      disabled={!tabelaSelecionada || !arquivoCotacao || processing || (prazosDisponiveis.length > 1 && !prazoEfetivo)}
+                      style={{
+                        ...primaryBtnStyle,
+                        opacity: (!tabelaSelecionada || !arquivoCotacao || (prazosDisponiveis.length > 1 && !prazoEfetivo)) ? 0.5 : 1,
+                        width: '100%', padding: 14, fontSize: 16,
+                      }}>
+                {processing
+                  ? 'Processando...'
+                  : prazoEfetivo
+                    ? `Processar Cotação — ${prazoEfetivo} dias`
+                    : 'Processar Cotação'}
+              </button>
+            </>
           )}
 
           {/* Barra de progresso */}

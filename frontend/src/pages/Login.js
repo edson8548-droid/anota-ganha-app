@@ -8,8 +8,18 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [touched, setTouched] = useState({});
   const { login } = useAuthContext();
   const navigate = useNavigate();
+
+  const touch = (field) => setTouched(t => ({ ...t, [field]: true }));
+
+  const getFieldError = (field) => {
+    if (!touched[field]) return null;
+    if (field === 'email') return !email.includes('@') ? 'Email inválido' : null;
+    if (field === 'password') return !password ? 'Senha obrigatória' : null;
+    return null;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -60,9 +70,12 @@ const Login = () => {
               placeholder="seu@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onBlur={() => touch('email')}
+              className={getFieldError('email') ? 'input-error' : touched.email && email ? 'input-valid' : ''}
               disabled={loading}
               autoComplete="email"
             />
+            {getFieldError('email') && <span className="field-error">{getFieldError('email')}</span>}
           </div>
 
           <div className="form-group">
@@ -72,9 +85,12 @@ const Login = () => {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onBlur={() => touch('password')}
+              className={getFieldError('password') ? 'input-error' : touched.password && password ? 'input-valid' : ''}
               disabled={loading}
               autoComplete="current-password"
             />
+            {getFieldError('password') && <span className="field-error">{getFieldError('password')}</span>}
           </div>
 
           <button type="submit" className="btn-login" disabled={loading}>

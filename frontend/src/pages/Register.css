@@ -1,26 +1,31 @@
+/* Register — Tema Venpro (Charcoal + Teal) */
+
 .register-page {
   min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #2B2D31;
   padding: 20px;
+  position: relative;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
 .register-container {
-  background: white;
-  border-radius: 16px;
-  padding: 40px;
+  background: #363940;
+  border: 1px solid #4A4D52;
+  border-radius: 20px;
+  padding: 40px 36px;
   width: 100%;
-  max-width: 450px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  animation: slideUp 0.5s ease-out;
+  max-width: 460px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.4s ease-out;
 }
 
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(30px);
+    transform: translateY(24px);
   }
   to {
     opacity: 1;
@@ -30,94 +35,162 @@
 
 .register-header {
   text-align: center;
-  margin-bottom: 35px;
+  margin-bottom: 32px;
+}
+
+.register-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.register-logo-ven {
+  font-size: 28px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+}
+
+.register-logo-pro {
+  font-size: 28px;
+  font-weight: 800;
+  color: #3A85A8;
+  letter-spacing: -0.5px;
 }
 
 .register-header h1 {
-  font-size: 32px;
-  color: #333;
-  margin-bottom: 10px;
+  font-size: 20px;
+  color: #E1E1E1;
+  margin: 0 0 6px 0;
   font-weight: 700;
 }
 
 .register-header p {
-  color: #666;
-  font-size: 16px;
+  color: #A0A3A8;
+  font-size: 14px;
+  margin: 0;
 }
 
 .register-form {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .form-group label {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: #333;
+  color: #A0A3A8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .form-group input {
-  padding: 14px 16px;
-  border: 2px solid #e1e8ed;
+  width: 100%;
+  padding: 13px 16px;
+  border: 1px solid #4A4D52;
   border-radius: 10px;
   font-size: 15px;
-  transition: all 0.3s;
-  background-color: #f8f9fa;
+  color: #E1E1E1;
+  background: #2B2D31;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+  font-family: inherit;
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: #667eea;
-  background-color: white;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #3A85A8;
+  background: #2f3238;
+  box-shadow: 0 0 0 3px rgba(58, 133, 168, 0.15);
+}
+
+.form-group input::placeholder {
+  color: #6B6E74;
 }
 
 .form-group input:disabled {
-  background-color: #f5f5f5;
+  opacity: 0.5;
   cursor: not-allowed;
-  opacity: 0.7;
+}
+
+.form-group input.input-error {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+.form-group input.input-valid {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+}
+
+.field-error {
+  font-size: 12px;
+  color: #f87171;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.field-error::before {
+  content: '!';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  background: #ef4444;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 800;
+  flex-shrink: 0;
 }
 
 .error-message {
-  padding: 14px;
-  background-color: #fee;
-  color: #c33;
+  padding: 12px 16px;
+  background: rgba(220, 53, 69, 0.12);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  color: #ff6b7a;
   border-radius: 10px;
   font-size: 14px;
   text-align: center;
-  border: 1px solid #fcc;
   animation: shake 0.4s;
 }
 
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-10px); }
-  75% { transform: translateX(10px); }
+  25% { transform: translateX(-8px); }
+  75% { transform: translateX(8px); }
 }
 
 .btn-register {
+  width: 100%;
   padding: 14px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: #3A85A8;
+  color: #ffffff;
   border: none;
   border-radius: 10px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.3s;
-  margin-top: 10px;
+  transition: all 0.2s;
+  margin-top: 6px;
+  font-family: inherit;
 }
 
 .btn-register:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+  background: #31708E;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(58, 133, 168, 0.35);
 }
 
 .btn-register:active:not(:disabled) {
@@ -125,45 +198,50 @@
 }
 
 .btn-register:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
 .register-footer {
   text-align: center;
-  margin-top: 25px;
+  margin-top: 24px;
   padding-top: 20px;
-  border-top: 1px solid #e1e8ed;
+  border-top: 1px solid #4A4D52;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .register-footer p {
-  color: #666;
+  color: #A0A3A8;
   font-size: 14px;
-  margin: 10px 0;
+  margin: 0;
 }
 
 .link-login,
 .link-home {
-  color: #667eea;
+  color: #3A85A8;
   text-decoration: none;
   font-weight: 600;
-  transition: all 0.2s;
+  transition: color 0.2s;
 }
 
 .link-login:hover,
 .link-home:hover {
-  color: #764ba2;
+  color: #5aa8c8;
   text-decoration: underline;
 }
 
-/* Responsivo */
 @media (max-width: 480px) {
   .register-container {
-    padding: 30px 20px;
+    padding: 32px 22px;
+    border-radius: 16px;
   }
-  
-  .register-header h1 {
-    font-size: 26px;
+
+  .register-logo-ven,
+  .register-logo-pro {
+    font-size: 24px;
   }
 
   .form-group input {
@@ -173,4 +251,32 @@
   .btn-register {
     padding: 12px;
   }
+}
+
+/* Password strength indicator */
+.password-strength {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.password-strength-bar {
+  flex: 1;
+  height: 4px;
+  background: #4A4D52;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.password-strength-bar div {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.password-strength span {
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
 }

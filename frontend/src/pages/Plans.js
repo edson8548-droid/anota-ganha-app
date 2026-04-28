@@ -2,6 +2,7 @@
 // Página de escolha de planos
 
 import React, { useState } from 'react';
+import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
@@ -32,7 +33,7 @@ const Plans = () => {
     console.log('📦 Plano selecionado:', planId);
     
     if (planId === 'trial') {
-      alert('Você já está no período de trial!');
+      toast('Você já está no período de trial!');
       return;
     }
 
@@ -43,7 +44,7 @@ const Plans = () => {
       navigate('/checkout', { state: { planId } });
     } catch (error) {
       console.error('Erro:', error);
-      alert('Erro ao processar. Tente novamente.');
+      toast.warning('Erro ao processar. Tente novamente.');
     } finally {
       setLoading(null);
     }

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { auth } from '../firebase/config';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const API_URL = 'https://api.venpro.com.br';
 
@@ -16,6 +18,11 @@ const MinhaLicenca = () => {
   const [regenerating, setRegenerating] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [erro, setErro] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null });
+
+  const showConfirm = (title, description, onConfirm) =>
+    setConfirmDialog({ open: true, title, description, onConfirm });
+  const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false }));
 
   // ─── Busca a chave de licença no backend ──────────────────────────────────
   useEffect(() => {
@@ -52,29 +59,34 @@ const MinhaLicenca = () => {
   };
 
   // ─── Gera nova chave ──────────────────────────────────────────────────────
-  const regenerar = async () => {
-    if (!window.confirm('Isso invalidará sua chave atual e o agente parará até você atualizar o arquivo agente.cfg. Continuar?')) return;
-    try {
-      setRegenerating(true);
-      setErro('');
-      const token = await auth.currentUser.getIdToken();
-      const resp = await fetch(`${API_URL}/api/license/regenerate`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-      if (!resp.ok) throw new Error(`Erro ${resp.status}`);
-      const data = await resp.json();
-      setLicenseKey(data.license_key);
-      alert('Nova chave gerada! Atualize o arquivo agente.cfg no seu computador.');
-    } catch (e) {
-      setErro('Erro ao gerar nova chave. Tente novamente.');
-    } finally {
-      setRegenerating(false);
-    }
+  const regenerar = () => {
+    showConfirm(
+      'Gerar nova chave',
+      'Isso invalidará sua chave atual e o agente parará até você atualizar o arquivo agente.cfg.',
+      async () => {
+        try {
+          setRegenerating(true);
+          setErro('');
+          const token = await auth.currentUser.getIdToken();
+          const resp = await fetch(`${API_URL}/api/license/regenerate`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          });
+          if (!resp.ok) throw new Error(`Erro ${resp.status}`);
+          const data = await resp.json();
+          setLicenseKey(data.license_key);
+          toast.success('Nova chave gerada! Atualize o arquivo agente.cfg no seu computador.');
+        } catch (e) {
+          setErro('Erro ao gerar nova chave. Tente novamente.');
+        } finally {
+          setRegenerating(false);
+        }
+      }
+    );
   };
 
   const handleLogout = () => {
-    if (window.confirm('Deseja sair?')) { logout(); navigate('/login'); }
+    showConfirm('Sair', 'Deseja realmente sair?', () => { logout(); navigate('/login'); });
   };
 
   // ─── Status da assinatura ─────────────────────────────────────────────────
@@ -132,14 +144,17 @@ const MinhaLicenca = () => {
           </p>
 
           {loading ? (
-            <div style={styles.loading}>⏳ Carregando sua chave...</div>
+            <div style={styles.keyBox}>
+              <span className="skeleton" style={{ flex: 1, height: 24, borderRadius: 6 }} />
+              <span className="skeleton" style={{ width: 90, height: 38, borderRadius: 8 }} />
+            </div>
           ) : erro ? (
             <div style={styles.erro}>{erro}</div>
           ) : (
             <>
               <div style={styles.keyBox}>
                 <span style={styles.keyText}>{licenseKey}</span>
-                <button onClick={copiar} style={{ ...styles.btnCopiar, background: copiado ? '#10b981' : '#667eea' }}>
+                <button onClick={copiar} style={{ ...styles.btnCopiar, background: copiado ? '#10b981' : '#3A85A8' }}>
                   {copiado ? '✅ Copiado!' : '📋 Copiar'}
                 </button>
               </div>
@@ -228,7 +243,7 @@ const MinhaLicenca = () => {
         </div>
 
         {/* Card: Como funciona o bloqueio */}
-        <div style={{ ...styles.card, background: '#fafafa' }}>
+        <div style={styles.card}>
           <h2 style={styles.cardTitle}>Como funciona a proteção</h2>
           <div style={styles.infoGrid}>
             <div style={styles.infoItem}>
@@ -256,47 +271,55 @@ const MinhaLicenca = () => {
         </div>
 
       </main>
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        onConfirm={() => { confirmDialog.onConfirm?.(); closeConfirm(); }}
+        onCancel={closeConfirm}
+      />
     </div>
   );
 };
 
-// ─── Estilos inline (mesmo padrão do projeto) ─────────────────────────────────
+// ─── Estilos inline — tema Venpro dark ───────────────────────────────────────
 
 const styles = {
-  page: { minHeight: '100vh', background: '#f3f4f6', fontFamily: 'Arial, sans-serif' },
-  header: { background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0 24px', height: 64, display: 'flex', alignItems: 'center' },
+  page: { minHeight: '100vh', background: '#2B2D31', fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif", color: '#E1E1E1' },
+  header: { background: 'rgba(43,45,49,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #4A4D52', padding: '0 24px', height: 64, display: 'flex', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 },
   headerContent: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: 900, margin: '0 auto' },
   headerLeft: { display: 'flex', alignItems: 'center', gap: 16 },
   headerRight: { display: 'flex', alignItems: 'center', gap: 12 },
-  btnBack: { background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 14, color: '#374151' },
-  logo: { fontSize: 18, fontWeight: 700, color: '#1f2937' },
-  userEmail: { fontSize: 13, color: '#6b7280' },
-  btnLogout: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 18 },
-  main: { maxWidth: 900, margin: '32px auto', padding: '0 24px', display: 'flex', flexDirection: 'column', gap: 24 },
-  card: { background: '#fff', borderRadius: 12, padding: 28, boxShadow: '0 1px 4px rgba(0,0,0,0.08)' },
-  cardTitle: { fontSize: 18, fontWeight: 700, color: '#1f2937', marginBottom: 16, marginTop: 0 },
-  cardDesc: { fontSize: 14, color: '#6b7280', marginBottom: 20, lineHeight: 1.6 },
+  btnBack: { background: 'none', border: '1px solid #4A4D52', borderRadius: 8, padding: '6px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#A0A3A8' },
+  logo: { fontSize: 16, fontWeight: 700, color: '#ffffff' },
+  userEmail: { fontSize: 13, color: '#6B6E74' },
+  btnLogout: { background: 'none', border: '1px solid #4A4D52', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#A0A3A8' },
+  main: { maxWidth: 900, margin: '32px auto', padding: '0 24px', display: 'flex', flexDirection: 'column', gap: 20 },
+  card: { background: '#363940', border: '1px solid #4A4D52', borderRadius: 16, padding: 28 },
+  cardTitle: { fontSize: 17, fontWeight: 700, color: '#ffffff', marginBottom: 14, marginTop: 0 },
+  cardDesc: { fontSize: 14, color: '#A0A3A8', marginBottom: 20, lineHeight: 1.6 },
   statusBadge: { display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', borderRadius: 10, marginBottom: 16 },
-  statusText: { fontSize: 16, fontWeight: 600 },
-  btnPlanos: { background: 'linear-gradient(135deg,#667eea,#764ba2)', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 24px', fontSize: 15, fontWeight: 600, cursor: 'pointer', marginTop: 4 },
-  loading: { textAlign: 'center', padding: '24px', color: '#6b7280', fontSize: 15 },
-  erro: { background: '#fef2f2', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 8, padding: '14px 18px', fontSize: 14 },
-  keyBox: { display: 'flex', alignItems: 'center', gap: 12, background: '#f9fafb', border: '2px solid #e5e7eb', borderRadius: 10, padding: '16px 20px', marginBottom: 12 },
-  keyText: { flex: 1, fontFamily: 'monospace', fontSize: 22, fontWeight: 700, letterSpacing: 2, color: '#1f2937' },
+  statusText: { fontSize: 15, fontWeight: 600 },
+  btnPlanos: { background: '#3A85A8', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 24px', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginTop: 4 },
+  loading: { textAlign: 'center', padding: '24px', color: '#A0A3A8', fontSize: 15 },
+  erro: { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: 10, padding: '14px 18px', fontSize: 14 },
+  keyBox: { display: 'flex', alignItems: 'center', gap: 12, background: '#2B2D31', border: '2px solid #4A4D52', borderRadius: 12, padding: '16px 20px', marginBottom: 12 },
+  keyText: { flex: 1, fontFamily: 'monospace', fontSize: 20, fontWeight: 700, letterSpacing: 2, color: '#3A85A8' },
   btnCopiar: { color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', transition: 'background 0.3s', whiteSpace: 'nowrap' },
-  btnRegenerar: { background: 'none', border: '1px solid #d1d5db', borderRadius: 8, padding: '8px 16px', fontSize: 13, color: '#6b7280', cursor: 'pointer', marginTop: 4 },
-  aviso: { fontSize: 12, color: '#9ca3af', marginTop: 8 },
-  code: { background: '#f3f4f6', borderRadius: 4, padding: '2px 6px', fontFamily: 'monospace', fontSize: 13, color: '#374151' },
-  codeBlock: { background: '#1f2937', color: '#e5e7eb', borderRadius: 8, padding: '14px 18px', fontFamily: 'monospace', fontSize: 13, lineHeight: 1.8, marginTop: 8, whiteSpace: 'pre' },
+  btnRegenerar: { background: 'none', border: '1px solid #4A4D52', borderRadius: 8, padding: '8px 16px', fontSize: 13, color: '#A0A3A8', cursor: 'pointer', marginTop: 4 },
+  aviso: { fontSize: 12, color: '#6B6E74', marginTop: 8 },
+  code: { background: '#2B2D31', borderRadius: 4, padding: '2px 7px', fontFamily: 'monospace', fontSize: 12, color: '#3A85A8', border: '1px solid #4A4D52' },
+  codeBlock: { background: '#1e2029', color: '#a8b4c8', borderRadius: 10, padding: '14px 18px', fontFamily: 'monospace', fontSize: 13, lineHeight: 1.8, marginTop: 8, whiteSpace: 'pre', border: '1px solid #4A4D52' },
   steps: { display: 'flex', flexDirection: 'column', gap: 20 },
   step: { display: 'flex', gap: 16, alignItems: 'flex-start' },
-  stepNum: { minWidth: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#667eea,#764ba2)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15 },
-  stepDesc: { fontSize: 13, color: '#6b7280', marginTop: 4, lineHeight: 1.6 },
-  link: { color: '#667eea' },
+  stepNum: { minWidth: 32, height: 32, borderRadius: '50%', background: '#3A85A8', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 },
+  stepDesc: { fontSize: 13, color: '#A0A3A8', marginTop: 4, lineHeight: 1.6 },
+  link: { color: '#3A85A8' },
   infoGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 20 },
   infoItem: { display: 'flex', gap: 12, alignItems: 'flex-start' },
-  infoIcon: { fontSize: 24 },
-  infoDesc: { fontSize: 13, color: '#6b7280', marginTop: 4, lineHeight: 1.6 },
+  infoIcon: { fontSize: 22 },
+  infoDesc: { fontSize: 13, color: '#A0A3A8', marginTop: 4, lineHeight: 1.6 },
 };
 
 export default MinhaLicenca;

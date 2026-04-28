@@ -26,7 +26,7 @@
 
 /* Header - Reutiliza o estilo do modal roxo */
 .modal-header-edit {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #3A85A8 0%, #31708E 100%);
   padding: 2rem 2.5rem;
   display: flex;
   justify-content: space-between;
@@ -113,8 +113,8 @@
 .form-group-edit-info input:focus,
 .form-group-edit-info textarea:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  border-color: #3A85A8;
+  box-shadow: 0 0 0 4px rgba(58, 133, 168, 0.1);
 }
 
 .input-disabled {

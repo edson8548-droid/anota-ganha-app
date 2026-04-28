@@ -34,17 +34,48 @@ const formatTelefone = (value) => {
 };
 // ⭐️ FIM: Funções de Máscara ⭐️
 
+function getPasswordStrength(pwd) {
+  if (!pwd) return null;
+  let score = 0;
+  if (pwd.length >= 8) score++;
+  if (/[A-Z]/.test(pwd)) score++;
+  if (/[0-9]/.test(pwd)) score++;
+  if (/[^A-Za-z0-9]/.test(pwd)) score++;
+  if (score <= 1) return { level: 'Fraca', color: '#ef4444', width: '33%' };
+  if (score <= 2) return { level: 'Boa', color: '#f59e0b', width: '66%' };
+  return { level: 'Forte', color: '#22c55e', width: '100%' };
+}
+
 const Register = () => {
   const [name, setName] = useState('');
-  // ⭐️ Adicionados novos estados para os novos campos
   const [cpf, setCpf] = useState('');
   const [telefone, setTelefone] = useState('');
-  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [touched, setTouched] = useState({});
+
+  const touch = (field) => setTouched(t => ({ ...t, [field]: true }));
+
+  const getFieldError = (field) => {
+    if (!touched[field]) return null;
+    switch (field) {
+      case 'name': return !name.trim() ? 'Nome é obrigatório' : null;
+      case 'cpf': return cpf.replace(/\D/g, '').length !== 11 ? 'CPF inválido (11 dígitos)' : null;
+      case 'telefone': return telefone.replace(/\D/g, '').length < 10 ? 'Telefone inválido' : null;
+      case 'email': return !email.includes('@') || !email.includes('.') ? 'Email inválido' : null;
+      case 'password': return password.length < 6 ? 'Mínimo 6 caracteres' : null;
+      case 'confirmPassword': return confirmPassword !== password ? 'As senhas não coincidem' : null;
+      default: return null;
+    }
+  };
+
+  const isFieldValid = (field) => {
+    if (!touched[field]) return false;
+    return getFieldError(field) === null;
+  };
   
   const { register } = useAuthContext();
   const navigate = useNavigate();
@@ -121,14 +152,18 @@ const Register = () => {
     <div className="register-page">
       <div className="register-container">
         <div className="register-header">
-          <h1>🎯 Venpro</h1>
-          <p>Crie sua conta grátis</p>
+          <div className="register-logo">
+            <span className="register-logo-ven">Ven</span>
+            <span className="register-logo-pro">pro</span>
+          </div>
+          <h1>Crie sua conta grátis</h1>
+          <p>15 dias grátis, sem cartão de crédito</p>
         </div>
         
         <form onSubmit={handleSubmit} className="register-form">
           {error && (
             <div className="error-message">
-              ⚠️ {error}
+              {error}
             </div>
           )}
           
@@ -140,41 +175,48 @@ const Register = () => {
               placeholder="Seu nome completo"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onBlur={() => touch('name')}
+              className={getFieldError('name') ? 'input-error' : isFieldValid('name') ? 'input-valid' : ''}
               disabled={loading}
               required
             />
+            {getFieldError('name') && <span className="field-error">{getFieldError('name')}</span>}
           </div>
-          
-          {/* ⭐️ INÍCIO: Novos Campos (CPF e Telefone) ⭐️ */}
+
           <div className="form-group">
             <label htmlFor="cpf">CPF</label>
             <input
               id="cpf"
-              type="text" // Usamos "text" para a máscara funcionar
+              type="text"
               placeholder="000.000.000-00"
               value={cpf}
               onChange={(e) => setCpf(formatCPF(e.target.value))}
+              onBlur={() => touch('cpf')}
+              className={getFieldError('cpf') ? 'input-error' : isFieldValid('cpf') ? 'input-valid' : ''}
               disabled={loading}
               maxLength={14}
               required
             />
+            {getFieldError('cpf') && <span className="field-error">{getFieldError('cpf')}</span>}
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="telefone">Telefone / WhatsApp</label>
             <input
               id="telefone"
-              type="tel" // "tel" é bom para telemóveis
+              type="tel"
               placeholder="(00) 00000-0000"
               value={telefone}
               onChange={(e) => setTelefone(formatTelefone(e.target.value))}
+              onBlur={() => touch('telefone')}
+              className={getFieldError('telefone') ? 'input-error' : isFieldValid('telefone') ? 'input-valid' : ''}
               disabled={loading}
               maxLength={15}
               required
             />
+            {getFieldError('telefone') && <span className="field-error">{getFieldError('telefone')}</span>}
           </div>
-          {/* ⭐️ FIM: Novos Campos ⭐️ */}
-          
+
           <div className="form-group">
             <label htmlFor="email">Email</label>
             <input
@@ -183,12 +225,15 @@ const Register = () => {
               placeholder="seu@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onBlur={() => touch('email')}
+              className={getFieldError('email') ? 'input-error' : isFieldValid('email') ? 'input-valid' : ''}
               disabled={loading}
               autoComplete="email"
               required
             />
+            {getFieldError('email') && <span className="field-error">{getFieldError('email')}</span>}
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="password">Senha</label>
             <input
@@ -197,12 +242,26 @@ const Register = () => {
               placeholder="Mínimo 6 caracteres"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onBlur={() => touch('password')}
+              className={getFieldError('password') ? 'input-error' : isFieldValid('password') ? 'input-valid' : ''}
               disabled={loading}
               autoComplete="new-password"
               required
             />
+            {getFieldError('password') && <span className="field-error">{getFieldError('password')}</span>}
+            {password && (() => {
+              const s = getPasswordStrength(password);
+              return (
+                <div className="password-strength">
+                  <div className="password-strength-bar">
+                    <div style={{ width: s.width, background: s.color }} />
+                  </div>
+                  <span style={{ color: s.color }}>Senha {s.level}</span>
+                </div>
+              );
+            })()}
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="confirmPassword">Confirmar Senha</label>
             <input
@@ -211,10 +270,13 @@ const Register = () => {
               placeholder="Digite a senha novamente"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              onBlur={() => touch('confirmPassword')}
+              className={getFieldError('confirmPassword') ? 'input-error' : isFieldValid('confirmPassword') ? 'input-valid' : ''}
               disabled={loading}
               autoComplete="new-password"
               required
             />
+            {getFieldError('confirmPassword') && <span className="field-error">{getFieldError('confirmPassword')}</span>}
           </div>
           
           <button 
@@ -222,7 +284,7 @@ const Register = () => {
             className="btn-register"
             disabled={loading}
           >
-            {loading ? '⏳ Criando conta...' : '🚀 Criar Conta'}
+            {loading ? 'Criando conta...' : 'Criar Conta'}
           </button>
         </form>
 

@@ -2,6 +2,7 @@
 // ⭐️ CORREÇÃO: Usa o SDK principal ('sdk.mercadopago.com/js/v2') para obter o Device ID.
 
 import React, { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
@@ -106,7 +107,7 @@ const Checkout = () => {
   // ============================================
   const handleCheckout = async () => {
     if (!selectedPlan || !user) {
-      alert('⚠️ Erro ao processar pagamento. Tente novamente.');
+      toast.warning('⚠️ Erro ao processar pagamento. Tente novamente.');
       return;
     }
 
@@ -149,12 +150,26 @@ const Checkout = () => {
 
     } catch (error) {
       console.error('❌ Erro no handleCheckout:', error);
-      alert('Erro ao processar pagamento. Tente novamente.');
+      toast.warning('Erro ao processar pagamento. Tente novamente.');
       setLoading(false);
     }
   };
 
-  if (!selectedPlan) return <div>Carregando...</div>;
+  if (!selectedPlan) return (
+    <div style={{
+      minHeight: '100vh', background: '#2B2D31',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div style={{
+        background: '#363940', border: '1px solid #4A4D52', borderRadius: 16,
+        padding: '32px 40px', display: 'flex', flexDirection: 'column', gap: 14, width: 320,
+      }}>
+        <span className="skeleton" style={{ height: 18, width: '55%', borderRadius: 6 }} />
+        <span className="skeleton" style={{ height: 40, width: '100%', borderRadius: 8 }} />
+        <span className="skeleton" style={{ height: 14, width: '70%', borderRadius: 6 }} />
+      </div>
+    </div>
+  );
 
   return (
     <div className="checkout-page">
