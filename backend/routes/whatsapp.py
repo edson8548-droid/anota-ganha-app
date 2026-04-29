@@ -79,11 +79,11 @@ _FONE_COLS = ['telefone', 'phone', 'celular', 'whatsapp', 'numero', 'número',
               'phone 1 - value', 'phone1']
 
 
-def normalize_phone(raw: str) -> Optional[str]:
-    if not raw or str(raw).strip().lower() in ('', 'nan', 'none'):
+def _parse_single_phone(text: str) -> Optional[str]:
+    text = text.strip()
+    if not text or text.lower() in ('nan', 'none'):
         return None
-    text = str(raw).split(':::')[-1].strip()
-    # Converte notação científica do Excel (ex: 1.1997501798E+10 → "11997501798")
+    # Converte notação científica do Excel (ex: 1.1997501798E+10)
     try:
         text = str(int(float(text)))
     except (ValueError, OverflowError):
@@ -96,6 +96,17 @@ def normalize_phone(raw: str) -> Optional[str]:
     if len(num) <= 11:
         num = '55' + num
     return num if len(num) >= 12 else None
+
+
+def normalize_phone(raw: str) -> Optional[str]:
+    """Aceita células com múltiplos números separados por :::, retorna o primeiro válido."""
+    if not raw or str(raw).strip().lower() in ('', 'nan', 'none'):
+        return None
+    for part in str(raw).split(':::'):
+        result = _parse_single_phone(part)
+        if result:
+            return result
+    return None
 
 
 def parse_csv_contacts(content: bytes) -> tuple[list[dict], int]:
@@ -128,10 +139,6 @@ def parse_csv_contacts(content: bytes) -> tuple[list[dict], int]:
             f"Colunas encontradas: {list(df.columns)}"
         )
 
-    print(f"[CSV-DEBUG] Colunas: {list(df.columns)}", flush=True)
-    print(f"[CSV-DEBUG] Col-nome={col_nome!r} Col-fone={col_fone!r}", flush=True)
-    sample = df[col_fone].dropna().head(5).tolist()
-    print(f"[CSV-DEBUG] Amostra fones: {sample}", flush=True)
 
     # Tenta detectar coluna de sobrenome para montar nome completo (Google Contacts)
     col_sobrenome = next((c for c in df.columns if c.strip().lower() in ('last name', 'sobrenome', 'surname')), None)
@@ -148,7 +155,6 @@ def parse_csv_contacts(content: bytes) -> tuple[list[dict], int]:
             continue
         contacts.append({'nome': nome, 'telefone': fone})
 
-    print(f"[CSV-DEBUG] Resultado: {len(contacts)} válidos, {invalidos} inválidos", flush=True)
     return contacts, invalidos
 
 
