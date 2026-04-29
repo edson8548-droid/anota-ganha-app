@@ -156,94 +156,93 @@ const Checkout = () => {
   };
 
   if (!selectedPlan) return (
-    <div style={{
-      minHeight: '100vh', background: '#2B2D31',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      <div style={{
-        background: '#363940', border: '1px solid #4A4D52', borderRadius: 16,
-        padding: '32px 40px', display: 'flex', flexDirection: 'column', gap: 14, width: 320,
-      }}>
-        <span className="skeleton" style={{ height: 18, width: '55%', borderRadius: 6 }} />
-        <span className="skeleton" style={{ height: 40, width: '100%', borderRadius: 8 }} />
-        <span className="skeleton" style={{ height: 14, width: '70%', borderRadius: 6 }} />
+    <div style={{ minHeight: '100vh', background: '#2B2D31', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: '#363940', border: '1px solid #4A4D52', borderRadius: 16, padding: '32px 40px', display: 'flex', flexDirection: 'column', gap: 14, width: 320 }}>
+        <span className="skeleton" style={{ height: 18, width: '55%' }} />
+        <span className="skeleton" style={{ height: 40, width: '100%' }} />
+        <span className="skeleton" style={{ height: 14, width: '70%' }} />
       </div>
     </div>
   );
 
   return (
     <div className="checkout-page">
-      <div className="checkout-container">
-        {/* Header (Mantido) */}
-        <div className="checkout-header">
-          <button className="btn-back-checkout" onClick={() => navigate('/plans')}>
-            ← Voltar para Planos
-          </button>
-          <h1>Finalizar Assinatura</h1>
-        </div>
 
+      {/* Header padrão sticky */}
+      <header className="checkout-header-bar">
+        <div className="checkout-header-inner">
+          <button className="btn-back-checkout" onClick={() => navigate('/plans')}>
+            ← Planos
+          </button>
+          <span className="checkout-header-title">Finalizar Assinatura</span>
+        </div>
+      </header>
+
+      <div className="checkout-body">
         <div className="checkout-grid">
-          {/* Coluna Esquerda - Resumo do Pedido (Mantido) */}
-          <div className="checkout-summary">
+
+          {/* Coluna Esquerda — Resumo */}
+          <div className="checkout-card">
             <h2>Resumo do Pedido</h2>
-            <div className="plan-summary-card">
-              <div className="plan-summary-header">
-                <span className="plan-badge-small">{selectedPlan.displayName.split(' ')[0]}</span>
-                <h3>{selectedPlan.name}</h3>
-              </div>
-              <div className="plan-summary-price">
-                {selectedPlan.id === 'annual_installments' ? (
-                  <>
-                    <div className="price-installments-checkout">12x de R$ {selectedPlan.pricePerMonth.toFixed(2)}</div>
-                    <div className="price-total-checkout">Total: R$ {selectedPlan.price.toFixed(2)}/ano</div>
-                  </>
-                ) : (
-                  <div className="price-main-checkout">
-                    R$ {selectedPlan.price.toFixed(2)}
-                    <span className="price-period-checkout">/{selectedPlan.id === 'monthly' ? 'mês' : 'ano'}</span>
-                  </div>
-                )}
-              </div>
-              {selectedPlan.savings && (<div className="savings-checkout">💰 Você economiza R$ {selectedPlan.savings.toFixed(2)} por ano!</div>)}
-              <div className="plan-summary-features">
-                <h4>O que está incluído:</h4>
-                <ul>
-                  {selectedPlan.features.map((feature, idx) => (<li key={idx}>✓ {feature}</li>))}
-                </ul>
-              </div>
+            <p className="plan-summary-name">{selectedPlan.name}</p>
+            <div className="plan-summary-price-block">
+              {selectedPlan.id === 'annual_installments' ? (
+                <>
+                  <div className="price-installments-checkout">12x de R$ {selectedPlan.pricePerMonth.toFixed(2)}</div>
+                  <div className="price-total-checkout">Total R$ {selectedPlan.price.toFixed(2)}/ano</div>
+                </>
+              ) : (
+                <div className="price-main-checkout">
+                  R$ {selectedPlan.price.toFixed(2)}
+                  <span className="price-period-checkout">/{selectedPlan.id === 'monthly' ? 'mês' : 'ano'}</span>
+                </div>
+              )}
+            </div>
+            {selectedPlan.savings && (
+              <div className="savings-checkout">Economize R$ {selectedPlan.savings.toFixed(2)} por ano</div>
+            )}
+            <div className="plan-summary-features">
+              <h4>Incluído no plano</h4>
+              <ul>
+                {selectedPlan.features.map((feature, idx) => <li key={idx}>{feature}</li>)}
+              </ul>
             </div>
             <div className="trial-info-checkout">
               <div className="trial-icon-checkout">🎁</div>
-              <div><strong>15 dias grátis</strong><p>O seu plano pago só começará após o fim do seu trial.</p></div>
+              <div>
+                <strong>15 dias grátis</strong>
+                <p>O plano pago começa após o trial.</p>
+              </div>
             </div>
           </div>
 
-          {/* Coluna Direita - Pagamento */}
-          <div className="checkout-payment">
+          {/* Coluna Direita — Pagamento */}
+          <div className="checkout-card">
             <h2>Método de Pagamento</h2>
-            {/* Mantemos as opções de método para UX, mas o MP no redirecionamento gere isso */}
             <div className="payment-methods">
               <label className={`payment-method-option ${paymentMethod === 'credit_card' ? 'selected' : ''}`}>
-                <input type="radio" name="paymentMethod" value="credit_card" checked={paymentMethod === 'credit_card'} onChange={(e) => setPaymentMethod(e.target.value)} />
+                <input type="radio" name="paymentMethod" value="credit_card" checked={paymentMethod === 'credit_card'} onChange={e => setPaymentMethod(e.target.value)} />
                 <div className="payment-method-content">
                   <span className="payment-icon">💳</span>
-                  <div><strong>Cartão de Crédito</strong><p>Pagamento seguro via Mercado Pago</p></div>
+                  <div>
+                    <strong>Cartão de Crédito</strong>
+                    <p>Pagamento seguro via Mercado Pago</p>
+                  </div>
                 </div>
               </label>
               <label className={`payment-method-option ${paymentMethod === 'pix' ? 'selected' : ''}`}>
-                <input type="radio" name="paymentMethod" value="pix" checked={paymentMethod === 'pix'} onChange={(e) => setPaymentMethod(e.target.value)} />
+                <input type="radio" name="paymentMethod" value="pix" checked={paymentMethod === 'pix'} onChange={e => setPaymentMethod(e.target.value)} />
                 <div className="payment-method-content">
-                  <span className="payment-icon">📱</span>
-                  <div><strong>PIX</strong><p>Aprovação instantânea</p></div>
+                  <span className="payment-icon">⚡</span>
+                  <div>
+                    <strong>PIX</strong>
+                    <p>Aprovação instantânea</p>
+                  </div>
                 </div>
               </label>
             </div>
-            <button
-              className="btn-checkout"
-              onClick={handleCheckout}
-              disabled={loading}
-            >
-              {loading ? '⏳ Processando...' : '🔒 Finalizar Pagamento'}
+            <button className="btn-checkout" onClick={handleCheckout} disabled={loading}>
+              {loading ? 'Processando...' : 'Finalizar Pagamento'}
             </button>
             <div className="security-badges">
               <p>🔒 Pagamento 100% seguro</p>
@@ -251,6 +250,7 @@ const Checkout = () => {
               <p>✓ Dados protegidos pelo Mercado Pago</p>
             </div>
           </div>
+
         </div>
       </div>
     </div>
