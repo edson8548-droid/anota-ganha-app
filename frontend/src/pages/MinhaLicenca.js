@@ -151,8 +151,8 @@ const MinhaLicenca = () => {
             <div style={s.extCard}>
               <div style={s.extIcon}>💬</div>
               <div style={{ flex: 1 }}>
-                <div style={s.extName}>Campanhas WhatsApp</div>
-                <div style={s.extDesc}>Dispara ofertas para sua carteira de clientes via WhatsApp Web.</div>
+                <div style={s.extName}>Carteira no WhatsApp</div>
+                <div style={s.extDesc}>Envia sua oferta para toda a carteira pelo WhatsApp Web com mensagens personalizadas.</div>
               </div>
               <a href="/venpro-whatsapp-extension.zip" download style={s.btnDownload}>
                 Baixar

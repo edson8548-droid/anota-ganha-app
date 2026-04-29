@@ -42,11 +42,11 @@ const Plans = () => {
   };
 
   const features = [
-    { icon: <FileSpreadsheet size={22} color="#3A85A8" />, text: 'Cotação Express — planilha preenchida automaticamente' },
-    { icon: <Send size={22} color="#3A85A8" />, text: 'Campanhas WhatsApp — envio em massa para sua carteira' },
-    { icon: <Sparkles size={22} color="#3A85A8" />, text: 'Consultor de Vendas IA — textos, ofertas e scripts' },
+    { icon: <FileSpreadsheet size={22} color="#3A85A8" />, text: 'Cotação Pronta — planilha preenchida automaticamente' },
+    { icon: <Send size={22} color="#3A85A8" />, text: 'Carteira no WhatsApp — envio em massa para seus clientes' },
+    { icon: <Sparkles size={22} color="#3A85A8" />, text: 'IA para Vender Mais — ofertas, negociações e scripts' },
     { icon: <Puzzle size={22} color="#3A85A8" />, text: 'Extensão Cotatudo Automático' },
-    { icon: <BarChart3 size={22} color="#3A85A8" />, text: 'Central de Campanhas e Clientes' },
+    { icon: <BarChart3 size={22} color="#3A85A8" />, text: 'Raio-X dos Incentivos' },
     { icon: <MessageCircle size={22} color="#3A85A8" />, text: 'Suporte via WhatsApp' },
   ];
 

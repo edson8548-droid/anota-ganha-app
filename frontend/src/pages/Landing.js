@@ -93,23 +93,23 @@ const Landing = () => {
         <div className="landing-features-grid">
           <div className="landing-feature-card">
             <div className="landing-feature-icon"><FileSpreadsheet size={32} /></div>
-            <h3>Cotação Express</h3>
-            <p>Suba sua planilha de cotação e receba todos os preços preenchidos automaticamente — por código de barras ou nome do produto.</p>
+            <h3>Cotação Pronta</h3>
+            <p>Suba a planilha do cliente e receba a cotação preenchida automaticamente por código de barras ou nome do produto. Menos digitação, mais tempo para vender.</p>
           </div>
           <div className="landing-feature-card">
             <div className="landing-feature-icon"><Sparkles size={32} /></div>
-            <h3>Consultor de Vendas IA</h3>
-            <p>Crie textos de oferta, emails profissionais, scripts de negociação e muito mais — especializado em representação comercial.</p>
+            <h3>IA para Vender Mais</h3>
+            <p>Digite sua ideia e a IA transforma em mensagem profissional para clientes, crédito, gerência ou indústria. Ofertas, negociações e cobranças em segundos.</p>
           </div>
           <div className="landing-feature-card">
             <div className="landing-feature-icon"><BarChart3 size={32} /></div>
-            <h3>Central de Campanhas</h3>
-            <p>Acompanhe campanhas, monitore positivação de clientes e acompanhe seus resultados de indústria em tempo real.</p>
+            <h3>Raio-X dos Incentivos</h3>
+            <p>Veja clientes positivados, clientes parados e oportunidades para ganhar mais incentivos da indústria — tudo em um só painel.</p>
           </div>
           <div className="landing-feature-card">
             <div className="landing-feature-icon"><MessageCircle size={32} /></div>
-            <h3>Campanhas WhatsApp</h3>
-            <p>Envie ofertas automaticamente para toda sua carteira de clientes com texto e fotos personalizados. (Em breve)</p>
+            <h3>Carteira no WhatsApp</h3>
+            <p>Monte sua oferta uma vez e envie para todos os seus clientes pelo WhatsApp Web com mensagens personalizadas e fotos dos produtos.</p>
           </div>
         </div>
       </section>
