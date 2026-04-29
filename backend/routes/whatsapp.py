@@ -110,12 +110,17 @@ def parse_csv_contacts(content: bytes) -> tuple[list[dict], int]:
     if df is None:
         raise ValueError("Não foi possível ler o CSV")
 
-    def _match(col: str, candidates: list) -> bool:
-        c = col.strip().lower().replace('﻿', '')
-        return any(cand in c for cand in candidates)
+    def _best_col(columns, candidates):
+        """Retorna a coluna com o candidato mais específico (mais longo) — evita falsos positivos."""
+        for cand in sorted(candidates, key=len, reverse=True):
+            for col in columns:
+                c = col.strip().lower().replace('﻿', '')
+                if cand in c:
+                    return col
+        return None
 
-    col_nome = next((c for c in df.columns if _match(c, _NOME_COLS)), None)
-    col_fone = next((c for c in df.columns if _match(c, _FONE_COLS)), None)
+    col_nome = _best_col(df.columns, _NOME_COLS)
+    col_fone = _best_col(df.columns, _FONE_COLS)
 
     if not col_nome or not col_fone:
         raise ValueError(
@@ -128,9 +133,14 @@ def parse_csv_contacts(content: bytes) -> tuple[list[dict], int]:
     sample = df[col_fone].dropna().head(5).tolist()
     print(f"[CSV-DEBUG] Amostra fones: {sample}", flush=True)
 
+    # Tenta detectar coluna de sobrenome para montar nome completo (Google Contacts)
+    col_sobrenome = next((c for c in df.columns if c.strip().lower() in ('last name', 'sobrenome', 'surname')), None)
+
     contacts, invalidos = [], 0
     for _, row in df.iterrows():
-        nome = str(row.get(col_nome, '') or '').strip() or 'Cliente'
+        primeiro = str(row.get(col_nome, '') or '').strip()
+        ultimo = str(row.get(col_sobrenome, '') or '').strip() if col_sobrenome else ''
+        nome = ' '.join(filter(None, [primeiro, ultimo])) or 'Cliente'
         raw_fone = str(row.get(col_fone, '') or '')
         fone = normalize_phone(raw_fone)
         if not fone:
