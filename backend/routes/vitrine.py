@@ -164,6 +164,12 @@ _F3_PRICE_RE = re.compile(r'^(\d+[,\.]\d+)\s+(\d+[,\.]\d+)')   # "1,45  34.80"  
 _F3_SINGLE_RE = re.compile(r'^(\d+[,\.]\d+)\s*$')               # "1,45"          (só unitário)
 _F3_PKG_RE = re.compile(r'\b(CX|FD|SC|TP|PC|PCT|BD|DR|VD|LT|CJ|PT|FRS|PTE|RL|TB|GF|GL|KG|UN|EMB)-(\d+)\s*$', re.IGNORECASE)
 
+# Parser para FORMATO INLINE: "PRODUTO CX-24 2,05" (tudo na mesma linha)
+_FI_RE = re.compile(
+    r'^(.+?)\s+\b(CX|FD|SC|TP|PC|PCT|BD|DR|VD|LT|CJ|PT|FRS|PTE|RL|TB|GF|GL|KG|UN|EMB)-(\d+)\s+(\d+[,\.]\d+)\s*$',
+    re.IGNORECASE
+)
+
 _CATEGORIAS_KW = {
     'Biscoito': ['bisc'],
     'Laticínio': ['leite', 'iogurte', 'manteiga', 'queijo', 'requeijao', 'nata'],
@@ -239,7 +245,54 @@ def _parse_formato3(lista: str) -> list:
     return items
 
 
+def _is_formato_inline(lista: str) -> bool:
+    linhas = [l.strip() for l in lista.split('\n') if l.strip()]
+    if not linhas:
+        return False
+    match_count = sum(1 for l in linhas if _FI_RE.match(l))
+    return match_count >= max(1, len(linhas) * 4 // 10)  # 40%+ das linhas batem
+
+def _parse_formato_inline(lista: str) -> list:
+    items = []
+    for raw in lista.split('\n'):
+        line = raw.strip()
+        if not line:
+            continue
+        m = _FI_RE.match(line)
+        if m:
+            nome = m.group(1).strip()
+            unit = m.group(2).upper()
+            upp = int(m.group(3))
+            unit_price = _parse_br_num(m.group(4))
+            items.append({
+                'product_name': nome,
+                'unit': unit,
+                'units_per_package': upp,
+                'unit_price': unit_price,
+                'price': round(unit_price * upp, 2),
+                'ean': None,
+                'category': _auto_categoria(nome),
+            })
+        elif line[0].isalpha():  # linha sem preço: aceita com price=0
+            pkg_m = _F3_PKG_RE.search(line)
+            if pkg_m:
+                nome = line[:pkg_m.start()].strip()
+                unit, upp = pkg_m.group(1).upper(), int(pkg_m.group(2))
+            else:
+                nome, unit, upp = line, 'UN', None
+            items.append({'product_name': nome, 'unit': unit, 'units_per_package': upp,
+                          'unit_price': None, 'price': 0, 'ean': None, 'category': _auto_categoria(nome)})
+    return items
+
+
 async def parse_lista_gemini(lista: str) -> List[dict]:
+    # Fast path: formato inline — "PRODUTO CX-24 2,05" (tudo na mesma linha)
+    if _is_formato_inline(lista):
+        result = _parse_formato_inline(lista)
+        if result:
+            logger.info(f"[parse_lista] FORMATO_INLINE Python: {len(result)} produtos")
+            return result
+
     # Fast path: parser Python puro para FORMATO 3 (determinístico, mais confiável que Gemini)
     if _is_formato3(lista):
         result = _parse_formato3(lista)
