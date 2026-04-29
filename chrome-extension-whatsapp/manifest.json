@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Venpro — Disparador WhatsApp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Dispara ofertas para clientes via WhatsApp Web com sua campanha Venpro.",
   "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel"],
   "host_permissions": [
