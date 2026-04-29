@@ -411,6 +411,74 @@
 .vp-btn-whatsapp:hover { background: #128c7e; }
 .vp-btn-whatsapp:disabled { background: #d1d5db; cursor: not-allowed; }
 
+/* ── Modal header com botão voltar ── */
+.vp-modal-header { margin-bottom: 12px; }
+.vp-btn-voltar {
+  background: none;
+  border: none;
+  color: #3A85A8;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-bottom: 4px;
+}
+.vp-btn-voltar:hover { text-decoration: underline; }
+
+/* ── Carrinho vazio ── */
+.vp-cart-empty {
+  text-align: center;
+  padding: 30px 10px;
+  color: #9ca3af;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── Dica de salvamento ── */
+.vp-save-hint {
+  text-align: center;
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+/* ── Banner restaurar pedido ── */
+.vp-restore-banner {
+  background: #eff6ff;
+  border-bottom: 1px solid #bfdbfe;
+  padding: 16px;
+  text-align: center;
+}
+.vp-restore-text {
+  font-size: 14px;
+  color: #1d4ed8;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.vp-restore-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.vp-restore-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1.5px solid #bfdbfe;
+  background: #fff;
+  color: #1d4ed8;
+  cursor: pointer;
+  transition: all .15s;
+}
+.vp-restore-btn.primary {
+  background: #3A85A8;
+  color: #fff;
+  border-color: #3A85A8;
+}
+.vp-restore-btn:hover { opacity: 0.9; }
+
 /* Loading / error */
 .vp-loading, .vp-error {
   min-height: 100vh;
