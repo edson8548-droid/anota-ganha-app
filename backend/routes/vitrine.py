@@ -160,7 +160,8 @@ class UpdateItemRequest(BaseModel):
 # ═══════════════════════════════════════
 
 # Parser Python puro para FORMATO 3 (produto na linha 1, preços na linha 2, separados por linhas em branco)
-_F3_PRICE_RE = re.compile(r'^(\d+[,\.]\d+)\s+(\d+[,\.]\d+)')
+_F3_PRICE_RE = re.compile(r'^(\d+[,\.]\d+)\s+(\d+[,\.]\d+)')   # "1,45  34.80"  (unitário + total)
+_F3_SINGLE_RE = re.compile(r'^(\d+[,\.]\d+)\s*$')               # "1,45"          (só unitário)
 _F3_PKG_RE = re.compile(r'\b(CX|FD|SC|TP|PC|PCT|BD|DR|VD|LT|CJ|PT|FRS|PTE|RL|TB|GF|GL|KG|UN|EMB)-(\d+)\s*$', re.IGNORECASE)
 
 _CATEGORIAS_KW = {
@@ -188,7 +189,7 @@ def _is_formato3(lista: str) -> bool:
     linhas = [l.strip() for l in lista.split('\n') if l.strip()]
     if not linhas:
         return False
-    price_count = sum(1 for l in linhas if _F3_PRICE_RE.match(l))
+    price_count = sum(1 for l in linhas if _F3_PRICE_RE.match(l) or _F3_SINGLE_RE.match(l))
     return price_count >= max(1, len(linhas) // 4)
 
 def _parse_formato3(lista: str) -> list:
@@ -199,10 +200,17 @@ def _parse_formato3(lista: str) -> list:
         if not line:
             continue
         pm = _F3_PRICE_RE.match(line)
-        if pm:
+        sm = None if pm else _F3_SINGLE_RE.match(line)
+        if pm or sm:
             if current is not None:
-                current['unit_price'] = _parse_br_num(pm.group(1))
-                current['price'] = _parse_br_num(pm.group(2))
+                if pm:
+                    current['unit_price'] = _parse_br_num(pm.group(1))
+                    current['price'] = _parse_br_num(pm.group(2))
+                else:
+                    up = _parse_br_num(sm.group(1))
+                    upp = current.get('units_per_package')
+                    current['unit_price'] = up
+                    current['price'] = round(up * upp, 2) if upp else up
                 items.append(current)
                 current = None
         elif line[0].isalpha():
