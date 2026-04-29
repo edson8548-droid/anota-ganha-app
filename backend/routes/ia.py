@@ -62,7 +62,7 @@ async def chat(request: ChatRequest):
         ]
 
         chat = client.chats.create(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             config=genai_types.GenerateContentConfig(
                 system_instruction=SYSTEM_PROMPT,
             ),

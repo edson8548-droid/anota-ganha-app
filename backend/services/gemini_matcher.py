@@ -118,7 +118,7 @@ def gemini_match_batch(itens_sem_match, precos_nome_lista, max_items=50):
                 disponiveis=_build_disponiveis_filtrado(candidatos_indexados),
             )
 
-            response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+            response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
             text = response.text.strip()
 
             if text.startswith("```"):

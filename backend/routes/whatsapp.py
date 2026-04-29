@@ -285,7 +285,7 @@ async def sugerir_mensagem_ia(payload: IaMensagemPayload, uid: str = Depends(get
     def _generate():
         client = _genai.Client(api_key=api_key)
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             contents=payload.descricao,
             config=_genai_types.GenerateContentConfig(
                 system_instruction=_IA_PROMPT,
