@@ -1,228 +1,240 @@
-/* COLE EM: src/pages/Checkout.css */
+/* Checkout Venpro — Tema dark padrão do site */
 
 .checkout-page {
   min-height: 100vh;
   background: #2B2D31;
-  padding: 40px 20px;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
-.checkout-container {
-  max-width: 1200px;
+/* ── Header sticky padrão ─────────────────────── */
+.checkout-header-bar {
+  background: rgba(43,45,49,0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #4A4D52;
+  padding: 0 24px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.checkout-header-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 860px;
   margin: 0 auto;
 }
 
-/* ============================================
-   HEADER
-   ============================================ */
-
-.checkout-header {
-  margin-bottom: 40px;
-}
-
 .btn-back-checkout {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  padding: 10px 20px;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
+  background: none;
+  border: 1px solid #4A4D52;
+  border-radius: 8px;
+  padding: 6px 16px;
   cursor: pointer;
-  transition: all 0.3s;
-  backdrop-filter: blur(10px);
-  margin-bottom: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #A0A3A8;
+  transition: color .2s, border-color .2s;
 }
 
 .btn-back-checkout:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateX(-5px);
+  color: #E1E1E1;
+  border-color: #5A5D63;
 }
 
-.checkout-header h1 {
-  color: white;
-  font-size: 36px;
+.checkout-header-title {
+  font-size: 15px;
   font-weight: 700;
-  margin: 0;
-  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.2);
+  color: #ffffff;
 }
 
-/* ============================================
-   GRID
-   ============================================ */
+/* ── Body ─────────────────────────────────────── */
+.checkout-body {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 32px 20px 60px;
+}
 
+/* ── Grid ─────────────────────────────────────── */
 .checkout-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 30px;
+  gap: 20px;
 }
 
-/* ============================================
-   RESUMO DO PEDIDO
-   ============================================ */
-
-.checkout-summary {
-  background: white;
-  border-radius: 24px;
-  padding: 40px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-}
-
-.checkout-summary h2 {
-  font-size: 24px;
-  font-weight: 700;
-  color: #111827;
-  margin: 0 0 25px 0;
-}
-
-.plan-summary-card {
-  background: #f9fafb;
+/* ── Cards ────────────────────────────────────── */
+.checkout-card {
+  background: #363940;
+  border: 1px solid #4A4D52;
   border-radius: 16px;
-  padding: 25px;
-  margin-bottom: 20px;
+  padding: 28px 24px;
 }
 
-.plan-summary-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
+.checkout-card h2 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #A0A3A8;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin: 0 0 20px;
 }
 
-.plan-badge-small {
-  font-size: 24px;
-}
-
-.plan-summary-header h3 {
+/* ── Resumo do plano ──────────────────────────── */
+.plan-summary-name {
   font-size: 20px;
   font-weight: 700;
-  color: #111827;
-  margin: 0;
+  color: #E1E1E1;
+  margin: 0 0 16px;
 }
 
-.plan-summary-price {
+.plan-summary-price-block {
+  background: #2B2D31;
+  border: 1px solid #4A4D52;
+  border-radius: 12px;
+  padding: 16px;
   text-align: center;
-  margin-bottom: 20px;
-}
-
-.price-installments-checkout {
-  font-size: 14px;
-  color: #6b7280;
-  margin-bottom: 5px;
+  margin-bottom: 16px;
 }
 
 .price-main-checkout {
-  font-size: 42px;
-  font-weight: 700;
-  color: #111827;
+  font-size: 36px;
+  font-weight: 800;
+  color: #E1E1E1;
 }
 
 .price-period-checkout {
-  font-size: 18px;
-  color: #6b7280;
+  font-size: 15px;
+  color: #A0A3A8;
+  font-weight: 400;
+}
+
+.price-installments-checkout {
+  font-size: 13px;
+  color: #A0A3A8;
+  margin-bottom: 4px;
 }
 
 .price-total-checkout {
-  font-size: 16px;
-  color: #6b7280;
-  margin-top: 5px;
+  font-size: 13px;
+  color: #A0A3A8;
+  margin-top: 4px;
 }
 
 .savings-checkout {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  color: white;
-  padding: 12px;
-  border-radius: 10px;
+  background: rgba(46,204,138,.12);
+  border: 1px solid rgba(46,204,138,.3);
+  color: #2ECC8A;
+  padding: 10px 14px;
+  border-radius: 8px;
   text-align: center;
-  font-weight: 700;
-  margin-bottom: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.plan-summary-features {
+  border-top: 1px solid #4A4D52;
+  padding-top: 16px;
 }
 
 .plan-summary-features h4 {
-  font-size: 16px;
+  font-size: 12px;
   font-weight: 700;
-  color: #111827;
-  margin: 0 0 12px 0;
+  color: #A0A3A8;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin: 0 0 10px;
 }
 
 .plan-summary-features ul {
   list-style: none;
   padding: 0;
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .plan-summary-features li {
-  padding: 8px 0;
-  font-size: 14px;
-  color: #374151;
+  font-size: 13px;
+  color: #C8CDD5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-summary-features li::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(49,112,142,.25);
+  border: 1px solid #31708E;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .trial-info-checkout {
-  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
-  color: white;
-  padding: 20px;
-  border-radius: 16px;
+  background: rgba(49,112,142,.1);
+  border: 1px solid rgba(49,112,142,.35);
+  border-radius: 10px;
+  padding: 14px 16px;
   display: flex;
-  align-items: center;
-  gap: 15px;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 16px;
 }
 
-.trial-icon-checkout {
-  font-size: 36px;
+.trial-info-checkout .trial-icon-checkout {
+  font-size: 20px;
+  flex-shrink: 0;
 }
 
 .trial-info-checkout strong {
   display: block;
-  font-size: 16px;
-  margin-bottom: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #E1E1E1;
+  margin-bottom: 2px;
 }
 
 .trial-info-checkout p {
   margin: 0;
-  font-size: 14px;
-  opacity: 0.95;
+  font-size: 12px;
+  color: #A0A3A8;
 }
 
-/* ============================================
-   PAGAMENTO
-   ============================================ */
-
-.checkout-payment {
-  background: white;
-  border-radius: 24px;
-  padding: 40px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-}
-
-.checkout-payment h2 {
-  font-size: 24px;
-  font-weight: 700;
-  color: #111827;
-  margin: 0 0 25px 0;
-}
-
+/* ── Métodos de pagamento ─────────────────────── */
 .payment-methods {
-  margin-bottom: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
 }
 
 .payment-method-option {
   display: block;
-  background: #f9fafb;
-  border: 3px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 20px;
-  margin-bottom: 15px;
+  background: #2B2D31;
+  border: 1px solid #4A4D52;
+  border-radius: 10px;
+  padding: 14px 16px;
   cursor: pointer;
-  transition: all 0.3s;
-  position: relative;
+  transition: border-color .2s, background .2s;
 }
 
 .payment-method-option:hover {
-  border-color: #7c3aed;
+  border-color: #3A85A8;
 }
 
 .payment-method-option.selected {
-  border-color: #7c3aed;
-  background: #faf5ff;
+  border-color: #31708E;
+  background: rgba(49,112,142,.1);
 }
 
 .payment-method-option input[type="radio"] {
@@ -235,78 +247,89 @@
 .payment-method-content {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 12px;
 }
 
 .payment-icon {
-  font-size: 32px;
+  font-size: 22px;
+  width: 32px;
+  text-align: center;
+  flex-shrink: 0;
 }
 
 .payment-method-content strong {
   display: block;
-  font-size: 16px;
-  color: #111827;
-  margin-bottom: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #E1E1E1;
+  margin-bottom: 2px;
 }
 
 .payment-method-content p {
   margin: 0;
-  font-size: 14px;
-  color: #6b7280;
+  font-size: 12px;
+  color: #A0A3A8;
 }
 
+/* ── Botão de checkout ────────────────────────── */
 .btn-checkout {
   width: 100%;
-  padding: 18px;
-  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
-  color: white;
+  padding: 15px;
+  background: linear-gradient(135deg, #31708E, #3A85A8);
+  color: #fff;
   border: none;
-  border-radius: 12px;
-  font-size: 18px;
+  border-radius: 10px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.3s;
-  margin-bottom: 20px;
+  transition: opacity .2s, transform .15s;
+  margin-bottom: 16px;
+  letter-spacing: .01em;
 }
 
 .btn-checkout:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.4);
+  opacity: .9;
+  transform: translateY(-1px);
 }
 
 .btn-checkout:disabled {
-  opacity: 0.6;
+  opacity: .5;
   cursor: not-allowed;
 }
 
+/* ── Selos de segurança ───────────────────────── */
 .security-badges {
-  text-align: center;
-  padding: 20px;
-  background: #f9fafb;
-  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  background: #2B2D31;
+  border: 1px solid #4A4D52;
+  border-radius: 8px;
 }
 
 .security-badges p {
-  margin: 8px 0;
-  font-size: 14px;
-  color: #6b7280;
+  margin: 0;
+  font-size: 12px;
+  color: #A0A3A8;
 }
 
-/* ============================================
-   RESPONSIVE
-   ============================================ */
+/* ── Skeleton loading ─────────────────────────── */
+.skeleton {
+  display: block;
+  background: linear-gradient(90deg, #363940 25%, #42454A 50%, #363940 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shine 1.4s infinite;
+  border-radius: 6px;
+}
 
-@media (max-width: 968px) {
-  .checkout-grid {
-    grid-template-columns: 1fr;
-  }
+@keyframes skeleton-shine {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 
-  .checkout-summary,
-  .checkout-payment {
-    padding: 30px 20px;
-  }
-
-  .checkout-header h1 {
-    font-size: 28px;
-  }
+/* ── Responsive ───────────────────────────────── */
+@media (max-width: 680px) {
+  .checkout-grid { grid-template-columns: 1fr; }
+  .checkout-body { padding: 20px 16px 40px; }
 }
