@@ -161,10 +161,11 @@ class UpdateItemRequest(BaseModel):
 
 async def parse_lista_gemini(lista: str) -> List[dict]:
     prompt = f"""Você é um parser de listas de produtos de representantes comerciais brasileiros.
+Extraia TODOS os produtos encontrados. Aceite informações parciais — apenas o nome do produto já é suficiente.
 
 A lista pode estar em vários formatos:
 
-FORMATO 1 — Texto livre (uma linha por produto):
+FORMATO 1 — Texto livre, uma linha por produto:
 AGUA SANITARIA YPE 2L R$ 8,54 CX 8UN
 LAVA ROUPA PO ASSIM 800G R$ 119,00 FD 20UN
 
@@ -172,30 +173,49 @@ FORMATO 2 — CSV com ponto e vírgula (com ou sem cabeçalho):
 Produto;R$ Unitário;Emb.;Qtde;UN;R$ Emb.
 COCO RAL MENINA 100G TRAD;2,052;CX-24;1;24;49,250
 
-FORMATO 3 — Tabela com espaços ou tabulação.
+FORMATO 3 — Duas linhas por produto separadas por linha em branco:
+  Linha 1: nome do produto (pode terminar com código de embalagem tipo CX-24, FD-20, TP, etc.)
+  Linha 2: preco_unitario  preco_embalagem  (separados por espaço/tab; pode estar ausente)
+  Exemplo:
+  COCO RAL MENINA 100G TRAD CX-24
+  2,05  49.250
 
-Regras para o FORMATO 2 (CSV com ponto e vírgula):
+  LEITE COND ITALAC 395G CX-27
+  5,04  136.150
+
+FORMATO 4 — Tabela com espaços ou tabulação, uma linha por produto.
+
+Regras para FORMATO 2 (CSV ponto e vírgula):
 - product_name: coluna "Produto"
-- price: coluna "R$ Emb." (preço da embalagem que o cliente paga) convertido para float
+- price: coluna "R$ Emb." convertido para float
 - unit_price: coluna "R$ Unitário" convertido para float
-- unit: extraia de "Emb." — ex: "CX-24" → "CX", "FD-20" → "FD"
-- units_per_package: extraia o número de "Emb." — ex: "CX-24" → 24, ou use coluna "UN"
-- IGNORE a coluna "Qtde" (é quantidade de pedido, não serve para a oferta)
+- unit: parte de texto de "Emb." — "CX-24" -> "CX", "FD-20" -> "FD"
+- units_per_package: número de "Emb." — "CX-24" -> 24, "FD-20" -> 20
+- IGNORE completamente a coluna "Qtde"
+
+Regras para FORMATO 3 (duas linhas):
+- product_name: conteúdo da linha 1, sem o código de embalagem do final
+- unit: código de embalagem no final da linha 1 — "CX-24" -> "CX", "FD-20" -> "FD"; padrão "UN"
+- units_per_package: número do código — "CX-24" -> 24, "FD-20" -> 20; null se ausente
+- unit_price: 1º número da linha 2 (vírgula=decimal) — "2,05" -> 2.05; null se linha 2 ausente
+- price: 2º número da linha 2 (ponto=decimal) — "49.250" -> 49.25; 0 se ausente
+- Produtos sem linha 2 são válidos: price=0, unit_price=null
 
 Regras para FORMATO 1 (texto livre):
-- price: preço mencionado (por unidade ou embalagem)
-- unit: tipo mencionado (CX, FD, UN, etc.), default "UN"
-- units_per_package: número após CX/FD se mencionado
+- price: valor numérico encontrado; 0 se não houver
+- unit: tipo de embalagem (CX, FD, UN); padrão "UN"
+- units_per_package: número junto ao tipo se mencionado
 
 Regras gerais:
-- ean: código de barras se presente, null caso contrário
-- category: categorize (Biscoito, Laticínio, Limpeza, Enlatado, Bebida, Higiene, Mercearia, etc.)
-- Números brasileiros: vírgula é decimal (2,052 → 2.052, 49,250 → 49.25)
-- Ignore linhas de cabeçalho e linhas em branco
+- Aceite informações parciais — product_name sozinho já é válido, use price=0
+- ean: código de barras de 13 dígitos se presente, null caso contrário
+- category: Biscoito, Laticínio, Limpeza, Enlatado, Bebida, Higiene, Mercearia, etc.
+- Vírgula como decimal: 2,05 -> 2.05
+- Ponto como decimal (não milhar): 49.250 -> 49.25
+- Ignore cabeçalhos de tabela, linhas separadoras e linhas totalmente em branco
 
-Retorne APENAS um array JSON válido, sem markdown, sem explicação.
-Exemplo de saída para o formato CSV:
-[{{"product_name":"Coco Ralado Menina 100g Tradicional","price":49.25,"unit_price":2.052,"unit":"CX","units_per_package":24,"ean":null,"category":"Mercearia"}}]
+Retorne APENAS um array JSON válido, sem markdown, sem explicação:
+[{{"product_name":"Coco Ralado Menina 100g Tradicional","price":49.25,"unit_price":2.05,"unit":"CX","units_per_package":24,"ean":null,"category":"Mercearia"}}]
 
 Lista para processar:
 {lista}"""
@@ -206,7 +226,7 @@ Lista para processar:
             client.models.generate_content,
             model="gemini-2.0-flash",
             contents=prompt,
-            config=genai_types.GenerateContentConfig(temperature=0.1, max_output_tokens=4096),
+            config=genai_types.GenerateContentConfig(temperature=0.1, max_output_tokens=8192),
         )
         text = response.text.strip()
         # Remover possíveis blocos markdown
