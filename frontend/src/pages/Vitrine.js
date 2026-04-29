@@ -484,9 +484,9 @@ function ItemReview({ item, onChange, onRemove, onImageChange, onSearchImage }) 
               title="Buscar foto no Google"
               onClick={onSearchImage}
               disabled={item._searching}
-              style={{ background:'none', border:'none', cursor:'pointer', color: item._imagePreview ? '#3A85A8' : '#6B6E74', padding:0, display:'flex', alignItems:'center' }}
+              style={{ background: item._imagePreview ? 'rgba(58,133,168,.15)' : '#363940', border: '1px solid #4A4D52', borderRadius: 6, cursor:'pointer', color: item._imagePreview ? '#3A85A8' : '#A0A3A8', padding:'4px 8px', display:'flex', alignItems:'center', gap: 4, fontSize: 11, fontWeight: 600 }}
             >
-              {item._searching ? <span style={{ fontSize:10 }}>...</span> : <Search size={13} />}
+              {item._searching ? '...' : <><Search size={12} /> Foto</>}
             </button>
           </div>
           <div className="vt-review-item-name">
