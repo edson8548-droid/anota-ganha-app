@@ -10,6 +10,7 @@ import uuid
 import asyncio
 import logging
 import unicodedata
+import requests
 from datetime import datetime, timezone
 from typing import List, Optional, Any
 
