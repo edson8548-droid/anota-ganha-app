@@ -159,7 +159,86 @@ class UpdateItemRequest(BaseModel):
 # PARSE DE LISTA VIA GEMINI
 # ═══════════════════════════════════════
 
+# Parser Python puro para FORMATO 3 (produto na linha 1, preços na linha 2, separados por linhas em branco)
+_F3_PRICE_RE = re.compile(r'^(\d+[,\.]\d+)\s+(\d+[,\.]\d+)')
+_F3_PKG_RE = re.compile(r'\b(CX|FD|SC|TP|PC|PCT|BD|DR|VD|LT|CJ|PT|FRS|PTE|RL|TB|GF|GL|KG|UN|EMB)-(\d+)\s*$', re.IGNORECASE)
+
+_CATEGORIAS_KW = {
+    'Biscoito': ['bisc'],
+    'Laticínio': ['leite', 'iogurte', 'manteiga', 'queijo', 'requeijao', 'nata'],
+    'Enlatado': ['sard', 'atum', 'molho', 'extrato'],
+    'Bebida': ['cha ', 'cafe', 'suco', 'refri'],
+    'Limpeza': ['lava roupa', 'lava loucas', 'sabao', 'deterg', 'cera ', 'inset', 'brilho'],
+    'Higiene': ['sabonete', 'shampoo', 'creme dent', 'fio dental', 'desodor'],
+    'Mercearia': ['coco', 'oleo', 'vinagre', 'macarr', 'arroz', 'feijao', 'farinha'],
+}
+
+def _auto_categoria(nome: str) -> str:
+    nl = nome.lower()
+    for cat, kws in _CATEGORIAS_KW.items():
+        if any(kw in nl for kw in kws):
+            return cat
+    return 'Mercearia'
+
+def _parse_br_num(s: str) -> float:
+    s = s.strip()
+    return float(s.replace(',', '.')) if ',' in s else float(s)
+
+def _is_formato3(lista: str) -> bool:
+    linhas = [l.strip() for l in lista.split('\n') if l.strip()]
+    if not linhas:
+        return False
+    price_count = sum(1 for l in linhas if _F3_PRICE_RE.match(l))
+    return price_count >= max(1, len(linhas) // 4)
+
+def _parse_formato3(lista: str) -> list:
+    items = []
+    current = None
+    for raw in lista.split('\n'):
+        line = raw.strip()
+        if not line:
+            continue
+        pm = _F3_PRICE_RE.match(line)
+        if pm:
+            if current is not None:
+                current['unit_price'] = _parse_br_num(pm.group(1))
+                current['price'] = _parse_br_num(pm.group(2))
+                items.append(current)
+                current = None
+        elif line[0].isalpha():
+            if current is not None:
+                current.setdefault('unit_price', None)
+                current.setdefault('price', 0)
+                items.append(current)
+            pkg_m = _F3_PKG_RE.search(line)
+            if pkg_m:
+                unit = pkg_m.group(1).upper()
+                upp = int(pkg_m.group(2))
+                nome = line[:pkg_m.start()].strip()
+            else:
+                unit, upp, nome = 'UN', None, line
+            current = {
+                'product_name': nome,
+                'unit': unit,
+                'units_per_package': upp,
+                'ean': None,
+                'category': _auto_categoria(nome),
+            }
+    if current is not None:
+        current.setdefault('unit_price', None)
+        current.setdefault('price', 0)
+        items.append(current)
+    return items
+
+
 async def parse_lista_gemini(lista: str) -> List[dict]:
+    # Fast path: parser Python puro para FORMATO 3 (determinístico, mais confiável que Gemini)
+    if _is_formato3(lista):
+        result = _parse_formato3(lista)
+        if result:
+            logger.info(f"[parse_lista] FORMATO3 Python: {len(result)} produtos")
+            return result
+
     prompt = f"""Você é um parser de listas de produtos de representantes comerciais brasileiros.
 Extraia TODOS os produtos encontrados. Aceite informações parciais — apenas o nome do produto já é suficiente.
 
