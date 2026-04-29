@@ -544,25 +544,29 @@ async def sugerir_imagem(product_name: str, uid: str = Depends(get_user_id)):
         params = {
             "key": GOOGLE_CSE_KEY,
             "cx": GOOGLE_CSE_CX,
-            "q": product_name,
+            "q": f"{product_name} produto",
             "searchType": "image",
-            "num": 1,
-            "safe": "active",
-            "imgType": "photo",
+            "num": 3,
+            "gl": "br",
+            "lr": "lang_pt",
         }
         resp = requests.get(
             "https://www.googleapis.com/customsearch/v1",
             params=params,
-            timeout=5
+            timeout=8
         )
         if resp.status_code == 200:
             items = resp.json().get("items", [])
-            if items:
-                image_url = items[0].get("link")
-                if image_url:
-                    return {"found": True, "image_url": image_url, "match": "google"}
-    except Exception:
-        pass
+            # Prefere imagens que não sejam SVG ou ícones pequenos
+            for it in items:
+                link = it.get("link", "")
+                if link and not link.endswith(".svg"):
+                    return {"found": True, "image_url": link, "match": "google"}
+        # Log do erro para debug
+        elif resp.status_code != 200:
+            print(f"[Google CSE] status={resp.status_code} body={resp.text[:200]}")
+    except Exception as e:
+        print(f"[Google CSE] exception: {e}")
 
     return {"found": False, "image_url": None, "match": None}
 
