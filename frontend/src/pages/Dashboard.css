@@ -98,14 +98,6 @@
 .btn-nav.active { background: var(--acento); color: #fff; border-color: var(--acento); }
 .btn-nav.active:hover { background: var(--acento2); }
 
-.btn-notification {
-  position: relative;
-  padding: .55rem .7rem;
-  font-size: 1rem;
-  min-width: 40px;
-  justify-content: center;
-}
-.btn-notification:hover { color: var(--amarelo); border-color: var(--amarelo); background: rgba(232,168,48,.08); }
 
 .user-menu {
   display: flex;
