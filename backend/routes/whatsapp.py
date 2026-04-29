@@ -82,7 +82,13 @@ _FONE_COLS = ['telefone', 'phone', 'celular', 'whatsapp', 'numero', 'número',
 def normalize_phone(raw: str) -> Optional[str]:
     if not raw or str(raw).strip().lower() in ('', 'nan', 'none'):
         return None
-    num = re.sub(r'\D', '', str(raw).split(':::')[-1])
+    text = str(raw).split(':::')[-1].strip()
+    # Converte notação científica do Excel (ex: 1.1997501798E+10 → "11997501798")
+    try:
+        text = str(int(float(text)))
+    except (ValueError, OverflowError):
+        pass
+    num = re.sub(r'\D', '', text)
     if not num:
         return None
     if num.startswith('0'):
@@ -263,13 +269,16 @@ from google import genai as _genai
 from google.genai import types as _genai_types
 
 _IA_PROMPT = """Você é o Assistente Venpro, especializado em representação comercial no Brasil.
-Crie um texto de oferta chamativo para WhatsApp.
-REGRAS:
-- NÃO inclua saudação (Bom dia/Olá/nome do cliente) — o robô adiciona automaticamente.
-- Comece direto no conteúdo da oferta.
-- Use emojis com moderação.
-- Destaque produto, preço e prazo quando disponíveis.
-- Máximo 5 linhas. Português brasileiro informal."""
+Crie um texto de oferta direto e impactante para WhatsApp de representante comercial.
+
+REGRAS OBRIGATÓRIAS:
+- NÃO inclua saudação — o robô já adiciona "Bom dia/tarde, [NOME]!" automaticamente.
+- Comece já na oferta, sem enrolação.
+- Use APENAS as informações que o usuário forneceu. Nunca invente preços, prazos ou links.
+- Se o usuário mencionou um link/URL, inclua-o literalmente no texto. Nunca substitua por [LINK] ou similar.
+- Se faltam informações (preço, prazo), escreva o texto sem elas — não use placeholders.
+- Máximo 5 linhas. Português brasileiro informal.
+- Emojis: no máximo 3, só se ficarem naturais."""
 
 
 class IaMensagemPayload(BaseModel):
