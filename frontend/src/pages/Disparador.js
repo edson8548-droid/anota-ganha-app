@@ -125,7 +125,7 @@ export default function Disparador() {
             ← Dashboard
           </button>
           <span style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Send size={16} /> Campanhas WhatsApp
+            <Send size={16} /> Carteira no WhatsApp
           </span>
         </div>
       </header>

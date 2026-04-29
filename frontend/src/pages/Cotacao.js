@@ -151,7 +151,7 @@ export default function Cotacao() {
             <span style={{ fontWeight: 800, fontSize: 17, color: '#fff' }}>
               Ven<span style={{ color: '#3A85A8' }}>pro</span>
             </span>
-            <span style={{ color: '#A0A3A8', fontSize: 13, fontWeight: 500 }}>Cotação Express</span>
+            <span style={{ color: '#A0A3A8', fontSize: 13, fontWeight: 500 }}>Cotação Pronta</span>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

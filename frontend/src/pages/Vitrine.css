@@ -1,0 +1,193 @@
+/* ── Vitrine Inteligente — Painel RCA ── */
+.vt-page {
+  min-height: 100vh;
+  background: #2B2D31;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  color: #E1E1E1;
+}
+
+/* Header */
+.vt-header {
+  background: rgba(43,45,49,0.97);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #4A4D52;
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.vt-header-left { display: flex; align-items: center; gap: 14px; }
+.vt-btn-back {
+  background: none; border: 1px solid #4A4D52; border-radius: 8px;
+  padding: 6px 14px; font-size: 13px; font-weight: 600;
+  color: #A0A3A8; cursor: pointer; transition: all .2s;
+}
+.vt-btn-back:hover { border-color: #3A85A8; color: #3A85A8; }
+.vt-header-title { font-size: 15px; font-weight: 700; color: #E1E1E1; }
+.vt-header-sub   { font-size: 11px; color: #6B6E74; }
+
+/* Body */
+.vt-body { max-width: 900px; margin: 0 auto; padding: 28px 24px; }
+
+/* Lista de vitrines */
+.vt-list-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
+}
+.vt-list-title { font-size: 18px; font-weight: 700; color: #E1E1E1; }
+.vt-list-sub   { font-size: 13px; color: #6B6E74; margin-top: 2px; }
+.vt-btn-new {
+  background: #3A85A8; color: #fff; border: none;
+  padding: 10px 20px; border-radius: 10px; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: background .2s;
+}
+.vt-btn-new:hover { background: #31708E; }
+
+/* Vitrine card */
+.vt-card {
+  background: #363940; border: 1px solid #4A4D52; border-radius: 14px;
+  padding: 20px; margin-bottom: 14px; transition: border-color .2s;
+}
+.vt-card:hover { border-color: #3A85A8; }
+.vt-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.vt-card-info { flex: 1; }
+.vt-card-title { font-size: 16px; font-weight: 700; color: #E1E1E1; margin-bottom: 4px; }
+.vt-card-meta  { font-size: 12px; color: #6B6E74; }
+.vt-card-meta span { margin-right: 12px; }
+.vt-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+}
+.vt-badge.active   { background: rgba(16,185,129,.15); color: #10b981; border: 1px solid rgba(16,185,129,.3); }
+.vt-badge.inactive { background: rgba(107,110,116,.15); color: #6B6E74; border: 1px solid #4A4D52; }
+.vt-card-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+.vt-link-box {
+  flex: 1; background: #2B2D31; border: 1px solid #4A4D52; border-radius: 8px;
+  padding: 7px 12px; font-size: 12px; color: #A0A3A8; font-family: monospace;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.vt-btn-sm {
+  background: none; border: 1px solid #4A4D52; border-radius: 8px;
+  padding: 6px 14px; font-size: 12px; font-weight: 600; color: #A0A3A8;
+  cursor: pointer; transition: all .2s; white-space: nowrap;
+}
+.vt-btn-sm:hover { border-color: #3A85A8; color: #3A85A8; }
+.vt-btn-sm.danger:hover { border-color: rgba(239,68,68,.5); color: #ef4444; }
+.vt-btn-sm.primary { background: #3A85A8; border-color: #3A85A8; color: #fff; }
+.vt-btn-sm.primary:hover { background: #31708E; }
+
+/* Empty state */
+.vt-empty {
+  text-align: center; padding: 60px 20px; color: #6B6E74;
+}
+.vt-empty-ico { font-size: 48px; margin-bottom: 14px; }
+.vt-empty-title { font-size: 18px; font-weight: 700; color: #A0A3A8; margin-bottom: 6px; }
+.vt-empty-sub { font-size: 14px; line-height: 1.6; }
+
+/* Limit info */
+.vt-limit-info {
+  background: rgba(58,133,168,.08); border: 1px solid rgba(58,133,168,.2);
+  border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #A0A3A8;
+  margin-bottom: 20px; display: flex; align-items: center; gap: 8px;
+}
+
+/* ── Formulário criar/editar ── */
+.vt-form { display: flex; flex-direction: column; gap: 20px; }
+.vt-form-section {
+  background: #363940; border: 1px solid #4A4D52; border-radius: 14px; padding: 24px;
+}
+.vt-form-section-title {
+  font-size: 14px; font-weight: 700; color: #E1E1E1; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.vt-field { margin-bottom: 16px; }
+.vt-field:last-child { margin-bottom: 0; }
+.vt-label {
+  display: block; font-size: 12px; font-weight: 700; color: #A0A3A8;
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;
+}
+.vt-input {
+  width: 100%; padding: 11px 14px; background: #2B2D31;
+  border: 1px solid #4A4D52; border-radius: 9px; color: #E1E1E1;
+  font-size: 14px; font-family: inherit; box-sizing: border-box; transition: border-color .2s;
+}
+.vt-input:focus { outline: none; border-color: #3A85A8; }
+.vt-input::placeholder { color: #6B6E74; }
+.vt-textarea { resize: vertical; min-height: 80px; }
+.vt-row { display: grid; gap: 12px; }
+.vt-row.col2 { grid-template-columns: 1fr 1fr; }
+.vt-row.col3 { grid-template-columns: 1fr 1fr 1fr; }
+
+/* Pasta lista */
+.vt-paste-area {
+  border: 2px dashed #4A4D52; border-radius: 10px; padding: 20px;
+  margin-bottom: 16px; transition: border-color .2s;
+}
+.vt-paste-area:focus-within { border-color: #3A85A8; }
+.vt-paste-hint { font-size: 12px; color: #6B6E74; margin-top: 8px; line-height: 1.5; }
+
+/* Botões de ação do form */
+.vt-form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+.vt-btn-primary {
+  background: #3A85A8; color: #fff; border: none;
+  padding: 12px 28px; border-radius: 10px; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: background .2s;
+}
+.vt-btn-primary:hover:not(:disabled) { background: #31708E; }
+.vt-btn-primary:disabled { background: #4A4D52; cursor: not-allowed; }
+.vt-btn-secondary {
+  background: none; border: 1px solid #4A4D52; color: #A0A3A8;
+  padding: 12px 28px; border-radius: 10px; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all .2s;
+}
+.vt-btn-secondary:hover { border-color: #3A85A8; color: #3A85A8; }
+
+/* ── Revisão de produtos (parse) ── */
+.vt-review-list { display: flex; flex-direction: column; gap: 12px; }
+.vt-review-item {
+  background: #2B2D31; border: 1px solid #4A4D52; border-radius: 12px; padding: 16px;
+  display: grid; gap: 10px;
+}
+.vt-review-item-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.vt-review-item-name { font-size: 14px; font-weight: 700; color: #E1E1E1; }
+.vt-review-item-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.vt-review-field label { font-size: 10px; font-weight: 700; color: #6B6E74; text-transform: uppercase; display: block; margin-bottom: 3px; }
+.vt-review-field input, .vt-review-field select {
+  width: 100%; padding: 6px 10px; background: #363940; border: 1px solid #4A4D52;
+  border-radius: 7px; color: #E1E1E1; font-size: 13px; box-sizing: border-box;
+}
+.vt-review-field input:focus, .vt-review-field select:focus { outline: none; border-color: #3A85A8; }
+
+/* Imagem no review */
+.vt-img-box {
+  width: 64px; height: 64px; border-radius: 8px; border: 1px solid #4A4D52;
+  background: #363940; overflow: hidden; flex-shrink: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: #6B6E74; font-size: 22px;
+  position: relative;
+}
+.vt-img-box img { width: 100%; height: 100%; object-fit: cover; }
+.vt-img-box .vt-img-overlay {
+  position: absolute; inset: 0; background: rgba(0,0,0,.5);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .2s; font-size: 12px; color: #fff; font-weight: 600;
+}
+.vt-img-box:hover .vt-img-overlay { opacity: 1; }
+
+/* Remover item */
+.vt-btn-remove {
+  background: none; border: none; color: #6B6E74; cursor: pointer; padding: 4px;
+  border-radius: 6px; transition: color .2s;
+}
+.vt-btn-remove:hover { color: #ef4444; }
+
+@media (max-width: 640px) {
+  .vt-body { padding: 16px; }
+  .vt-row.col2, .vt-row.col3 { grid-template-columns: 1fr; }
+  .vt-card-actions { flex-direction: column; }
+  .vt-link-box { width: 100%; }
+}

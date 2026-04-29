@@ -1,13 +1,13 @@
 :root {
-  --ia-bg:      #F0EFEB;
-  --ia-card:    #FFFFFF;
-  --ia-borda:   #D6D4CE;
-  --ia-texto:   #2D2926;
-  --ia-sub:     #6B6560;
-  --ia-sub2:    #9B9690;
-  --ia-acento:  #B35C44;
-  --ia-acento2: #C96B52;
-  --ia-bg3:     #E8E6E0;
+  --ia-bg:      #2B2D31;
+  --ia-card:    #363940;
+  --ia-borda:   #4A4D52;
+  --ia-texto:   #E1E1E1;
+  --ia-sub:     #A0A3A8;
+  --ia-sub2:    #6B6E74;
+  --ia-acento:  #3A85A8;
+  --ia-acento2: #31708E;
+  --ia-bg3:     #45484e;
 }
 
 .ia-page {
@@ -21,7 +21,7 @@
 
 /* ── Header ── */
 .ia-header {
-  background: rgba(240,239,235,.95);
+  background: rgba(43,45,49,.97);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--ia-borda);
   padding: 0 5%;
@@ -128,7 +128,7 @@
 }
 .ia-prompt-btn:hover {
   border-color: var(--ia-acento);
-  background: #FDF8F6;
+  background: rgba(58,133,168,.06);
 }
 .ia-prompt-btn span {
   display: block;
@@ -170,7 +170,7 @@
   color: var(--ia-sub2);
   text-align: center;
 }
-.ia-empty-ico { font-size: 38px; }
+.ia-empty-ico { display: flex; align-items: center; justify-content: center; }
 .ia-empty-title { font-size: 15px; font-weight: 700; color: var(--ia-sub); }
 .ia-empty-sub { font-size: 13px; line-height: 1.55; max-width: 300px; }
 
@@ -192,8 +192,8 @@
   word-break: break-word;
 }
 .ia-msg.user .ia-bubble {
-  background: rgba(179,92,68,.1);
-  border: 1px solid rgba(179,92,68,.18);
+  background: rgba(58,133,168,.12);
+  border: 1px solid rgba(58,133,168,.22);
   color: var(--ia-texto);
   border-bottom-right-radius: 4px;
 }
@@ -312,12 +312,12 @@
 
 /* ── Botão ferramenta (destaque) ── */
 .ia-prompt-btn--ferramenta {
-  background: #FDF0EC;
-  border-color: #D4856E;
+  background: rgba(58,133,168,.1);
+  border-color: rgba(58,133,168,.35);
   color: var(--ia-acento);
 }
 .ia-prompt-btn--ferramenta:hover {
-  background: #FAE0D8;
+  background: rgba(58,133,168,.16);
   border-color: var(--ia-acento);
 }
 
@@ -477,7 +477,7 @@
 .ia-bubble .ia-md-code {
   font-family: 'Courier New', Courier, monospace;
   font-size: 12px;
-  background: rgba(0, 0, 0, 0.08);
+  background: rgba(58,133,168,.15);
   border-radius: 4px;
   padding: 1px 5px;
   color: var(--ia-acento);

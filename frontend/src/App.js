@@ -20,6 +20,9 @@ import AssistenteIA from './pages/AssistenteIA';
 import Cotacao from './pages/Cotacao';
 import Disparador from './pages/Disparador';
 import ForgotPassword from './pages/ForgotPassword';
+import Vitrine from './pages/Vitrine';
+import VitrineEditar from './pages/VitrineEditar';
+import VitrinePublica from './pages/VitrinePublica';
 
 // ⭐️ 1. IMPORTAR A NOVA PÁGINA DE ADMIN
 import AdminDashboard from './pages/AdminDashboard';
@@ -74,6 +77,9 @@ function App() {
             <Route path="/assistente" element={<AssistenteIA />} />
             <Route path="/cotacao" element={<Cotacao />} />
             <Route path="/disparador-whatsapp" element={<Disparador />} />
+            <Route path="/vitrine" element={<Vitrine />} />
+            <Route path="/vitrine/:id/editar" element={<VitrineEditar />} />
+            <Route path="/oferta/:slug" element={<VitrinePublica />} />
             <Route path="/payment-success" element={<PaymentSuccess />} />
             <Route path="/payment-failure" element={<PaymentFailure />} />
             <Route path="/payment-pending" element={<PaymentFailure />} />

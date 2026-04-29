@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { FileSpreadsheet, Sparkles, BarChart3, Send } from 'lucide-react';
+import { FileSpreadsheet, Sparkles, BarChart3, Send, Store } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useCampaigns } from '../hooks/useCampaigns';
 import { useClients } from '../hooks/useClients';
@@ -269,20 +269,20 @@ const Dashboard = () => {
               <div className="tool-card" onClick={() => navigate('/cotacao')}>
                 <div className="tool-card-icon"><FileSpreadsheet size={32} /></div>
                 <div className="tool-card-badge live">Disponível</div>
-                <div className="tool-card-title">Cotação Express</div>
-                <div className="tool-card-desc">Suba sua planilha e receba com todos os preços preenchidos automaticamente — por código de barras ou nome do produto.</div>
+                <div className="tool-card-title">Cotação Pronta</div>
+                <div className="tool-card-desc">Suba a planilha do cliente e receba a cotação preenchida automaticamente por código de barras ou nome do produto. Menos digitação, menos erro e mais tempo livre para atender clientes, visitar lojas e vender mais.</div>
               </div>
               <div className="tool-card" onClick={() => navigate('/assistente')}>
                 <div className="tool-card-icon"><Sparkles size={32} /></div>
                 <div className="tool-card-badge live">Disponível</div>
-                <div className="tool-card-title">Consultor de Vendas IA</div>
-                <div className="tool-card-desc">Crie textos de oferta, emails profissionais, scripts de negociação e muito mais — especializado em representação comercial.</div>
+                <div className="tool-card-title">IA para Vender Mais</div>
+                <div className="tool-card-desc">Digite sua ideia e a IA transforma em uma mensagem profissional para clientes, crédito, gerência ou indústria. Ideal para ofertas, negociações, cobranças, comunicados e respostas comerciais.</div>
               </div>
               <div className="tool-card" onClick={() => navigate('/disparador-whatsapp')}>
                 <div className="tool-card-icon"><Send size={32} /></div>
                 <div className="tool-card-badge live">Disponível</div>
-                <div className="tool-card-title">Campanhas WhatsApp</div>
-                <div className="tool-card-desc">Envie ofertas em massa para toda sua carteira de clientes com texto e fotos personalizados via WhatsApp Web.</div>
+                <div className="tool-card-title">Carteira no WhatsApp</div>
+                <div className="tool-card-desc">Monte sua oferta uma vez e envie para todos os seus clientes pelo WhatsApp Web, com mensagens personalizadas, fotos dos produtos ou link de venda. Menos copia e cola, mais clientes avisados e mais tempo para vender.</div>
               </div>
               <div className="tool-card" onClick={() => {
                 if (campaigns.length > 0) {
@@ -293,8 +293,14 @@ const Dashboard = () => {
               }}>
                 <div className="tool-card-icon"><BarChart3 size={32} /></div>
                 <div className="tool-card-badge live">Disponível</div>
-                <div className="tool-card-title">Central de Campanhas</div>
-                <div className="tool-card-desc">Acompanhe campanhas, monitore positivação de clientes e acompanhe seus resultados de indústria em tempo real.</div>
+                <div className="tool-card-title">Raio-X dos Incentivos</div>
+                <div className="tool-card-desc">Acompanhe sua carteira em um só painel: veja clientes positivados, clientes parados, itens vendidos por cliente, campanhas ativas e oportunidades para ganhar mais incentivos da indústria. Mais controle para saber onde agir e vender melhor.</div>
+              </div>
+              <div className="tool-card" onClick={() => navigate('/vitrine')}>
+                <div className="tool-card-icon"><Store size={32} /></div>
+                <div className="tool-card-badge live">Disponível</div>
+                <div className="tool-card-title">Vitrine Inteligente</div>
+                <div className="tool-card-desc">Monte sua oferta com produtos e preços, gere um link exclusivo e envie para seus clientes. Eles escolhem as quantidades e mandam o pedido direto no seu WhatsApp — sem ligação, sem digitação.</div>
               </div>
             </div>
           </section>

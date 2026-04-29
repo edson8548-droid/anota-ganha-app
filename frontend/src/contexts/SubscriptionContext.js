@@ -63,11 +63,11 @@ export const PLANS = {
       industries: 999999
     },
     features: [
-      'Cotação Express — planilha preenchida automática',
-      'Disparador WhatsApp — envio em massa',
-      'Consultor de Vendas IA',
+      'Cotação Pronta — planilha preenchida automática',
+      'Carteira no WhatsApp — envio em massa',
+      'IA para Vender Mais',
       'Extensão Cotatudo Automático',
-      'Central de Campanhas e Clientes',
+      'Raio-X dos Incentivos',
       'Suporte via WhatsApp',
     ],
     highlight: true
@@ -87,11 +87,11 @@ export const PLANS = {
       industries: 999999
     },
     features: [
-      'Cotação Express — planilha preenchida automática',
-      'Disparador WhatsApp — envio em massa',
-      'Consultor de Vendas IA',
+      'Cotação Pronta — planilha preenchida automática',
+      'Carteira no WhatsApp — envio em massa',
+      'IA para Vender Mais',
       'Extensão Cotatudo Automático',
-      'Central de Campanhas e Clientes',
+      'Raio-X dos Incentivos',
       'Suporte via WhatsApp',
     ],
     highlight: true
@@ -111,11 +111,11 @@ export const PLANS = {
       industries: 999999
     },
     features: [
-      'Cotação Express — planilha preenchida automática',
-      'Disparador WhatsApp — envio em massa',
-      'Consultor de Vendas IA',
+      'Cotação Pronta — planilha preenchida automática',
+      'Carteira no WhatsApp — envio em massa',
+      'IA para Vender Mais',
       'Extensão Cotatudo Automático',
-      'Central de Campanhas e Clientes',
+      'Raio-X dos Incentivos',
       'Suporte via WhatsApp',
       '💰 Melhor custo-benefício!'
     ],
