@@ -15,6 +15,26 @@ function fmtMoeda(v) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
 }
 
+function orderKey(slug) {
+  return `vitrine_pedido_${slug}`;
+}
+
+function salvarPedido(slug, quantidades, cliente) {
+  const data = { quantidades, cliente, salvoEm: new Date().toISOString() };
+  try { localStorage.setItem(orderKey(slug), JSON.stringify(data)); } catch {}
+}
+
+function carregarPedido(slug) {
+  try {
+    const raw = localStorage.getItem(orderKey(slug));
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function limparPedido(slug) {
+  try { localStorage.removeItem(orderKey(slug)); } catch {}
+}
+
 export default function VitrinePublica() {
   const { slug } = useParams();
   const [oferta, setOferta] = useState(null);
@@ -25,6 +45,7 @@ export default function VitrinePublica() {
   const [quantidades, setQuantidades] = useState({});
   const [showCarrinho, setShowCarrinho] = useState(false);
   const [cliente, setCliente] = useState({ nome: '', empresa: '', cidade: '', obs: '' });
+  const [pedidoAnterior, setPedidoAnterior] = useState(null);
   const headerRef = useRef(null);
 
   useEffect(() => {
@@ -33,6 +54,23 @@ export default function VitrinePublica() {
       .catch(() => setErro('Vitrine não encontrada ou inativa.'))
       .finally(() => setLoading(false));
   }, [slug]);
+
+  // Restaurar pedido salvo ao carregar
+  useEffect(() => {
+    if (!oferta) return;
+    const saved = carregarPedido(slug);
+    if (saved && saved.quantidades) {
+      // Só restaura itens que ainda existem na oferta
+      const idsValidos = new Set(oferta.items.map(i => i.id));
+      const qtsValidas = {};
+      for (const [id, qty] of Object.entries(saved.quantidades)) {
+        if (idsValidos.has(id) && qty > 0) qtsValidas[id] = qty;
+      }
+      if (Object.keys(qtsValidas).length > 0) {
+        setPedidoAnterior({ quantidades: qtsValidas, cliente: saved.cliente || {} });
+      }
+    }
+  }, [oferta, slug]);
 
   // Atualiza CSS variable para sticky search bar
   useEffect(() => {
@@ -77,8 +115,23 @@ export default function VitrinePublica() {
   const totalCarrinho = useMemo(() => itensCarrinho.reduce((s, i) => s + i.subtotal, 0), [itensCarrinho]);
   const qtdItens = useMemo(() => itensCarrinho.reduce((s, i) => s + i.qty, 0), [itensCarrinho]);
 
+  const restaurarPedido = () => {
+    if (!pedidoAnterior) return;
+    setQuantidades(pedidoAnterior.quantidades);
+    if (pedidoAnterior.cliente) setCliente(pedidoAnterior.cliente);
+    setPedidoAnterior(null);
+  };
+
+  const descartarPedido = () => {
+    limparPedido(slug);
+    setPedidoAnterior(null);
+  };
+
   const finalizarWhatsApp = () => {
     if (itensCarrinho.length === 0) return;
+
+    // Salvar pedido antes de enviar
+    salvarPedido(slug, quantidades, cliente);
 
     const linhasItens = itensCarrinho.map((item, i) => {
       const unidade = item.units_per_package
@@ -111,6 +164,8 @@ export default function VitrinePublica() {
     const numero = oferta.rca_whatsapp.replace(/\D/g, '');
     const url = `https://wa.me/55${numero}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
+
+    setShowCarrinho(false);
   };
 
   // ── Loading / erro ───────────────────────────────────
@@ -132,9 +187,28 @@ export default function VitrinePublica() {
   const vencida = oferta.expires_at && new Date(oferta.expires_at) < new Date();
   const abaixoMinimo = oferta.minimum_order_value && totalCarrinho > 0 && totalCarrinho < oferta.minimum_order_value;
   const faltaMinimo = abaixoMinimo ? oferta.minimum_order_value - totalCarrinho : 0;
+  const temCarrinho = qtdItens > 0;
 
   return (
     <div className="vp-page">
+
+      {/* ── Banner pedido anterior ── */}
+      {pedidoAnterior && !temCarrinho && (
+        <div className="vp-restore-banner">
+          <div className="vp-restore-text">
+            Você tem um pedido anterior salvo.
+            Deseja continuar de onde parou?
+          </div>
+          <div className="vp-restore-actions">
+            <button className="vp-restore-btn primary" onClick={restaurarPedido}>
+              Sim, restaurar pedido
+            </button>
+            <button className="vp-restore-btn" onClick={descartarPedido}>
+              Novo pedido
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Header ── */}
       <div className="vp-header" ref={headerRef}>
@@ -271,7 +345,13 @@ export default function VitrinePublica() {
         <div className="vp-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowCarrinho(false); }}>
           <div className="vp-modal">
             <div className="vp-modal-handle" />
-            <div className="vp-modal-title">Seu Pedido</div>
+
+            <div className="vp-modal-header">
+              <button className="vp-btn-voltar" onClick={() => setShowCarrinho(false)}>
+                ← Voltar aos produtos
+              </button>
+              <div className="vp-modal-title">Seu Pedido</div>
+            </div>
 
             {abaixoMinimo && (
               <div className="vp-min-warn">
@@ -280,43 +360,57 @@ export default function VitrinePublica() {
               </div>
             )}
 
-            {/* Resumo */}
-            {itensCarrinho.map(item => (
-              <div key={item.id} className="vp-cart-item">
-                <div>
-                  <div className="vp-cart-item-name">{item.product_name}</div>
-                  <div className="vp-cart-item-meta">
-                    {item.qty} {item.unit}
-                    {item.units_per_package ? ` (cx ${item.units_per_package} un)` : ''}
-                    {' · '}{fmtMoeda(item.price)}{item.unit_price ? ` (un ${fmtMoeda(item.unit_price)})` : ''}
-                  </div>
-                </div>
-                <div className="vp-cart-item-price">{fmtMoeda(item.subtotal)}</div>
+            {itensCarrinho.length === 0 ? (
+              <div className="vp-cart-empty">
+                Nenhum produto adicionado ainda.
+                Volte e adicione produtos ao pedido.
               </div>
-            ))}
+            ) : (
+              <>
+                {/* Resumo */}
+                {itensCarrinho.map(item => (
+                  <div key={item.id} className="vp-cart-item">
+                    <div>
+                      <div className="vp-cart-item-name">{item.product_name}</div>
+                      <div className="vp-cart-item-meta">
+                        {item.qty} {item.unit}
+                        {item.units_per_package ? ` (cx ${item.units_per_package} un)` : ''}
+                        {' · '}{fmtMoeda(item.price)}{item.unit_price ? ` (un ${fmtMoeda(item.unit_price)})` : ''}
+                      </div>
+                    </div>
+                    <div className="vp-cart-item-price">{fmtMoeda(item.subtotal)}</div>
+                  </div>
+                ))}
 
-            <div className="vp-cart-total">
-              <span>Total</span>
-              <span>{fmtMoeda(totalCarrinho)}</span>
-            </div>
+                <div className="vp-cart-total">
+                  <span>Total</span>
+                  <span>{fmtMoeda(totalCarrinho)}</span>
+                </div>
 
-            {/* Dados do cliente */}
-            <div className="vp-client-fields">
-              <input className="vp-client-input" placeholder="Seu nome (opcional)"
-                value={cliente.nome} onChange={e => setCliente(c => ({ ...c, nome: e.target.value }))} />
-              <input className="vp-client-input" placeholder="Mercado / Empresa (opcional)"
-                value={cliente.empresa} onChange={e => setCliente(c => ({ ...c, empresa: e.target.value }))} />
-              <input className="vp-client-input" placeholder="Cidade (opcional)"
-                value={cliente.cidade} onChange={e => setCliente(c => ({ ...c, cidade: e.target.value }))} />
-              <textarea className="vp-client-input" placeholder="Observação (opcional)" rows={2}
-                style={{ resize: 'vertical' }}
-                value={cliente.obs} onChange={e => setCliente(c => ({ ...c, obs: e.target.value }))} />
-            </div>
+                {/* Dados do cliente */}
+                <div className="vp-client-fields">
+                  <input className="vp-client-input" placeholder="Seu nome (opcional)"
+                    value={cliente.nome} onChange={e => setCliente(c => ({ ...c, nome: e.target.value }))} />
+                  <input className="vp-client-input" placeholder="Mercado / Empresa (opcional)"
+                    value={cliente.empresa} onChange={e => setCliente(c => ({ ...c, empresa: e.target.value }))} />
+                  <input className="vp-client-input" placeholder="Cidade (opcional)"
+                    value={cliente.cidade} onChange={e => setCliente(c => ({ ...c, cidade: e.target.value }))} />
+                  <textarea className="vp-client-input" placeholder="Observação (opcional)" rows={2}
+                    style={{ resize: 'vertical' }}
+                    value={cliente.obs} onChange={e => setCliente(c => ({ ...c, obs: e.target.value }))} />
+                </div>
 
-            <button className="vp-btn-whatsapp" onClick={finalizarWhatsApp}
-              disabled={itensCarrinho.length === 0 || abaixoMinimo}>
-              📲 Enviar pedido pelo WhatsApp
-            </button>
+                <button className="vp-btn-whatsapp" onClick={finalizarWhatsApp}
+                  disabled={itensCarrinho.length === 0 || abaixoMinimo}>
+                  📲 Enviar pedido pelo WhatsApp
+                </button>
+
+                <div className="vp-save-hint">
+                  Seu pedido será salvo automaticamente. Se clicar neste link novamente,
+                  poderá editar e adicionar mais itens.
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
