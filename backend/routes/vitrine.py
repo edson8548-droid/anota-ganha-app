@@ -515,15 +515,20 @@ async def upload_logo(
     return {"logo_url": logo_url}
 
 
+GOOGLE_CSE_KEY = "AIzaSyDbevva8TgL4HbmdJY0EhkQaUfgH1ORxQ4"
+GOOGLE_CSE_CX  = "a15f97cf882374626"
+
 @router.get("/sugerir-imagem")
 async def sugerir_imagem(product_name: str, uid: str = Depends(get_user_id)):
-    """Busca imagem no banco interno por similaridade de nome."""
+    """Busca imagem: 1) banco interno, 2) Google Custom Search."""
     nome_norm = normalizar(product_name)
-    # Busca exata primeiro
+
+    # 1. Banco interno — busca exata
     doc = await _db.vitrine_product_images.find_one({"normalized_name": nome_norm})
     if doc:
         return {"found": True, "image_url": doc["image_url"], "match": "exact"}
-    # Busca por palavras-chave (primeiras 3 palavras)
+
+    # 2. Banco interno — busca por palavras-chave
     palavras = nome_norm.split()[:3]
     if palavras:
         regex = ".*".join(re.escape(p) for p in palavras)
@@ -533,6 +538,32 @@ async def sugerir_imagem(product_name: str, uid: str = Depends(get_user_id)):
         )
         if doc:
             return {"found": True, "image_url": doc["image_url"], "match": "similar"}
+
+    # 3. Google Custom Search Images
+    try:
+        params = {
+            "key": GOOGLE_CSE_KEY,
+            "cx": GOOGLE_CSE_CX,
+            "q": product_name,
+            "searchType": "image",
+            "num": 1,
+            "safe": "active",
+            "imgType": "photo",
+        }
+        resp = requests.get(
+            "https://www.googleapis.com/customsearch/v1",
+            params=params,
+            timeout=5
+        )
+        if resp.status_code == 200:
+            items = resp.json().get("items", [])
+            if items:
+                image_url = items[0].get("link")
+                if image_url:
+                    return {"found": True, "image_url": image_url, "match": "google"}
+    except Exception:
+        pass
+
     return {"found": False, "image_url": None, "match": None}
 
 

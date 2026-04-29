@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Store, Plus, X, Image } from 'lucide-react';
+import { Store, Plus, X, Image, Search } from 'lucide-react';
 import { vitrineService } from '../services/vitrine.service';
 import './Vitrine.css';
 
@@ -84,8 +84,28 @@ export default function VitrineEditar() {
     if (!file) return;
     const preview = URL.createObjectURL(file);
     setItens(prev => prev.map(it =>
-      it._key === key ? { ...it, _imageFile: file, _imagePreview: preview } : it
+      it._key === key ? { ...it, _imageFile: file, _imagePreview: preview, _imageUrl: null } : it
     ));
+  };
+
+  const handleSearchImage = async (key, productName) => {
+    if (!productName?.trim()) { toast.warning('Digite o nome do produto primeiro'); return; }
+    setItens(prev => prev.map(it => it._key === key ? { ...it, _searching: true } : it));
+    try {
+      const res = await vitrineService.sugerirImagem(productName);
+      if (res.data.found && res.data.image_url) {
+        setItens(prev => prev.map(it =>
+          it._key === key ? { ...it, _imagePreview: res.data.image_url, _imageUrl: res.data.image_url, _imageFile: null, _searching: false } : it
+        ));
+        toast.success('Imagem encontrada!');
+      } else {
+        toast.warning('Nenhuma imagem encontrada para este produto');
+        setItens(prev => prev.map(it => it._key === key ? { ...it, _searching: false } : it));
+      }
+    } catch {
+      toast.error('Erro ao buscar imagem');
+      setItens(prev => prev.map(it => it._key === key ? { ...it, _searching: false } : it));
+    }
   };
 
   const parsearLista = async () => {
@@ -151,6 +171,7 @@ export default function VitrineEditar() {
             price: parseFloat(it.price) || 0,
             unit: it.unit || 'UN',
             units_per_package: it.units_per_package ? parseInt(it.units_per_package) : null,
+            ...(it._imageUrl ? { image_url: it._imageUrl } : {}),
           });
           if (it._imageFile) {
             await vitrineService.uploadImagem(id, it.id, it._imageFile);
@@ -170,7 +191,7 @@ export default function VitrineEditar() {
             unit: it.unit || 'UN',
             units_per_package: it.units_per_package ? parseInt(it.units_per_package) : null,
             unit_price: null,
-            image_url: null,
+            image_url: it._imageUrl || null,
             sort_order: existentes.length + i,
             active: true,
           });
@@ -292,6 +313,7 @@ export default function VitrineEditar() {
                     onChange={(field, value) => updateItem(item._key, field, value)}
                     onDelete={() => deleteItem(item._key)}
                     onImageChange={(file) => handleImagePick(item._key, file)}
+                    onSearchImage={() => handleSearchImage(item._key, item.product_name)}
                   />
                 ))}
               </div>
@@ -357,7 +379,7 @@ export default function VitrineEditar() {
   );
 }
 
-function ItemReviewEditar({ item, onChange, onDelete, onImageChange }) {
+function ItemReviewEditar({ item, onChange, onDelete, onImageChange, onSearchImage }) {
   const imgRef = useRef(null);
   const currentImg = item._imagePreview || imgUrl(item.image_url);
 
@@ -365,14 +387,24 @@ function ItemReviewEditar({ item, onChange, onDelete, onImageChange }) {
     <div className="vt-review-item">
       <div className="vt-review-item-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div className="vt-img-box" onClick={() => imgRef.current?.click()} title="Clique para trocar foto">
-            {currentImg
-              ? <img src={currentImg} alt="" />
-              : <Image size={22} />
-            }
-            <div className="vt-img-overlay">Foto</div>
-            <input type="file" accept="image/*" ref={imgRef} style={{ display: 'none' }}
-              onChange={e => onImageChange(e.target.files[0])} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <div className="vt-img-box" onClick={() => imgRef.current?.click()} title="Clique para trocar foto">
+              {currentImg
+                ? <img src={currentImg} alt="" />
+                : <Image size={22} />
+              }
+              <div className="vt-img-overlay">Foto</div>
+              <input type="file" accept="image/*" ref={imgRef} style={{ display: 'none' }}
+                onChange={e => onImageChange(e.target.files[0])} />
+            </div>
+            <button
+              title="Buscar foto no Google"
+              onClick={onSearchImage}
+              disabled={item._searching}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: currentImg ? '#3A85A8' : '#6B6E74', padding: 0, display: 'flex', alignItems: 'center' }}
+            >
+              {item._searching ? <span style={{ fontSize: 10 }}>...</span> : <Search size={13} />}
+            </button>
           </div>
           <div className="vt-review-item-name">
             <input
