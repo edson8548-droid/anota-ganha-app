@@ -95,7 +95,7 @@ def _parse_single_phone(text: str) -> Optional[str]:
         num = num[1:]
     if len(num) <= 11:
         num = '55' + num
-    return num if len(num) >= 12 else None
+    return num or None
 
 
 def normalize_phone(raw: str) -> Optional[str]:
