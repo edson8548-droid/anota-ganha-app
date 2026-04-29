@@ -78,26 +78,27 @@ export default function VitrinePublica() {
   const qtdItens = useMemo(() => itensCarrinho.reduce((s, i) => s + i.qty, 0), [itensCarrinho]);
 
   const finalizarWhatsApp = () => {
-    if (!cliente.nome.trim() || !cliente.empresa.trim() || !cliente.cidade.trim()) {
-      alert('Preencha seu nome, empresa e cidade para finalizar o pedido.');
-      return;
-    }
     if (itensCarrinho.length === 0) return;
 
     const linhasItens = itensCarrinho.map((item, i) => {
       const unidade = item.units_per_package
         ? `${item.qty} ${item.unit} (cx ${item.units_per_package} un)`
         : `${item.qty} ${item.unit}`;
-      return `${i + 1}. ${item.product_name}\nQtd: ${unidade}\nPreço: ${fmtMoeda(item.price)}\nSubtotal: ${fmtMoeda(item.subtotal)}`;
+      const precoUn = item.unit_price ? `\nPreço un: ${fmtMoeda(item.unit_price)}` : '';
+      return `${i + 1}. ${item.product_name}\nQtd: ${unidade}\nPreço: ${fmtMoeda(item.price)}${precoUn}\nSubtotal: ${fmtMoeda(item.subtotal)}`;
     }).join('\n\n');
+
+    const linhasCliente = [
+      cliente.nome.trim()    ? `Cliente: ${cliente.nome.trim()}`            : '',
+      cliente.empresa.trim() ? `Empresa/Mercado: ${cliente.empresa.trim()}` : '',
+      cliente.cidade.trim()  ? `Cidade: ${cliente.cidade.trim()}`           : '',
+    ].filter(Boolean);
 
     const msg = [
       `Olá, segue meu pedido:`,
       ``,
       `Oferta: ${oferta.title}`,
-      `Cliente: ${cliente.nome}`,
-      `Empresa/Mercado: ${cliente.empresa}`,
-      `Cidade: ${cliente.cidade}`,
+      ...linhasCliente,
       ``,
       `Itens:`,
       ``,
@@ -129,7 +130,8 @@ export default function VitrinePublica() {
   );
 
   const vencida = oferta.expires_at && new Date(oferta.expires_at) < new Date();
-  const abaixoMinimo = oferta.minimum_order_value && totalCarrinho < oferta.minimum_order_value && totalCarrinho > 0;
+  const abaixoMinimo = oferta.minimum_order_value && totalCarrinho > 0 && totalCarrinho < oferta.minimum_order_value;
+  const faltaMinimo = abaixoMinimo ? oferta.minimum_order_value - totalCarrinho : 0;
 
   return (
     <div className="vp-page">
@@ -211,13 +213,16 @@ export default function VitrinePublica() {
                     </div>
                   )}
 
-                  <div className="vp-product-price">{fmtMoeda(item.price)}</div>
-
                   {item.unit_price && (
                     <div className="vp-product-unit-price">
                       {fmtMoeda(item.unit_price)} / un
                     </div>
                   )}
+
+                  <div className="vp-product-price">
+                    {fmtMoeda(item.price)}
+                    {item.units_per_package ? ` / ${item.unit}` : ''}
+                  </div>
 
                   {qty > 0 && (
                     <div className="vp-product-subtotal">= {fmtMoeda(subtotal)}</div>
@@ -270,8 +275,8 @@ export default function VitrinePublica() {
 
             {abaixoMinimo && (
               <div className="vp-min-warn">
-                ⚠️ Pedido mínimo: {fmtMoeda(oferta.minimum_order_value)}.
-                Seu pedido está em {fmtMoeda(totalCarrinho)}.
+                ⚠️ Faltam <strong>{fmtMoeda(faltaMinimo)}</strong> para o pedido mínimo de {fmtMoeda(oferta.minimum_order_value)}.
+                Adicione mais produtos para continuar.
               </div>
             )}
 
@@ -283,7 +288,7 @@ export default function VitrinePublica() {
                   <div className="vp-cart-item-meta">
                     {item.qty} {item.unit}
                     {item.units_per_package ? ` (cx ${item.units_per_package} un)` : ''}
-                    · {fmtMoeda(item.price)} cada
+                    {' · '}{fmtMoeda(item.price)}{item.unit_price ? ` (un ${fmtMoeda(item.unit_price)})` : ''}
                   </div>
                 </div>
                 <div className="vp-cart-item-price">{fmtMoeda(item.subtotal)}</div>
@@ -297,11 +302,11 @@ export default function VitrinePublica() {
 
             {/* Dados do cliente */}
             <div className="vp-client-fields">
-              <input className="vp-client-input" placeholder="Seu nome *"
+              <input className="vp-client-input" placeholder="Seu nome (opcional)"
                 value={cliente.nome} onChange={e => setCliente(c => ({ ...c, nome: e.target.value }))} />
-              <input className="vp-client-input" placeholder="Mercado / Empresa *"
+              <input className="vp-client-input" placeholder="Mercado / Empresa (opcional)"
                 value={cliente.empresa} onChange={e => setCliente(c => ({ ...c, empresa: e.target.value }))} />
-              <input className="vp-client-input" placeholder="Cidade *"
+              <input className="vp-client-input" placeholder="Cidade (opcional)"
                 value={cliente.cidade} onChange={e => setCliente(c => ({ ...c, cidade: e.target.value }))} />
               <textarea className="vp-client-input" placeholder="Observação (opcional)" rows={2}
                 style={{ resize: 'vertical' }}
@@ -309,7 +314,7 @@ export default function VitrinePublica() {
             </div>
 
             <button className="vp-btn-whatsapp" onClick={finalizarWhatsApp}
-              disabled={!cliente.nome.trim() || !cliente.empresa.trim() || !cliente.cidade.trim()}>
+              disabled={itensCarrinho.length === 0 || abaixoMinimo}>
               📲 Enviar pedido pelo WhatsApp
             </button>
           </div>
