@@ -16,6 +16,7 @@ from routes.license import router as license_router
 from routes.ia import router as ia_router
 from routes.cotacao import router as cotacao_router, init_cotacao
 from routes.whatsapp import router as whatsapp_router, init_whatsapp
+from routes.users import router as users_router, init_users
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import uuid
@@ -102,6 +103,7 @@ app.include_router(license_router, prefix="/api/license", tags=["Licença"])
 app.include_router(ia_router, prefix="/api/ia", tags=["Assistente IA"])
 app.include_router(cotacao_router, prefix="/api/cotacao", tags=["Cotação"])
 app.include_router(whatsapp_router, prefix="/api/whatsapp", tags=["WhatsApp"])
+app.include_router(users_router, prefix="/api/users", tags=["Usuários"])
 
 # ==================== Mount Router & Lifecycle ====================
 app.include_router(api_router)
@@ -117,6 +119,7 @@ async def startup_event():
     setup_mercadopago()
     init_cotacao(db)
     init_whatsapp(db)
+    init_users(db)
     try:
         await db.cotacao_aprendizado.create_index(
             [("user_id", 1), ("produto_cotacao_norm", 1)],

@@ -45,4 +45,11 @@ export const deleteClient = (id) => api.delete(`/clients/${id}`);
 export const getCampaignStats = (campaignId) => api.get(`/stats/${campaignId}`);
 export const getCampaignStatsByCity = (campaignId) => api.get(`/stats/${campaignId}/cities`);
 
+// Users
+export const uploadAvatar = (file) => {
+  const formData = new FormData();
+  formData.append('arquivo', file);
+  return api.post('/users/avatar', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+};
+
 export default api;

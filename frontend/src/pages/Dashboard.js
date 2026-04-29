@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { FileSpreadsheet, Sparkles, BarChart3, Send } from 'lucide-react';
@@ -13,6 +13,7 @@ import EditClientInfoModal from '../components/EditClientInfoModal';
 import Analytics from '../components/Analytics';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { campaignsService } from '../services/campaigns.service';
+import { uploadAvatar } from '../services/api';
 import './Dashboard.css';
 
 
@@ -36,6 +37,9 @@ const Dashboard = () => {
 
   const [expandedClientId, setExpandedClientId] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null });
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef(null);
 
   const showConfirm = (title, description, onConfirm) =>
     setConfirmDialog({ open: true, title, description, onConfirm });
@@ -45,6 +49,30 @@ const Dashboard = () => {
   useEffect(() => {
     fetch('https://api.venpro.com.br/health', { method: 'GET', mode: 'cors' }).catch(() => {});
   }, []);
+
+  // Inicializa avatar com photoURL do Firestore
+  useEffect(() => {
+    if (user?.photoURL) setAvatarUrl(user.photoURL);
+  }, [user?.photoURL]);
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAvatar(true);
+    try {
+      const r = await uploadAvatar(file);
+      setAvatarUrl(r.data.photoURL);
+      if (authData.updateUserProfile) {
+        await authData.updateUserProfile({ photoURL: r.data.photoURL });
+      }
+      toast.success('Foto atualizada');
+    } catch {
+      toast.error('Erro ao subir foto');
+    } finally {
+      setUploadingAvatar(false);
+      e.target.value = '';
+    }
+  };
 
   const selectedCampaign = useMemo(() => {
     if (!selectedCampaignId) return null;
@@ -205,7 +233,23 @@ const Dashboard = () => {
               <button className="btn-nav" onClick={() => navigate('/minha-licenca')}>Licença</button>
               <button className="btn-nav" onClick={handleWhatsAppSupport}>Suporte</button>
               <div className="user-menu">
-                <div className="user-avatar">{userInitial}</div>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={handleAvatarChange}
+                />
+                <div
+                  className={`user-avatar${uploadingAvatar ? ' avatar-uploading' : ''}`}
+                  onClick={() => !uploadingAvatar && avatarInputRef.current.click()}
+                  title="Clique para trocar a foto"
+                >
+                  {avatarUrl
+                    ? <img src={avatarUrl} alt="avatar" className="avatar-img" />
+                    : uploadingAvatar ? '...' : userInitial
+                  }
+                </div>
                 <div className="user-info">
                   <span className="user-name">{user?.name || 'Usuário'}</span>
                   <span className="user-email">{user?.email}</span>
