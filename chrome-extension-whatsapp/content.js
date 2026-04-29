@@ -5,15 +5,20 @@ const API_URL = 'https://api.venpro.com.br/api';
 
 // ── WhatsApp Web selectors (ported from meu_robo.py) ─────────────────────
 const SEL_CHAT_INPUT = [
-  "footer [contenteditable='true']",
-  "footer [role='textbox']",
-  "div[title='Digite uma mensagem']",
+  "#main div[contenteditable='true'][data-tab='10']",
+  "#main div[contenteditable='true'][role='textbox']",
   "div[contenteditable='true'][data-tab='10']",
+  "div[contenteditable='true'][aria-label='Digite uma mensagem']",
+  "div[contenteditable='true'][aria-label='Type a message']",
+  "div[contenteditable='true'][role='textbox']",
+  "div[contenteditable='true'].selectable-text",
+  "div[title='Digite uma mensagem']",
 ];
 const SEL_ATTACH = [
   "[aria-label*='Anexar']", "[aria-label*='Attach']",
   "span[data-icon='attach-menu-plus']", "span[data-icon='clip']",
-  "footer span[data-icon='plus-rounded']",
+  "span[data-icon='plus-rounded']", "[data-icon='plus-rounded']",
+  "button[aria-label*='Attach']", "button[aria-label*='Anexar']",
 ];
 const SEL_FILE_INPUT = [
   "input[type='file'][accept*='image']",
@@ -82,19 +87,31 @@ function buildMessage(nome, msgTemplate) {
 }
 
 async function typeMessage(input, text) {
+  input.click();
   input.focus();
-  await sleep(200);
-  // Use execCommand to preserve newlines
+  await sleep(300);
+
+  // Clear any existing draft
+  document.execCommand('selectAll', false, null);
+  document.execCommand('delete', false, null);
+  await sleep(100);
+
   const lines = text.split('\n');
   for (let i = 0; i < lines.length; i++) {
-    document.execCommand('insertText', false, lines[i]);
+    // execCommand works on Chrome; if it fails, fall back to InputEvent
+    const ok = document.execCommand('insertText', false, lines[i]);
+    if (!ok) {
+      input.dispatchEvent(new InputEvent('input', {
+        data: lines[i], inputType: 'insertText', bubbles: true,
+      }));
+    }
     if (i < lines.length - 1) {
-      // Shift+Enter for newline inside WhatsApp
-      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true }));
-      await sleep(50);
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, keyCode: 13, bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent('keyup',  { key: 'Enter', shiftKey: true, keyCode: 13, bubbles: true }));
+      await sleep(80);
     }
   }
-  await sleep(300);
+  await sleep(400);
 }
 
 async function clickSend() {
