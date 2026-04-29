@@ -123,11 +123,10 @@ def parse_csv_contacts(content: bytes) -> tuple[list[dict], int]:
             f"Colunas encontradas: {list(df.columns)}"
         )
 
-    # Log para diagnóstico
-    logger.info(f"[CSV] Colunas detectadas: {list(df.columns)}")
-    logger.info(f"[CSV] Coluna nome: {col_nome!r} | Coluna fone: {col_fone!r}")
+    print(f"[CSV-DEBUG] Colunas: {list(df.columns)}", flush=True)
+    print(f"[CSV-DEBUG] Col-nome={col_nome!r} Col-fone={col_fone!r}", flush=True)
     sample = df[col_fone].dropna().head(5).tolist()
-    logger.info(f"[CSV] Amostra fones (raw): {sample}")
+    print(f"[CSV-DEBUG] Amostra fones: {sample}", flush=True)
 
     contacts, invalidos = [], 0
     for _, row in df.iterrows():
@@ -135,12 +134,11 @@ def parse_csv_contacts(content: bytes) -> tuple[list[dict], int]:
         raw_fone = str(row.get(col_fone, '') or '')
         fone = normalize_phone(raw_fone)
         if not fone:
-            logger.debug(f"[CSV] Fone inválido: {raw_fone!r}")
             invalidos += 1
             continue
         contacts.append({'nome': nome, 'telefone': fone})
 
-    logger.info(f"[CSV] Resultado: {len(contacts)} válidos, {invalidos} inválidos")
+    print(f"[CSV-DEBUG] Resultado: {len(contacts)} válidos, {invalidos} inválidos", flush=True)
     return contacts, invalidos
 
 
