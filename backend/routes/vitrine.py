@@ -598,36 +598,6 @@ async def sugerir_imagem(product_name: str, uid: str = Depends(get_user_id)):
     return result
 
 
-@router.get("/debug-imagem")
-async def debug_imagem(product_name: str = "AGUA SANITARIA YPE 2L"):
-    """Endpoint temporário de diagnóstico — remover após debug."""
-    import json as _json
-    steps = []
-    try:
-        nome_norm = normalizar(product_name)
-        steps.append(f"1. normalizado: {nome_norm!r}")
-
-        # Serper direto
-        def _do():
-            try:
-                resp = requests.post(
-                    "https://google.serper.dev/images",
-                    headers={"X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json"},
-                    json={"q": f"{product_name} produto", "gl": "br", "hl": "pt", "num": 3},
-                    timeout=10,
-                )
-                return {"status": resp.status_code, "body_preview": resp.text[:500]}
-            except Exception as ex:
-                return {"error": str(ex)}
-
-        serper_result = await asyncio.to_thread(_do)
-        steps.append(f"2. serper: {_json.dumps(serper_result, ensure_ascii=False)}")
-    except Exception as e:
-        steps.append(f"ERRO: {e}")
-
-    return {"product_name": product_name, "serper_key": SERPER_API_KEY[:8] + "...", "steps": steps}
-
-
 # ═══════════════════════════════════════
 # ROTA PÚBLICA — sem autenticação
 # ═══════════════════════════════════════
