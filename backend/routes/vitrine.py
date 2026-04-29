@@ -538,17 +538,46 @@ async def upload_logo(
     return {"logo_url": logo_url}
 
 
-SERPER_API_KEY = "30bf5805f5be43982b8cccb566da1899311525c2"
+SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "30bf5805f5be43982b8cccb566da1899311525c2")
+
+
+def _serper_search(product_name: str) -> dict:
+    """Busca síncrona no Serper.dev — chamada via asyncio.to_thread()."""
+    try:
+        resp = requests.post(
+            "https://google.serper.dev/images",
+            headers={"X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json"},
+            json={"q": f"{product_name} produto", "gl": "br", "hl": "pt", "num": 8},
+            timeout=10,
+        )
+        logger.info(f"[Serper] status={resp.status_code} query={product_name!r}")
+        if resp.status_code == 200:
+            images = resp.json().get("images", [])
+            logger.info(f"[Serper] images received: {len(images)}")
+            for img in images:
+                url = img.get("imageUrl") or img.get("thumbnailUrl") or ""
+                if url and not url.endswith(".svg"):
+                    return {"found": True, "image_url": url, "match": "serper"}
+            logger.warning(f"[Serper] no valid imageUrl in {len(images)} results")
+        else:
+            logger.error(f"[Serper] status={resp.status_code} body={resp.text[:300]}")
+    except Exception as e:
+        logger.error(f"[Serper] exception: {e}")
+    return {"found": False, "image_url": None, "match": None}
+
 
 @router.get("/sugerir-imagem")
 async def sugerir_imagem(product_name: str, uid: str = Depends(get_user_id)):
     """Busca imagem: 1) banco interno, 2) Serper.dev (Google Images)."""
     nome_norm = normalizar(product_name)
+    logger.info(f"[sugerir-imagem] query={product_name!r} norm={nome_norm!r}")
 
     # 1. Banco interno — busca exata
     doc = await _db.vitrine_product_images.find_one({"normalized_name": nome_norm})
     if doc:
-        return {"found": True, "image_url": doc["image_url"], "match": "exact"}
+        url = doc.get("image_url")
+        if url:
+            return {"found": True, "image_url": url, "match": "exact"}
 
     # 2. Banco interno — busca por palavras-chave
     palavras = nome_norm.split()[:3]
@@ -556,31 +585,16 @@ async def sugerir_imagem(product_name: str, uid: str = Depends(get_user_id)):
         regex = ".*".join(re.escape(p) for p in palavras)
         doc = await _db.vitrine_product_images.find_one(
             {"normalized_name": {"$regex": regex, "$options": "i"}},
-            sort=[("selected_count", -1)]
+            sort=[("selected_count", -1)],
         )
         if doc:
-            return {"found": True, "image_url": doc["image_url"], "match": "similar"}
+            url = doc.get("image_url")
+            if url:
+                return {"found": True, "image_url": url, "match": "similar"}
 
-    # 3. Serper.dev — Google Images
-    try:
-        resp = requests.post(
-            "https://google.serper.dev/images",
-            headers={"X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json"},
-            json={"q": f"{product_name} produto", "gl": "br", "hl": "pt", "num": 5},
-            timeout=8
-        )
-        if resp.status_code == 200:
-            images = resp.json().get("images", [])
-            for img in images:
-                url = img.get("imageUrl", "")
-                if url and not url.endswith(".svg") and url.startswith("http"):
-                    return {"found": True, "image_url": url, "match": "serper"}
-        else:
-            print(f"[Serper] status={resp.status_code} body={resp.text[:200]}")
-    except Exception as e:
-        print(f"[Serper] exception: {e}")
-
-    return {"found": False, "image_url": None, "match": None}
+    # 3. Serper.dev — Google Images (via thread para não bloquear event loop)
+    result = await asyncio.to_thread(_serper_search, product_name)
+    return result
 
 
 # ═══════════════════════════════════════
