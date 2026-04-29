@@ -515,12 +515,11 @@ async def upload_logo(
     return {"logo_url": logo_url}
 
 
-GOOGLE_CSE_KEY = "AIzaSyDbevva8TgL4HbmdJY0EhkQaUfgH1ORxQ4"
-GOOGLE_CSE_CX  = "a15f97cf882374626"
+SERPER_API_KEY = "30bf5805f5be43982b8cccb566da1899311525c2"
 
 @router.get("/sugerir-imagem")
 async def sugerir_imagem(product_name: str, uid: str = Depends(get_user_id)):
-    """Busca imagem: 1) banco interno, 2) Google Custom Search."""
+    """Busca imagem: 1) banco interno, 2) Serper.dev (Google Images)."""
     nome_norm = normalizar(product_name)
 
     # 1. Banco interno — busca exata
@@ -539,34 +538,24 @@ async def sugerir_imagem(product_name: str, uid: str = Depends(get_user_id)):
         if doc:
             return {"found": True, "image_url": doc["image_url"], "match": "similar"}
 
-    # 3. Google Custom Search Images
+    # 3. Serper.dev — Google Images
     try:
-        params = {
-            "key": GOOGLE_CSE_KEY,
-            "cx": GOOGLE_CSE_CX,
-            "q": f"{product_name} produto",
-            "searchType": "image",
-            "num": 3,
-            "gl": "br",
-            "lr": "lang_pt",
-        }
-        resp = requests.get(
-            "https://www.googleapis.com/customsearch/v1",
-            params=params,
+        resp = requests.post(
+            "https://google.serper.dev/images",
+            headers={"X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json"},
+            json={"q": f"{product_name} produto", "gl": "br", "hl": "pt", "num": 5},
             timeout=8
         )
         if resp.status_code == 200:
-            items = resp.json().get("items", [])
-            # Prefere imagens que não sejam SVG ou ícones pequenos
-            for it in items:
-                link = it.get("link", "")
-                if link and not link.endswith(".svg"):
-                    return {"found": True, "image_url": link, "match": "google"}
-        # Log do erro para debug
-        elif resp.status_code != 200:
-            print(f"[Google CSE] status={resp.status_code} body={resp.text[:200]}")
+            images = resp.json().get("images", [])
+            for img in images:
+                url = img.get("imageUrl", "")
+                if url and not url.endswith(".svg") and url.startswith("http"):
+                    return {"found": True, "image_url": url, "match": "serper"}
+        else:
+            print(f"[Serper] status={resp.status_code} body={resp.text[:200]}")
     except Exception as e:
-        print(f"[Google CSE] exception: {e}")
+        print(f"[Serper] exception: {e}")
 
     return {"found": False, "image_url": None, "match": None}
 
