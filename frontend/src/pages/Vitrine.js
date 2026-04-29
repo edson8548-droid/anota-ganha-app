@@ -172,7 +172,7 @@ export default function Vitrine() {
           price: parseFloat(it.price) || 0,
           unit: it.unit || 'UN',
           units_per_package: it.units_per_package ? parseInt(it.units_per_package) : null,
-          unit_price: null,
+          unit_price: it.unit_price ? parseFloat(it.unit_price) : null,
           image_url: it._imageUrl || null,
           sort_order: i,
           active: true,

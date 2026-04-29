@@ -161,17 +161,40 @@ class UpdateItemRequest(BaseModel):
 async def parse_lista_gemini(lista: str) -> List[dict]:
     prompt = f"""Você é um parser de listas de produtos de representantes comerciais brasileiros.
 
-Analise a lista abaixo e extraia CADA produto com os campos:
-- product_name: nome completo do produto (string)
-- price: preço numérico sem R$ (float)
-- unit: unidade de venda — UN, CX, FD, PC, KG, L, etc. (string, default "UN")
-- units_per_package: quantidade de itens por embalagem se mencionado (int ou null)
-- ean: código de barras se presente (string ou null)
-- category: categoria se mencionável (string ou null)
+A lista pode estar em vários formatos:
 
-Retorne APENAS um array JSON válido, sem markdown, sem explicação, sem texto extra.
-Exemplo de saída:
-[{{"product_name":"Água Sanitária Ypê 2L","price":8.54,"unit":"UN","units_per_package":8,"ean":null,"category":"Limpeza"}}]
+FORMATO 1 — Texto livre (uma linha por produto):
+AGUA SANITARIA YPE 2L R$ 8,54 CX 8UN
+LAVA ROUPA PO ASSIM 800G R$ 119,00 FD 20UN
+
+FORMATO 2 — CSV com ponto e vírgula (com ou sem cabeçalho):
+Produto;R$ Unitário;Emb.;Qtde;UN;R$ Emb.
+COCO RAL MENINA 100G TRAD;2,052;CX-24;1;24;49,250
+
+FORMATO 3 — Tabela com espaços ou tabulação.
+
+Regras para o FORMATO 2 (CSV com ponto e vírgula):
+- product_name: coluna "Produto"
+- price: coluna "R$ Emb." (preço da embalagem que o cliente paga) convertido para float
+- unit_price: coluna "R$ Unitário" convertido para float
+- unit: extraia de "Emb." — ex: "CX-24" → "CX", "FD-20" → "FD"
+- units_per_package: extraia o número de "Emb." — ex: "CX-24" → 24, ou use coluna "UN"
+- IGNORE a coluna "Qtde" (é quantidade de pedido, não serve para a oferta)
+
+Regras para FORMATO 1 (texto livre):
+- price: preço mencionado (por unidade ou embalagem)
+- unit: tipo mencionado (CX, FD, UN, etc.), default "UN"
+- units_per_package: número após CX/FD se mencionado
+
+Regras gerais:
+- ean: código de barras se presente, null caso contrário
+- category: categorize (Biscoito, Laticínio, Limpeza, Enlatado, Bebida, Higiene, Mercearia, etc.)
+- Números brasileiros: vírgula é decimal (2,052 → 2.052, 49,250 → 49.25)
+- Ignore linhas de cabeçalho e linhas em branco
+
+Retorne APENAS um array JSON válido, sem markdown, sem explicação.
+Exemplo de saída para o formato CSV:
+[{{"product_name":"Coco Ralado Menina 100g Tradicional","price":49.25,"unit_price":2.052,"unit":"CX","units_per_package":24,"ean":null,"category":"Mercearia"}}]
 
 Lista para processar:
 {lista}"""
