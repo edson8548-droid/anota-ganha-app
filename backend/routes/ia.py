@@ -2,7 +2,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 import os
-import google.generativeai as genai
+from google import genai
+from google.genai import types as genai_types
 
 router = APIRouter()
 
@@ -50,20 +51,24 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY não configurada no servidor.")
 
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(
-            model_name="gemini-2.0-flash",
-            system_instruction=SYSTEM_PROMPT
-        )
+        client = genai.Client(api_key=api_key)
 
         history = [
-            {"role": msg.role, "parts": [msg.content]}
+            genai_types.Content(
+                role=msg.role,
+                parts=[genai_types.Part(text=msg.content)]
+            )
             for msg in request.history
         ]
 
-        session = model.start_chat(history=history)
-        result = session.send_message(request.message)
-
+        chat = client.chats.create(
+            model="gemini-2.0-flash",
+            config=genai_types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT,
+            ),
+            history=history,
+        )
+        result = chat.send_message(request.message)
         return ChatResponse(response=result.text)
 
     except Exception as e:

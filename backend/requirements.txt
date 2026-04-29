@@ -22,7 +22,7 @@ mercadopago
 
 firebase-admin
 
-google-generativeai
+google-genai
 
 rapidfuzz
 openpyxl

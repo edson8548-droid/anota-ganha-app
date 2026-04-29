@@ -259,7 +259,8 @@ async def registrar_enviado(payload: EnviadosPayload, uid: str = Depends(get_use
     return {"ok": True}
 
 
-import google.generativeai as genai
+from google import genai as _genai
+from google.genai import types as _genai_types
 
 _IA_PROMPT = """Você é o Assistente Venpro, especializado em representação comercial no Brasil.
 Crie um texto de oferta chamativo para WhatsApp.
@@ -282,14 +283,15 @@ async def sugerir_mensagem_ia(payload: IaMensagemPayload, uid: str = Depends(get
         raise HTTPException(500, "GEMINI_API_KEY não configurada")
 
     def _generate():
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(
-            model_name="gemini-2.0-flash",
-            system_instruction=_IA_PROMPT,
+        client = _genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=payload.descricao,
+            config=_genai_types.GenerateContentConfig(
+                system_instruction=_IA_PROMPT,
+            ),
         )
-        chat = model.start_chat()
-        resp = chat.send_message(payload.descricao)
-        return resp.text
+        return response.text
 
     texto = await asyncio.to_thread(_generate)
     return {"sugestao": texto}

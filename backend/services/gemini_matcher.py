@@ -7,7 +7,7 @@ pede ao Gemini para encontrar correspondências.
 import os
 import json
 import logging
-import google.generativeai as genai
+from google import genai
 
 logger = logging.getLogger(__name__)
 
@@ -105,8 +105,7 @@ def gemini_match_batch(itens_sem_match, precos_nome_lista, max_items=50):
     if not itens_sem_match or not precos_nome_lista:
         return {}
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_name="gemini-2.0-flash")
+    client = genai.Client(api_key=api_key)
 
     matches = {}
 
@@ -119,7 +118,7 @@ def gemini_match_batch(itens_sem_match, precos_nome_lista, max_items=50):
                 disponiveis=_build_disponiveis_filtrado(candidatos_indexados),
             )
 
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
             text = response.text.strip()
 
             if text.startswith("```"):
