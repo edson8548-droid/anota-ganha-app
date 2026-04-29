@@ -202,8 +202,6 @@ const Dashboard = () => {
             </div>
             <div className="header-actions">
               <button className="btn-nav" onClick={() => navigate('/plans')}>Planos</button>
-              <button className="btn-nav" onClick={() => window.open('/assistente', '_blank', 'noopener,noreferrer')}>Consultor IA</button>
-              <button className="btn-nav btn-notification" onClick={() => window.open('/notificacoes', '_blank', 'noopener,noreferrer')} title="Notificações">🔔</button>
               <button className="btn-nav" onClick={() => navigate('/minha-licenca')}>Licença</button>
               <button className="btn-nav" onClick={handleWhatsAppSupport}>Suporte</button>
               <div className="user-menu">
@@ -239,7 +237,7 @@ const Dashboard = () => {
               <div className="tool-card" onClick={() => navigate('/disparador-whatsapp')}>
                 <div className="tool-card-icon"><Send size={32} /></div>
                 <div className="tool-card-badge live">Disponível</div>
-                <div className="tool-card-title">Disparador WhatsApp</div>
+                <div className="tool-card-title">Campanhas WhatsApp</div>
                 <div className="tool-card-desc">Envie ofertas em massa para toda sua carteira de clientes com texto e fotos personalizados via WhatsApp Web.</div>
               </div>
               <div className="tool-card" onClick={() => {
