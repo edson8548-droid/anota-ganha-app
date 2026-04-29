@@ -98,8 +98,8 @@ export default function Disparador() {
       const r = await sugerirMensagemIA(iaDescricao);
       setMessage(r.data.sugestao);
       toast.success('Sugestão gerada — edite se quiser');
-    } catch {
-      toast.error('Erro ao gerar sugestão');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || err.message || 'Erro ao gerar sugestão');
     } finally {
       setLoadingIA(false);
     }
