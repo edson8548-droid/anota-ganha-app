@@ -22,8 +22,6 @@ from pydantic import BaseModel
 from bson import ObjectId
 import firebase_admin
 from firebase_admin import auth as firebase_auth
-from google import genai
-from google.genai import types as genai_types
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -156,7 +154,7 @@ class UpdateItemRequest(BaseModel):
 
 
 # ═══════════════════════════════════════
-# PARSE DE LISTA VIA GEMINI
+# PARSE DE LISTA POR CODIGO
 # ═══════════════════════════════════════
 
 # Parser Python puro para FORMATO 3 (produto na linha 1, preços na linha 2, separados por linhas em branco)
@@ -189,6 +187,7 @@ def _auto_categoria(nome: str) -> str:
 
 def _parse_br_num(s: str) -> float:
     s = s.strip()
+    s = s.replace('R$', '').replace(' ', '')
     return float(s.replace(',', '.')) if ',' in s else float(s)
 
 def _is_formato3(lista: str) -> bool:
@@ -285,7 +284,149 @@ def _parse_formato_inline(lista: str) -> list:
     return items
 
 
-async def parse_lista_gemini(lista: str) -> List[dict]:
+def _parse_formato_csv(lista: str) -> list:
+    linhas = [l.strip() for l in lista.split('\n') if l.strip()]
+    if not linhas or not any(';' in l for l in linhas):
+        return []
+
+    items = []
+    header = None
+    for line in linhas:
+        cols = [c.strip() for c in line.split(';')]
+        lowered = [normalizar(c) for c in cols]
+
+        if any(c in ('produto', 'product_name', 'nome') for c in lowered):
+            header = lowered
+            continue
+
+        if len(cols) < 2:
+            continue
+
+        nome = cols[0]
+        if not nome or not re.search(r'[A-Za-zÀ-ÿ]', nome):
+            continue
+
+        unit_price = None
+        price = 0
+        unit = 'UN'
+        units_per_package = None
+
+        if header:
+            def col_value(*names):
+                for name in names:
+                    if name in header:
+                        idx = header.index(name)
+                        if idx < len(cols):
+                            return cols[idx]
+                return ''
+
+            nome = col_value('produto', 'product_name', 'nome') or nome
+            unit_price_raw = col_value('r$ unitario', 'unitario', 'preco unitario', 'preco_unitario')
+            price_raw = col_value('r$ emb.', 'r$ emb', 'preco embalagem', 'preco_embalagem', 'preco')
+            emb_raw = col_value('emb.', 'emb', 'embalagem', 'unidade')
+        else:
+            unit_price_raw = cols[1] if len(cols) > 1 else ''
+            price_raw = cols[-1] if len(cols) > 2 else cols[1]
+            emb_raw = next((c for c in cols if _F3_PKG_RE.search(c)), '')
+
+        try:
+            if unit_price_raw and re.search(r'\d', unit_price_raw):
+                unit_price = _parse_br_num(unit_price_raw)
+        except Exception:
+            unit_price = None
+
+        try:
+            if price_raw and re.search(r'\d', price_raw):
+                price = _parse_br_num(price_raw)
+        except Exception:
+            price = 0
+
+        pkg_m = _F3_PKG_RE.search(emb_raw or nome)
+        if pkg_m:
+            unit = pkg_m.group(1).upper()
+            units_per_package = int(pkg_m.group(2))
+            if emb_raw and not header:
+                nome = _F3_PKG_RE.sub('', nome).strip()
+
+        items.append({
+            'product_name': nome,
+            'unit': unit,
+            'units_per_package': units_per_package,
+            'unit_price': unit_price,
+            'price': price,
+            'ean': None,
+            'category': _auto_categoria(nome),
+        })
+
+    return items
+
+
+def _parse_formato_livre(lista: str) -> list:
+    items = []
+    price_re = re.compile(r'(?:R\$\s*)?(\d+[,.]\d{1,3})')
+    pkg_any_re = re.compile(r'\b(CX|FD|SC|TP|PC|PCT|BD|DR|VD|LT|CJ|PT|FRS|PTE|RL|TB|GF|GL|KG|UN|EMB)\s*-?\s*(\d+)?\s*(?:UN)?\b', re.IGNORECASE)
+
+    for raw in lista.split('\n'):
+        line = raw.strip()
+        if not line or not re.search(r'[A-Za-zÀ-ÿ]', line):
+            continue
+
+        if ';' in line:
+            continue
+
+        ean_m = re.search(r'\b\d{13}\b', line)
+        ean = ean_m.group(0) if ean_m else None
+
+        price_matches = list(price_re.finditer(line))
+        unit_price = None
+        price = 0
+        if price_matches:
+            try:
+                price = _parse_br_num(price_matches[-1].group(1))
+            except Exception:
+                price = 0
+            if len(price_matches) > 1:
+                try:
+                    unit_price = _parse_br_num(price_matches[0].group(1))
+                except Exception:
+                    unit_price = None
+
+        unit = 'UN'
+        units_per_package = None
+        pkg_matches = list(pkg_any_re.finditer(line))
+        if pkg_matches:
+            pkg = pkg_matches[-1]
+            unit = pkg.group(1).upper()
+            if pkg.group(2):
+                units_per_package = int(pkg.group(2))
+
+        nome = line
+        if price_matches:
+            nome = nome[:price_matches[0].start()].strip()
+        nome = re.sub(r'\b\d{13}\b', '', nome).strip()
+        nome = _F3_PKG_RE.sub('', nome).strip()
+        nome = re.sub(r'\s+', ' ', nome)
+
+        if not nome:
+            continue
+
+        if unit_price is not None and units_per_package and price == unit_price:
+            price = round(unit_price * units_per_package, 2)
+
+        items.append({
+            'product_name': nome,
+            'unit': unit,
+            'units_per_package': units_per_package,
+            'unit_price': unit_price,
+            'price': price,
+            'ean': ean,
+            'category': _auto_categoria(nome),
+        })
+
+    return items
+
+
+async def parse_lista_codigo(lista: str) -> List[dict]:
     # Fast path: formato inline — "PRODUTO CX-24 2,05" (tudo na mesma linha)
     if _is_formato_inline(lista):
         result = _parse_formato_inline(lista)
@@ -300,84 +441,17 @@ async def parse_lista_gemini(lista: str) -> List[dict]:
             logger.info(f"[parse_lista] FORMATO3 Python: {len(result)} produtos")
             return result
 
-    prompt = f"""Você é um parser de listas de produtos de representantes comerciais brasileiros.
-Extraia TODOS os produtos encontrados. Aceite informações parciais — apenas o nome do produto já é suficiente.
+    result = _parse_formato_csv(lista)
+    if result:
+        logger.info(f"[parse_lista] CSV Python: {len(result)} produtos")
+        return result
 
-A lista pode estar em vários formatos:
+    result = _parse_formato_livre(lista)
+    if result:
+        logger.info(f"[parse_lista] TEXTO_LIVRE Python: {len(result)} produtos")
+        return result
 
-FORMATO 1 — Texto livre, uma linha por produto:
-AGUA SANITARIA YPE 2L R$ 8,54 CX 8UN
-LAVA ROUPA PO ASSIM 800G R$ 119,00 FD 20UN
-
-FORMATO 2 — CSV com ponto e vírgula (com ou sem cabeçalho):
-Produto;R$ Unitário;Emb.;Qtde;UN;R$ Emb.
-COCO RAL MENINA 100G TRAD;2,052;CX-24;1;24;49,250
-
-FORMATO 3 — Duas linhas por produto separadas por linha em branco:
-  Linha 1: nome do produto (pode terminar com código de embalagem tipo CX-24, FD-20, TP, etc.)
-  Linha 2: preco_unitario  preco_embalagem  (separados por espaço/tab; pode estar ausente)
-  Exemplo:
-  COCO RAL MENINA 100G TRAD CX-24
-  2,05  49.250
-
-  LEITE COND ITALAC 395G CX-27
-  5,04  136.150
-
-FORMATO 4 — Tabela com espaços ou tabulação, uma linha por produto.
-
-Regras para FORMATO 2 (CSV ponto e vírgula):
-- product_name: coluna "Produto"
-- price: coluna "R$ Emb." convertido para float
-- unit_price: coluna "R$ Unitário" convertido para float
-- unit: parte de texto de "Emb." — "CX-24" -> "CX", "FD-20" -> "FD"
-- units_per_package: número de "Emb." — "CX-24" -> 24, "FD-20" -> 20
-- IGNORE completamente a coluna "Qtde"
-
-Regras para FORMATO 3 (duas linhas):
-- product_name: conteúdo da linha 1, sem o código de embalagem do final
-- unit: código de embalagem no final da linha 1 — "CX-24" -> "CX", "FD-20" -> "FD"; padrão "UN"
-- units_per_package: número do código — "CX-24" -> 24, "FD-20" -> 20; null se ausente
-- unit_price: 1º número da linha 2 (vírgula=decimal) — "2,05" -> 2.05; null se linha 2 ausente
-- price: 2º número da linha 2 (ponto=decimal) — "49.250" -> 49.25; 0 se ausente
-- Produtos sem linha 2 são válidos: price=0, unit_price=null
-
-Regras para FORMATO 1 (texto livre):
-- price: valor numérico encontrado; 0 se não houver
-- unit: tipo de embalagem (CX, FD, UN); padrão "UN"
-- units_per_package: número junto ao tipo se mencionado
-
-Regras gerais:
-- Aceite informações parciais — product_name sozinho já é válido, use price=0
-- ean: código de barras de 13 dígitos se presente, null caso contrário
-- category: Biscoito, Laticínio, Limpeza, Enlatado, Bebida, Higiene, Mercearia, etc.
-- Vírgula como decimal: 2,05 -> 2.05
-- Ponto como decimal (não milhar): 49.250 -> 49.25
-- Ignore cabeçalhos de tabela, linhas separadoras e linhas totalmente em branco
-
-Retorne APENAS um array JSON válido, sem markdown, sem explicação:
-[{{"product_name":"Coco Ralado Menina 100g Tradicional","price":49.25,"unit_price":2.05,"unit":"CX","units_per_package":24,"ean":null,"category":"Mercearia"}}]
-
-Lista para processar:
-{lista}"""
-
-    try:
-        client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY", ""))
-        response = await asyncio.to_thread(
-            client.models.generate_content,
-            model="gemini-2.0-flash",
-            contents=prompt,
-            config=genai_types.GenerateContentConfig(temperature=0.1, max_output_tokens=8192),
-        )
-        text = response.text.strip()
-        # Remover possíveis blocos markdown
-        text = re.sub(r"^```[a-z]*\n?", "", text)
-        text = re.sub(r"\n?```$", "", text)
-        import json
-        items = json.loads(text)
-        return items if isinstance(items, list) else []
-    except Exception as e:
-        logger.error(f"Gemini parse error: {e}")
-        return []
+    return []
 
 
 # ═══════════════════════════════════════
@@ -568,7 +642,7 @@ async def reordenar_items(offer_id: str, order: List[str], uid: str = Depends(ge
 async def parse_lista(req: ParseListRequest, uid: str = Depends(get_user_id)):
     if not req.lista.strip():
         raise HTTPException(400, "Lista vazia")
-    items = await parse_lista_gemini(req.lista)
+    items = await parse_lista_codigo(req.lista)
     if not items:
         raise HTTPException(422, "Não foi possível interpretar a lista. Verifique o formato e tente novamente.")
     return {"items": items, "total": len(items)}
@@ -699,32 +773,79 @@ async def upload_logo(
     return {"logo_url": logo_url}
 
 
-SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "30bf5805f5be43982b8cccb566da1899311525c2")
+SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "").strip()
 
 
-def _serper_search(product_name: str) -> dict:
-    """Busca síncrona no Serper.dev — chamada via asyncio.to_thread()."""
+def _image_score(img: dict) -> int:
+    url = img.get("imageUrl") or img.get("thumbnailUrl") or ""
+    width = int(img.get("imageWidth") or img.get("width") or 0)
+    height = int(img.get("imageHeight") or img.get("height") or 0)
+    score = 0
+    if img.get("imageUrl"):
+        score += 100
+    if width and height:
+        score += min(width * height // 10000, 120)
+        if width >= 500 and height >= 500:
+            score += 60
+        if width < 250 or height < 250:
+            score -= 80
+    if "thumb" in url.lower():
+        score -= 30
+    return score
+
+
+def _serper_images(product_name: str, limit: int = 6) -> dict:
+    """Busca opções de imagem no Serper.dev e retorna a melhor + alternativas."""
+    if not SERPER_API_KEY:
+        logger.warning("[Serper] SERPER_API_KEY não configurada")
+        return {"found": False, "image_url": None, "match": None, "images": []}
+
     try:
         resp = requests.post(
             "https://google.serper.dev/images",
             headers={"X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json"},
-            json={"q": f"{product_name} produto", "gl": "br", "hl": "pt", "num": 8},
+            json={"q": f"{product_name} produto", "gl": "br", "hl": "pt", "num": 10},
             timeout=10,
         )
         logger.info(f"[Serper] status={resp.status_code} query={product_name!r}")
-        if resp.status_code == 200:
-            images = resp.json().get("images", [])
-            logger.info(f"[Serper] images received: {len(images)}")
-            for img in images:
-                url = img.get("imageUrl") or img.get("thumbnailUrl") or ""
-                if url and not url.endswith(".svg"):
-                    return {"found": True, "image_url": url, "match": "serper"}
-            logger.warning(f"[Serper] no valid imageUrl in {len(images)} results")
-        else:
+        if resp.status_code != 200:
             logger.error(f"[Serper] status={resp.status_code} body={resp.text[:300]}")
+            return {"found": False, "image_url": None, "match": None, "images": []}
+
+        raw_images = resp.json().get("images", [])
+        logger.info(f"[Serper] images received: {len(raw_images)}")
+        candidates = []
+        seen = set()
+        for img in raw_images:
+            url = img.get("imageUrl") or img.get("thumbnailUrl") or ""
+            if not url or url in seen or url.lower().endswith(".svg"):
+                continue
+            seen.add(url)
+            candidates.append({
+                "image_url": url,
+                "thumbnail_url": img.get("thumbnailUrl") or url,
+                "width": img.get("imageWidth") or img.get("width"),
+                "height": img.get("imageHeight") or img.get("height"),
+                "source": "serper",
+                "_score": _image_score(img),
+            })
+
+        candidates.sort(key=lambda item: item["_score"], reverse=True)
+        images = [{k: v for k, v in item.items() if k != "_score"} for item in candidates[:limit]]
+        if not images:
+            logger.warning(f"[Serper] no valid imageUrl in {len(raw_images)} results")
+            return {"found": False, "image_url": None, "match": None, "images": []}
+
+        return {"found": True, "image_url": images[0]["image_url"], "match": "serper", "images": images}
     except Exception as e:
         logger.error(f"[Serper] exception: {e}")
-    return {"found": False, "image_url": None, "match": None}
+        return {"found": False, "image_url": None, "match": None, "images": []}
+
+
+def _serper_search(product_name: str) -> dict:
+    """Busca síncrona no Serper.dev — chamada via asyncio.to_thread()."""
+    result = _serper_images(product_name, limit=1)
+    return {"found": result["found"], "image_url": result["image_url"], "match": result["match"]}
 
 
 @router.get("/sugerir-imagem")
@@ -755,6 +876,31 @@ async def sugerir_imagem(product_name: str, uid: str = Depends(get_user_id)):
 
     # 3. Serper.dev — Google Images (via thread para não bloquear event loop)
     result = await asyncio.to_thread(_serper_search, product_name)
+    if result.get("found") and result.get("image_url"):
+        await _db.vitrine_product_images.update_one(
+            {"normalized_name": nome_norm},
+            {
+                "$set": {
+                    "product_name": product_name,
+                    "normalized_name": nome_norm,
+                    "image_url": result["image_url"],
+                    "source": result.get("match") or "serper",
+                    "updated_at": datetime.now(timezone.utc),
+                },
+                "$inc": {"selected_count": 1},
+                "$setOnInsert": {"created_at": datetime.now(timezone.utc)},
+            },
+            upsert=True,
+        )
+    return result
+
+
+@router.get("/sugerir-imagens")
+async def sugerir_imagens(product_name: str, uid: str = Depends(get_user_id)):
+    """Retorna até 6 opções da internet para o RCA escolher outra foto."""
+    if not product_name.strip():
+        raise HTTPException(400, "Nome do produto obrigatório")
+    result = await asyncio.to_thread(_serper_images, product_name, 6)
     return result
 
 

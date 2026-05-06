@@ -517,60 +517,8 @@ def _ler_excel_base(caminho_arquivo):
         return []
 
 
-def _extrair_pdf_com_gemini(caminho_pdf):
-    """Fallback: usa Gemini para extrair tabela de preços de PDF escaneado/complexo."""
-    import json
-    import google.generativeai as genai
-
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY não configurada — não é possível processar este PDF")
-
-    genai.configure(api_key=api_key)
-    uploaded = genai.upload_file(caminho_pdf, mime_type="application/pdf")
-
-    model = genai.GenerativeModel("gemini-2.5-flash-lite")
-    prompt = """Este PDF contém uma tabela de preços de atacadista.
-
-Extraia TODOS os produtos com seus preços. Retorne APENAS JSON válido:
-{"produtos": [{"nome": "PRODUTO X 1KG", "ean": "7891234567890", "preco": 4.50}, ...]}
-
-Regras:
-- nome: descrição completa do produto (com marca, gramagem, embalagem)
-- ean: código de barras EAN (13 dígitos). Se não existir, use ""
-- preco: preço como número decimal (use ponto como separador). Se houver colunas de prazo (7d, 14d, 21d, 28d), use o de MENOR prazo (geralmente 7 dias ou à vista)
-- Ignore cabeçalhos, totais, rodapés
-- Não inclua produtos sem nome ou sem preço"""
-
-    response = model.generate_content([uploaded, prompt])
-    text = response.text.strip()
-
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-        text = text.strip()
-
-    data = json.loads(text)
-    rows_data = []
-    for p in data.get("produtos", []):
-        try:
-            preco = float(str(p.get("preco", 0)).replace(",", "."))
-        except (ValueError, TypeError):
-            continue
-        if not p.get("nome") or preco <= 0:
-            continue
-        rows_data.append({
-            "nome": str(p["nome"]).strip(),
-            "ean": str(p.get("ean", "")).strip(),
-            "preco_base": preco,
-        })
-
-    return rows_data
-
-
 def _ler_pdf_base(caminho_pdf):
-    """Lê PDF de tabela do atacadista. Tenta pdfplumber, fallback para Gemini."""
+    """Lê PDF de tabela do atacadista usando somente extração local."""
     import logging
     logger_local = logging.getLogger(__name__)
 
@@ -619,8 +567,9 @@ def _ler_pdf_base(caminho_pdf):
         logger_local.warning(f"pdfplumber falhou: {e}")
 
     if not rows_data:
-        logger_local.info("Nenhuma tabela extraída pelo pdfplumber — usando Gemini")
-        rows_data = _extrair_pdf_com_gemini(caminho_pdf)
+        raise ValueError(
+            "Não foi possível ler a tabela do PDF sem IA. Converta o PDF para Excel ou use o prompt de Cotação Pronta para organizar a tabela."
+        )
 
     return rows_data
 

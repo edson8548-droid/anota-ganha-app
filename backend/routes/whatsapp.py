@@ -288,42 +288,13 @@ async def registrar_enviado(payload: EnviadosPayload, uid: str = Depends(get_use
     return {"ok": True}
 
 
-from google import genai as _genai
-from google.genai import types as _genai_types
-
-_IA_PROMPT = """Você é o Assistente Venpro, especializado em representação comercial no Brasil.
-Crie um texto de oferta direto e impactante para WhatsApp de representante comercial.
-
-REGRAS OBRIGATÓRIAS:
-- NÃO inclua saudação — o robô já adiciona "Bom dia/tarde, [NOME]!" automaticamente.
-- Comece já na oferta, sem enrolação.
-- Use APENAS as informações que o usuário forneceu. Nunca invente preços, prazos ou links.
-- Se o usuário mencionou um link/URL, inclua-o literalmente no texto. Nunca substitua por [LINK] ou similar.
-- Se faltam informações (preço, prazo), escreva o texto sem elas — não use placeholders.
-- Máximo 5 linhas. Português brasileiro informal.
-- Emojis: no máximo 3, só se ficarem naturais."""
-
-
 class IaMensagemPayload(BaseModel):
     descricao: str
 
 
 @router.post("/campanha/ia-mensagem")
 async def sugerir_mensagem_ia(payload: IaMensagemPayload, uid: str = Depends(get_user_id)):
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise HTTPException(500, "GEMINI_API_KEY não configurada")
-
-    def _generate():
-        client = _genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=payload.descricao,
-            config=_genai_types.GenerateContentConfig(
-                system_instruction=_IA_PROMPT,
-            ),
-        )
-        return response.text
-
-    texto = await asyncio.to_thread(_generate)
-    return {"sugestao": texto}
+    raise HTTPException(
+        410,
+        "Sugestão integrada por IA desativada. Use o prompt copiável no painel e cole na IA da sua conta.",
+    )
