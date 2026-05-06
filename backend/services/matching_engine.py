@@ -362,16 +362,36 @@ _MULTI_CATS = {
 # ─────────────────────────────────────────────
 
 def limpar_ean(ean):
-        """Corrige EAN científico (7.89E+12) ou com .0"""
-        if not ean or not ean or str(ean).lower() == 'nan' or str(ean).lower() == 'nan':
+        """Normaliza EAN/GTIN para comparação exata.
+
+        Aceita números vindos do Excel como float/notação científica e textos com
+        máscara, espaços, hífen, apóstrofo ou caracteres invisíveis.
+        """
+        if ean is None:
             return ""
+
         s = str(ean).strip()
+        if not s or s.lower() in {"nan", "none", "null"}:
+            return ""
+
+        s = s.replace("\u00a0", " ").replace("\ufeff", "").strip().strip("'\"")
+
         try:
-            if 'e+' in s.lower() or '.' in s:
-                s = str(int(float(s)))
-        except:
+            if re.fullmatch(r"[+-]?\d+(?:[.,]\d+)?(?:[eE][+-]?\d+)?", s.replace(" ", "")):
+                normalized = s.replace(" ", "").replace(",", ".")
+                digits = str(int(float(normalized)))
+                return digits if 8 <= len(digits) <= 14 else ""
+        except (ValueError, OverflowError):
             pass
-        return s
+
+        digits = re.sub(r"\D", "", s)
+        if 8 <= len(digits) <= 14:
+            return digits
+
+        for match in re.findall(r"\d{8,14}", s):
+            return match
+
+        return ""
 
 def normalizar_nome(nome):
         """Normalização completa v4.0 — Turbo + Ajustes v5.0 + HTML decode"""

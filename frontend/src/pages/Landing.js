@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
-import { FileSpreadsheet, Sparkles, MessageCircle, BarChart3 } from 'lucide-react';
+import { FileSpreadsheet, Sparkles, MessageCircle, BarChart3, Store } from 'lucide-react';
 import './Landing.css';
 
 const Landing = () => {
@@ -111,6 +111,31 @@ const Landing = () => {
             <h3>Carteira no WhatsApp</h3>
             <p>Monte sua oferta uma vez e envie para todos os seus clientes pelo WhatsApp Web com mensagens personalizadas e fotos dos produtos.</p>
           </div>
+        </div>
+      </section>
+
+      <section className="landing-video-section">
+        <div className="landing-video-copy">
+          <span className="landing-video-badge"><Store size={16} /> Vitrine Inteligente</span>
+          <h2>Monte ofertas com foto e envie o link para o cliente pedir pelo WhatsApp</h2>
+          <p>
+            Cole sua lista de produtos, revise as fotos, gere uma vitrine profissional e mande o
+            link para seus clientes. O pedido volta pronto para o RCA continuar no WhatsApp.
+          </p>
+          <button className="landing-btn-cta" onClick={handleCTA}>
+            Criar minha vitrine
+          </button>
+        </div>
+        <div className="landing-video-frame">
+          <video
+            src="/videos/venpro-vitrine-inteligente-curto.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            controls
+            preload="metadata"
+          />
         </div>
       </section>
 
