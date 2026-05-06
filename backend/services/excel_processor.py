@@ -15,6 +15,40 @@ import re as _re
 from .matching_engine import limpar_ean, normalizar_nome, ordenar_palavras, processar_cotacao_com_ia
 
 
+def _score_coluna_ean(nome_coluna) -> int:
+    """Pontua colunas prováveis de EAN/GTIN evitando confundir com código interno."""
+    c = str(nome_coluna or "").upper().strip()
+    c = _re.sub(r"\s+", " ", c)
+    c_norm = _re.sub(r"[^A-Z0-9]+", " ", c).strip()
+
+    if not c_norm:
+        return 0
+    if "EAN" in c_norm or "GTIN" in c_norm:
+        return 100
+    if "CODIGO DE BARRAS" in c_norm or "COD BARRAS" in c_norm or "COD BARRA" in c_norm:
+        return 95
+    if "COD BARR" in c_norm or "CODBAR" in c_norm or "COD BARRA" in c_norm:
+        return 92
+    if "BARRAS" in c_norm or "BARRA" in c_norm or "BARCODE" in c_norm:
+        return 90
+    if c_norm in {"COD", "CODIGO", "CÓDIGO"}:
+        return 35
+    if "COD PROD" in c_norm or "CODIGO PROD" in c_norm or "COD INTERNO" in c_norm:
+        return 0
+    return 0
+
+
+def _melhor_coluna_ean(colunas):
+    melhor_col = None
+    melhor_score = 0
+    for col in colunas:
+        score = _score_coluna_ean(col)
+        if score > melhor_score:
+            melhor_col = col
+            melhor_score = score
+    return melhor_col if melhor_score >= 35 else None
+
+
 def _xlsx_safe_bytes(caminho_arquivo):
     """
     Retorna BytesIO do xlsx com styles.xml corrigido.
@@ -107,12 +141,8 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
                     c_nome = cols[i]
                     break
 
-            # Coluna de EAN
-            c_ean = None
-            for i, c in enumerate(cols_up):
-                if any(k in c for k in ("EAN", "COD", "BARRAS", "BARRA", "GTIN")):
-                    c_ean = cols[i]
-                    break
+            # Coluna de EAN/GTIN. Prioriza códigos de barras reais e evita COD PRODUTO.
+            c_ean = _melhor_coluna_ean(cols)
 
             if c_nome is not None and c_preco is not None:
                 df_final = df
@@ -182,7 +212,7 @@ def ler_cotacao(caminho_arquivo):
         return any(k in val for k in _NOME_KW)
 
     def _match_ean(val):
-        return any(k in val for k in _EAN_KW)
+        return _score_coluna_ean(val) >= 35
 
     def _match_preco(val):
         return any(k in val for k in _PRECO_KW)
@@ -382,13 +412,7 @@ def _parse_preco(valor) -> float | None:
 
 
 def _parse_ean(valor) -> str:
-    if valor is None:
-        return ""
-    try:
-        s = str(int(float(str(valor).strip())))
-        return s if len(s) >= 8 else ""
-    except (ValueError, TypeError):
-        return ""
+    return limpar_ean(valor)
 
 
 def _ler_excel_base(caminho_arquivo):
@@ -408,7 +432,7 @@ def _ler_excel_base(caminho_arquivo):
         for i, c in enumerate(cols_upper):
             if col_nome is None and any(k in c for k in NOME_KEYWORDS):
                 col_nome = i
-            if col_ean is None and any(k in c for k in EAN_KEYWORDS):
+            if col_ean is None and _score_coluna_ean(c) >= 35:
                 col_ean = i
             if col_preco is None and any(k in c for k in PRECO_KEYWORDS):
                 col_preco = i
@@ -479,7 +503,7 @@ def _ler_excel_base(caminho_arquivo):
                 if col_nome == 0 and any(k in val for k in NOME_KEYWORDS):
                     col_nome = cell.column - 1
                     header_row_idx = row_idx
-                elif col_ean is None and any(k in val for k in EAN_KEYWORDS):
+                elif col_ean is None and _score_coluna_ean(val) >= 35:
                     col_ean = cell.column - 1
                 elif col_preco is None and any(k in val for k in PRECO_KEYWORDS):
                     col_preco = cell.column - 1
@@ -541,7 +565,7 @@ def _ler_pdf_base(caminho_pdf):
                     for i, h in enumerate(headers):
                         if any(k in h for k in ("PRODUTO", "DESCRI", "ITEM", "MERCADORIA")):
                             col_nome = i
-                        elif any(k in h for k in ("EAN", "COD", "BARRAS", "CODIGO")):
+                        elif _score_coluna_ean(h) >= 35:
                             col_ean = i
                         elif any(k in h for k in ("PRECO", "PREÇO", "VALOR", "R$", "UNIT")):
                             col_preco = i
@@ -560,7 +584,7 @@ def _ler_pdf_base(caminho_pdf):
                             continue
                         rows_data.append({
                             "nome": nome,
-                            "ean": ean_raw,
+                            "ean": limpar_ean(ean_raw),
                             "preco_base": preco,
                         })
     except Exception as e:
