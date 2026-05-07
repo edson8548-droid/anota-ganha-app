@@ -403,10 +403,10 @@ export default function Vitrine() {
             <div className="vt-paste-area">
               <label className="vt-label">Cole sua lista de produtos</label>
               <textarea className="vt-input vt-textarea"
-                placeholder={"AGUA SANITARIA YPE 2L R$ 8,54 UN CX 8UN\nLAVA ROUPA PO ASSIM 800G R$ 119,00 CX 20UN\nVEJA MULTIUSO 500ML R$ 3,72 UN"}
+                placeholder={"AGUA SANITARIA YPE 2L R$ 8,54 UN CX 8UN\nLAVA ROUPA PO ASSIM 800G R$ 119,00 CX 20UN\nOu lista compactada: PRODUTO CX-24 2,50 PRODUTO 2 CX-12 4,90"}
                 value={listaTexto} onChange={e => setListaTexto(e.target.value)} rows={5} />
               <div className="vt-paste-hint">
-                Cole uma linha por produto. A IA interpreta nome, preço, unidade e quantidade por embalagem.
+                Cole uma linha por produto ou uma lista compactada de IA/PDF. O sistema interpreta nome, preço, unidade e quantidade por embalagem.
               </div>
               <div style={{ display:'flex', gap:10, marginTop:12 }}>
                 <button className="vt-btn-primary" onClick={parsearLista} disabled={parsing || !listaTexto.trim()}>

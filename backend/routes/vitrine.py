@@ -167,6 +167,10 @@ _FI_RE = re.compile(
     r'^(.+?)\s+\b(CX|FD|SC|TP|PC|PCT|BD|DR|VD|LT|CJ|PT|FRS|PTE|RL|TB|GF|GL|KG|UN|EMB)-(\d+)\s+(\d+[,\.]\d+)\s*$',
     re.IGNORECASE
 )
+_COMPACT_PKG_PRICE_RE = re.compile(
+    r'\b(CX|FD|SC|TP|PC|PCT|BD|DR|VD|LT|CJ|PT|FRS|PTE|RL|TB|GF|GL|KG|UN|EMB)\s*-?\s*(\d+)\s*(?:UN)?\s+(\d+[,\.]\d{1,3})\b',
+    re.IGNORECASE
+)
 
 _CATEGORIAS_KW = {
     'Biscoito': ['bisc'],
@@ -281,6 +285,54 @@ def _parse_formato_inline(lista: str) -> list:
                 nome, unit, upp = line, 'UN', None
             items.append({'product_name': nome, 'unit': unit, 'units_per_package': upp,
                           'unit_price': None, 'price': 0, 'ean': None, 'category': _auto_categoria(nome)})
+    return items
+
+
+def _limpar_cabecalho_lista_compacta(nome: str) -> str:
+    nome = nome.strip()
+    nome = re.sub(r'^\s*Nome\s+do\s+Produto\s+Quantidade\s+da\s+Embalagem\s+Preço\s+Unitário\s*(?:\(R\$\))?\s*', '', nome, flags=re.IGNORECASE)
+    nome = re.sub(r'^\s*Nome\s*do\s*Produto\s*Quantidade\s*da\s*Embalagem\s*Preço\s*Unitário\s*(?:\(R\$\))?\s*', '', nome, flags=re.IGNORECASE)
+    nome = re.sub(r'^\s*Produto\s+Embalagem\s+Preço\s*', '', nome, flags=re.IGNORECASE)
+    return nome.strip(' -;|\t')
+
+
+def _is_formato_compacto(lista: str) -> bool:
+    texto = re.sub(r'\s+', ' ', lista or '').strip()
+    if not texto:
+        return False
+    matches = list(_COMPACT_PKG_PRICE_RE.finditer(texto))
+    if len(matches) >= 2:
+        return True
+    return len(matches) == 1 and '\n' not in texto and len(texto) > 20
+
+
+def _parse_formato_compacto(lista: str) -> list:
+    texto = re.sub(r'\s+', ' ', lista or '').strip()
+    items = []
+    matches = list(_COMPACT_PKG_PRICE_RE.finditer(texto))
+    start = 0
+
+    for idx, match in enumerate(matches):
+        nome = texto[start:match.start()].strip()
+        nome = _limpar_cabecalho_lista_compacta(nome)
+        start = match.end()
+
+        if not nome or not re.search(r'[A-Za-zÀ-ÿΑ-ω]', nome):
+            continue
+
+        unit = match.group(1).upper()
+        upp = int(match.group(2))
+        unit_price = _parse_br_num(match.group(3))
+        items.append({
+            'product_name': nome,
+            'unit': unit,
+            'units_per_package': upp,
+            'unit_price': unit_price,
+            'price': round(unit_price * upp, 2),
+            'ean': None,
+            'category': _auto_categoria(nome),
+        })
+
     return items
 
 
@@ -427,6 +479,14 @@ def _parse_formato_livre(lista: str) -> list:
 
 
 async def parse_lista_codigo(lista: str) -> List[dict]:
+    # Lista colada de IA/Excel/PDF sem quebras de linha:
+    # "Produto CX-24 2,05 Produto 2 CX-12 4,90 ..."
+    if _is_formato_compacto(lista):
+        result = _parse_formato_compacto(lista)
+        if result:
+            logger.info(f"[parse_lista] FORMATO_COMPACTO Python: {len(result)} produtos")
+            return result
+
     # Fast path: formato inline — "PRODUTO CX-24 2,05" (tudo na mesma linha)
     if _is_formato_inline(lista):
         result = _parse_formato_inline(lista)
