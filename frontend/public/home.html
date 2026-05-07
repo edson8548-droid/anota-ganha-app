@@ -377,15 +377,6 @@ table.mt tr:hover td { background:rgba(0,0,0,.02); }
   opacity:.68;
 }
 
-/* ══ COMO FUNCIONA ══ */
-.steps { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); border:1px solid var(--borda); border-radius:16px; overflow:hidden; margin-top:0; }
-.step { padding:32px 28px; border-right:1px solid var(--borda); }
-.step:last-child { border-right:none; }
-.step-n { font-size:46px; font-weight:900; color:var(--borda); line-height:1; margin-bottom:16px; transition:color .3s; }
-.step:hover .step-n { color:var(--acento); }
-.step-h { font-size:15px; font-weight:700; margin-bottom:8px; }
-.step-p { color:var(--sub); font-size:13px; line-height:1.65; }
-
 /* ══ PLANOS ══ */
 .planos-grid {
   display:grid;
@@ -527,8 +518,6 @@ footer {
   .proof-panel { grid-template-columns:1fr; padding:22px; }
   .proof-metrics { grid-template-columns:1fr; }
   .proof-phone { margin:0; max-width:100%; }
-  .step { border-right:none; border-bottom:1px solid var(--borda); }
-  .step:last-child { border-bottom:none; }
   .cta-box { padding:40px 24px; }
 }
 </style>
@@ -544,7 +533,6 @@ footer {
   <div class="nav-links">
     <a href="#recursos">Recursos</a>
     <a href="#ia">Prompts RCA</a>
-    <a href="#como-funciona">Como Funciona</a>
     <a href="#plano">Plano</a>
     <a href="#faq">FAQ</a>
   </div>
@@ -568,7 +556,7 @@ footer {
     <p class="hero-sub">Uma cotação real processada pelo Venpro. Cada linha identificada por EAN ou similaridade de nome — preço preenchido em segundos.</p>
     <div class="hero-btns">
       <button class="btn-pri" onclick="window.location.href='/register'">Testar 15 dias grátis →</button>
-      <button class="btn-sec" onclick="document.getElementById('como-funciona').scrollIntoView({behavior:'smooth'})">Como funciona</button>
+      <button class="btn-sec" onclick="document.getElementById('vitrine-demo').scrollIntoView({behavior:'smooth'})">Ver demonstração</button>
     </div>
     <div class="hero-stats">
       <div><div class="hs-val"><b>95</b>%</div><div class="hs-lbl">taxa de acerto</div></div>
@@ -705,21 +693,6 @@ footer {
         <img class="proof-thumb" src="/assets/screenshots/pedido-whatsapp-vitrine-2.jpg" alt="">
       </div>
     </div>
-  </div>
-</div>
-</div>
-
-<!-- ── COMO FUNCIONA ── -->
-<div class="sec-wrap" id="como-funciona">
-<div class="sec-inner">
-  <div class="sec-lbl">Simples de usar</div>
-  <h2 class="sec-h">Pronto em 4 passos.</h2>
-  <p class="sec-p" style="margin-bottom:40px">Configure uma vez, use todo dia. Não precisa de conhecimento técnico.</p>
-  <div class="steps">
-    <div class="step"><div class="step-n">01</div><div class="step-h">Crie sua conta</div><div class="step-p">Cadastro rápido com e-mail. 15 dias grátis sem cartão de crédito.</div></div>
-    <div class="step"><div class="step-n">02</div><div class="step-h">Instale o Agente</div><div class="step-p">Baixe o agente, cole sua chave de licença do painel e rode. Passo a passo incluso.</div></div>
-    <div class="step"><div class="step-n">03</div><div class="step-h">Suba sua cotação</div><div class="step-p">Envie a planilha pelo painel. O Venpro devolve com todos os preços preenchidos em minutos.</div></div>
-    <div class="step"><div class="step-n">04</div><div class="step-h">Dispare as ofertas</div><div class="step-p">O agente envia para sua lista inteira automaticamente, com texto e fotos de oferta.</div></div>
   </div>
 </div>
 </div>
