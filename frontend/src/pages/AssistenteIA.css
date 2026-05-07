@@ -130,6 +130,10 @@
   border-color: var(--ia-acento);
   background: rgba(58,133,168,.06);
 }
+.ia-prompt-btn.active {
+  border-color: var(--ia-acento);
+  background: rgba(58,133,168,.14);
+}
 .ia-prompt-btn span {
   display: block;
   font-size: 11px;
@@ -138,12 +142,88 @@
   margin-top: 2px;
 }
 
-/* ── Chat ── */
+/* ── Prompt principal ── */
 .ia-chat-wrap {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+.ia-prompt-view {
+  background: var(--ia-card);
+  border: 1px solid var(--ia-borda);
+  border-radius: 16px;
+  min-height: 560px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
+.ia-prompt-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 512px;
+  gap: 14px;
+}
+.ia-prompt-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ia-borda);
+}
+.ia-prompt-card-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ia-texto);
+}
+.ia-prompt-card-sub {
+  font-size: 13px;
+  color: var(--ia-sub);
+  margin-top: 4px;
+}
+.ia-copy-main {
+  border: none;
+  border-radius: 9px;
+  background: var(--ia-acento);
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 10px 16px;
+  white-space: nowrap;
+  transition: background .2s, transform .15s;
+}
+.ia-copy-main:hover {
+  background: var(--ia-acento2);
+  transform: translateY(-1px);
+}
+.ia-copy-main.copied {
+  background: #1A7A4A;
+}
+.ia-prompt-textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 390px;
+  border: 1px solid var(--ia-borda);
+  border-radius: 12px;
+  background: var(--ia-bg);
+  color: var(--ia-texto);
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.65;
+  padding: 18px;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+.ia-prompt-textarea:focus {
+  border-color: var(--ia-acento);
+}
+.ia-prompt-help {
+  color: var(--ia-sub2);
+  font-size: 12px;
+  line-height: 1.5;
 }
 .ia-messages {
   background: var(--ia-card);
@@ -513,7 +593,24 @@
 }
 
 @media (max-width: 768px) {
-  .ia-sidebar { display: none; }
-  .ia-body { padding: 16px 4%; }
+  .ia-body {
+    padding: 16px 4%;
+    flex-direction: column;
+  }
+  .ia-sidebar {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .ia-prompt-view {
+    width: 100%;
+    min-height: 460px;
+  }
+  .ia-prompt-card-header {
+    flex-direction: column;
+  }
+  .ia-copy-main {
+    width: 100%;
+  }
   .ia-messages { max-height: 400px; }
 }
