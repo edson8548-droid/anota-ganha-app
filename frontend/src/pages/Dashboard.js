@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { FileSpreadsheet, Sparkles, BarChart3, Send, Store } from 'lucide-react';
+import { FileSpreadsheet, ClipboardList, BarChart3, Send, Store } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useCampaigns } from '../hooks/useCampaigns';
 import { useClients } from '../hooks/useClients';
@@ -273,10 +273,10 @@ const Dashboard = () => {
                 <div className="tool-card-desc">Suba a planilha do cliente e receba a cotação preenchida automaticamente por código de barras ou nome do produto. Menos digitação, menos erro e mais tempo livre para atender clientes, visitar lojas e vender mais.</div>
               </div>
               <div className="tool-card" onClick={() => navigate('/assistente')}>
-                <div className="tool-card-icon"><Sparkles size={32} /></div>
+                <div className="tool-card-icon"><ClipboardList size={32} /></div>
                 <div className="tool-card-badge live">Disponível</div>
-                <div className="tool-card-title">IA para Vender Mais</div>
-                <div className="tool-card-desc">Digite sua ideia e a IA transforma em uma mensagem profissional para clientes, crédito, gerência ou indústria. Ideal para ofertas, negociações, cobranças, comunicados e respostas comerciais.</div>
+                <div className="tool-card-title">Prompts Prontos para RCA</div>
+                <div className="tool-card-desc">Copie comandos prontos para organizar tabelas, montar ofertas, revisar mensagens e usar no ChatGPT, Gemini ou outra IA da sua preferência.</div>
               </div>
               <div className="tool-card" onClick={() => navigate('/disparador-whatsapp')}>
                 <div className="tool-card-icon"><Send size={32} /></div>

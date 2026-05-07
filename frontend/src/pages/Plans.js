@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { FileSpreadsheet, Send, Sparkles, Puzzle, BarChart3, MessageCircle } from 'lucide-react';
+import { FileSpreadsheet, Send, ClipboardList, Puzzle, BarChart3, MessageCircle } from 'lucide-react';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import api from '../services/api';
@@ -44,7 +44,7 @@ const Plans = () => {
   const features = [
     { icon: <FileSpreadsheet size={22} color="#3A85A8" />, text: 'Cotação Pronta — planilha preenchida automaticamente' },
     { icon: <Send size={22} color="#3A85A8" />, text: 'Carteira no WhatsApp — envio em massa para seus clientes' },
-    { icon: <Sparkles size={22} color="#3A85A8" />, text: 'IA para Vender Mais — ofertas, negociações e scripts' },
+    { icon: <ClipboardList size={22} color="#3A85A8" />, text: 'Prompts Prontos para RCA — ofertas, planilhas e mensagens' },
     { icon: <Puzzle size={22} color="#3A85A8" />, text: 'Extensão Cotatudo Automático' },
     { icon: <BarChart3 size={22} color="#3A85A8" />, text: 'Raio-X dos Incentivos' },
     { icon: <MessageCircle size={22} color="#3A85A8" />, text: 'Suporte via WhatsApp' },

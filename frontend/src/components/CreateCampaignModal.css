@@ -157,6 +157,9 @@
 .product-tag button {
   background: none; border: none; color: #4338ca;
   font-size: 16px; cursor: pointer; opacity: 0.7;
+  width: 20px; height: 20px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  line-height: 1;
 }
 .product-tag button:hover { opacity: 1; }
 

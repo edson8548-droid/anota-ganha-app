@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
-import { FileSpreadsheet, Sparkles, MessageCircle, BarChart3, Store } from 'lucide-react';
+import { FileSpreadsheet, ClipboardList, MessageCircle, BarChart3, Store } from 'lucide-react';
 import './Landing.css';
 
 const Landing = () => {
@@ -97,9 +97,9 @@ const Landing = () => {
             <p>Suba a planilha do cliente e receba a cotação preenchida automaticamente por código de barras ou nome do produto. Menos digitação, mais tempo para vender.</p>
           </div>
           <div className="landing-feature-card">
-            <div className="landing-feature-icon"><Sparkles size={32} /></div>
-            <h3>IA para Vender Mais</h3>
-            <p>Digite sua ideia e a IA transforma em mensagem profissional para clientes, crédito, gerência ou indústria. Ofertas, negociações e cobranças em segundos.</p>
+            <div className="landing-feature-icon"><ClipboardList size={32} /></div>
+            <h3>Prompts Prontos para RCA</h3>
+            <p>Copie modelos de comando para organizar tabelas, montar ofertas, revisar mensagens e usar no ChatGPT, Gemini ou outra IA da sua preferência.</p>
           </div>
           <div className="landing-feature-card">
             <div className="landing-feature-icon"><BarChart3 size={32} /></div>

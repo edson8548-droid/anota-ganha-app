@@ -397,7 +397,7 @@ export default function Vitrine() {
 
           {/* Seção 2 — Produtos */}
           <div className="vt-form-section">
-            <div className="vt-form-section-title">📦 Produtos</div>
+            <div className="vt-form-section-title">Produtos</div>
 
             {/* Cole lista */}
             <div className="vt-paste-area">
@@ -410,7 +410,7 @@ export default function Vitrine() {
               </div>
               <div style={{ display:'flex', gap:10, marginTop:12 }}>
                 <button className="vt-btn-primary" onClick={parsearLista} disabled={parsing || !listaTexto.trim()}>
-                  {parsing ? '⏳ Interpretando...' : '✨ Interpretar lista'}
+                  {parsing ? 'Interpretando...' : 'Interpretar lista'}
                 </button>
                 <button className="vt-btn-secondary" onClick={addItemManual}>
                   + Adicionar manualmente
@@ -449,7 +449,7 @@ export default function Vitrine() {
               Cancelar
             </button>
             <button className="vt-btn-primary" onClick={salvarOferta} disabled={saving}>
-              {saving ? '⏳ Salvando...' : '🚀 Criar Vitrine e Gerar Link'}
+              {saving ? 'Salvando...' : 'Criar vitrine de ofertas'}
             </button>
           </div>
 

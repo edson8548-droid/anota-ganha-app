@@ -501,7 +501,9 @@ const Analytics = ({ campaign, clients, onClose }) => {
             </div>
             <button onClick={() => setMissingDialog(null)} style={{
               background: 'none', border: 'none', color: '#6B6E74', fontSize: 20,
-              cursor: 'pointer', lineHeight: 1, padding: '2px 6px',
+              cursor: 'pointer', lineHeight: 1, padding: 0, width: 28, height: 28,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: 6,
             }}>×</button>
           </div>
           <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
