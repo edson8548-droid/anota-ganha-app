@@ -47,11 +47,8 @@ const Login = () => {
       <div className="login-card">
         <div className="login-header">
           <div className="login-logo">
-            <svg className="login-logo-icon" viewBox="0 0 18 18" fill="none">
-              <path d="M2 3.5L9 14.5L16 3.5" stroke="#3A85A8" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M9 14.5L12.5 8.5" stroke="rgba(58,133,168,0.6)" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            <span className="login-logo-ven">Ven</span><span className="login-logo-pro">pro</span>
+            <img className="login-logo-icon" src="/assets/logo/venpro-logo-icon-transparent.png" alt="VenPro" />
+            <span className="login-logo-ven">Ven</span><span className="login-logo-pro">Pro</span>
           </div>
           <p className="login-subtitle">Entre na sua conta</p>
         </div>
