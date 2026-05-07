@@ -72,6 +72,7 @@ function applyDispatchState(state) {
   progressPct.textContent  = pct + '%';
   progressText.textContent = `${state.sent} / ${total} enviados`;
   if (state.invalidos > 0) invalidosWrap.textContent = `${state.invalidos} número(s) inválido(s)`;
+  if (state.errorMsg) setStatus(state.errorMsg, 'err');
 
   if (state.status === 'running') {
     const stuck = !state.ts || (Date.now() - state.ts) > STUCK_MS;
@@ -79,7 +80,9 @@ function applyDispatchState(state) {
     cancelWrap.style.display = stuck ? 'none' : 'block';
     btnDisparar.disabled = true;
     btnDisparar.textContent = stuck ? 'Pausado' : 'Disparando...';
-    setStatus(stuck ? `Pausado em ${pct}% — PC dormiu ou erro` : `Disparando... ${pct}%`, stuck ? 'err' : 'info');
+    if (!state.errorMsg) {
+      setStatus(stuck ? `Pausado em ${pct}% — PC dormiu ou erro` : `Disparando... ${pct}%`, stuck ? 'err' : 'info');
+    }
   }
   if (state.status === 'done') {
     stuckWrap.style.display  = 'none';
