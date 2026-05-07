@@ -478,6 +478,11 @@ function ItemReviewEditar({ item, onChange, onDelete, onImageChange, onSearchIma
             onChange={e => onChange('price', e.target.value)} placeholder="0,00" />
         </div>
         <div className="vt-review-field">
+          <label>Preço caixa (R$) - opcional</label>
+          <input type="number" step="0.01" value={item.unit_price || ''}
+            onChange={e => onChange('unit_price', e.target.value)} placeholder="Calcule se não informar" />
+        </div>
+        <div className="vt-review-field">
           <label>Unidade</label>
           <select value={item.unit || 'UN'} onChange={e => onChange('unit', e.target.value)}>
             {UNIDADES.map(u => <option key={u}>{u}</option>)}
