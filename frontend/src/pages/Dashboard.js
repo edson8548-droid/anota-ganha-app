@@ -211,6 +211,19 @@ const Dashboard = () => {
   // ============================================
   const renderMainDashboard = () => {
     const userInitial = user?.email ? user.email.charAt(0).toUpperCase() : '?';
+    const displayName = (user?.name || user?.displayName || user?.email?.split('@')[0] || 'RCA').split(' ')[0];
+    const currentHour = new Date().getHours();
+    const greeting = currentHour < 12 ? 'Bom dia' : currentHour < 18 ? 'Boa tarde' : 'Boa noite';
+    const dailyMessages = [
+      'Sua carteira tem oportunidade escondida. Revise clientes parados e transforme visita em pedido.',
+      'Quem acompanha incentivo todos os dias vende com mais direcao. Foque nos clientes que ainda podem positivar.',
+      'Oferta boa parada nao vira comissao. Escolha uma acao simples hoje e mande para sua carteira.',
+      'O cliente que comprou pouco pode comprar melhor. Revise mix, margem e giro antes da proxima visita.',
+      'Menos correria, mais metodo. Use seus dados para decidir onde agir primeiro.',
+      'Todo pedido comeca com uma abordagem clara. Organize sua lista e fale com os clientes certos.',
+      'Seu tempo vale venda. Automatize o repetitivo e use sua energia para negociar melhor.'
+    ];
+    const dailyMessage = dailyMessages[new Date().getDate() % dailyMessages.length];
 
     return (
       <div className="dashboard-container">
@@ -262,6 +275,12 @@ const Dashboard = () => {
 
         {/* Main Content */}
         <main className="dashboard-main">
+          <section className="daily-message-card">
+            <div className="daily-message-kicker">Mensagem diaria de incentivo</div>
+            <h2 className="daily-message-title">{greeting}, {displayName}</h2>
+            <p className="daily-message-text">{dailyMessage}</p>
+          </section>
+
           {/* Ferramentas */}
           <section className="tools-section">
             <div className="tools-section-title">Ferramentas</div>
@@ -303,72 +322,6 @@ const Dashboard = () => {
                 <div className="tool-card-desc">Monte sua oferta com produtos e preços, gere um link exclusivo e envie para seus clientes. Eles escolhem as quantidades e mandam o pedido direto no seu WhatsApp — sem ligação, sem digitação.</div>
               </div>
             </div>
-          </section>
-
-          {/* Campanhas */}
-          <section className="tools-section">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="tools-section-title">Minhas Campanhas</div>
-              <button
-                className="btn-action teal"
-                style={{ fontSize: 13, padding: '7px 16px' }}
-                onClick={() => setShowCreateCampaign(true)}
-              >
-                + Nova
-              </button>
-            </div>
-
-            {campaignsLoading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-                {[1, 2].map(i => (
-                  <div key={i} className="campaign-quick-card" style={{ pointerEvents: 'none' }}>
-                    <div className="cqc-main">
-                      <span className="skeleton" style={{ display: 'block', height: 15, width: '55%', marginBottom: 8 }} />
-                      <span className="skeleton" style={{ display: 'block', height: 11, width: '38%' }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : campaigns.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">📊</div>
-                <h3 className="empty-title">Nenhuma campanha ainda</h3>
-                <p className="empty-description">Crie sua primeira campanha para começar a acompanhar positivação.</p>
-                <button className="btn-action teal" onClick={() => setShowCreateCampaign(true)}>+ Criar Campanha</button>
-              </div>
-            ) : (
-              <div className="campaigns-quick-list">
-                {campaigns.map(c => {
-                  const start = new Date(c.startDate).toLocaleDateString('pt-BR');
-                  const end = new Date(c.endDate).toLocaleDateString('pt-BR');
-                  const industriesCount = Object.keys(c.industries || {}).length;
-                  return (
-                    <div
-                      key={c.id}
-                      className="campaign-quick-card"
-                      onClick={() => setSelectedCampaignId(c.id)}
-                    >
-                      <div className="cqc-main">
-                        <div className="cqc-name">{c.name}</div>
-                        <div className="cqc-meta">{start} – {end} · {industriesCount} indústria{industriesCount !== 1 ? 's' : ''}</div>
-                      </div>
-                      <div className="cqc-actions">
-                        <button
-                          className="btn-icon btn-edit"
-                          title="Editar"
-                          onClick={(e) => handleEditCampaign(e, c)}
-                        >✏️</button>
-                        <button
-                          className="btn-icon btn-delete"
-                          title="Apagar"
-                          onClick={(e) => handleDeleteCampaign(e, c.id)}
-                        >🗑️</button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </section>
         </main>
       </div>
