@@ -14,6 +14,7 @@ import Analytics from '../components/Analytics';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { campaignsService } from '../services/campaigns.service';
 import { uploadAvatar } from '../services/api';
+import { getDailyMotivationMessage } from '../data/dailyMotivationMessages';
 import './Dashboard.css';
 
 
@@ -214,16 +215,7 @@ const Dashboard = () => {
     const displayName = (user?.name || user?.displayName || user?.email?.split('@')[0] || 'RCA').split(' ')[0];
     const currentHour = new Date().getHours();
     const greeting = currentHour < 12 ? 'Bom dia' : currentHour < 18 ? 'Boa tarde' : 'Boa noite';
-    const dailyMessages = [
-      'Sua carteira tem oportunidade escondida. Revise clientes parados e transforme visita em pedido.',
-      'Quem acompanha incentivo todos os dias vende com mais direcao. Foque nos clientes que ainda podem positivar.',
-      'Oferta boa parada nao vira comissao. Escolha uma acao simples hoje e mande para sua carteira.',
-      'O cliente que comprou pouco pode comprar melhor. Revise mix, margem e giro antes da proxima visita.',
-      'Menos correria, mais metodo. Use seus dados para decidir onde agir primeiro.',
-      'Todo pedido comeca com uma abordagem clara. Organize sua lista e fale com os clientes certos.',
-      'Seu tempo vale venda. Automatize o repetitivo e use sua energia para negociar melhor.'
-    ];
-    const dailyMessage = dailyMessages[new Date().getDate() % dailyMessages.length];
+    const dailyMessage = getDailyMotivationMessage();
 
     return (
       <div className="dashboard-container">
