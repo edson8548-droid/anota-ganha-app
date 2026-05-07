@@ -25,25 +25,25 @@
 .landing-nav-logo {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   text-decoration: none;
 }
 
 .landing-nav-logo img {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   object-fit: contain;
   filter: drop-shadow(0 5px 12px rgba(0,0,0,.28));
 }
 
 .landing-nav-ven {
-  font-size: 24px;
+  font-size: 27px;
   font-weight: 800;
   color: #ffffff;
 }
 
 .landing-nav-pro {
-  font-size: 24px;
+  font-size: 27px;
   font-weight: 800;
   color: #3A85A8;
 }
@@ -99,6 +99,39 @@
   padding: 80px 24px 60px;
   max-width: 800px;
   margin: 0 auto;
+}
+
+.landing-hero-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.landing-hero-brand img {
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 26px rgba(0,0,0,.28));
+}
+
+.landing-hero-brand-name {
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+
+.landing-hero-brand-name span:first-child { color: #ffffff; }
+.landing-hero-brand-name span:last-child { color: #3A85A8; }
+
+.landing-hero-brand-line {
+  margin-top: 8px;
+  color: #E8A830;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2.4px;
+  text-transform: uppercase;
 }
 
 .landing-hero-badge {
@@ -405,6 +438,17 @@
   }
   .landing-hero {
     padding: 50px 20px 40px;
+  }
+  .landing-hero-brand img {
+    width: 58px;
+    height: 58px;
+  }
+  .landing-hero-brand-name {
+    font-size: 30px;
+  }
+  .landing-hero-brand-line {
+    font-size: 10px;
+    letter-spacing: 1.6px;
   }
   .landing-hero h1 {
     font-size: 30px;
