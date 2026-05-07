@@ -294,18 +294,21 @@ export default function VitrinePublica() {
                     </div>
                   )}
 
-                  {/* Preço unitário em destaque (principal) */}
+                  {/* Preço principal em destaque */}
                   <div className="vp-product-unit-price">
                     {item.units_per_package
-                      ? `Un: ${item.unit_price ? fmtMoeda(item.unit_price) : fmtMoeda(item.price / item.units_per_package)}`
+                      ? `Caixa: ${fmtMoeda(item.price)}`
                       : `Un: ${item.unit_price ? fmtMoeda(item.unit_price) : fmtMoeda(item.price)}`
                     }
                   </div>
 
-                  {/* Preço da caixa (secundário) - sempre mostra quando há embalagem */}
-                  {item.units_per_package && (
+                  {/* Preço secundário - mostra quando há embalagem ou quando há unit_price */}
+                  {(item.units_per_package || item.unit_price) && (
                     <div className="vp-product-price">
-                      Caixa: {fmtMoeda(item.price)}
+                      {item.units_per_package
+                        ? `Un: ${item.unit_price ? fmtMoeda(item.unit_price) : fmtMoeda(item.price / item.units_per_package)}`
+                        : `Un: ${fmtMoeda(item.price)}`
+                      }
                     </div>
                   )}
 
@@ -386,12 +389,12 @@ export default function VitrinePublica() {
                       <div className="vp-cart-item-meta">
                         {item.qty} {item.unit}
                         {item.units_per_package ? ` (cx ${item.units_per_package} un)` : ''}
-                        {' · Un: '}{item.units_per_package
-                          ? (item.unit_price ? fmtMoeda(item.unit_price) : fmtMoeda(item.price / item.units_per_package))
-                          : (item.unit_price ? fmtMoeda(item.unit_price) : fmtMoeda(item.price))
+                        {' · '}{item.units_per_package
+                          ? `Caixa: ${fmtMoeda(item.price)}`
+                          : `Un: ${item.unit_price ? fmtMoeda(item.unit_price) : fmtMoeda(item.price)}`
                         }
-                        {item.units_per_package && (
-                          <span> · Caixa: {fmtMoeda(item.price)}</span>
+                        {item.units_per_package && item.unit_price && (
+                          <span> · Un: ${fmtMoeda(item.unit_price)}</span>
                         )}
                       </div>
                     </div>
