@@ -28,6 +28,7 @@ export default function VitrineEditar() {
   const [logoFile, setLogoFile] = useState(null);
   const [listaTexto, setListaTexto] = useState('');
   const [itens, setItens] = useState([]);
+  const [imagePicker, setImagePicker] = useState(null);
 
   const logoInputRef = useRef(null);
 
@@ -90,22 +91,31 @@ export default function VitrineEditar() {
 
   const handleSearchImage = async (key, productName) => {
     if (!productName?.trim()) { toast.warning('Digite o nome do produto primeiro'); return; }
-    setItens(prev => prev.map(it => it._key === key ? { ...it, _searching: true } : it));
+    setImagePicker({ key, productName, loading: true, images: [] });
     try {
-      const res = await vitrineService.sugerirImagem(productName);
-      if (res.data.found && res.data.image_url) {
-        setItens(prev => prev.map(it =>
-          it._key === key ? { ...it, _imagePreview: res.data.image_url, _imageUrl: res.data.image_url, _imageFile: null, _searching: false } : it
-        ));
-        toast.success('Imagem encontrada!');
+      const res = await vitrineService.sugerirImagens(productName);
+      const images = res.data.images || [];
+      if (images.length) {
+        setImagePicker({ key, productName, loading: false, images });
       } else {
         toast.warning('Nenhuma imagem encontrada para este produto');
-        setItens(prev => prev.map(it => it._key === key ? { ...it, _searching: false } : it));
+        setImagePicker(null);
       }
     } catch {
       toast.error('Erro ao buscar imagem');
-      setItens(prev => prev.map(it => it._key === key ? { ...it, _searching: false } : it));
+      setImagePicker(null);
     }
+  };
+
+  const selecionarImagem = (imageUrl) => {
+    if (!imagePicker?.key || !imageUrl) return;
+    setItens(prev => prev.map(it =>
+      it._key === imagePicker.key
+        ? { ...it, _imagePreview: imageUrl, _imageUrl: imageUrl, _imageFile: null }
+        : it
+    ));
+    setImagePicker(null);
+    toast.success('Foto trocada');
   };
 
   const parsearLista = async () => {
@@ -394,6 +404,14 @@ export default function VitrineEditar() {
                 ))}
               </div>
             )}
+
+            {imagePicker && (
+              <ImagePickerModal
+                picker={imagePicker}
+                onClose={() => setImagePicker(null)}
+                onSelect={selecionarImagem}
+              />
+            )}
           </div>
 
           {/* Ações */}
@@ -478,6 +496,41 @@ function ItemReviewEditar({ item, onChange, onDelete, onImageChange, onSearchIma
           <label>Categoria</label>
           <input value={item.category || ''} onChange={e => onChange('category', e.target.value)} placeholder="Ex: Limpeza" />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ImagePickerModal({ picker, onClose, onSelect }) {
+  return (
+    <div className="vt-image-picker-overlay" onClick={onClose}>
+      <div className="vt-image-picker" onClick={e => e.stopPropagation()}>
+        <div className="vt-image-picker-header">
+          <div>
+            <div className="vt-image-picker-title">Escolha uma foto</div>
+            <div className="vt-image-picker-sub">{picker.productName}</div>
+          </div>
+          <button className="vt-btn-remove" onClick={onClose} title="Fechar">
+            <X size={18} />
+          </button>
+        </div>
+
+        {picker.loading ? (
+          <div className="vt-image-picker-loading">Buscando opções de foto...</div>
+        ) : (
+          <div className="vt-image-picker-grid">
+            {picker.images.map((img, i) => (
+              <button
+                key={`${img.image_url}-${i}`}
+                className="vt-image-option"
+                onClick={() => onSelect(img.image_url)}
+              >
+                <img src={img.thumbnail_url || img.image_url} alt="" />
+                <span>Usar esta foto</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
