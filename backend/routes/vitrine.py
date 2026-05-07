@@ -525,7 +525,19 @@ async def listar_ofertas(uid: str = Depends(get_user_id)):
         sort=[("created_at", -1)]
     )
     docs = await cursor.to_list(length=50)
-    return [doc_to_dict(d) for d in docs]
+
+    result = []
+    for doc in docs:
+        oferta_dict = doc_to_dict(doc)
+
+        # Garantir que unit_price seja calculado quando há units_per_package
+        for item in oferta_dict.get("items", []):
+            if item.get("units_per_package") and not item.get("unit_price"):
+                item["unit_price"] = round(item.get("price", 0) / item["units_per_package"], 2)
+
+        result.append(oferta_dict)
+
+    return result
 
 
 @router.post("/ofertas")
@@ -541,9 +553,15 @@ async def criar_oferta(req: CreateOfferRequest, uid: str = Depends(get_user_id))
 
     items = []
     for i, item in enumerate(req.items or []):
+        item_dict = item.model_dump()
+
+        # Calcular automaticamente preço de caixa se houver units_per_package mas não unit_price
+        if item_dict.get("units_per_package") and not item_dict.get("unit_price"):
+            item_dict["unit_price"] = round(item_dict.get("price", 0) / item_dict["units_per_package"], 2)
+
         items.append({
             "id": str(uuid.uuid4()),
-            **item.model_dump(),
+            **item_dict,
             "sort_order": i,
             "created_at": datetime.now(timezone.utc),
         })
@@ -577,7 +595,15 @@ async def obter_oferta(offer_id: str, uid: str = Depends(get_user_id)):
         raise HTTPException(400, "ID inválido")
     if not doc:
         raise HTTPException(404, "Oferta não encontrada")
-    return doc_to_dict(doc)
+
+    result = doc_to_dict(doc)
+
+    # Garantir que unit_price seja calculado quando há units_per_package
+    for item in result.get("items", []):
+        if item.get("units_per_package") and not item.get("unit_price"):
+            item["unit_price"] = round(item.get("price", 0) / item["units_per_package"], 2)
+
+    return result
 
 
 @router.put("/ofertas/{offer_id}")
@@ -623,9 +649,16 @@ async def adicionar_item(offer_id: str, item: OfferItem, uid: str = Depends(get_
         oid = ObjectId(offer_id)
     except Exception:
         raise HTTPException(400, "ID inválido")
+
+    item_dict = item.model_dump()
+
+    # Calcular automaticamente preço de caixa se houver units_per_package mas não unit_price
+    if item_dict.get("units_per_package") and not item_dict.get("unit_price"):
+        item_dict["unit_price"] = round(item_dict.get("price", 0) / item_dict["units_per_package"], 2)
+
     new_item = {
         "id": str(uuid.uuid4()),
-        **item.model_dump(),
+        **item_dict,
         "created_at": datetime.now(timezone.utc),
     }
     result = await _db.vitrine_offers.update_one(
@@ -643,7 +676,33 @@ async def atualizar_item(offer_id: str, item_id: str, req: UpdateItemRequest, ui
         oid = ObjectId(offer_id)
     except Exception:
         raise HTTPException(400, "ID inválido")
+
+    # Buscar o item atual primeiro
+    doc = await _db.vitrine_offers.find_one({"_id": oid, "created_by": uid})
+    if not doc:
+        raise HTTPException(404, "Oferta não encontrada")
+
+    item_atual = None
+    for item in doc.get("items", []):
+        if item.get("id") == item_id:
+            item_atual = item
+            break
+
+    if not item_atual:
+        raise HTTPException(404, "Item não encontrado")
+
     updates = {k: v for k, v in req.model_dump().items() if v is not None}
+
+    # Calcular automaticamente preço de caixa se houver units_per_package mas não unit_price
+    if updates.get("units_per_package") and not updates.get("unit_price"):
+        updates["unit_price"] = round(updates.get("price", item_atual.get("price", 0)) / updates.get("units_per_package"), 2)
+    elif updates.get("units_per_package") and updates.get("unit_price"):
+        # Se ambos foram atualizados, manter o unit_price informado
+        pass
+    elif updates.get("price") and item_atual.get("units_per_package") and not updates.get("unit_price"):
+        # Se o preço foi atualizado e há units_per_package, recalcular unit_price
+        updates["unit_price"] = round(updates.get("price") / item_atual.get("units_per_package"), 2)
+
     set_fields = {f"items.$[elem].{k}": v for k, v in updates.items()}
     set_fields["updated_at"] = datetime.now(timezone.utc)
     result = await _db.vitrine_offers.update_one(
@@ -977,8 +1036,12 @@ async def pagina_publica(slug: str):
     # Remover dados internos
     result.pop("created_by", None)
     # Filtrar apenas itens ativos e ordenar
-    result["items"] = sorted(
-        [i for i in result.get("items", []) if i.get("active", True)],
-        key=lambda x: x.get("sort_order", 0)
-    )
+    items_ativos = [i for i in result.get("items", []) if i.get("active", True)]
+
+    # Garantir que unit_price seja calculado quando há units_per_package
+    for item in items_ativos:
+        if item.get("units_per_package") and not item.get("unit_price"):
+            item["unit_price"] = round(item.get("price", 0) / item["units_per_package"], 2)
+
+    result["items"] = sorted(items_ativos, key=lambda x: x.get("sort_order", 0))
     return result
