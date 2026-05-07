@@ -365,17 +365,19 @@ def _parse_formato_csv(lista: str) -> list:
 
         if header:
             def col_value(*names):
-                for name in names:
-                    if name in header:
-                        idx = header.index(name)
+                names_norm = [normalizar(name) for name in names]
+                for idx, col in enumerate(header):
+                    if any(col == name or name in col for name in names_norm):
                         if idx < len(cols):
                             return cols[idx]
                 return ''
 
-            nome = col_value('produto', 'product_name', 'nome') or nome
-            unit_price_raw = col_value('r$ unitario', 'unitario', 'preco unitario', 'preco_unitario')
-            price_raw = col_value('r$ emb.', 'r$ emb', 'preco embalagem', 'preco_embalagem', 'preco')
-            emb_raw = col_value('emb.', 'emb', 'embalagem', 'unidade')
+            nome = col_value('produto', 'nome do produto', 'product_name', 'nome') or nome
+            unit_price_raw = col_value('preco unitario', 'r$ unitario', 'unitario', 'preco_unitario')
+            price_raw = col_value('preco caixa', 'preco embalagem', 'r$ emb.', 'r$ emb', 'preco_embalagem')
+            emb_raw = col_value('quantidade da embalagem', 'qtd embalagem', 'qtd por embalagem', 'embalagem', 'emb.', 'emb')
+            if not price_raw:
+                price_raw = unit_price_raw
         else:
             # Quando não há header, assume formato: Produto;CX-QTD;PREÇO
             # ou Produto;CX-QTD;PREÇO_UNITÁRIO;PREÇO_CAIXA
@@ -384,20 +386,18 @@ def _parse_formato_csv(lista: str) -> list:
             emb_raw = None
 
             if len(cols) == 2:
-                # Formato: Produto;CX-QTD;PREÇO (assume preço unitário)
-                unit_price_raw = cols[1] if len(cols) > 1 else ''
-                price_raw = cols[-1] if len(cols) > 1 else cols[1]
+                unit_price_raw = cols[1]
+                price_raw = cols[1]
                 emb_raw = next((c for c in cols if _F3_PKG_RE.search(c)), '')
             elif len(cols) == 3:
-                # Formato: Produto;CX-QTD;PREÇO_UNITÁRIO;PREÇO_CAIXA
-                unit_price_raw = cols[1]
+                unit_price_raw = cols[2]
                 price_raw = cols[2]
-                emb_raw = cols[0]
+                emb_raw = cols[1]
             elif len(cols) >= 4:
                 # Formato: Produto;CX-QTD;PREÇO_UNITÁRIO;PREÇO_CAIXA (com mais campos)
                 unit_price_raw = cols[2]
                 price_raw = cols[3]
-                emb_raw = cols[0]
+                emb_raw = cols[1]
             else:
                 # Formato inválido, pular
                 continue
