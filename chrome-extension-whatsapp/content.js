@@ -5,6 +5,12 @@ const API_URL = 'https://api.venpro.com.br/api';
 
 // ── WhatsApp Web selectors (ported from meu_robo.py) ─────────────────────
 const SEL_CHAT_INPUT = [
+  "#main footer div[contenteditable='true'][role='textbox']",
+  "#main footer div[contenteditable='true'][aria-placeholder='Digite uma mensagem']",
+  "#main footer div[contenteditable='true'][aria-placeholder='Type a message']",
+  "#main footer div[contenteditable='true']",
+  "#main div[contenteditable='true'][aria-placeholder='Digite uma mensagem']",
+  "#main div[contenteditable='true'][aria-placeholder='Type a message']",
   "#main div[contenteditable='true'][data-tab='10']",
   "#main div[contenteditable='true'][role='textbox']",
   "div[contenteditable='true'][data-tab='10']",
@@ -52,10 +58,18 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 function findFirst(selectors) {
   for (const sel of selectors) {
-    const el = document.querySelector(sel);
+    const matches = Array.from(document.querySelectorAll(sel));
+    const el = matches.find(isVisible);
     if (el) return el;
   }
   return null;
+}
+
+function isVisible(el) {
+  if (!el) return false;
+  const rect = el.getBoundingClientRect();
+  const style = window.getComputedStyle(el);
+  return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
 }
 
 async function waitFor(selectors, timeoutMs = 30000) {
@@ -96,27 +110,57 @@ async function typeMessage(input, text) {
   document.execCommand('delete', false, null);
   await sleep(100);
 
-  const lines = text.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    // execCommand works on Chrome; if it fails, fall back to InputEvent
-    const ok = document.execCommand('insertText', false, lines[i]);
-    if (!ok) {
-      input.dispatchEvent(new InputEvent('input', {
-        data: lines[i], inputType: 'insertText', bubbles: true,
-      }));
-    }
-    if (i < lines.length - 1) {
-      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, keyCode: 13, bubbles: true }));
-      input.dispatchEvent(new KeyboardEvent('keyup',  { key: 'Enter', shiftKey: true, keyCode: 13, bubbles: true }));
-      await sleep(80);
-    }
+  if (await pasteMessage(input, text)) {
+    await sleep(400);
+    return true;
   }
+
+  // Fallback for older Chrome/WhatsApp builds.
+  const ok = document.execCommand('insertText', false, text);
+  if (!ok || !hasTypedText(input, text)) {
+    input.textContent = text;
+    input.dispatchEvent(new InputEvent('beforeinput', {
+      inputType: 'insertText', data: text, bubbles: true, cancelable: true,
+    }));
+    input.dispatchEvent(new InputEvent('input', {
+      inputType: 'insertText', data: text, bubbles: true,
+    }));
+  }
+
   await sleep(400);
+  return hasTypedText(input, text);
+}
+
+async function pasteMessage(input, text) {
+  try {
+    const data = new DataTransfer();
+    data.setData('text/plain', text);
+    const event = new ClipboardEvent('paste', {
+      clipboardData: data,
+      bubbles: true,
+      cancelable: true,
+    });
+    input.dispatchEvent(event);
+    await sleep(300);
+    return hasTypedText(input, text);
+  } catch {
+    return false;
+  }
+}
+
+function hasTypedText(input, text) {
+  const expected = text.replace(/\s+/g, ' ').trim().slice(0, 24);
+  const current = (input.innerText || input.textContent || '').replace(/\s+/g, ' ').trim();
+  return !expected || current.includes(expected);
 }
 
 async function clickSend() {
   const btn = findFirst(SEL_SEND);
-  if (btn) { btn.click(); return; }
+  if (btn) {
+    const clickable = btn.closest('button,[role="button"]') || btn;
+    clickable.click();
+    return;
+  }
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 }
 
@@ -177,8 +221,8 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
   let invalidos = 0;
   const total = contacts.length;
 
-  async function saveState(status) {
-    const state = { status, sent, total, invalidos, ts: Date.now(), startIdx: sent };
+  async function saveState(status, errorMsg = '') {
+    const state = { status, sent, total, invalidos, errorMsg, ts: Date.now(), startIdx: sent };
     await new Promise(r => chrome.runtime.sendMessage({ action: 'saveDispatchState', state }, r));
     chrome.runtime.sendMessage({ action: 'dispatchUpdate' });
   }
@@ -206,7 +250,11 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
 
     // 1. Send text message
     const fullMsg = buildMessage(nome, msgTpl);
-    await typeMessage(chatInput, fullMsg);
+    const typed = await typeMessage(chatInput, fullMsg);
+    if (!typed) {
+      await saveState('running', 'Nao consegui escrever a mensagem no WhatsApp Web. Atualize o WhatsApp Web e tente novamente.');
+      continue;
+    }
     await sleep(300);
     await clickSend();
     await sleep(15000); // wait 15s before sending photos (same as meu_robo.py)
