@@ -85,6 +85,14 @@ export const vitrineService = {
     });
   },
 
+  async sugerirImagens(productName) {
+    const headers = await getHeaders();
+    return axios.get(`${API_URL}/api/vitrine/sugerir-imagens`, {
+      headers,
+      params: { product_name: productName },
+    });
+  },
+
   // ── Página pública (sem auth) ─────────────────────
   async obterPublica(slug) {
     return axios.get(`${API_URL}/api/vitrine/publica/${slug}`);
