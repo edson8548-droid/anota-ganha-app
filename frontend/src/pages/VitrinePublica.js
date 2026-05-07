@@ -15,6 +15,15 @@ function fmtMoeda(v) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
 }
 
+function getUnitPrice(item) {
+  return item.unit_price || item.price || 0;
+}
+
+function getPackagePrice(item) {
+  const unit = getUnitPrice(item);
+  return item.units_per_package ? unit * item.units_per_package : item.price || unit;
+}
+
 function orderKey(slug) {
   return `vitrine_pedido_${slug}`;
 }
@@ -109,7 +118,7 @@ export default function VitrinePublica() {
     if (!oferta) return [];
     return oferta.items
       .filter(item => (quantidades[item.id] || 0) > 0)
-      .map(item => ({ ...item, qty: quantidades[item.id], subtotal: item.price * quantidades[item.id] }));
+      .map(item => ({ ...item, qty: quantidades[item.id], subtotal: getPackagePrice(item) * quantidades[item.id] }));
   }, [oferta, quantidades]);
 
   const totalCarrinho = useMemo(() => itensCarrinho.reduce((s, i) => s + i.subtotal, 0), [itensCarrinho]);
@@ -137,13 +146,8 @@ export default function VitrinePublica() {
       const unidade = item.units_per_package
         ? `${item.qty} ${item.unit} (cx ${item.units_per_package} un)`
         : `${item.qty} ${item.unit}`;
-      const precoUn = item.units_per_package || item.unit_price
-        ? `\nPreço un: ${item.units_per_package
-            ? (item.unit_price ? fmtMoeda(item.unit_price) : fmtMoeda(item.price / item.units_per_package))
-            : (item.unit_price ? fmtMoeda(item.unit_price) : fmtMoeda(item.price))
-          }`
-        : '';
-      const precoCaixa = item.units_per_package ? `\nPreço caixa: ${fmtMoeda(item.price)}` : '';
+      const precoUn = `\nPreço un: ${fmtMoeda(getUnitPrice(item))}`;
+      const precoCaixa = item.units_per_package ? `\nPreço caixa: ${fmtMoeda(getPackagePrice(item))}` : '';
       return `${i + 1}. ${item.product_name}\nQtd: ${unidade}${precoUn}${precoCaixa}\nSubtotal: ${fmtMoeda(item.subtotal)}`;
     }).join('\n\n');
 
@@ -274,7 +278,9 @@ export default function VitrinePublica() {
         ) : (
           itensFiltrados.map(item => {
             const qty = quantidades[item.id] || 0;
-            const subtotal = item.price * qty;
+            const subtotal = getPackagePrice(item) * qty;
+            const unitPrice = getUnitPrice(item);
+            const packagePrice = getPackagePrice(item);
 
             return (
               <div key={item.id} className={`vp-product-card ${qty > 0 ? 'has-qty' : ''}`}>
@@ -296,19 +302,13 @@ export default function VitrinePublica() {
 
                   {/* Preço principal em destaque */}
                   <div className="vp-product-unit-price">
-                    {item.units_per_package
-                      ? `Caixa: ${fmtMoeda(item.price)}`
-                      : `Un: ${item.unit_price ? fmtMoeda(item.unit_price) : fmtMoeda(item.price)}`
-                    }
+                    Un: {fmtMoeda(unitPrice)}
                   </div>
 
-                  {/* Preço secundário - mostra quando há embalagem ou quando há unit_price */}
-                  {(item.units_per_package || item.unit_price) && (
+                  {/* Preço secundário */}
+                  {item.units_per_package && (
                     <div className="vp-product-price">
-                      {item.units_per_package
-                        ? `Un: ${item.unit_price ? fmtMoeda(item.unit_price) : fmtMoeda(item.price / item.units_per_package)}`
-                        : `Un: ${fmtMoeda(item.price)}`
-                      }
+                      Caixa: {fmtMoeda(packagePrice)}
                     </div>
                   )}
 
@@ -390,12 +390,9 @@ export default function VitrinePublica() {
                         {item.qty} {item.unit}
                         {item.units_per_package ? ` (cx ${item.units_per_package} un)` : ''}
                         {' · '}{item.units_per_package
-                          ? `Caixa: ${fmtMoeda(item.price)}`
-                          : `Un: ${item.unit_price ? fmtMoeda(item.unit_price) : fmtMoeda(item.price)}`
+                          ? `Un: ${fmtMoeda(getUnitPrice(item))} · Caixa: ${fmtMoeda(getPackagePrice(item))}`
+                          : `Un: ${fmtMoeda(getUnitPrice(item))}`
                         }
-                        {item.units_per_package && item.unit_price && (
-                          <span> · Un: ${fmtMoeda(item.unit_price)}</span>
-                        )}
                       </div>
                     </div>
                     <div className="vp-cart-item-price">{fmtMoeda(item.subtotal)}</div>

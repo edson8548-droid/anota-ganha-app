@@ -8,6 +8,29 @@ import './Vitrine.css';
 const API_URL = 'https://api.venpro.com.br';
 const UNIDADES = ['UN', 'CX', 'FD', 'PC', 'PCT', 'KG', 'L', 'ML', 'G', 'FRD', 'BAG'];
 
+const toNumber = (value) => {
+  if (value === null || value === undefined || value === '') return 0;
+  const parsed = parseFloat(String(value).replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const buildItemPayload = (it, sortOrder) => {
+  const unitPrice = toNumber(it.price);
+  const unitsPerPackage = it.units_per_package ? parseInt(it.units_per_package) || null : null;
+  return {
+    product_name: it.product_name,
+    ean: it.ean || null,
+    category: it.category || null,
+    price: unitsPerPackage ? Number((unitPrice * unitsPerPackage).toFixed(2)) : unitPrice,
+    unit: it.unit || 'UN',
+    units_per_package: unitsPerPackage,
+    unit_price: unitPrice,
+    image_url: it._imageUrl || null,
+    sort_order: sortOrder,
+    active: true,
+  };
+};
+
 function imgUrl(path) {
   if (!path) return null;
   if (path.startsWith('http')) return path;
@@ -48,7 +71,7 @@ export default function VitrineEditar() {
       });
       setItens((oferta.items || []).map((item, i) => ({
         ...item,
-        price: String(item.price ?? ''),
+        price: String(item.unit_price ?? item.price ?? ''),
         units_per_package: item.units_per_package ? String(item.units_per_package) : '',
         _key: `existing-${item.id || i}`,
         _imageFile: null,
@@ -131,7 +154,7 @@ export default function VitrineEditar() {
         _imagePreview: null,
         _deleted: false,
         _searching: true,
-        price: String(item.price ?? ''),
+        price: String(item.unit_price ?? item.price ?? ''),
         units_per_package: item.units_per_package ? String(item.units_per_package) : '',
       }));
       setItens(prev => [...prev, ...novos]);
@@ -207,15 +230,7 @@ export default function VitrineEditar() {
       const existentes = itens.filter(it => !it._deleted && it.id);
       for (const it of existentes) {
         try {
-          await vitrineService.atualizarItem(id, it.id, {
-            product_name: it.product_name,
-            ean: it.ean || null,
-            category: it.category || null,
-            price: parseFloat(it.price) || 0,
-            unit: it.unit || 'UN',
-            units_per_package: it.units_per_package ? parseInt(it.units_per_package) : null,
-            ...(it._imageUrl ? { image_url: it._imageUrl } : {}),
-          });
+          await vitrineService.atualizarItem(id, it.id, buildItemPayload(it, it.sort_order || 0));
           if (it._imageFile) {
             await vitrineService.uploadImagem(id, it.id, it._imageFile);
           }
@@ -226,18 +241,7 @@ export default function VitrineEditar() {
       for (let i = 0; i < novos.length; i++) {
         const it = novos[i];
         try {
-          const res = await vitrineService.adicionarItem(id, {
-            product_name: it.product_name,
-            ean: it.ean || null,
-            category: it.category || null,
-            price: parseFloat(it.price) || 0,
-            unit: it.unit || 'UN',
-            units_per_package: it.units_per_package ? parseInt(it.units_per_package) : null,
-            unit_price: null,
-            image_url: it._imageUrl || null,
-            sort_order: existentes.length + i,
-            active: true,
-          });
+          const res = await vitrineService.adicionarItem(id, buildItemPayload(it, existentes.length + i));
           const novoId = res.data?.id;
           if (it._imageFile && novoId) {
             try { await vitrineService.uploadImagem(id, novoId, it._imageFile); } catch {}
@@ -433,6 +437,9 @@ export default function VitrineEditar() {
 function ItemReviewEditar({ item, onChange, onDelete, onImageChange, onSearchImage }) {
   const imgRef = useRef(null);
   const currentImg = item._imagePreview || imgUrl(item.image_url);
+  const unitPrice = toNumber(item.price);
+  const unitsPerPackage = item.units_per_package ? parseInt(item.units_per_package) || 0 : 0;
+  const packagePrice = unitsPerPackage ? unitPrice * unitsPerPackage : unitPrice;
 
   return (
     <div className="vt-review-item">
@@ -473,14 +480,15 @@ function ItemReviewEditar({ item, onChange, onDelete, onImageChange, onSearchIma
 
       <div className="vt-review-item-fields">
         <div className="vt-review-field">
-          <label>Preço (R$)</label>
+          <label>Preço unitário (R$)</label>
           <input type="number" step="0.01" value={item.price}
             onChange={e => onChange('price', e.target.value)} placeholder="0,00" />
         </div>
         <div className="vt-review-field">
-          <label>Preço caixa (R$) - opcional</label>
-          <input type="number" step="0.01" value={item.unit_price || ''}
-            onChange={e => onChange('unit_price', e.target.value)} placeholder="Calcule se não informar" />
+          <label>Preço caixa</label>
+          <div className="vt-calculated-price">
+            {unitsPerPackage ? `R$ ${packagePrice.toFixed(2).replace('.', ',')}` : 'Informe qtd'}
+          </div>
         </div>
         <div className="vt-review-field">
           <label>Unidade</label>
