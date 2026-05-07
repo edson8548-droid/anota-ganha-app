@@ -113,22 +113,55 @@ export default function VitrineEditar() {
     setParsing(true);
     try {
       const res = await vitrineService.parseLista(listaTexto);
+      const stamp = Date.now();
       const novos = res.data.items.map((item, i) => ({
         ...item,
-        _key: `parsed-${i}-${Date.now()}`,
+        _key: `parsed-${i}-${stamp}`,
         _imageFile: null,
         _imagePreview: null,
         _deleted: false,
+        _searching: true,
         price: String(item.price ?? ''),
         units_per_package: item.units_per_package ? String(item.units_per_package) : '',
       }));
       setItens(prev => [...prev, ...novos]);
       setListaTexto('');
       toast.success(`${novos.length} produto(s) adicionados — revise e salve`);
+      buscarImagensAutomaticamente(novos);
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Erro ao interpretar lista');
     }
     setParsing(false);
+  };
+
+  const buscarImagensAutomaticamente = async (items) => {
+    let encontradas = 0;
+    const fila = [...items];
+    const workers = Array.from({ length: Math.min(4, fila.length) }, async () => {
+      while (fila.length) {
+        const item = fila.shift();
+        if (!item?.product_name?.trim()) continue;
+        try {
+          const res = await vitrineService.sugerirImagem(item.product_name);
+          if (res.data.found && res.data.image_url) {
+            encontradas += 1;
+            setItens(prev => prev.map(it =>
+              it._key === item._key
+                ? { ...it, _imagePreview: res.data.image_url, _imageUrl: res.data.image_url, _imageFile: null, _searching: false }
+                : it
+            ));
+          } else {
+            setItens(prev => prev.map(it => it._key === item._key ? { ...it, _searching: false } : it));
+          }
+        } catch {
+          setItens(prev => prev.map(it => it._key === item._key ? { ...it, _searching: false } : it));
+        }
+      }
+    });
+    await Promise.all(workers);
+    if (encontradas > 0) {
+      toast.success(`${encontradas} foto(s) encontradas automaticamente`);
+    }
   };
 
   const salvar = async () => {
@@ -386,7 +419,7 @@ function ItemReviewEditar({ item, onChange, onDelete, onImageChange, onSearchIma
   return (
     <div className="vt-review-item">
       <div className="vt-review-item-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="vt-review-item-main">
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             <div className="vt-img-box" onClick={() => imgRef.current?.click()} title="Clique para trocar foto">
               {currentImg
