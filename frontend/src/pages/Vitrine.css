@@ -154,8 +154,21 @@
 .vt-review-item-header {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
-.vt-review-item-name { font-size: 14px; font-weight: 700; color: #E1E1E1; }
-.vt-review-item-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.vt-review-item-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+.vt-review-item-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #E1E1E1;
+  flex: 1;
+  min-width: min(620px, 100%);
+}
+.vt-review-item-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .vt-review-field label { font-size: 10px; font-weight: 700; color: #6B6E74; text-transform: uppercase; display: block; margin-bottom: 3px; }
 .vt-review-field input, .vt-review-field select {
   width: 100%; padding: 6px 10px; background: #363940; border: 1px solid #4A4D52;
@@ -190,6 +203,9 @@
 @media (max-width: 640px) {
   .vt-body { padding: 16px; }
   .vt-row.col2, .vt-row.col3 { grid-template-columns: 1fr; }
+  .vt-review-item-header { align-items: flex-start; }
+  .vt-review-item-main { align-items: flex-start; }
+  .vt-review-item-name { min-width: 0; }
   .vt-card-actions { flex-direction: column; }
   .vt-link-box { width: 100%; }
 }
