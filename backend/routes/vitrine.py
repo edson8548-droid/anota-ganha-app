@@ -610,6 +610,30 @@ async def criar_oferta(req: CreateOfferRequest, uid: str = Depends(get_user_id))
 
     logger.info(f"[CRIAR_OFERTA] Total de itens: {len(items)}")
 
+    # Correção: quando usuário informa unit_price, tratar como preço unitário e não calcular automaticamente
+    for item in items:
+        has_unit_price = item.get("unit_price") is not None and item.get("unit_price") != 0
+        has_price = item.get("price") is not None and item.get("price") != 0
+        has_units = item.get("units_per_package") is not None and item.get("units_per_package") != 0
+
+        # Se o usuário informou unit_price, não sobrescrever - tratar como preço unitário
+        if has_unit_price and not has_price:
+            logger.info(f"[CRIAR_OFERTA] Item {item.get('product_name')}: unit_price informado={item.get('unit_price')}, mantendo como preço unitário")
+            # Calcular price apenas se não foi informado
+            if not item.get("price") or item.get("price") == 0:
+                if has_units:
+                    item["price"] = round(item.get("unit_price", 0) * item.get("units_per_package"), 2)
+            else:
+                item["price"] = item.get("unit_price", 0)
+        elif has_price and has_units and not has_unit_price:
+            # Tem price e units: calcular unit_price
+            logger.info(f"[CRIAR_OFERTA] Item {item.get('product_name')}: calculando unit_price = {item.get('price')} ÷ {item.get('units_per_package')}")
+            item["unit_price"] = round(item.get("price", 0) / item.get("units_per_package"), 2)
+        elif has_price and not has_units and not has_unit_price:
+            # Tem apenas price: usar como está
+            logger.info(f"[CRIAR_OFERTA] Item {item.get('product_name')}: usando price como está: {item.get('price')}")
+            pass
+
     doc = {
         "slug": slug,
         "title": req.title,
