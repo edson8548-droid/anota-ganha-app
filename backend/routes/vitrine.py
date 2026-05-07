@@ -576,9 +576,17 @@ async def criar_oferta(req: CreateOfferRequest, uid: str = Depends(get_user_id))
     for i, item in enumerate(req.items or []):
         item_dict = item.model_dump()
 
+        # Debug: Log dos dados recebidos
+        logger.info(f"[CRIAR_OFERTA] Item {i}: {item_dict}")
+
         # Calcular automaticamente preço de caixa se houver units_per_package mas não unit_price
         if item_dict.get("units_per_package") and not item_dict.get("unit_price"):
+            logger.info(f"[CRIAR_OFERTA] Calculando unit_price: {item_dict.get('price')} / {item_dict.get('units_per_package')} = {round(item_dict.get('price', 0) / item_dict.get('units_per_package'), 2)}")
             item_dict["unit_price"] = round(item_dict.get("price", 0) / item_dict["units_per_package"], 2)
+        elif item_dict.get("units_per_package") and item_dict.get("unit_price"):
+            # Se ambos foram informados, manter o unit_price informado
+            logger.info(f"[CRIAR_OFERTA] Mantendo unit_price informado: {item_dict.get('unit_price')}")
+            pass
 
         items.append({
             "id": str(uuid.uuid4()),
@@ -586,6 +594,8 @@ async def criar_oferta(req: CreateOfferRequest, uid: str = Depends(get_user_id))
             "sort_order": i,
             "created_at": datetime.now(timezone.utc),
         })
+
+    logger.info(f"[CRIAR_OFERTA] Total de itens: {len(items)}")
 
     doc = {
         "slug": slug,
