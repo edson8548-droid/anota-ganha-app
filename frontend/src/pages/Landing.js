@@ -21,11 +21,8 @@ const Landing = () => {
       {/* Navbar */}
       <nav className="landing-nav">
         <div className="landing-nav-logo">
-          <svg viewBox="0 0 18 18" fill="none">
-            <path d="M2 3.5L9 14.5L16 3.5" stroke="#3A85A8" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M9 14.5L12.5 8.5" stroke="rgba(58,133,168,0.6)" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-          <span className="landing-nav-ven">Ven</span><span className="landing-nav-pro">pro</span>
+          <img src="/assets/logo/venpro-logo-icon-transparent.png" alt="VenPro" />
+          <span className="landing-nav-ven">Ven</span><span className="landing-nav-pro">Pro</span>
         </div>
         <div className="landing-nav-actions">
           {user ? (

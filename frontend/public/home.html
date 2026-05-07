@@ -68,6 +68,14 @@ a { text-decoration: none; color: inherit; }
   flex-shrink: 0;
 }
 .logo-icon svg { width:18px; height:18px; }
+.logo-mark {
+  width:40px;
+  height:40px;
+  object-fit:contain;
+  filter: drop-shadow(0 5px 12px rgba(0,0,0,.28));
+  flex-shrink:0;
+}
+.logo-mark.small { width:32px; height:32px; }
 .logo-text { font-size:21px; font-weight:800; letter-spacing:-0.5px; }
 .logo-ven { color: var(--texto); }
 .logo-pro { color: var(--acento); }
@@ -411,13 +419,8 @@ footer {
 <!-- ── NAV ── -->
 <nav>
   <div class="logo-wrap">
-    <div class="logo-icon">
-      <svg viewBox="0 0 18 18" fill="none">
-        <path d="M2 3.5L9 14.5L16 3.5" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M9 14.5L12.5 8.5" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
-    </div>
-    <div class="logo-text"><span class="logo-ven">Ven</span><span class="logo-pro">pro</span></div>
+    <img class="logo-mark" src="/assets/logo/venpro-logo-icon-transparent.png" alt="VenPro">
+    <div class="logo-text"><span class="logo-ven">Ven</span><span class="logo-pro">Pro</span></div>
   </div>
   <div class="nav-links">
     <a href="#recursos">Recursos</a>
@@ -899,12 +902,8 @@ footer {
 <!-- ── FOOTER ── -->
 <footer>
   <div class="logo-wrap">
-    <div class="logo-icon" style="width:28px;height:28px">
-      <svg viewBox="0 0 18 18" fill="none" style="width:14px;height:14px">
-        <path d="M2 3.5L9 14.5L16 3.5" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </div>
-    <div class="logo-text" style="font-size:17px"><span class="logo-ven">Ven</span><span class="logo-pro">pro</span></div>
+    <img class="logo-mark small" src="/assets/logo/venpro-logo-icon-transparent.png" alt="VenPro">
+    <div class="logo-text" style="font-size:17px"><span class="logo-ven">Ven</span><span class="logo-pro">Pro</span></div>
   </div>
   <div class="ft-links">
     <a href="#">Política de Privacidade</a>
