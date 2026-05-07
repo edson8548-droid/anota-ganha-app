@@ -52,6 +52,7 @@ const INVALID_PATTERNS = [
 // ── State ─────────────────────────────────────────────────────────────────
 let dispatching = false;
 let cancelFlag  = false;
+let resumedFromNavigation = false;
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -129,6 +130,15 @@ async function typeMessage(input, text) {
 
   await sleep(400);
   return hasTypedText(input, text);
+}
+
+async function waitForMessageReady(input, text, timeoutMs = 12000) {
+  const end = Date.now() + timeoutMs;
+  while (Date.now() < end) {
+    if (hasTypedText(input, text)) return true;
+    await sleep(500);
+  }
+  return false;
 }
 
 async function pasteMessage(input, text) {
@@ -221,6 +231,16 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
   let invalidos = 0;
   const total = contacts.length;
 
+  async function saveJob(nextIdx) {
+    await chrome.storage.local.set({
+      whatsappDispatchJob: { campaign, token, pausaMin, pausaMax, startIdx: nextIdx, ts: Date.now() },
+    });
+  }
+
+  async function clearJob() {
+    await chrome.storage.local.remove('whatsappDispatchJob');
+  }
+
   async function saveState(status, errorMsg = '') {
     const state = { status, sent, total, invalidos, errorMsg, ts: Date.now(), startIdx: sent };
     await new Promise(r => chrome.runtime.sendMessage({ action: 'saveDispatchState', state }, r));
@@ -234,10 +254,15 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
     if (sentSet.has(telefone)) continue;
 
     await saveState('running');
+    await saveJob(i);
 
     // Open chat
-    window.location.href = `https://web.whatsapp.com/send?phone=${telefone}&app_absent=0`;
-    await sleep(2000);
+    const fullMsg = buildMessage(nome, msgTpl);
+    const targetUrl = `https://web.whatsapp.com/send?phone=${telefone}&text=${encodeURIComponent(fullMsg)}&app_absent=0`;
+    if (!window.location.href.includes(`phone=${telefone}`)) {
+      window.location.href = targetUrl;
+      await sleep(2000);
+    }
 
     // Wait for chat input (up to 40s)
     const chatInput = await waitFor(SEL_CHAT_INPUT, 40000);
@@ -249,8 +274,8 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
     }
 
     // 1. Send text message
-    const fullMsg = buildMessage(nome, msgTpl);
-    const typed = await typeMessage(chatInput, fullMsg);
+    const alreadyTyped = await waitForMessageReady(chatInput, fullMsg, 6000);
+    const typed = alreadyTyped || await typeMessage(chatInput, fullMsg);
     if (!typed) {
       await saveState('running', 'Nao consegui escrever a mensagem no WhatsApp Web. Atualize o WhatsApp Web e tente novamente.');
       continue;
@@ -288,9 +313,25 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
     await sleep(pausa * 1000);
   }
 
+  await clearJob();
   await saveState(cancelFlag ? 'running' : 'done');
   dispatching = false;
 }
+
+async function resumePendingJob() {
+  if (resumedFromNavigation || dispatching) return;
+  resumedFromNavigation = true;
+  const data = await chrome.storage.local.get('whatsappDispatchJob');
+  const job = data.whatsappDispatchJob;
+  if (!job?.campaign || !job?.token) return;
+  if (Date.now() - (job.ts || 0) > 10 * 60 * 1000) {
+    await chrome.storage.local.remove('whatsappDispatchJob');
+    return;
+  }
+  dispatch(job.campaign, job.token, job.pausaMin || 60, job.pausaMax || 90, job.startIdx || 0).catch(console.error);
+}
+
+resumePendingJob();
 
 // ── Message listener ──────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
