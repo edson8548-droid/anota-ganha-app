@@ -51,7 +51,7 @@ export const PLANS = {
   monthly: {
     id: 'monthly',
     name: 'Venpro',
-    displayName: '🚀 Venpro',
+    displayName: 'Venpro',
     price: 99.90,
     period: 'monthly',
     duration: 'por mês',
@@ -65,7 +65,7 @@ export const PLANS = {
     features: [
       'Cotação Pronta — planilha preenchida automática',
       'Carteira no WhatsApp — envio em massa',
-      'IA para Vender Mais',
+      'Prompts Prontos para RCA',
       'Extensão Cotatudo Automático',
       'Raio-X dos Incentivos',
       'Suporte via WhatsApp',
@@ -75,7 +75,7 @@ export const PLANS = {
   annual_installments: {
     id: 'annual_installments',
     name: 'Venpro',
-    displayName: '🚀 Venpro',
+    displayName: 'Venpro',
     price: 99.90,
     period: 'monthly',
     duration: 'por mês',
@@ -89,7 +89,7 @@ export const PLANS = {
     features: [
       'Cotação Pronta — planilha preenchida automática',
       'Carteira no WhatsApp — envio em massa',
-      'IA para Vender Mais',
+      'Prompts Prontos para RCA',
       'Extensão Cotatudo Automático',
       'Raio-X dos Incentivos',
       'Suporte via WhatsApp',
@@ -99,7 +99,7 @@ export const PLANS = {
   annual_upfront: {
     id: 'annual_upfront',
     name: 'Venpro',
-    displayName: '🚀 Venpro',
+    displayName: 'Venpro',
     price: 99.90,
     period: 'monthly',
     duration: 'por mês',
@@ -113,7 +113,7 @@ export const PLANS = {
     features: [
       'Cotação Pronta — planilha preenchida automática',
       'Carteira no WhatsApp — envio em massa',
-      'IA para Vender Mais',
+      'Prompts Prontos para RCA',
       'Extensão Cotatudo Automático',
       'Raio-X dos Incentivos',
       'Suporte via WhatsApp',

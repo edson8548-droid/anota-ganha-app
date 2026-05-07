@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Sparkles } from 'lucide-react';
+import { ClipboardList } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { gerarTabelaPrazos } from '../services/cotacao.service';
 import './AssistenteIA.css';
@@ -250,8 +250,8 @@ export default function AssistenteIA() {
           <button className="ia-btn-back" onClick={() => navigate('/dashboard')}>← Voltar</button>
           <div className="ia-status-dot" />
           <div>
-            <div className="ia-header-title">IA para Vender Mais</div>
-            <div className="ia-header-sub">Mensagens profissionais para clientes, crédito, gerência e indústria</div>
+            <div className="ia-header-title">Prompts Prontos para RCA</div>
+            <div className="ia-header-sub">Comandos para organizar tabelas, ofertas e mensagens usando a IA da sua preferência</div>
           </div>
         </div>
         <button className="ia-clear-btn" onClick={() => setMessages([])}>Limpar conversa</button>
@@ -399,9 +399,9 @@ export default function AssistenteIA() {
           <div className="ia-messages">
             {messages.length === 0 ? (
               <div className="ia-empty">
-                <div className="ia-empty-ico"><Sparkles size={42} color="var(--ia-acento)" /></div>
+                <div className="ia-empty-ico"><ClipboardList size={42} color="var(--ia-acento)" /></div>
                 <div className="ia-empty-title">Olá{user?.name ? `, ${user.name.split(' ')[0]}` : ''}!</div>
-                <div className="ia-empty-sub">Sou seu assistente especializado em representação comercial. Escolha um atalho ao lado ou me pergunte qualquer coisa.</div>
+                <div className="ia-empty-sub">Escolha um prompt pronto ao lado, copie e use na IA da sua preferência.</div>
               </div>
             ) : (
               messages.map((msg, idx) => (

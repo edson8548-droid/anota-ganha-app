@@ -182,6 +182,8 @@
 .vt-btn-remove {
   background: none; border: none; color: #6B6E74; cursor: pointer; padding: 4px;
   border-radius: 6px; transition: color .2s;
+  width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+  line-height: 1;
 }
 .vt-btn-remove:hover { color: #ef4444; }
 

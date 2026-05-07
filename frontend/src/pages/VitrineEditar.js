@@ -298,7 +298,7 @@ export default function VitrineEditar() {
           {/* Produtos */}
           <div className="vt-form-section">
             <div className="vt-form-section-title">
-              📦 Produtos
+              Produtos
               <span style={{ marginLeft: 8, fontSize: 12, color: '#6B6E74', fontWeight: 400 }}>
                 {itensVisiveis.length} produto{itensVisiveis.length !== 1 ? 's' : ''}
               </span>
@@ -338,7 +338,7 @@ export default function VitrineEditar() {
                 value={listaTexto} onChange={e => setListaTexto(e.target.value)} rows={3} />
               <div style={{ marginTop: 10 }}>
                 <button className="vt-btn-primary" onClick={parsearLista} disabled={parsing || !listaTexto.trim()}>
-                  {parsing ? '⏳ Interpretando...' : '✨ Interpretar e adicionar'}
+                  {parsing ? 'Interpretando...' : 'Interpretar e adicionar'}
                 </button>
               </div>
             </div>
@@ -369,7 +369,7 @@ export default function VitrineEditar() {
               Cancelar
             </button>
             <button className="vt-btn-primary" onClick={salvar} disabled={saving}>
-              {saving ? '⏳ Salvando...' : '💾 Salvar Alterações'}
+              {saving ? 'Salvando...' : 'Salvar alterações'}
             </button>
           </div>
 
