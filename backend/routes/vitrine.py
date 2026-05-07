@@ -579,13 +579,26 @@ async def criar_oferta(req: CreateOfferRequest, uid: str = Depends(get_user_id))
         # Debug: Log dos dados recebidos
         logger.info(f"[CRIAR_OFERTA] Item {i}: {item_dict}")
 
-        # Calcular automaticamente preço de caixa se houver units_per_package mas não unit_price
-        if item_dict.get("units_per_package") and not item_dict.get("unit_price"):
-            logger.info(f"[CRIAR_OFERTA] Calculando unit_price: {item_dict.get('price')} / {item_dict.get('units_per_package')} = {round(item_dict.get('price', 0) / item_dict.get('units_per_package'), 2)}")
-            item_dict["unit_price"] = round(item_dict.get("price", 0) / item_dict["units_per_package"], 2)
-        elif item_dict.get("units_per_package") and item_dict.get("unit_price"):
-            # Se ambos foram informados, manter o unit_price informado
-            logger.info(f"[CRIAR_OFERTA] Mantendo unit_price informado: {item_dict.get('unit_price')}")
+        # Calcular preços automaticamente baseado no que foi informado
+        has_unit_price = item_dict.get("unit_price") is not None and item_dict.get("unit_price") != 0
+        has_price = item_dict.get("price") is not None and item_dict.get("price") != 0
+        has_units = item_dict.get("units_per_package") is not None and item_dict.get("units_per_package") != 0
+
+        if has_unit_price and has_units and not has_price:
+            # Tem unit_price e units: calcular preço de caixa = unit_price × units
+            logger.info(f"[CRIAR_OFERTA] Calculando preço de caixa: {item_dict.get('unit_price')} × {item_dict.get('units_per_package')} = {round(item_dict.get('unit_price', 0) * item_dict.get('units_per_package'), 2)}")
+            item_dict["price"] = round(item_dict.get("unit_price", 0) * item_dict.get("units_per_package"), 2)
+        elif has_price and has_units and not has_unit_price:
+            # Tem price e units: calcular unit_price = price ÷ units
+            logger.info(f"[CRIAR_OFERTA] Calculando preço unitário: {item_dict.get('price')} ÷ {item_dict.get('units_per_package')} = {round(item_dict.get('price', 0) / item_dict.get('units_per_package'), 2)}")
+            item_dict["unit_price"] = round(item_dict.get("price", 0) / item_dict["units_per_package"), 2)
+        elif has_unit_price and not has_units:
+            # Tem apenas unit_price sem units: usar unit_price como price
+            logger.info(f"[CRIAR_OFERTA] Usando unit_price como price: {item_dict.get('unit_price')}")
+            item_dict["price"] = item_dict.get("unit_price", 0)
+        elif has_price and not has_units and not has_unit_price:
+            # Tem apenas price sem unit_price e sem units: usar como está
+            logger.info(f"[CRIAR_OFERTA] Usando price como está: {item_dict.get('price')}")
             pass
 
         items.append({
@@ -629,10 +642,24 @@ async def obter_oferta(offer_id: str, uid: str = Depends(get_user_id)):
 
     result = doc_to_dict(doc)
 
-    # Garantir que unit_price seja calculado quando há units_per_package
+    # Calcular preços automaticamente baseado no que foi informado
     for item in result.get("items", []):
-        if item.get("units_per_package") and not item.get("unit_price"):
-            item["unit_price"] = round(item.get("price", 0) / item["units_per_package"], 2)
+        has_unit_price = item.get("unit_price") is not None and item.get("unit_price") != 0
+        has_price = item.get("price") is not None and item.get("price") != 0
+        has_units = item.get("units_per_package") is not None and item.get("units_per_package") != 0
+
+        if has_unit_price and has_units and not has_price:
+            # Tem unit_price e units: calcular preço de caixa = unit_price × units
+            logger.info(f"[ATUALIZAR_OFERTA] Item {item.get('product_name')}: calculando preço de caixa = {item.get('unit_price')} × {item.get('units_per_package')}")
+            item["price"] = round(item.get("unit_price", 0) * item.get("units_per_package"), 2)
+        elif has_price and has_units and not has_unit_price:
+            # Tem price e units: calcular unit_price = price ÷ units
+            logger.info(f"[ATUALIZAR_OFERTA] Item {item.get('product_name')}: calculando unit_price = {item.get('price')} ÷ {item.get('units_per_package')}")
+            item["unit_price"] = round(item.get("price", 0) / item.get("units_per_package"), 2)
+        elif has_unit_price and not has_units and not has_price:
+            # Tem apenas unit_price: usar unit_price como price
+            logger.info(f"[ATUALIZAR_OFERTA] Item {item.get('product_name')}: usando unit_price como price = {item.get('unit_price')}")
+            item["price"] = item.get("unit_price", 0)
 
     return result
 
@@ -683,9 +710,19 @@ async def adicionar_item(offer_id: str, item: OfferItem, uid: str = Depends(get_
 
     item_dict = item.model_dump()
 
-    # Calcular automaticamente preço de caixa se houver units_per_package mas não unit_price
-    if item_dict.get("units_per_package") and not item_dict.get("unit_price"):
-        item_dict["unit_price"] = round(item_dict.get("price", 0) / item_dict["units_per_package"], 2)
+    # Calcular preços automaticamente baseado no que foi informado
+    has_unit_price = item_dict.get("unit_price") is not None and item_dict.get("unit_price") != 0
+    has_price = item_dict.get("price") is not None and item_dict.get("price") != 0
+    has_units = item_dict.get("units_per_package") is not None and item_dict.get("units_per_package") != 0
+
+    if has_unit_price and has_units and not has_price:
+        # Tem unit_price e units: calcular preço de caixa = unit_price × units
+        logger.info(f"[ADICIONAR_ITEM] Item {item_dict.get('product_name')}: calculando preço de caixa = {item_dict.get('unit_price')} × {item_dict.get('units_per_package')}")
+        item_dict["price"] = round(item_dict.get("unit_price", 0) * item_dict.get("units_per_package"), 2)
+    elif has_price and has_units and not has_unit_price:
+        # Tem price e units: calcular unit_price = price ÷ units
+        logger.info(f"[ADICIONAR_ITEM] Item {item_dict.get('product_name')}: calculando unit_price = {item_dict.get('price')} ÷ {item_dict.get('units_per_package')}")
+        item_dict["unit_price"] = round(item_dict.get("price", 0) / item_dict.get("units_per_package"), 2)
 
     new_item = {
         "id": str(uuid.uuid4()),
