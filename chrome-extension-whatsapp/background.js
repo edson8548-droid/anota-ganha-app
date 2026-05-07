@@ -1,4 +1,5 @@
 const API_URL = 'https://api.venpro.com.br/api';
+const TOKEN_TTL_MS = 55 * 60 * 1000;
 
 // Open side panel when icon clicked
 chrome.action.onClicked.addListener((tab) => {
@@ -13,11 +14,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.action === 'getToken') {
-    chrome.storage.local.get(['venpro_token', 'venpro_token_ts'], (data) => {
-      const age = Date.now() - (data.venpro_token_ts || 0);
-      const token = data.venpro_token && age < 55 * 60 * 1000 ? data.venpro_token : null;
-      sendResponse({ token });
-    });
+    getValidToken().then(token => sendResponse({ token }));
     return true;
   }
 
@@ -54,3 +51,44 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 });
+
+async function getValidToken() {
+  const stored = await chrome.storage.local.get(['venpro_token', 'venpro_token_ts']);
+  const age = Date.now() - (stored.venpro_token_ts || 0);
+  if (stored.venpro_token && age < TOKEN_TTL_MS) {
+    return stored.venpro_token;
+  }
+
+  const token = await readTokenFromOpenVenProTab();
+  if (token) {
+    await chrome.storage.local.set({ venpro_token: token, venpro_token_ts: Date.now() });
+    return token;
+  }
+
+  return null;
+}
+
+async function readTokenFromOpenVenProTab() {
+  const tabs = await chrome.tabs.query({
+    url: [
+      'https://venpro.com.br/*',
+      'https://www.venpro.com.br/*',
+      'https://anota-ganha-app.web.app/*',
+      'https://anota-ganha-app.firebaseapp.com/*',
+    ],
+  });
+
+  for (const tab of tabs) {
+    try {
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => localStorage.getItem('venpro_ext_token'),
+      });
+      if (result?.result) return result.result;
+    } catch {
+      // Some tabs can reject script injection while loading. Try the next one.
+    }
+  }
+
+  return null;
+}

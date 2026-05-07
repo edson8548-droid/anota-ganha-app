@@ -36,7 +36,7 @@ async function getToken() {
 async function loadCampaign() {
   const token = await getToken();
   if (!token) {
-    setStatus('Faça login em venpro.com.br primeiro.', 'err');
+    setStatus('Faça login no VenPro e deixe uma aba do painel aberta.', 'err');
     return;
   }
   try {
@@ -57,7 +57,7 @@ async function loadCampaign() {
 
     const ready = campaign.contacts_count > 0 && campaign.message;
     btnDisparar.disabled = !ready;
-    setStatus(ready ? 'Campanha pronta para disparar.' : 'Configure contatos e mensagem em venpro.com.br', ready ? 'ok' : 'info');
+    setStatus(ready ? 'Campanha pronta para disparar.' : 'Configure contatos e mensagem no VenPro', ready ? 'ok' : 'info');
   } catch {
     setStatus('Erro ao carregar campanha.', 'err');
   }
@@ -123,7 +123,7 @@ btnDisparar.addEventListener('click', async () => {
     return;
   }
   const token = await getToken();
-  if (!token) { setStatus('Token expirado. Faça login.', 'err'); return; }
+  if (!token) { setStatus('Login expirado. Abra o painel do VenPro e tente de novo.', 'err'); return; }
 
   const pausaMin = parseInt(pausaMinEl.value) || 60;
   const pausaMax = Math.max(pausaMin, parseInt(pausaMaxEl.value) || 90);
