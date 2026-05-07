@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ClipboardList } from 'lucide-react';
@@ -69,8 +69,6 @@ function renderMarkdown(text) {
   return result;
 }
 
-const API_URL = 'https://api.venpro.com.br';
-
 const PROMPTS_RAPIDOS = [
   {
     label: '📲 Oferta WhatsApp',
@@ -109,22 +107,12 @@ const PROMPTS_RAPIDOS = [
   },
 ];
 
-function formatTime(date) {
-  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-}
-
 export default function AssistenteIA() {
   const navigate = useNavigate();
   const { user } = useAuthContext();
-  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const lastUserTextRef = useRef('');
   const [copiedId, setCopiedId] = useState(null);
-  const messagesEndRef = useRef(null);
-  const textareaRef = useRef(null);
-  const messagesRef = useRef(messages);
-  messagesRef.current = messages;
+  const [selectedPrompt, setSelectedPrompt] = useState(null);
 
   // Estado do modal "Gerar Tabela com Prazos"
   const [showTabelaModal, setShowTabelaModal] = useState(false);
@@ -136,91 +124,15 @@ export default function AssistenteIA() {
   const tabelaInputRef = useRef(null);
   const timerRef = useRef(null);
 
-  useEffect(() => {
-    fetch('https://api.venpro.com.br/health', { method: 'GET', mode: 'cors' }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, loading]);
-
-  const sendMessage = useCallback(async (text) => {
-    const trimmed = (text || input).trim();
-    if (!trimmed || loading) return;
-
-    lastUserTextRef.current = trimmed;
-    const userMsg = { role: 'user', content: trimmed, time: new Date() };
-    setMessages(prev => [...prev, userMsg]);
-    setInput('');
-    setLoading(true);
-
-    const history = messagesRef.current
-      .filter(m => !m.isError)
-      .map(m => ({ role: m.role, content: m.content }));
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-    try {
-      const res = await fetch(`${API_URL}/api/ia/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: trimmed, history }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.detail || `Erro ${res.status}`);
-      }
-
-      const data = await res.json();
-      setMessages(prev => [...prev, {
-        role: 'model',
-        content: data.response,
-        time: new Date(),
-      }]);
-    } catch (err) {
-      const msg = err.name === 'AbortError'
-        ? 'Tempo esgotado (30s). Tente novamente.'
-        : (err.message || 'Erro desconhecido');
-      setMessages(prev => [...prev, {
-        role: 'model',
-        content: msg,
-        time: new Date(),
-        isError: true,
-        retryText: lastUserTextRef.current,
-      }]);
-    } finally {
-      clearTimeout(timeoutId);
-      setLoading(false);
-      setTimeout(() => textareaRef.current?.focus(), 100);
-    }
-  }, [input, loading]);
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
-
   const handleCopy = (content, id) => {
     navigator.clipboard.writeText(content);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handlePrompt = (texto) => {
-    setInput(texto);
-    textareaRef.current?.focus();
-  };
-
-  const autoResize = (e) => {
-    e.target.style.height = 'auto';
-    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+  const handlePrompt = (prompt) => {
+    setSelectedPrompt(prompt);
+    setInput(prompt.texto);
   };
 
   const handleGerarTabela = async () => {
@@ -259,7 +171,6 @@ export default function AssistenteIA() {
             <div className="ia-header-sub">Comandos para organizar tabelas, ofertas e mensagens usando a IA da sua preferência</div>
           </div>
         </div>
-        <button className="ia-clear-btn" onClick={() => setMessages([])}>Limpar conversa</button>
       </header>
 
       {/* Corpo */}
@@ -278,7 +189,11 @@ export default function AssistenteIA() {
 
           <div className="ia-sidebar-title" style={{ marginTop: 16 }}>Atalhos rápidos</div>
           {PROMPTS_RAPIDOS.map((p, i) => (
-            <button key={i} className="ia-prompt-btn" onClick={() => handlePrompt(p.texto)}>
+            <button
+              key={i}
+              className={`ia-prompt-btn ${selectedPrompt?.label === p.label ? 'active' : ''}`}
+              onClick={() => handlePrompt(p)}
+            >
               {p.label}
               <span>{p.sub}</span>
             </button>
@@ -399,88 +314,41 @@ export default function AssistenteIA() {
           </div>
         )}
 
-        {/* Chat */}
+        {/* Prompt selecionado */}
         <div className="ia-chat-wrap">
-          <div className="ia-messages">
-            {messages.length === 0 ? (
+          <div className="ia-prompt-view">
+            {!selectedPrompt ? (
               <div className="ia-empty">
                 <div className="ia-empty-ico"><ClipboardList size={42} color="var(--ia-acento)" /></div>
                 <div className="ia-empty-title">Olá{user?.name ? `, ${user.name.split(' ')[0]}` : ''}!</div>
-                <div className="ia-empty-sub">Escolha um prompt pronto ao lado, copie e use na IA da sua preferência.</div>
+                <div className="ia-empty-sub">Escolha um prompt ao lado para copiar e usar na IA da sua preferência.</div>
               </div>
             ) : (
-              messages.map((msg, idx) => (
-                <div key={idx} className={`ia-msg ${msg.role === 'user' ? 'user' : 'bot'}`}>
-                  <div className={`ia-bubble${msg.isError ? ' ia-bubble--error' : ''}`}>
-                    {msg.role === 'user'
-                      ? msg.content
-                      : msg.isError
-                        ? <span className="ia-error-text">⚠ {msg.content}</span>
-                        : renderMarkdown(msg.content)
-                    }
+              <div className="ia-prompt-card">
+                <div className="ia-prompt-card-header">
+                  <div>
+                    <div className="ia-prompt-card-title">{selectedPrompt.label}</div>
+                    <div className="ia-prompt-card-sub">{selectedPrompt.sub}</div>
                   </div>
-                  <div className="ia-msg-footer">
-                    <span className="ia-msg-time">{formatTime(msg.time)}</span>
-                    {msg.role === 'model' && msg.isError && msg.retryText && (
-                      <button
-                        className="ia-retry-btn"
-                        onClick={() => {
-                          setMessages(prev => prev.filter((_, i) => i !== idx));
-                          sendMessage(msg.retryText);
-                        }}
-                      >
-                        Tentar novamente
-                      </button>
-                    )}
-                    {msg.role === 'model' && !msg.isError && (
-                      <button
-                        className={`ia-copy-btn ${copiedId === idx ? 'copied' : ''}`}
-                        onClick={() => handleCopy(msg.content, idx)}
-                      >
-                        {copiedId === idx ? '✓ Copiado' : 'Copiar'}
-                      </button>
-                    )}
-                  </div>
+                  <button
+                    className={`ia-copy-main ${copiedId === 'prompt' ? 'copied' : ''}`}
+                    onClick={() => handleCopy(input, 'prompt')}
+                  >
+                    {copiedId === 'prompt' ? 'Copiado' : 'Copiar prompt'}
+                  </button>
                 </div>
-              ))
-            )}
-
-            {loading && (
-              <div className="ia-msg bot ia-typing">
-                <div className="ia-bubble">
-                  <div className="ia-dot" />
-                  <div className="ia-dot" />
-                  <div className="ia-dot" />
+                <textarea
+                  className="ia-prompt-textarea"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  spellCheck={false}
+                />
+                <div className="ia-prompt-help">
+                  Edite os campos entre colchetes, copie o prompt e cole no ChatGPT, Gemini ou outra IA que preferir.
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
-
-          {/* Input */}
-          <div className="ia-input-area">
-            <textarea
-              ref={textareaRef}
-              className="ia-textarea"
-              placeholder="Pergunte qualquer coisa sobre vendas, ofertas, clientes..."
-              value={input}
-              onChange={(e) => { setInput(e.target.value); autoResize(e); }}
-              onKeyDown={handleKeyDown}
-              rows={1}
-              disabled={loading}
-            />
-            <button
-              className="ia-send-btn"
-              onClick={() => sendMessage()}
-              disabled={!input.trim() || loading}
-              title="Enviar (Enter)"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M22 2L11 13M22 2L15 22L11 13M11 13L2 9L22 2" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          </div>
-          <div className="ia-input-hint">Enter para enviar · Shift+Enter para nova linha</div>
         </div>
 
       </div>
