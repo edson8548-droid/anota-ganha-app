@@ -38,6 +38,13 @@ const Landing = () => {
 
       {/* Hero */}
       <section className="landing-hero">
+        <div className="landing-hero-brand">
+          <img src="/assets/logo/venpro-logo-icon-transparent.png" alt="VenPro" />
+          <div>
+            <div className="landing-hero-brand-name"><span>Ven</span><span>Pro</span></div>
+            <div className="landing-hero-brand-line">Mais vendas. Mais resultados.</div>
+          </div>
+        </div>
         <span className="landing-hero-badge">Ferramentas para Representantes Comerciais</span>
         <h1>
           Venda mais, <span>trabalhe menos</span>

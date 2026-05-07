@@ -69,14 +69,14 @@ a { text-decoration: none; color: inherit; }
 }
 .logo-icon svg { width:18px; height:18px; }
 .logo-mark {
-  width:40px;
-  height:40px;
+  width:48px;
+  height:48px;
   object-fit:contain;
   filter: drop-shadow(0 5px 12px rgba(0,0,0,.28));
   flex-shrink:0;
 }
 .logo-mark.small { width:32px; height:32px; }
-.logo-text { font-size:21px; font-weight:800; letter-spacing:-0.5px; }
+.logo-text { font-size:24px; font-weight:800; letter-spacing:-0.5px; }
 .logo-ven { color: var(--texto); }
 .logo-pro { color: var(--acento); }
 
@@ -84,7 +84,7 @@ a { text-decoration: none; color: inherit; }
 nav {
   position:sticky; top:0; z-index:100;
   display:flex; align-items:center; justify-content:space-between;
-  padding:0 6%; height:64px;
+  padding:0 6%; height:72px;
   background: rgba(43,45,49,.92);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid rgba(74,77,82,.9);
@@ -129,6 +129,34 @@ nav {
   position: relative;
 }
 .hero-left { flex:1; min-width:280px; }
+.hero-brand {
+  display:inline-flex;
+  align-items:center;
+  gap:14px;
+  margin-bottom:22px;
+}
+.hero-brand img {
+  width:74px;
+  height:74px;
+  object-fit:contain;
+  filter: drop-shadow(0 12px 26px rgba(0,0,0,.28));
+}
+.hero-brand-name {
+  font-size:38px;
+  font-weight:900;
+  letter-spacing:-1px;
+  line-height:1;
+}
+.hero-brand-name span:first-child { color:var(--texto); }
+.hero-brand-name span:last-child { color:var(--acento); }
+.hero-brand-line {
+  margin-top:8px;
+  color:var(--amarelo);
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:2.6px;
+  text-transform:uppercase;
+}
 .hero-tag {
   display:inline-flex; align-items:center; gap:8px;
   color:var(--acento); font-size:12px; font-weight:700;
@@ -408,6 +436,9 @@ footer {
 @media(max-width:700px){
   .nav-links { display:none; }
   .hero { padding:60px 5% 48px; }
+  .hero-brand img { width:58px; height:58px; }
+  .hero-brand-name { font-size:30px; }
+  .hero-brand-line { font-size:10px; letter-spacing:1.8px; }
   .step { border-right:none; border-bottom:1px solid var(--borda); }
   .step:last-child { border-bottom:none; }
   .cta-box { padding:40px 24px; }
@@ -437,6 +468,13 @@ footer {
 <div class="hero-wrap">
 <section class="hero">
   <div class="hero-left">
+    <div class="hero-brand">
+      <img src="/assets/logo/venpro-logo-icon-transparent.png" alt="VenPro">
+      <div>
+        <div class="hero-brand-name"><span>Ven</span><span>Pro</span></div>
+        <div class="hero-brand-line">Mais vendas. Mais resultados.</div>
+      </div>
+    </div>
     <div class="hero-tag">Resultado real</div>
     <h1>Veja o sistema<br>em <em>operação.</em></h1>
     <p class="hero-sub">Uma cotação real processada pelo Venpro. Cada linha identificada por EAN ou similaridade de nome — preço preenchido em segundos.</p>
