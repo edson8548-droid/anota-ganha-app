@@ -199,13 +199,17 @@
   border-radius: 5px;
   margin-bottom: 6px;
 }
-.vp-product-price { font-size: 12px; font-weight: 600; color: #6b7280; margin-top: 2px; }
-.vp-product-unit-price { font-size: 20px; font-weight: 800; color: #16a34a; }
+.vp-product-price { font-size: 12px; font-weight: 500; color: #6b7280; margin-top: 2px; }
+.vp-product-unit-price { font-size: 22px; font-weight: 800; color: #16a34a; margin-top: 4px; }
 .vp-product-subtotal {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: #3A85A8;
-  margin-top: 4px;
+  margin-top: 6px;
+  background: #eff6ff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
 }
 
 /* Quantidade */
