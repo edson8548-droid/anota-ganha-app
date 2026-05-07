@@ -377,9 +377,30 @@ def _parse_formato_csv(lista: str) -> list:
             price_raw = col_value('r$ emb.', 'r$ emb', 'preco embalagem', 'preco_embalagem', 'preco')
             emb_raw = col_value('emb.', 'emb', 'embalagem', 'unidade')
         else:
-            unit_price_raw = cols[1] if len(cols) > 1 else ''
-            price_raw = cols[-1] if len(cols) > 2 else cols[1]
-            emb_raw = next((c for c in cols if _F3_PKG_RE.search(c)), '')
+            # Quando não há header, assume formato: Produto;CX-QTD;PREÇO
+            # ou Produto;CX-QTD;PREÇO_UNITÁRIO;PREÇO_CAIXA
+            unit_price_raw = None
+            price_raw = None
+            emb_raw = None
+
+            if len(cols) == 2:
+                # Formato: Produto;CX-QTD;PREÇO (assume preço unitário)
+                unit_price_raw = cols[1] if len(cols) > 1 else ''
+                price_raw = cols[-1] if len(cols) > 1 else cols[1]
+                emb_raw = next((c for c in cols if _F3_PKG_RE.search(c)), '')
+            elif len(cols) == 3:
+                # Formato: Produto;CX-QTD;PREÇO_UNITÁRIO;PREÇO_CAIXA
+                unit_price_raw = cols[1]
+                price_raw = cols[2]
+                emb_raw = cols[0]
+            elif len(cols) >= 4:
+                # Formato: Produto;CX-QTD;PREÇO_UNITÁRIO;PREÇO_CAIXA (com mais campos)
+                unit_price_raw = cols[2]
+                price_raw = cols[3]
+                emb_raw = cols[0]
+            else:
+                # Formato inválido, pular
+                continue
 
         try:
             if unit_price_raw and re.search(r'\d', unit_price_raw):
