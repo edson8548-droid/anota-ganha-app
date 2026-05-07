@@ -9,6 +9,30 @@ const API_URL = 'https://api.venpro.com.br';
 
 const UNIDADES = ['UN', 'CX', 'FD', 'PC', 'PCT', 'KG', 'L', 'ML', 'G', 'FRD', 'BAG'];
 
+const toNumber = (value) => {
+  if (value === null || value === undefined || value === '') return 0;
+  const parsed = parseFloat(String(value).replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const buildItemPayload = (it, sortOrder) => {
+  const unitPrice = toNumber(it.price);
+  const unitsPerPackage = it.units_per_package ? parseInt(it.units_per_package) || null : null;
+  return {
+    product_name: it.product_name,
+    product_code: it.product_code || null,
+    ean: it.ean || null,
+    category: it.category || null,
+    price: unitsPerPackage ? Number((unitPrice * unitsPerPackage).toFixed(2)) : unitPrice,
+    unit: it.unit || 'UN',
+    units_per_package: unitsPerPackage,
+    unit_price: unitPrice,
+    image_url: it._imageUrl || null,
+    sort_order: sortOrder,
+    active: true,
+  };
+};
+
 export default function Vitrine() {
   const navigate = useNavigate();
   const [view, setView] = useState('lista'); // 'lista' | 'nova' | 'revisao'
@@ -89,7 +113,7 @@ export default function Vitrine() {
         _imageFile: null,
         _imagePreview: null,
         _searching: true,
-        price: String(item.price ?? ''),
+        price: String(item.unit_price ?? item.price ?? ''),
         units_per_package: item.units_per_package ? String(item.units_per_package) : '',
       }));
       setItensParsed(items);
@@ -206,19 +230,7 @@ export default function Vitrine() {
         minimum_order_value: form.minimum_order_value ? parseFloat(form.minimum_order_value) : null,
         expires_at: form.expires_at || null,
         notes: form.notes || null,
-        items: itensParsed.map((it, i) => ({
-          product_name: it.product_name,
-          product_code: it.product_code || null,
-          ean: it.ean || null,
-          category: it.category || null,
-          price: parseFloat(it.price) || 0,
-          unit: it.unit || 'UN',
-          units_per_package: it.units_per_package ? parseInt(it.units_per_package) : null,
-          unit_price: it.unit_price ? parseFloat(it.unit_price) : null,
-          image_url: it._imageUrl || null,
-          sort_order: i,
-          active: true,
-        })),
+        items: itensParsed.map((it, i) => buildItemPayload(it, i)),
       });
 
       const oferta = ofertaRes.data;
@@ -514,6 +526,9 @@ export default function Vitrine() {
 // ════════════════════════════════════════════════════
 function ItemReview({ item, onChange, onRemove, onImageChange, onSearchImage }) {
   const imgRef = useRef(null);
+  const unitPrice = toNumber(item.price);
+  const unitsPerPackage = item.units_per_package ? parseInt(item.units_per_package) || 0 : 0;
+  const packagePrice = unitsPerPackage ? unitPrice * unitsPerPackage : unitPrice;
 
   return (
     <div className="vt-review-item">
@@ -555,14 +570,15 @@ function ItemReview({ item, onChange, onRemove, onImageChange, onSearchImage }) 
 
       <div className="vt-review-item-fields">
         <div className="vt-review-field">
-          <label>Preço (R$)</label>
+          <label>Preço unitário (R$)</label>
           <input type="number" step="0.01" value={item.price}
             onChange={e => onChange('price', e.target.value)} placeholder="0,00" />
         </div>
         <div className="vt-review-field">
-          <label>Preço caixa (R$) - opcional</label>
-          <input type="number" step="0.01" value={item.unit_price || ''}
-            onChange={e => onChange('unit_price', e.target.value)} placeholder="Calcule se não informar" />
+          <label>Preço caixa</label>
+          <div className="vt-calculated-price">
+            {unitsPerPackage ? `R$ ${packagePrice.toFixed(2).replace('.', ',')}` : 'Informe qtd'}
+          </div>
         </div>
         <div className="vt-review-field">
           <label>Unidade</label>

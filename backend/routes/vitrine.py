@@ -499,6 +499,37 @@ def _parse_formato_livre(lista: str) -> list:
     return items
 
 
+def _normalizar_precos_vitrine_item(item: dict) -> dict:
+    """
+    Na Vitrine, o preço digitado pelo RCA representa o preço unitário.
+    O preço da caixa/embalagem fica separado em `price` para cálculo de subtotal.
+    """
+    units = item.get("units_per_package") or None
+    try:
+        units = int(units) if units else None
+    except Exception:
+        units = None
+
+    raw_unit = item.get("unit_price")
+    raw_price = item.get("price")
+    unit_price = None
+
+    try:
+        if raw_unit is not None and raw_unit != 0:
+            unit_price = float(raw_unit)
+        elif raw_price is not None:
+            unit_price = float(raw_price)
+    except Exception:
+        unit_price = 0
+
+    if unit_price is None:
+        unit_price = 0
+
+    item["unit_price"] = round(unit_price, 3)
+    item["price"] = round(unit_price * units, 2) if units else round(unit_price, 2)
+    return item
+
+
 async def parse_lista_codigo(lista: str) -> List[dict]:
     # Lista colada de IA/Excel/PDF sem quebras de linha:
     # "Produto CX-24 2,05 Produto 2 CX-12 4,90 ..."
@@ -551,10 +582,8 @@ async def listar_ofertas(uid: str = Depends(get_user_id)):
     for doc in docs:
         oferta_dict = doc_to_dict(doc)
 
-        # Garantir que unit_price seja calculado quando há units_per_package
         for item in oferta_dict.get("items", []):
-            if item.get("units_per_package") and not item.get("unit_price"):
-                item["unit_price"] = round(item.get("price", 0) / item["units_per_package"], 2)
+            _normalizar_precos_vitrine_item(item)
 
         result.append(oferta_dict)
 
@@ -576,30 +605,8 @@ async def criar_oferta(req: CreateOfferRequest, uid: str = Depends(get_user_id))
     for i, item in enumerate(req.items or []):
         item_dict = item.model_dump()
 
-        # Debug: Log dos dados recebidos
         logger.info(f"[CRIAR_OFERTA] Item {i}: {item_dict}")
-
-        # Calcular preços automaticamente baseado no que foi informado
-        has_unit_price = item_dict.get("unit_price") is not None and item_dict.get("unit_price") != 0
-        has_price = item_dict.get("price") is not None and item_dict.get("price") != 0
-        has_units = item_dict.get("units_per_package") is not None and item_dict.get("units_per_package") != 0
-
-        if has_unit_price and has_units and not has_price:
-            # Tem unit_price e units: calcular preço de caixa = unit_price × units
-            logger.info(f"[CRIAR_OFERTA] Calculando preço de caixa: {item_dict.get('unit_price')} × {item_dict.get('units_per_package')} = {round(item_dict.get('unit_price', 0) * item_dict.get('units_per_package'), 2)}")
-            item_dict["price"] = round(item_dict.get("unit_price", 0) * item_dict.get("units_per_package"), 2)
-        elif has_price and has_units and not has_unit_price:
-            # Tem price e units: calcular unit_price = price ÷ units
-            logger.info(f"[CRIAR_OFERTA] Calculando preço unitário: {item_dict.get('price')} ÷ {item_dict.get('units_per_package')} = {round(item_dict.get('price', 0) / item_dict.get('units_per_package'), 2)}")
-            item_dict["unit_price"] = round(item_dict.get("price", 0) / item_dict["units_per_package"), 2)
-        elif has_unit_price and not has_units:
-            # Tem apenas unit_price sem units: usar unit_price como price
-            logger.info(f"[CRIAR_OFERTA] Usando unit_price como price: {item_dict.get('unit_price')}")
-            item_dict["price"] = item_dict.get("unit_price", 0)
-        elif has_price and not has_units and not has_unit_price:
-            # Tem apenas price sem unit_price e sem units: usar como está
-            logger.info(f"[CRIAR_OFERTA] Usando price como está: {item_dict.get('price')}")
-            pass
+        _normalizar_precos_vitrine_item(item_dict)
 
         items.append({
             "id": str(uuid.uuid4()),
@@ -609,30 +616,6 @@ async def criar_oferta(req: CreateOfferRequest, uid: str = Depends(get_user_id))
         })
 
     logger.info(f"[CRIAR_OFERTA] Total de itens: {len(items)}")
-
-    # Correção: quando usuário informa unit_price, tratar como preço unitário e não calcular automaticamente
-    for item in items:
-        has_unit_price = item.get("unit_price") is not None and item.get("unit_price") != 0
-        has_price = item.get("price") is not None and item.get("price") != 0
-        has_units = item.get("units_per_package") is not None and item.get("units_per_package") != 0
-
-        # Se o usuário informou unit_price, não sobrescrever - tratar como preço unitário
-        if has_unit_price and not has_price:
-            logger.info(f"[CRIAR_OFERTA] Item {item.get('product_name')}: unit_price informado={item.get('unit_price')}, mantendo como preço unitário")
-            # Calcular price apenas se não foi informado
-            if not item.get("price") or item.get("price") == 0:
-                if has_units:
-                    item["price"] = round(item.get("unit_price", 0) * item.get("units_per_package"), 2)
-            else:
-                item["price"] = item.get("unit_price", 0)
-        elif has_price and has_units and not has_unit_price:
-            # Tem price e units: calcular unit_price
-            logger.info(f"[CRIAR_OFERTA] Item {item.get('product_name')}: calculando unit_price = {item.get('price')} ÷ {item.get('units_per_package')}")
-            item["unit_price"] = round(item.get("price", 0) / item.get("units_per_package"), 2)
-        elif has_price and not has_units and not has_unit_price:
-            # Tem apenas price: usar como está
-            logger.info(f"[CRIAR_OFERTA] Item {item.get('product_name')}: usando price como está: {item.get('price')}")
-            pass
 
     doc = {
         "slug": slug,
@@ -666,24 +649,8 @@ async def obter_oferta(offer_id: str, uid: str = Depends(get_user_id)):
 
     result = doc_to_dict(doc)
 
-    # Calcular preços automaticamente baseado no que foi informado
     for item in result.get("items", []):
-        has_unit_price = item.get("unit_price") is not None and item.get("unit_price") != 0
-        has_price = item.get("price") is not None and item.get("price") != 0
-        has_units = item.get("units_per_package") is not None and item.get("units_per_package") != 0
-
-        if has_unit_price and has_units and not has_price:
-            # Tem unit_price e units: calcular preço de caixa = unit_price × units
-            logger.info(f"[ATUALIZAR_OFERTA] Item {item.get('product_name')}: calculando preço de caixa = {item.get('unit_price')} × {item.get('units_per_package')}")
-            item["price"] = round(item.get("unit_price", 0) * item.get("units_per_package"), 2)
-        elif has_price and has_units and not has_unit_price:
-            # Tem price e units: calcular unit_price = price ÷ units
-            logger.info(f"[ATUALIZAR_OFERTA] Item {item.get('product_name')}: calculando unit_price = {item.get('price')} ÷ {item.get('units_per_package')}")
-            item["unit_price"] = round(item.get("price", 0) / item.get("units_per_package"), 2)
-        elif has_unit_price and not has_units and not has_price:
-            # Tem apenas unit_price: usar unit_price como price
-            logger.info(f"[ATUALIZAR_OFERTA] Item {item.get('product_name')}: usando unit_price como price = {item.get('unit_price')}")
-            item["price"] = item.get("unit_price", 0)
+        _normalizar_precos_vitrine_item(item)
 
     return result
 
@@ -734,19 +701,7 @@ async def adicionar_item(offer_id: str, item: OfferItem, uid: str = Depends(get_
 
     item_dict = item.model_dump()
 
-    # Calcular preços automaticamente baseado no que foi informado
-    has_unit_price = item_dict.get("unit_price") is not None and item_dict.get("unit_price") != 0
-    has_price = item_dict.get("price") is not None and item_dict.get("price") != 0
-    has_units = item_dict.get("units_per_package") is not None and item_dict.get("units_per_package") != 0
-
-    if has_unit_price and has_units and not has_price:
-        # Tem unit_price e units: calcular preço de caixa = unit_price × units
-        logger.info(f"[ADICIONAR_ITEM] Item {item_dict.get('product_name')}: calculando preço de caixa = {item_dict.get('unit_price')} × {item_dict.get('units_per_package')}")
-        item_dict["price"] = round(item_dict.get("unit_price", 0) * item_dict.get("units_per_package"), 2)
-    elif has_price and has_units and not has_unit_price:
-        # Tem price e units: calcular unit_price = price ÷ units
-        logger.info(f"[ADICIONAR_ITEM] Item {item_dict.get('product_name')}: calculando unit_price = {item_dict.get('price')} ÷ {item_dict.get('units_per_package')}")
-        item_dict["unit_price"] = round(item_dict.get("price", 0) / item_dict.get("units_per_package"), 2)
+    _normalizar_precos_vitrine_item(item_dict)
 
     new_item = {
         "id": str(uuid.uuid4()),
@@ -785,15 +740,12 @@ async def atualizar_item(offer_id: str, item_id: str, req: UpdateItemRequest, ui
 
     updates = {k: v for k, v in req.model_dump().items() if v is not None}
 
-    # Calcular automaticamente preço de caixa se houver units_per_package mas não unit_price
-    if updates.get("units_per_package") and not updates.get("unit_price"):
-        updates["unit_price"] = round(updates.get("price", item_atual.get("price", 0)) / updates.get("units_per_package"), 2)
-    elif updates.get("units_per_package") and updates.get("unit_price"):
-        # Se ambos foram atualizados, manter o unit_price informado
-        pass
-    elif updates.get("price") and item_atual.get("units_per_package") and not updates.get("unit_price"):
-        # Se o preço foi atualizado e há units_per_package, recalcular unit_price
-        updates["unit_price"] = round(updates.get("price") / item_atual.get("units_per_package"), 2)
+    if "price" in updates or "unit_price" in updates or "units_per_package" in updates:
+        merged = {**item_atual, **updates}
+        _normalizar_precos_vitrine_item(merged)
+        updates["price"] = merged["price"]
+        updates["unit_price"] = merged["unit_price"]
+        updates["units_per_package"] = merged.get("units_per_package")
 
     set_fields = {f"items.$[elem].{k}": v for k, v in updates.items()}
     set_fields["updated_at"] = datetime.now(timezone.utc)
@@ -1130,10 +1082,8 @@ async def pagina_publica(slug: str):
     # Filtrar apenas itens ativos e ordenar
     items_ativos = [i for i in result.get("items", []) if i.get("active", True)]
 
-    # Garantir que unit_price seja calculado quando há units_per_package
     for item in items_ativos:
-        if item.get("units_per_package") and not item.get("unit_price"):
-            item["unit_price"] = round(item.get("price", 0) / item["units_per_package"], 2)
+        _normalizar_precos_vitrine_item(item)
 
     result["items"] = sorted(items_ativos, key=lambda x: x.get("sort_order", 0))
     return result

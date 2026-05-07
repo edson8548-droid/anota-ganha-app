@@ -175,6 +175,17 @@
   border-radius: 7px; color: #E1E1E1; font-size: 13px; box-sizing: border-box;
 }
 .vt-review-field input:focus, .vt-review-field select:focus { outline: none; border-color: #3A85A8; }
+.vt-calculated-price {
+  width: 100%;
+  padding: 6px 10px;
+  background: rgba(46,204,138,.08);
+  border: 1px solid rgba(46,204,138,.22);
+  border-radius: 7px;
+  color: #2ECC8A;
+  font-size: 13px;
+  font-weight: 800;
+  box-sizing: border-box;
+}
 
 /* Imagem no review */
 .vt-img-box {
