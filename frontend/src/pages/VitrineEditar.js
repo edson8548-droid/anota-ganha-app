@@ -334,7 +334,7 @@ export default function VitrineEditar() {
             <div className="vt-paste-area" style={{ marginTop: 16 }}>
               <label className="vt-label">Adicionar mais produtos via lista</label>
               <textarea className="vt-input vt-textarea"
-                placeholder={"SABAO PO ASSIM 800G R$ 5,90 UN CX 20UN\n..."}
+                placeholder={"SABAO PO ASSIM 800G R$ 5,90 UN CX 20UN\nOu lista compactada: PRODUTO CX-24 2,50 PRODUTO 2 CX-12 4,90"}
                 value={listaTexto} onChange={e => setListaTexto(e.target.value)} rows={3} />
               <div style={{ marginTop: 10 }}>
                 <button className="vt-btn-primary" onClick={parsearLista} disabled={parsing || !listaTexto.trim()}>
