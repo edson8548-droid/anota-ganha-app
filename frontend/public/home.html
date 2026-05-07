@@ -315,34 +315,66 @@ table.mt tr:hover td { background:rgba(0,0,0,.02); }
   object-fit:cover;
   background:#101418;
 }
-.proof-wrap { margin-top:42px; }
-.proof-head {
-  display:flex;
-  align-items:flex-end;
-  justify-content:space-between;
-  gap:18px;
-  margin-bottom:18px;
-}
-.proof-title { font-size:20px; font-weight:800; }
-.proof-sub { color:var(--sub); font-size:14px; line-height:1.6; max-width:520px; }
-.proof-grid {
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:18px;
-}
-.proof-card {
-  background:var(--bg2);
+.proof-wrap { margin-top:46px; }
+.proof-panel {
+  background:linear-gradient(145deg, rgba(18,24,27,.88), rgba(35,38,43,.78));
   border:1px solid var(--borda);
-  border-radius:16px;
-  overflow:hidden;
-  box-shadow:0 18px 44px rgba(0,0,0,.28);
+  border-radius:18px;
+  padding:28px;
+  display:grid;
+  grid-template-columns:1fr 360px;
+  gap:34px;
+  align-items:center;
+  box-shadow:0 22px 60px rgba(0,0,0,.24);
 }
-.proof-card img {
+.proof-kicker {
+  color:var(--verde);
+  font-size:11px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:1.1px;
+  margin-bottom:12px;
+}
+.proof-title { font-size:25px; font-weight:900; line-height:1.25; margin-bottom:12px; }
+.proof-sub { color:var(--sub); font-size:15px; line-height:1.7; max-width:620px; margin-bottom:22px; }
+.proof-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; max-width:560px; }
+.proof-metric {
+  background:rgba(255,255,255,.025);
+  border:1px solid var(--borda);
+  border-radius:12px;
+  padding:14px 16px;
+}
+.proof-metric b { display:block; color:var(--texto); font-size:20px; line-height:1; margin-bottom:6px; }
+.proof-metric span { display:block; color:var(--sub2); font-size:12px; line-height:1.45; }
+.proof-phone {
+  width:100%;
+  max-width:330px;
+  margin-left:auto;
+  background:#0f1416;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:24px;
+  padding:10px;
+  overflow:hidden;
+  box-shadow:0 18px 50px rgba(0,0,0,.4);
+}
+.proof-phone img {
   display:block;
   width:100%;
-  aspect-ratio:9/14;
+  aspect-ratio:9/16;
   object-fit:cover;
   object-position:top center;
+  border-radius:16px;
+}
+.proof-note { color:var(--sub2); font-size:12px; margin-top:14px; }
+.proof-thumbs { display:flex; gap:8px; margin-top:12px; }
+.proof-thumb {
+  width:52px;
+  height:76px;
+  border:1px solid var(--borda);
+  border-radius:9px;
+  object-fit:cover;
+  object-position:top center;
+  opacity:.68;
 }
 
 /* ══ COMO FUNCIONA ══ */
@@ -492,8 +524,9 @@ footer {
   .hero-brand-name { font-size:30px; }
   .hero-brand-line { font-size:10px; letter-spacing:1.8px; }
   .video-demo { grid-template-columns:1fr; gap:28px; }
-  .proof-head { display:block; }
-  .proof-grid { grid-template-columns:1fr; }
+  .proof-panel { grid-template-columns:1fr; padding:22px; }
+  .proof-metrics { grid-template-columns:1fr; }
+  .proof-phone { margin:0; max-width:100%; }
   .step { border-right:none; border-bottom:1px solid var(--borda); }
   .step:last-child { border-bottom:none; }
   .cta-box { padding:40px 24px; }
@@ -651,19 +684,26 @@ footer {
   </div>
 </div>
 <div class="sec-inner proof-wrap">
-  <div class="proof-head">
+  <div class="proof-panel">
     <div>
-      <div class="sec-lbl">Prova real</div>
-      <div class="proof-title">Pedido recebido direto no WhatsApp.</div>
+      <div class="proof-kicker">Prova real com dados preservados</div>
+      <div class="proof-title">O link vira pedido pronto no WhatsApp do RCA.</div>
+      <p class="proof-sub">O cliente escolhe os produtos na vitrine e o VenPro devolve a lista organizada para o representante: quantidade, preco unitario, preco da caixa, subtotal e total estimado.</p>
+      <div class="proof-metrics">
+        <div class="proof-metric"><b>R$ 952,40</b><span>pedido estimado recebido pelo WhatsApp</span></div>
+        <div class="proof-metric"><b>5 itens</b><span>produtos com caixa, unidade e subtotal</span></div>
+        <div class="proof-metric"><b>0 retrabalho</b><span>sem copiar pedido item por item</span></div>
+      </div>
+      <div class="proof-note">Capturas reais anonimizadas. Nomes, fotos e dados do cliente foram ocultados.</div>
     </div>
-    <p class="proof-sub">O cliente abre o link, escolhe os produtos e o representante recebe o pedido pronto, com quantidade, preco unitario, preco da caixa e total estimado.</p>
-  </div>
-  <div class="proof-grid">
-    <div class="proof-card">
-      <img src="/assets/screenshots/pedido-whatsapp-vitrine-1.jpg" alt="Pedido recebido pelo WhatsApp com dados do cliente preservados">
-    </div>
-    <div class="proof-card">
-      <img src="/assets/screenshots/pedido-whatsapp-vitrine-2.jpg" alt="Pedido recebido pelo WhatsApp com produtos e totais">
+    <div>
+      <div class="proof-phone">
+        <img src="/assets/screenshots/pedido-whatsapp-vitrine-2.jpg" alt="Pedido recebido pelo WhatsApp com dados do cliente preservados">
+      </div>
+      <div class="proof-thumbs" aria-hidden="true">
+        <img class="proof-thumb" src="/assets/screenshots/pedido-whatsapp-vitrine-1.jpg" alt="">
+        <img class="proof-thumb" src="/assets/screenshots/pedido-whatsapp-vitrine-2.jpg" alt="">
+      </div>
     </div>
   </div>
 </div>
