@@ -96,6 +96,11 @@ const PROMPTS_RAPIDOS = [
     texto: 'Aja como um assistente de um representante comercial. Escreva uma mensagem persuasiva, profissional e direta para o setor de análise de crédito da empresa, solicitando a liberação de um pedido e o aumento do limite de crédito de um cliente. A mensagem será enviada por e-mail para o analista.\n\nUse os seguintes dados para montar a mensagem:\n\nNome do Cliente / Razão Social: [DIGITE O NOME AQUI]\nCNPJ: [DIGITE O CNPJ AQUI]\nLimite Atual: [DIGITE O VALOR DO LIMITE ATUAL AQUI]\nLimite Desejado / Solicitado: [DIGITE O NOVO LIMITE AQUI]\nValor do Pedido Atual (que está travado): [DIGITE O VALOR DO PEDIDO AQUI]\nJustificativa principal: [ESCOLHA UMA OU MAIS: Excelente pagador / Cliente novo com grande potencial de compra / Aumentou muito o volume de vendas na loja / Concorrente está oferecendo mais limite / Mix de produtos está girando rápido]\n\nA mensagem deve ser amigável, focada em não perder a venda e em construir uma boa parceria com o setor de crédito. Gere apenas o texto da mensagem pronto para eu copiar e enviar.',
   },
   {
+    label: 'Vitrine: lista organizada',
+    sub: 'Transforma pedido, PDF ou Excel em lista para colar na vitrine',
+    texto: 'Analise a lista, PDF ou Excel fornecido abaixo. Extraia os dados e crie uma tabela contendo apenas as seguintes colunas:\n\nNome do Produto\nQuantidade da Embalagem\nPreço Unitário\n\nIgnore códigos, descrições duplicadas, observações ou qualquer outra informação irrelevante.\n\nRegras importantes:\n- Mantenha um produto por linha.\n- Se encontrar preço em formato brasileiro, mantenha com vírgula. Exemplo: 8,54.\n- Se a embalagem aparecer como CX 8UN, CX-24, FARDO 12UN ou similar, coloque essa informação em Quantidade da Embalagem.\n- Se não encontrar a quantidade da embalagem, deixe em branco.\n- Não invente produtos, preços ou quantidades.\n- Gere apenas a tabela final, sem explicações.\n\n[COLE SUA LISTA AQUI OU ANEXE O PDF/EXCEL]',
+  },
+  {
     label: '🛒 Mix por cliente',
     sub: 'Quais produtos oferecer',
     texto: 'Tenho um cliente que é [tipo: mercadinho/padaria/bar/supermercado] com faturamento médio de R$ [valor] por pedido. Quais categorias de produtos de [alimentos/higiene/limpeza] devo priorizar para ele?',
