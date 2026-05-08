@@ -43,11 +43,13 @@ def _gridfs():
 
 async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
     if not credentials:
+        logger.warning("[SECURITY] auth_missing route=vitrine")
         raise HTTPException(401, "Token obrigatório")
     try:
         decoded = await asyncio.to_thread(firebase_auth.verify_id_token, credentials.credentials)
         return decoded["uid"]
     except Exception:
+        logger.warning("[SECURITY] auth_invalid route=vitrine")
         raise HTTPException(401, "Token inválido")
 
 
@@ -1138,14 +1140,17 @@ async def sugerir_imagens(product_name: str, uid: str = Depends(get_user_id)):
 @router.get("/publica/{slug}")
 async def pagina_publica(slug: str):
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{2,80}", slug):
+        logger.warning("[SECURITY] vitrine_public_blocked reason=bad_slug slug_len=%s", len(slug or ""))
         raise HTTPException(404, "Vitrine não encontrada ou inativa")
 
     doc = await _db.vitrine_offers.find_one({"slug": slug, "status": "active"})
     if not doc:
+        logger.warning("[SECURITY] vitrine_public_blocked reason=not_found_or_inactive slug_len=%s", len(slug or ""))
         raise HTTPException(404, "Vitrine não encontrada ou inativa")
 
     expires_at = _parse_public_expiration(doc.get("expires_at"))
     if expires_at and datetime.now(timezone.utc) > expires_at:
+        logger.warning("[SECURITY] vitrine_public_blocked reason=expired slug_len=%s", len(slug or ""))
         raise HTTPException(410, "Vitrine expirada")
 
     return _public_offer_response(doc)

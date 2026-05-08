@@ -98,6 +98,15 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
 
         if len(timestamps) >= max_requests:
             retry_after = max(1, int(window_seconds - (now - timestamps[0])))
+            logger.warning(
+                "[SECURITY] rate_limit_exceeded ip=%s bucket=%s path=%s limit=%s/%ss retry_after=%ss",
+                self._client_ip(request),
+                bucket,
+                request.url.path,
+                max_requests,
+                window_seconds,
+                retry_after,
+            )
             return JSONResponse(
                 status_code=429,
                 content={"detail": "Muitas tentativas. Aguarde um pouco e tente novamente."},
