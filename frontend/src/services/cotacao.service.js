@@ -1,5 +1,6 @@
 import api from './api';
 import { auth } from '../firebase/config';
+import { apiUrl, backendUrl } from '../config/api';
 
 export const listarTabelas = () => api.get('/cotacao/tabelas');
 
@@ -57,12 +58,12 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress) => {
   const headers = { Authorization: `Bearer ${token}` };
 
   // Wake up backend before sending the file
-  try { await fetch('https://api.venpro.com.br/health', { mode: 'cors' }); } catch {}
+  try { await fetch(backendUrl('/health'), { mode: 'cors' }); } catch {}
 
   // Submit job
   let submitRes;
   try {
-    submitRes = await fetch('https://api.venpro.com.br/api/cotacao/gerar-tabela-prazos', {
+    submitRes = await fetch(apiUrl('/cotacao/gerar-tabela-prazos'), {
       method: 'POST',
       headers,
       body: formData,
@@ -87,7 +88,7 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress) => {
     onProgress?.((i + 1) * 3);
 
     try {
-      var pollRes = await fetch(`https://api.venpro.com.br/api/cotacao/jobs/${job_id}`, { headers });
+      var pollRes = await fetch(apiUrl(`/cotacao/jobs/${job_id}`), { headers });
     } catch {
       continue; // network glitch, retry
     }

@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { vitrineService } from '../services/vitrine.service';
+import { backendUrl } from '../config/api';
 import './VitrinePublica.css';
-
-const API_URL = 'https://api.venpro.com.br';
 
 function imgUrl(path) {
   if (!path) return null;
   if (path.startsWith('http')) return path;
-  return `${API_URL}${path}`;
+  return backendUrl(path);
 }
 
 function fmtMoeda(v) {
@@ -30,18 +29,18 @@ function orderKey(slug) {
 
 function salvarPedido(slug, quantidades, cliente) {
   const data = { quantidades, cliente, salvoEm: new Date().toISOString() };
-  try { localStorage.setItem(orderKey(slug), JSON.stringify(data)); } catch {}
+  try { sessionStorage.setItem(orderKey(slug), JSON.stringify(data)); } catch {}
 }
 
 function carregarPedido(slug) {
   try {
-    const raw = localStorage.getItem(orderKey(slug));
+    const raw = sessionStorage.getItem(orderKey(slug));
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }
 
 function limparPedido(slug) {
-  try { localStorage.removeItem(orderKey(slug)); } catch {}
+  try { sessionStorage.removeItem(orderKey(slug)); } catch {}
 }
 
 export default function VitrinePublica() {

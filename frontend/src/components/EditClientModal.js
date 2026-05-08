@@ -4,6 +4,8 @@
 import React, { useState, useEffect } from 'react';
 import './EditClientModal.css'; 
 
+const INDUSTRY_META_FIELDS = ['targetValue', 'alreadySoldValue'];
+
 const EditClientModal = ({ isOpen, onClose, client, onSave, campaign }) => {
   const [formData, setFormData] = useState({
     CNPJ: '', CLIENTE: '', CIDADE: '', ESTADO: '',
@@ -22,7 +24,7 @@ const EditClientModal = ({ isOpen, onClose, client, onSave, campaign }) => {
       if (campaign.industries) {
         Object.entries(campaign.industries).forEach(([industryName, products]) => {
           hydratedIndustries[industryName] = {};
-          Object.keys(products).filter(p => p !== 'targetValue').forEach(productName => {
+          Object.keys(products).filter(p => !INDUSTRY_META_FIELDS.includes(p)).forEach(productName => {
             const clientProductData = client.industries?.[industryName]?.[productName];
             if (clientProductData) {
               hydratedIndustries[industryName][productName] = {
@@ -115,7 +117,13 @@ const EditClientModal = ({ isOpen, onClose, client, onSave, campaign }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave({ ...client, ...formData });
+    const dataToSave = { ...formData };
+    ['CNPJ', 'CLIENTE', 'CIDADE', 'ESTADO', 'ENDERECO', 'BAIRRO', 'CEP', 'TELEFONE', 'EMAIL'].forEach(field => {
+      if (!String(dataToSave[field] || '').trim() && client?.[field]) {
+        dataToSave[field] = client[field];
+      }
+    });
+    onSave({ ...client, ...dataToSave });
     onClose();
   };
 

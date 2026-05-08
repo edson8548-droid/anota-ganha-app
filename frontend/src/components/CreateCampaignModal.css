@@ -80,47 +80,215 @@
 }
 
 /* Indústrias Adicionadas */
-.industries-list h3 {
-  font-size: 16px; font-weight: 600;
-  color: #1f2937; margin-bottom: 12px;
+.industries-list {
+  margin: 22px 0 26px;
+}
+.industries-list-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.industries-list-header h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 4px;
+}
+.industries-list-header p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+.industries-list-header > span {
+  flex: none;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 12px;
+  font-weight: 800;
+}
+.industries-card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
 }
 .industry-item {
-  background: #f9fafb; border: 2px solid #e5e7eb;
-  border-radius: 12px; padding: 16px; margin-bottom: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, .06);
 }
 .industry-header {
-  display: flex; justify-content: space-between;
-  align-items: center; margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
 }
-.industry-header-info { flex: 1; }
+.industry-header-info {
+  flex: 1;
+  min-width: 0;
+}
+.industry-label {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
 .industry-header-info strong {
-  font-size: 1.1rem; color: #667eea; font-weight: 700;
+  display: block;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 850;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
-.industry-target {
-  font-size: 0.95rem; font-weight: 600; color: #10b981;
-  display: block; margin-top: 4px;
+.industry-header-info small {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  margin-top: 4px;
 }
 .industry-header-actions { display: flex; align-items: center; gap: 8px; }
 
 /* ⭐️ BOTÃO EDITAR INDÚSTRIA (NOVO) ⭐️ */
 .btn-edit-industry {
-  background: #ede9fe; border: none; color: #7c3aed;
-  width: 30px; height: 30px; border-radius: 50%;
-  cursor: pointer; font-size: 16px; transition: all 0.2s;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #4338ca;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  transition: all 0.2s;
   display: flex; align-items: center; justify-content: center;
 }
-.btn-edit-industry:hover { background: #d8b4fe; }
+.btn-edit-industry:hover { background: #e0e7ff; border-color: #818cf8; }
 
 .btn-remove {
-  background: #fee2e2; border: none; color: #dc2626;
-  width: 30px; height: 30px; border-radius: 50%;
-  cursor: pointer; font-size: 18px; transition: all 0.2s;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #e11d48;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 22px;
+  transition: all 0.2s;
   display: flex; align-items: center; justify-content: center;
+  line-height: 1;
 }
-.btn-remove:hover { background: #fecaca; }
+.btn-remove:hover { background: #ffe4e6; border-color: #fb7185; }
+
+.industry-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.industry-metrics div {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px;
+  min-width: 0;
+}
+.industry-metrics div.remaining {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+.industry-metrics span,
+.industry-progress span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.industry-metrics strong {
+  color: #111827;
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+.industry-metrics .remaining strong {
+  color: #b45309;
+}
+
+.industry-progress {
+  margin-bottom: 14px;
+}
+.industry-progress > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+.industry-progress > div:first-child span {
+  margin: 0;
+}
+.industry-progress > div:first-child strong {
+  color: #059669;
+  font-size: 13px;
+}
+.industry-progress-track {
+  height: 9px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+.industry-progress-track span {
+  display: block;
+  height: 100%;
+  min-width: 3px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #10b981, #14b8a6);
+}
 
 .industry-products {
-  font-size: 14px; color: #6b7280; word-break: break-all;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 12px;
+}
+.industry-products > strong {
+  display: block;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  margin-bottom: 8px;
+}
+.industry-product-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.industry-product-list span {
+  max-width: 100%;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+  font-size: 12px;
+  font-weight: 700;
+}
+.industry-product-list .more-products {
+  background: #eef2ff;
+  color: #4338ca;
+  border-color: #c7d2fe;
 }
 
 /* Seção Adicionar Indústria */
@@ -182,6 +350,82 @@
 }
 .btn-cancel-edit-industry:hover { background: #e2e8f0; }
 
+.industry-edit-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10002;
+  padding: 20px;
+}
+
+.industry-edit-modal {
+  width: 100%;
+  max-width: 620px;
+  max-height: 90vh;
+  background: #ffffff;
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 70px rgba(0,0,0,.32);
+  animation: slideUp-campaign 0.24s ease;
+}
+
+.industry-edit-header {
+  padding: 22px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.industry-edit-header h3 {
+  margin: 0 0 4px;
+  color: #111827;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.industry-edit-header p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.industry-edit-header button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.industry-edit-body {
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.industry-edit-footer {
+  padding: 18px 24px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
 /* Footer */
 .campaign-modal-footer {
   padding: 20px 24px; border-top: 2px solid #f3f4f6;
@@ -208,4 +452,34 @@
 @media (max-width: 768px) {
   .modal-content-campaign { border-radius: 16px; max-height: 95vh; }
   .campaign-dates-row { grid-template-columns: 1fr; }
+  .industries-list-header { flex-direction: column; }
+  .industry-header { flex-direction: column; }
+  .industry-header-actions { width: 100%; }
+  .btn-edit-industry { flex: 1; }
+  .industry-metrics { grid-template-columns: 1fr; }
+}
+
+/* Escopo reforçado para evitar mistura com cards do dashboard */
+.modal-content-campaign .industries-list {
+  display: block;
+  margin: 22px 0 26px;
+}
+
+.modal-content-campaign .industries-card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.modal-content-campaign .industry-item {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, .06);
+}
+
+.modal-content-campaign .industry-products {
+  display: block;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 12px;
 }

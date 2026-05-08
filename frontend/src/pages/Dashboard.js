@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { FileSpreadsheet, ClipboardList, BarChart3, Send, Store } from 'lucide-react';
+import { FileSpreadsheet, ClipboardList, BarChart3, Send, Store, Plus, RotateCcw, Trash2, Copy, MessageCircle } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useCampaigns } from '../hooks/useCampaigns';
 import { useClients } from '../hooks/useClients';
@@ -15,8 +15,10 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { campaignsService } from '../services/campaigns.service';
 import { uploadAvatar } from '../services/api';
 import { getDailyMotivationMessage } from '../data/dailyMotivationMessages';
+import { backendUrl } from '../config/api';
 import './Dashboard.css';
 
+const INDUSTRY_META_FIELDS = ['targetValue', 'alreadySoldValue'];
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -34,13 +36,18 @@ const Dashboard = () => {
   const [editingCampaign, setEditingCampaign] = useState(null);
   const [activeTab, setActiveTab] = useState('clients');
   const [selectedCity, setSelectedCity] = useState('all');
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState('all');
+  const [selectedActionStatus, setSelectedActionStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [messageComposer, setMessageComposer] = useState(null);
+  const [showCampaignSelector, setShowCampaignSelector] = useState(false);
 
   const [expandedClientId, setExpandedClientId] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null });
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef(null);
+  const campaignSelectorRef = useRef(null);
 
   const showConfirm = (title, description, onConfirm) =>
     setConfirmDialog({ open: true, title, description, onConfirm });
@@ -48,7 +55,7 @@ const Dashboard = () => {
 
   // Wake up backend on first load
   useEffect(() => {
-    fetch('https://api.venpro.com.br/health', { method: 'GET', mode: 'cors' }).catch(() => {});
+    fetch(backendUrl('/health'), { method: 'GET', mode: 'cors' }).catch(() => {});
   }, []);
 
   // Inicializa avatar com photoURL do Firestore
@@ -97,6 +104,18 @@ const Dashboard = () => {
     setEditingCampaign(campaign);
     setShowCreateCampaign(true);
   };
+  const handleOpenNewCampaign = (e) => {
+    e?.stopPropagation();
+    setEditingCampaign(null);
+    setShowCreateCampaign(true);
+  };
+  const handleOpenCampaignSelector = () => {
+    if (campaigns.length === 0) {
+      setShowCreateCampaign(true);
+      return;
+    }
+    setShowCampaignSelector(true);
+  };
   const handleUpdateCampaign = async (campaignData) => {
     try {
       await updateCampaign(editingCampaign.id, campaignData);
@@ -114,6 +133,108 @@ const Dashboard = () => {
           await deleteCampaign(campaignId);
           if (selectedCampaign?.id === campaignId) setSelectedCampaignId(null);
         } catch (error) { console.error('Erro ao deletar campanha:', error); }
+      }
+    );
+  };
+  const buildResetIndustries = (campaign) => {
+    const resetIndustries = {};
+    Object.entries(campaign?.industries || {}).forEach(([industryName, industryData]) => {
+      resetIndustries[industryName] = {};
+      Object.entries(industryData || {}).forEach(([fieldName, fieldValue]) => {
+        if (fieldName === 'alreadySoldValue') {
+          resetIndustries[industryName][fieldName] = 0;
+        } else if (INDUSTRY_META_FIELDS.includes(fieldName)) {
+          resetIndustries[industryName][fieldName] = fieldValue;
+        } else {
+          resetIndustries[industryName][fieldName] = { positivado: false, valor: 0 };
+        }
+      });
+    });
+    return resetIndustries;
+  };
+  const handleDuplicateCampaign = (e) => {
+    e.stopPropagation();
+    if (!selectedCampaign) return;
+
+    showConfirm(
+      'Duplicar campanha',
+      'Será criada uma nova campanha com as mesmas indústrias e produtos, mas com vendas e positivações zeradas.',
+      async () => {
+        try {
+          const today = new Date().toISOString().slice(0, 10);
+          const newCampaignId = await createCampaign({
+            name: `${selectedCampaign.name} - nova`,
+            startDate: today,
+            endDate: selectedCampaign.endDate || today,
+            status: 'active',
+            industries: buildResetIndustries(selectedCampaign)
+          });
+          if (newCampaignId) setSelectedCampaignId(newCampaignId);
+          toast.success('Nova campanha criada com as indústrias reaproveitadas.');
+        } catch (error) {
+          console.error('Erro ao duplicar campanha:', error);
+          toast.error('Erro ao duplicar campanha.');
+        }
+      }
+    );
+  };
+  const handleCloseCampaign = (e) => {
+    e.stopPropagation();
+    if (!selectedCampaign) return;
+
+    showConfirm(
+      'Encerrar campanha',
+      'A campanha ficará inativa, mas os resultados continuarão salvos para consulta.',
+      async () => {
+        try {
+          await updateCampaign(selectedCampaign.id, { status: 'inactive' });
+          toast.success('Campanha encerrada.');
+        } catch (error) {
+          console.error('Erro ao encerrar campanha:', error);
+          toast.error('Erro ao encerrar campanha.');
+        }
+      }
+    );
+  };
+  const handleResetCampaignProgress = (e) => {
+    e.stopPropagation();
+    if (!selectedCampaign) return;
+
+    showConfirm(
+      'Zerar vendas da campanha',
+      'Isto limpa as positivações e valores vendidos dos clientes desta campanha, mas mantém clientes, indústrias, produtos e metas cadastradas.',
+      async () => {
+        try {
+          const resetIndustries = buildResetIndustries(selectedCampaign);
+
+          await Promise.all(campaignClients.map(client => {
+            const nextIndustries = { ...(client.industries || {}) };
+
+            Object.entries(selectedCampaign.industries || {}).forEach(([industryName, industryConfig]) => {
+              const currentIndustry = nextIndustries[industryName] || {};
+              nextIndustries[industryName] = {};
+
+              Object.keys(industryConfig || {})
+                .filter(productName => !INDUSTRY_META_FIELDS.includes(productName))
+                .forEach(productName => {
+                  nextIndustries[industryName][productName] = {
+                    ...(currentIndustry[productName] || {}),
+                    positivado: false,
+                    valor: 0
+                  };
+                });
+            });
+
+            return updateClient(client.id, { industries: nextIndustries });
+          }));
+
+          await updateCampaign(selectedCampaign.id, { industries: resetIndustries });
+
+          toast.success('Vendas e positivações zeradas para esta campanha.');
+        } catch (error) {
+          console.error('Erro ao zerar campanha:', error);
+          toast.error('Erro ao zerar vendas da campanha.');
+        }
       }
     );
   };
@@ -178,10 +299,201 @@ const Dashboard = () => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
 
+  const getClientDisplayName = (client) => {
+    return client.CLIENTE || client.NOME || client.nome || client.RAZAO_SOCIAL ||
+      client.razao_social || client.NOME_FANTASIA || client.nome_fantasia ||
+      client.CNPJ || 'Cliente sem nome';
+  };
+
+  const getClientContactName = (client) => {
+    const contact = client.CONTATO || client.contato || client.NOME_CONTATO || '';
+    if (String(contact).trim()) return String(contact).trim();
+    const displayName = getClientDisplayName(client);
+    return displayName === 'Cliente sem nome' ? 'cliente' : displayName.split(' ')[0];
+  };
+
+  const getTimeGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Bom dia';
+    if (hour < 18) return 'Boa tarde';
+    return 'Boa noite';
+  };
+
+  const getClientIndustrySummaries = (client) => {
+    if (!selectedCampaign) return [];
+    return Object.keys(selectedCampaign.industries || {}).map(industryName => {
+      const clientIndustryProducts = client.industries?.[industryName] || {};
+      const campaignProducts = selectedCampaign.industries[industryName] || {};
+      const productNames = Object.keys(campaignProducts).filter(p => !INDUSTRY_META_FIELDS.includes(p));
+      const soldProducts = [];
+      const missingProducts = [];
+      let totalValue = 0;
+
+      productNames.forEach(productName => {
+        const productData = clientIndustryProducts[productName];
+        if (productData?.positivado) {
+          soldProducts.push(productName);
+          totalValue += parseFloat(productData.valor) || 0;
+        } else {
+          missingProducts.push(productName);
+        }
+      });
+
+      return {
+        name: industryName,
+        soldProducts,
+        missingProducts,
+        total: productNames.length,
+        sold: soldProducts.length,
+        totalValue,
+        percentage: productNames.length > 0 ? (soldProducts.length / productNames.length) * 100 : 0
+      };
+    });
+  };
+
+  const getClientActionMeta = (client) => {
+    const industrySummaries = getClientIndustrySummaries(client);
+    const total = industrySummaries.reduce((sum, industry) => sum + industry.total, 0);
+    const sold = industrySummaries.reduce((sum, industry) => sum + industry.sold, 0);
+    const missingCount = industrySummaries.reduce((sum, industry) => sum + industry.missingProducts.length, 0);
+    const completion = total > 0 ? (sold / total) * 100 : 0;
+    const phoneDigits = String(client.TELEFONE || '').replace(/\D/g, '');
+    const hasPhone = phoneDigits.length >= 10;
+    let status = 'empty';
+    if (total > 0 && sold >= total) status = 'complete';
+    else if (sold > 0) status = 'partial';
+
+    let priority = 'medium';
+    if (status === 'partial') priority = missingCount <= 3 || completion >= 50 ? 'high' : 'medium';
+    if (status === 'empty') priority = hasPhone ? 'medium' : 'low';
+    if (status === 'complete') priority = 'done';
+
+    return { industrySummaries, total, sold, missingCount, completion, status, priority, hasPhone, phoneDigits };
+  };
+
+  const getPriorityLabel = (priority) => {
+    if (priority === 'high') return 'Alta prioridade';
+    if (priority === 'medium') return 'Prioridade media';
+    if (priority === 'low') return 'Baixa prioridade';
+    return 'Concluido';
+  };
+
+  const getMissingProducts = (meta) => meta.industrySummaries
+    .flatMap(industry => industry.missingProducts)
+    .slice(0, 12);
+
+  const buildClientMessage = (client, meta = getClientActionMeta(client), template = 'oferta', prices = {}) => {
+    const name = getClientContactName(client);
+    const greeting = getTimeGreeting();
+    const missingProducts = getMissingProducts(meta);
+    const missingLines = missingProducts
+      .map(product => `- ${product}: R$ ${prices[product] || ''}`)
+      .join('\n');
+    const introByTemplate = {
+      oferta: 'Separei algumas ofertas especialmente para você aproveitar na sua loja:',
+      reativacao: 'Faz tempo que não vejo esses itens no seu pedido e separei uma oportunidade para repor com boa saída:',
+      fechamento: 'Estou fechando os pedidos de hoje e deixei estes itens separados para você analisar:'
+    };
+    const ctaByTemplate = {
+      oferta: 'Posso separar uma sugestão de pedido com esses itens para você analisar?',
+      reativacao: 'Quer que eu monte uma sugestão de reposição com esses produtos?',
+      fechamento: 'Me confirma o que posso reservar para você antes de fechar?'
+    };
+
+    return [
+      `${greeting}, ${name}. Tudo bem?`,
+      introByTemplate[template] || introByTemplate.oferta,
+      missingLines || '- Produtos em oferta selecionados para sua loja',
+      ctaByTemplate[template] || ctaByTemplate.oferta
+    ].join('\n\n');
+  };
+
+  const handleCopyClientMessage = async (e, client, meta) => {
+    e.stopPropagation();
+    const message = buildClientMessage(client, meta);
+    try {
+      await navigator.clipboard.writeText(message);
+      toast.success('Mensagem copiada');
+    } catch {
+      toast.warning('Não consegui copiar automaticamente. Tente pelo WhatsApp.');
+    }
+  };
+
+  const handleOpenClientWhatsApp = (e, client, meta) => {
+    e.stopPropagation();
+    const missingProducts = getMissingProducts(meta);
+    setMessageComposer({
+      client,
+      meta,
+      template: 'oferta',
+      prices: {},
+      message: buildClientMessage(client, meta, 'oferta', {}),
+      products: missingProducts
+    });
+  };
+
+  const updateComposerMessage = (nextComposer) => ({
+    ...nextComposer,
+    message: buildClientMessage(nextComposer.client, nextComposer.meta, nextComposer.template, nextComposer.prices)
+  });
+
+  const handleComposerTemplateChange = (template) => {
+    setMessageComposer(current => current ? updateComposerMessage({ ...current, template }) : current);
+  };
+
+  const handleComposerPriceChange = (product, value) => {
+    setMessageComposer(current => {
+      if (!current) return current;
+      const prices = { ...current.prices, [product]: value };
+      return updateComposerMessage({ ...current, prices });
+    });
+  };
+
+  const handleComposerTextChange = (value) => {
+    setMessageComposer(current => current ? { ...current, message: value } : current);
+  };
+
+  const handleCopyComposerMessage = async () => {
+    if (!messageComposer) return;
+    try {
+      await navigator.clipboard.writeText(messageComposer.message);
+      toast.success('Mensagem copiada');
+    } catch {
+      toast.warning('Não consegui copiar automaticamente.');
+    }
+  };
+
+  const handleSendComposerWhatsApp = () => {
+    if (!messageComposer) return;
+    const client = messageComposer.client;
+    const meta = messageComposer.meta;
+    const phoneDigits = meta?.phoneDigits || String(client.TELEFONE || '').replace(/\D/g, '');
+    if (phoneDigits.length < 10) {
+      toast.warning('Cliente sem telefone válido');
+      return;
+    }
+    const phone = phoneDigits.startsWith('55') ? phoneDigits : `55${phoneDigits}`;
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(messageComposer.message)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setMessageComposer(null);
+  };
+
   const handleToggleClientCard = (e, clientId) => {
     e.stopPropagation();
     setExpandedClientId(prevId => (prevId === clientId ? null : clientId));
   };
+
+  useEffect(() => {
+    setSelectedNeighborhood('all');
+  }, [selectedCity]);
+
+  useEffect(() => {
+    if (!showCampaignSelector) return;
+    const timer = setTimeout(() => {
+      campaignSelectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [showCampaignSelector]);
 
   const campaignClients = useMemo(() => {
     if (!selectedCampaign) return [];
@@ -199,13 +511,36 @@ const Dashboard = () => {
   }, [selectedCampaign, clients]);
 
   const cities = ['all', ...new Set(campaignClients.map(c => c.CIDADE).filter(Boolean))];
+  const cityFilteredClients = selectedCity === 'all'
+    ? campaignClients
+    : campaignClients.filter(client => client.CIDADE === selectedCity);
+  const neighborhoods = ['all', ...new Set(cityFilteredClients.map(c => c.BAIRRO).filter(Boolean))];
   const filteredClients = campaignClients.filter(client => {
     const matchesCity = selectedCity === 'all' || client.CIDADE === selectedCity;
+    const matchesNeighborhood = selectedNeighborhood === 'all' || client.BAIRRO === selectedNeighborhood;
+    const clientName = getClientDisplayName(client);
+    const meta = getClientActionMeta(client);
+    const matchesStatus =
+      selectedActionStatus === 'all' ||
+      meta.status === selectedActionStatus ||
+      (selectedActionStatus === 'priority' && meta.priority === 'high');
     const matchesSearch = !searchTerm ||
-      client.CLIENTE?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.CNPJ?.includes(searchTerm);
-    return matchesCity && matchesSearch;
+    return matchesCity && matchesNeighborhood && matchesStatus && matchesSearch;
   });
+
+  const actionStats = campaignClients.reduce((acc, client) => {
+    const matchesCity = selectedCity === 'all' || client.CIDADE === selectedCity;
+    const matchesNeighborhood = selectedNeighborhood === 'all' || client.BAIRRO === selectedNeighborhood;
+    if (!matchesCity || !matchesNeighborhood) return acc;
+    const meta = getClientActionMeta(client);
+    acc.total++;
+    acc[meta.status] = (acc[meta.status] || 0) + 1;
+    if (meta.priority === 'high') acc.priority++;
+    acc.missingProducts += meta.missingCount;
+    return acc;
+  }, { total: 0, empty: 0, partial: 0, complete: 0, priority: 0, missingProducts: 0 });
 
   // ============================================
   // RENDER: TELA PRINCIPAL (LISTA DE CAMPANHAS)
@@ -290,13 +625,7 @@ const Dashboard = () => {
                 <div className="tool-card-title">Carteira no WhatsApp</div>
                 <div className="tool-card-desc">Monte sua oferta uma vez e envie para todos os seus clientes pelo WhatsApp Web, com mensagens personalizadas, fotos dos produtos ou link de venda. Menos copia e cola, mais clientes avisados e mais tempo para vender.</div>
               </div>
-              <div className="tool-card" onClick={() => {
-                if (campaigns.length > 0) {
-                  setSelectedCampaignId(campaigns[0].id);
-                } else {
-                  setShowCreateCampaign(true);
-                }
-              }}>
+              <div className="tool-card" onClick={handleOpenCampaignSelector}>
                 <div className="tool-card-icon"><BarChart3 size={32} /></div>
                 <div className="tool-card-badge live">Disponível</div>
                 <div className="tool-card-title">Raio-X dos Incentivos</div>
@@ -310,6 +639,56 @@ const Dashboard = () => {
               </div>
             </div>
           </section>
+
+          {showCampaignSelector && (
+            <section className="campaign-selector-panel" ref={campaignSelectorRef}>
+              <div className="campaign-selector-header">
+                <div>
+                  <span>Raio-X da campanha</span>
+                  <h2>Escolha qual incentivo deseja acompanhar</h2>
+                  <p>Selecione uma campanha cadastrada ou crie uma nova para começar outro período.</p>
+                </div>
+                <button type="button" className="btn-new-campaign" onClick={handleOpenNewCampaign}>
+                  <Plus size={16} /> Nova campanha
+                </button>
+              </div>
+
+              <div className="campaign-selector-grid">
+                {campaigns.map(campaign => {
+                  const startDate = campaign.startDate ? new Date(campaign.startDate).toLocaleDateString('pt-BR') : '--';
+                  const endDate = campaign.endDate ? new Date(campaign.endDate).toLocaleDateString('pt-BR') : '--';
+                  const industryCount = Object.keys(campaign.industries || {}).length;
+                  const linkedClientCount = clients.filter(client =>
+                    client.campaignId === campaign.id || (campaign.clientIds || []).includes(client.id)
+                  ).length;
+
+                  return (
+                    <button
+                      key={campaign.id}
+                      type="button"
+                      className="campaign-selector-card"
+                      onClick={() => setSelectedCampaignId(campaign.id)}
+                    >
+                      <div className="campaign-selector-card-top">
+                        <span className={`campaign-selector-status ${campaign.status === 'inactive' ? 'inactive' : 'active'}`}>
+                          {campaign.status === 'inactive' ? 'Encerrada' : 'Ativa'}
+                        </span>
+                        <strong>{campaign.name}</strong>
+                      </div>
+                      <div className="campaign-selector-card-meta">
+                        <span>{startDate} - {endDate}</span>
+                        <span>{industryCount} indústria{industryCount !== 1 ? 's' : ''}</span>
+                        <span>{linkedClientCount} cliente{linkedClientCount !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div className="campaign-selector-card-action">
+                        Abrir Raio-X
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
         </main>
       </div>
     );
@@ -338,7 +717,24 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="campaign-view-actions">
+              <button className="btn-campaign-action primary" onClick={handleOpenNewCampaign}>
+                <Plus size={16} /> Nova campanha
+              </button>
+              <button className="btn-campaign-action secondary" onClick={handleDuplicateCampaign}>
+                <Copy size={16} /> Duplicar
+              </button>
+              {selectedCampaign.status !== 'inactive' && (
+                <button className="btn-campaign-action secondary" onClick={handleCloseCampaign}>
+                  Encerrar
+                </button>
+              )}
               <button className="btn-edit-campaign" onClick={(e) => handleEditCampaign(e, selectedCampaign)}>✏️ Editar</button>
+              <button className="btn-campaign-action warning" onClick={handleResetCampaignProgress}>
+                <RotateCcw size={16} /> Zerar vendas
+              </button>
+              <button className="btn-campaign-action danger" onClick={(e) => handleDeleteCampaign(e, selectedCampaign.id)}>
+                <Trash2 size={16} /> Excluir
+              </button>
               <button className="btn-whatsapp" onClick={handleWhatsAppSupport}>💬 Suporte</button>
               <button className="btn-logout" onClick={handleLogout}>Sair</button>
             </div>
@@ -366,7 +762,42 @@ const Dashboard = () => {
                     {cities.filter(c => c !== 'all').map(city => (<option key={city} value={city}>{city}</option>))}
                   </select>
                 </div>
+                <div className="filter-group">
+                  <select value={selectedNeighborhood} onChange={(e) => setSelectedNeighborhood(e.target.value)}>
+                    <option value="all">Todos os Bairros</option>
+                    {neighborhoods.filter(b => b !== 'all').map(neighborhood => (
+                      <option key={neighborhood} value={neighborhood}>{neighborhood}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="filter-group">
+                  <select value={selectedActionStatus} onChange={(e) => setSelectedActionStatus(e.target.value)}>
+                    <option value="all">Todos os status</option>
+                    <option value="priority">Alta prioridade</option>
+                    <option value="empty">Sem venda ainda</option>
+                    <option value="partial">Venda parcial</option>
+                    <option value="complete">100% positivado</option>
+                  </select>
+                </div>
                 <button className="btn-action teal" onClick={() => setShowCreateClient(true)}>+ Novo Cliente</button>
+              </div>
+
+              <div className="clients-action-summary">
+                <div className="summary-main">
+                  <span>Resumo do dia</span>
+                  <strong>
+                    Foque em {actionStats.priority || actionStats.partial || actionStats.empty} cliente{(actionStats.priority || actionStats.partial || actionStats.empty) !== 1 ? 's' : ''} de maior chance.
+                  </strong>
+                  <p>
+                    {selectedCity === 'all' ? 'Todas as cidades' : selectedCity}
+                    {selectedNeighborhood !== 'all' ? ` / ${selectedNeighborhood}` : ''}: {actionStats.empty} sem venda, {actionStats.partial} parciais, {actionStats.complete} completos.
+                  </p>
+                </div>
+                <div className="summary-kpis">
+                  <div><strong>{actionStats.priority}</strong><span>prioridade alta</span></div>
+                  <div><strong>{actionStats.missingProducts}</strong><span>itens faltando</span></div>
+                  <div><strong>{filteredClients.length}</strong><span>no filtro atual</span></div>
+                </div>
               </div>
 
               {clientsLoading ? (
@@ -389,6 +820,7 @@ const Dashboard = () => {
               ) : (
                 <div className="clients-grid">
                   {filteredClients.map(client => {
+                    const clientDisplayName = getClientDisplayName(client);
                     const clientIndustries = client.industries || {};
                     const totalClientValue = Object.values(clientIndustries).reduce((acc, industry) =>
                       acc + Object.values(industry).reduce((sum, p) => sum + (p.valor || 0), 0)
@@ -396,24 +828,9 @@ const Dashboard = () => {
 
                     const isExpanded = expandedClientId === client.id;
                     const totalIndustriesCount = Object.keys(selectedCampaign.industries || {}).length;
-
-                    let clientProductsTotalCampaign = 0;
-                    let clientPositivated = 0;
-                    if (client.industries) {
-                      Object.keys(selectedCampaign.industries || {}).forEach(industryName => {
-                        const clientIndustryProducts = client.industries?.[industryName] || {};
-                        const campaignProducts = selectedCampaign.industries[industryName] || {};
-                        const total = Object.keys(campaignProducts).filter(p => p !== 'targetValue').length;
-                        clientProductsTotalCampaign += total;
-                        Object.keys(campaignProducts).filter(p => p !== 'targetValue').forEach(productName => {
-                          const productData = clientIndustryProducts[productName];
-                          if (productData?.positivado) {
-                            clientPositivated++;
-                          }
-                        });
-                      });
-                    }
-                    const isComplete = clientProductsTotalCampaign > 0 && clientPositivated === clientProductsTotalCampaign;
+                    const actionMeta = getClientActionMeta(client);
+                    const industrySummaries = actionMeta.industrySummaries;
+                    const isComplete = actionMeta.status === 'complete';
 
                     return (
                       <div key={client.id} className="client-card">
@@ -421,19 +838,38 @@ const Dashboard = () => {
                           <div className="client-header">
                             <div className="client-title-section">
                               <h3>
-                                {client.CLIENTE}
+                                {clientDisplayName}
                                 {isComplete && <span className="icon-complete" title="Cliente 100% completo!">🏆</span>}
                               </h3>
                               <p>{client.CIDADE} - {client.ESTADO}</p>
+                              {client.BAIRRO && <p className="client-neighborhood">{client.BAIRRO}</p>}
                             </div>
                             <div className="client-actions-btns">
                               <button className="btn-icon btn-edit" onClick={(e) => handleOpenEditInfo(e, client)} title="Editar">✏️</button>
                               <button className="btn-icon btn-delete" onClick={(e) => handleDeleteClient(e, client.id)} title="Deletar">🗑️</button>
                             </div>
                           </div>
+                          <div className={`client-priority-badge ${actionMeta.priority}`}>
+                            {getPriorityLabel(actionMeta.priority)}
+                          </div>
                           <div className="client-info-grid">
                             <div className="client-info-item"><strong>CNPJ</strong><span>{client.CNPJ}</span></div>
+                            <div className="client-info-item"><strong>CONTATO</strong><span>{client.CONTATO || '--'}</span></div>
                             <div className="client-info-item"><strong>TELEFONE</strong><span>{client.TELEFONE || '--'}</span></div>
+                          </div>
+                          <div className="client-industry-summary">
+                            {industrySummaries.map(industry => (
+                              <button
+                                key={industry.name}
+                                type="button"
+                                className={`client-industry-pill ${industry.sold === industry.total && industry.total > 0 ? 'complete' : industry.sold > 0 ? 'partial' : 'empty'}`}
+                                onClick={(e) => handleOpenEditProducts(e, client)}
+                                title={industry.missingProducts.length > 0 ? `Faltam: ${industry.missingProducts.join(', ')}` : 'Industria completa'}
+                              >
+                                <span>{industry.name}</span>
+                                <strong>{industry.sold}/{industry.total}</strong>
+                              </button>
+                            ))}
                           </div>
                         </div>
 
@@ -442,19 +878,29 @@ const Dashboard = () => {
                             <>
                               <div className="client-industries">
                                 {Object.keys(selectedCampaign.industries || {}).map(industryName => {
-                                  const clientIndustryData = client.industries?.[industryName] || {};
-                                  const campaignProducts = selectedCampaign.industries[industryName] || {};
-                                  const totalValue = Object.values(clientIndustryData).reduce((sum, p) => sum + (p.valor || 0), 0);
-                                  const positivated = Object.values(clientIndustryData).filter(p => p.positivado).length;
-                                  const total = Object.keys(campaignProducts).filter(p => p !== 'targetValue').length;
-                                  const percentage = total > 0 ? (positivated / total) * 100 : 0;
+                                  const industry = industrySummaries.find(item => item.name === industryName);
+                                  if (!industry) return null;
                                   return (
                                     <div key={industryName} className="industry-section" onClick={(e) => handleOpenEditProducts(e, client)} style={{ cursor: 'pointer' }}>
                                       <strong className="industry-name">🏭 {industryName}</strong>
-                                      <div className="progress-bar"><div className="progress-fill" style={{ width: `${percentage}%` }} /></div>
+                                      <div className="progress-bar"><div className="progress-fill" style={{ width: `${industry.percentage}%` }} /></div>
                                       <div className="industry-total">
-                                        <span>{positivated}/{total} produtos</span>
-                                        <span>{formatCurrency(totalValue)}</span>
+                                        <span>{industry.sold}/{industry.total} produtos</span>
+                                        <span>{formatCurrency(industry.totalValue)}</span>
+                                      </div>
+                                      <div className="industry-products-status">
+                                        {industry.soldProducts.length > 0 && (
+                                          <div>
+                                            <strong>Vendido</strong>
+                                            <span>{industry.soldProducts.join(', ')}</span>
+                                          </div>
+                                        )}
+                                        {industry.missingProducts.length > 0 && (
+                                          <div>
+                                            <strong>Falta</strong>
+                                            <span>{industry.missingProducts.join(', ')}</span>
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   );
@@ -465,6 +911,16 @@ const Dashboard = () => {
                                 <span>{formatCurrency(totalClientValue)}</span>
                               </div>
                             </>
+                          )}
+                          {!isComplete && (
+                            <div className="client-message-actions">
+                              <button type="button" onClick={(e) => handleCopyClientMessage(e, client, actionMeta)}>
+                                Copiar mensagem
+                              </button>
+                              <button type="button" className="whatsapp" onClick={(e) => handleOpenClientWhatsApp(e, client, actionMeta)}>
+                                Preparar WhatsApp
+                              </button>
+                            </div>
                           )}
                           <button
                             type="button"
@@ -533,6 +989,80 @@ const Dashboard = () => {
           client={selectedClient}
           campaign={selectedCampaign}
         />
+      )}
+
+      {messageComposer && (
+        <div className="message-composer-overlay" onClick={() => setMessageComposer(null)}>
+          <div className="message-composer-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="message-composer-header">
+              <div>
+                <span>Mensagem para WhatsApp</span>
+                <h3>{getClientDisplayName(messageComposer.client)}</h3>
+                <p>Preencha os preços, revise o texto e envie quando estiver pronto.</p>
+              </div>
+              <button type="button" onClick={() => setMessageComposer(null)}>×</button>
+            </div>
+
+            <div className="message-template-tabs">
+              <button
+                type="button"
+                className={messageComposer.template === 'oferta' ? 'active' : ''}
+                onClick={() => handleComposerTemplateChange('oferta')}
+              >
+                Oferta rápida
+              </button>
+              <button
+                type="button"
+                className={messageComposer.template === 'reativacao' ? 'active' : ''}
+                onClick={() => handleComposerTemplateChange('reativacao')}
+              >
+                Reativar cliente
+              </button>
+              <button
+                type="button"
+                className={messageComposer.template === 'fechamento' ? 'active' : ''}
+                onClick={() => handleComposerTemplateChange('fechamento')}
+              >
+                Fechamento do dia
+              </button>
+            </div>
+
+            {messageComposer.products.length > 0 && (
+              <div className="message-price-grid">
+                {messageComposer.products.map(product => (
+                  <label key={product}>
+                    <span>{product}</span>
+                    <input
+                      type="text"
+                      value={messageComposer.prices[product] || ''}
+                      onChange={(e) => handleComposerPriceChange(product, e.target.value)}
+                      placeholder="Ex: 7,99"
+                    />
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <textarea
+              className="message-composer-textarea"
+              value={messageComposer.message}
+              onChange={(e) => handleComposerTextChange(e.target.value)}
+              rows={11}
+            />
+
+            <div className="message-composer-footer">
+              <button type="button" className="btn-cancel-message" onClick={() => setMessageComposer(null)}>
+                Cancelar
+              </button>
+              <button type="button" className="btn-copy-message" onClick={handleCopyComposerMessage}>
+                <Copy size={16} /> Copiar
+              </button>
+              <button type="button" className="btn-send-message" onClick={handleSendComposerWhatsApp}>
+                <MessageCircle size={16} /> Abrir WhatsApp
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <ConfirmDialog

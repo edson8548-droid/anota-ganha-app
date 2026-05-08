@@ -4,26 +4,19 @@ import "./index.css";
 import App from './App';
 import { Toaster } from "sonner";
 
-// ============================================
-// ⭐️ CORREÇÃO APLICADA ⭐️
-// O Service Worker foi desativado para desenvolvimento em localhost
-// para corrigir o bug de "Internal storage".
-// ============================================
-/*
-// Registrar Service Worker para PWA
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
-      .then((registration) => {
-        console.log('✅ PWA: Service Worker registrado!', registration.scope);
-      })
-      .catch((error) => {
-        console.log('❌ PWA: Erro ao registrar Service Worker:', error);
-      });
+  window.addEventListener('load', async () => {
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map(registration => registration.unregister()));
+      if (registrations.length) {
+        console.info(`[SW] ${registrations.length} service worker antigo removido.`);
+      }
+    } catch (error) {
+      console.warn('[SW] Não foi possível remover service worker antigo.', error);
+    }
   });
 }
-*/
-// ============================================
 
 ReactDOM.render(
   <React.StrictMode>

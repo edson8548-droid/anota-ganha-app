@@ -3,9 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Store, Plus, X, Image, Search } from 'lucide-react';
 import { vitrineService } from '../services/vitrine.service';
+import { backendUrl } from '../config/api';
 import './Vitrine.css';
 
-const API_URL = 'https://api.venpro.com.br';
 const UNIDADES = ['UN', 'CX', 'FD', 'PC', 'PCT', 'KG', 'L', 'ML', 'G', 'FRD', 'BAG'];
 
 const toNumber = (value) => {
@@ -34,7 +34,7 @@ const buildItemPayload = (it, sortOrder) => {
 function imgUrl(path) {
   if (!path) return null;
   if (path.startsWith('http')) return path;
-  return `${API_URL}${path}`;
+  return backendUrl(path);
 }
 
 export default function VitrineEditar() {

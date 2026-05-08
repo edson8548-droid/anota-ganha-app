@@ -7,9 +7,11 @@ import * as XLSX from 'xlsx';
 import './Analytics.css';
 
 
+const INDUSTRY_META_FIELDS = ['targetValue', 'alreadySoldValue'];
 
 const Analytics = ({ campaign, clients, onClose }) => {
   const [selectedCity, setSelectedCity] = useState('todas');
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState('todos');
 
   // Estados dos filtros
   const [selectedIndustries, setSelectedIndustries] = useState({});
@@ -21,11 +23,15 @@ const Analytics = ({ campaign, clients, onClose }) => {
     if (!campaign || !clients) return null;
 
     const campaignClients = clients; 
-    const filteredClients = selectedCity === 'todas' 
-      ? campaignClients 
+    const cityFilteredClients = selectedCity === 'todas'
+      ? campaignClients
       : campaignClients.filter(c => c.CIDADE === selectedCity);
+    const filteredClients = selectedNeighborhood === 'todos'
+      ? cityFilteredClients
+      : cityFilteredClients.filter(c => c.BAIRRO === selectedNeighborhood);
 
     const cities = [...new Set(campaignClients.map(c => c.CIDADE).filter(Boolean))];
+    const neighborhoods = [...new Set(cityFilteredClients.map(c => c.BAIRRO).filter(Boolean))];
 
     let totalProducts = 0;
     const industriesData = {};
@@ -33,7 +39,8 @@ const Analytics = ({ campaign, clients, onClose }) => {
     
     if (campaign.industries) {
       Object.keys(campaign.industries).forEach(industryName => {
-        const products = Object.keys(campaign.industries[industryName]).filter(p => p !== 'targetValue');
+        const industryConfig = campaign.industries[industryName] || {};
+        const products = Object.keys(industryConfig).filter(p => !INDUSTRY_META_FIELDS.includes(p));
         if (products.length === 0) return;
         totalProducts += products.length;
         industryNames.push(industryName);
@@ -43,6 +50,8 @@ const Analytics = ({ campaign, clients, onClose }) => {
           totalProducts: products.length,
           positivatedClients: 0,
           totalValue: 0,
+          targetValue: parseFloat(industryConfig.targetValue) || 0,
+          alreadySoldValue: parseFloat(industryConfig.alreadySoldValue) || 0,
           productsPositivated: {}
         };
         products.forEach(p => {
@@ -62,40 +71,47 @@ const Analytics = ({ campaign, clients, onClose }) => {
       let clientValue = 0;
       const missingProducts = {};
       const industryCompletion = {}; 
+      const industryProgress = {};
 
-      if (client.industries) {
-        Object.keys(industriesData).forEach(industryName => {
-          const clientIndustryProducts = client.industries?.[industryName] || {};
-          const campaignProducts = industriesData[industryName].products;
-          const totalProductsInIndustry = campaignProducts.length;
-          
-          clientProductsTotalCampaign += totalProductsInIndustry;
-          let positivadosInIndustry = 0;
-          let industryPositivated = false;
-          missingProducts[industryName] = [];
+      Object.keys(industriesData).forEach(industryName => {
+        const clientIndustryProducts = client.industries?.[industryName] || {};
+        const campaignProducts = industriesData[industryName].products;
+        const totalProductsInIndustry = campaignProducts.length;
+        
+        clientProductsTotalCampaign += totalProductsInIndustry;
+        let positivadosInIndustry = 0;
+        let industryPositivated = false;
+        missingProducts[industryName] = [];
 
-          campaignProducts.forEach(productName => {
-            const productData = clientIndustryProducts[productName];
-            if (productData?.positivado) {
-              clientPositivated++; // Incrementa o local
-              positivadosInIndustry++;
-              industryPositivated = true;
-              const value = productData.valor || 0;
-              clientValue += value;
-              totalValue += value;
-              industriesData[industryName].totalValue += value;
-              industriesData[industryName].productsPositivated[productName]++;
-            } else {
-              missingProducts[industryName].push(productName);
-            }
-          });
-          
-          if (industryPositivated) {
-            industriesData[industryName].positivatedClients++;
+        campaignProducts.forEach(productName => {
+          const productData = clientIndustryProducts[productName];
+          if (productData?.positivado) {
+            clientPositivated++; // Incrementa o local
+            positivadosInIndustry++;
+            industryPositivated = true;
+            const value = productData.valor || 0;
+            clientValue += value;
+            totalValue += value;
+            industriesData[industryName].totalValue += value;
+            industriesData[industryName].productsPositivated[productName]++;
+          } else {
+            missingProducts[industryName].push(productName);
           }
-          industryCompletion[industryName] = (totalProductsInIndustry > 0 && positivadosInIndustry === totalProductsInIndustry);
         });
-      }
+        
+        if (industryPositivated) {
+          industriesData[industryName].positivatedClients++;
+        }
+        industryCompletion[industryName] = (totalProductsInIndustry > 0 && positivadosInIndustry === totalProductsInIndustry);
+        industryProgress[industryName] = {
+          positivated: positivadosInIndustry,
+          total: totalProductsInIndustry,
+          value: campaignProducts.reduce((sum, productName) => {
+            const productData = clientIndustryProducts[productName];
+            return sum + (productData?.positivado ? (parseFloat(productData.valor) || 0) : 0);
+          }, 0)
+        };
+      });
 
       // ⭐️⭐️⭐️ A CORREÇÃO DO BUG ESTÁ AQUI ⭐️⭐️⭐️
       // (Soma o total do cliente ao total global)
@@ -110,10 +126,11 @@ const Analytics = ({ campaign, clients, onClose }) => {
 
       clientsAnalysis.push({
         id: client.id, name: client.CLIENTE, city: client.CIDADE,
-        cnpj: client.CNPJ, totalProducts: clientProductsTotalCampaign,
+        neighborhood: client.BAIRRO, cnpj: client.CNPJ, totalProducts: clientProductsTotalCampaign,
         positivated: clientPositivated, percentage: percentage,
         value: clientValue, missingProducts: missingProducts,
-        isComplete: isComplete, industryCompletion: industryCompletion
+        isComplete: isComplete, industryCompletion: industryCompletion,
+        industryProgress: industryProgress
       });
     });
 
@@ -138,6 +155,20 @@ const Analytics = ({ campaign, clients, onClose }) => {
     });
     topProducts.sort((a, b) => b.count - a.count);
     const topClients = [...clientsAnalysis].sort((a, b) => b.value - a.value).slice(0, 10);
+    const goalData = Object.values(industriesData).map(industry => {
+      const totalSold = industry.alreadySoldValue + industry.totalValue;
+      const remaining = Math.max(industry.targetValue - totalSold, 0);
+      const percentage = industry.targetValue > 0 ? Math.min((totalSold / industry.targetValue) * 100, 100) : 0;
+      return {
+        name: industry.name,
+        targetValue: industry.targetValue,
+        alreadySoldValue: industry.alreadySoldValue,
+        venproValue: industry.totalValue,
+        totalSold,
+        remaining,
+        percentage
+      };
+    }).filter(industry => industry.targetValue > 0);
 
     return {
       totalClients: filteredClients.length, totalProducts, totalPositivated,
@@ -146,9 +177,13 @@ const Analytics = ({ campaign, clients, onClose }) => {
       industriesData: Object.values(industriesData),
       industryNames,
       clientsAnalysis, pieDataGeneral, pieDataCities, barDataProducts,
-      topProducts: topProducts.slice(0, 10), topClients, cities,
+      topProducts: topProducts.slice(0, 10), topClients, cities, neighborhoods, goalData,
     };
-  }, [campaign, clients, selectedCity]);
+  }, [campaign, clients, selectedCity, selectedNeighborhood]);
+
+  useEffect(() => {
+    setSelectedNeighborhood('todos');
+  }, [selectedCity]);
 
   // Inicializar checkboxes
   useEffect(() => {
@@ -179,6 +214,53 @@ const Analytics = ({ campaign, clients, onClose }) => {
   };
 
   const numSelectedIndustries = Object.values(selectedIndustries).filter(Boolean).length;
+  const activeIndustryNames = useMemo(() => {
+    if (!analytics) return [];
+    const selected = analytics.industryNames.filter(name => selectedIndustries[name]);
+    return selected.length > 0 ? selected : analytics.industryNames;
+  }, [analytics, selectedIndustries]);
+
+  const clientsToAttack = useMemo(() => {
+    if (!analytics) return { empty: [], partial: [], all: [] };
+
+    const mapped = analytics.clientsAnalysis.map(client => {
+      const total = activeIndustryNames.reduce((sum, industryName) => {
+        return sum + (client.industryProgress?.[industryName]?.total || 0);
+      }, 0);
+      const positivated = activeIndustryNames.reduce((sum, industryName) => {
+        return sum + (client.industryProgress?.[industryName]?.positivated || 0);
+      }, 0);
+      const missingByIndustry = {};
+      activeIndustryNames.forEach(industryName => {
+        const products = client.missingProducts?.[industryName] || [];
+        if (products.length > 0) missingByIndustry[industryName] = products;
+      });
+      const missingCount = Object.values(missingByIndustry).flat().length;
+      const percentage = total > 0 ? (positivated / total) * 100 : 0;
+
+      return {
+        ...client,
+        activeTotal: total,
+        activePositivated: positivated,
+        activeMissingCount: missingCount,
+        activePercentage: percentage,
+        activeMissingProducts: missingByIndustry,
+        actionStatus: positivated === 0 ? 'empty' : 'partial'
+      };
+    }).filter(client => client.activeTotal > 0 && client.activePositivated < client.activeTotal);
+
+    mapped.sort((a, b) => {
+      if (a.actionStatus !== b.actionStatus) return a.actionStatus === 'empty' ? -1 : 1;
+      if (a.activePercentage !== b.activePercentage) return a.activePercentage - b.activePercentage;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    return {
+      empty: mapped.filter(client => client.actionStatus === 'empty'),
+      partial: mapped.filter(client => client.actionStatus === 'partial'),
+      all: mapped
+    };
+  }, [analytics, activeIndustryNames]);
 
   // Lógica de filtragem da lista
   const filteredClientList = useMemo(() => {
@@ -218,11 +300,11 @@ const Analytics = ({ campaign, clients, onClose }) => {
     ];
 
     const clientesData = [
-      ['Cliente', 'Cidade', 'CNPJ', 'Positivados', 'Total Produtos', '% Conclusão', 'Valor (R$)', 'Status']
+      ['Cliente', 'Cidade', 'Bairro', 'CNPJ', 'Positivados', 'Total Produtos', '% Conclusão', 'Valor (R$)', 'Status']
     ];
     analytics.clientsAnalysis.forEach(c => {
       clientesData.push([
-        c.name, c.city || '', c.cnpj || '',
+        c.name, c.city || '', c.neighborhood || '', c.cnpj || '',
         c.positivated, c.totalProducts,
         parseFloat(c.percentage.toFixed(1)),
         parseFloat(c.value.toFixed(2)),
@@ -253,6 +335,10 @@ const Analytics = ({ campaign, clients, onClose }) => {
   }
 
   const COLORS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899'];
+  const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(value || 0);
 
   return (
     <>
@@ -262,7 +348,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
         <div className="analytics-header-left">
           <button className="btn-back-analytics" onClick={onClose} title="Voltar"><span>←</span></button>
           <div>
-            <h1 className="analytics-title">📊 Analytics & Relatórios</h1>
+            <h1 className="analytics-title">Raio-X da Campanha</h1>
             <p className="analytics-subtitle">{campaign.name}</p>
           </div>
         </div>
@@ -281,6 +367,15 @@ const Analytics = ({ campaign, clients, onClose }) => {
             {analytics.cities.map(city => (<option key={city} value={city}>{city}</option>))}
           </select>
         </div>
+        <div className="filter-group">
+          <label>Bairro:</label>
+          <select value={selectedNeighborhood} onChange={(e) => setSelectedNeighborhood(e.target.value)}>
+            <option value="todos">Todos os bairros</option>
+            {analytics.neighborhoods.map(neighborhood => (
+              <option key={neighborhood} value={neighborhood}>{neighborhood}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Métricas (mantidas) */}
@@ -288,8 +383,115 @@ const Analytics = ({ campaign, clients, onClose }) => {
         <div className="metric-card metric-purple"><div className="metric-icon">👥</div><div className="metric-content"><div className="metric-value">{analytics.totalClients}</div><div className="metric-label">Total de Clientes</div></div></div>
         <div className="metric-card metric-green"><div className="metric-icon">✅</div><div className="metric-content"><div className="metric-value">{analytics.totalPositivated}</div><div className="metric-label">Produtos Positivados</div></div></div>
         <div className="metric-card metric-blue"><div className="metric-icon">📈</div><div className="metric-content"><div className="metric-value">{analytics.positivationRate.toFixed(1)}%</div><div className="metric-label">Taxa de Positivação</div></div></div>
-        <div className="metric-card metric-orange"><div className="metric-icon">💰</div><div className="metric-content"><div className="metric-value">R$ {(analytics.totalValue / 1000).toFixed(1)}k</div><div className="metric-label">Valor Total</div></div></div>
+        <div className="metric-card metric-orange"><div className="metric-icon">💰</div><div className="metric-content"><div className="metric-value">R$ {(analytics.totalValue / 1000).toFixed(1)}k</div><div className="metric-label">Valor positivado</div></div></div>
         <div className="metric-card metric-gold"><div className="metric-icon">🏆</div><div className="metric-content"><div className="metric-value">{analytics.clientsWithAllProducts}</div><div className="metric-label">Clientes 100%</div></div></div>
+      </div>
+
+      {analytics.goalData.length > 0 && (
+        <div className="section-card goals-panel">
+          <div className="goals-panel-header">
+            <div>
+              <h3 className="section-title">Metas de incentivo</h3>
+              <p className="goals-panel-subtitle">
+                Some o que voce ja vendeu antes com o que foi positivado no VenPro para enxergar quanto falta vender.
+              </p>
+            </div>
+          </div>
+          <div className="goals-grid">
+            {analytics.goalData.map(industry => (
+              <div key={industry.name} className={`goal-card ${industry.remaining <= 0 ? 'complete' : ''}`}>
+                <div className="goal-card-header">
+                  <strong>{industry.name}</strong>
+                  <span>{industry.percentage.toFixed(0)}%</span>
+                </div>
+                <div className="goal-progress">
+                  <div className="goal-progress-fill" style={{ width: `${industry.percentage}%` }}></div>
+                </div>
+                <div className="goal-values">
+                  <div><span>Meta</span><strong>{formatCurrency(industry.targetValue)}</strong></div>
+                  <div><span>Ja vendido</span><strong>{formatCurrency(industry.alreadySoldValue)}</strong></div>
+                  <div><span>No VenPro</span><strong>{formatCurrency(industry.venproValue)}</strong></div>
+                  <div><span>Falta</span><strong>{formatCurrency(industry.remaining)}</strong></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="section-card action-panel">
+        <div className="action-panel-header">
+          <div>
+            <h3 className="section-title">Clientes para atacar agora</h3>
+            <p className="action-panel-subtitle">
+              {selectedCity === 'todas'
+                ? 'Todas as cidades'
+                : selectedCity}
+              {selectedNeighborhood !== 'todos' ? ` / ${selectedNeighborhood}` : ''} - mostrando quem ainda falta positivar nas industrias selecionadas.
+            </p>
+          </div>
+          <div className="action-summary">
+            <div><strong>{clientsToAttack.empty.length}</strong><span>sem venda</span></div>
+            <div><strong>{clientsToAttack.partial.length}</strong><span>parciais</span></div>
+            <div><strong>{clientsToAttack.all.length}</strong><span>pendentes</span></div>
+          </div>
+        </div>
+
+        {clientsToAttack.all.length === 0 ? (
+          <div className="action-empty">
+            Nenhum cliente pendente para os filtros atuais. Essa cidade/industria esta 100% positivada.
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="analytics-table action-table">
+              <thead>
+                <tr>
+                  <th>Prioridade</th>
+                  <th>Cliente</th>
+                  <th>Cidade</th>
+                  <th>Bairro</th>
+                  <th>Progresso</th>
+                  <th>Faltam</th>
+                  <th>Acao</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clientsToAttack.all.slice(0, 20).map(client => (
+                  <tr key={client.id}>
+                    <td>
+                      <span className={`action-status ${client.actionStatus}`}>
+                        {client.actionStatus === 'empty' ? 'Nao vendeu' : 'Vendeu parcial'}
+                      </span>
+                    </td>
+                    <td><strong>{client.name}</strong></td>
+                    <td>{client.city || '-'}</td>
+                    <td>{client.neighborhood || '-'}</td>
+                    <td>
+                      <div className="progress-bar-small">
+                        <div className="progress-fill-small" style={{ width: `${client.activePercentage}%` }}></div>
+                        <span>{client.activePositivated}/{client.activeTotal}</span>
+                      </div>
+                    </td>
+                    <td>{client.activeMissingCount} produto{client.activeMissingCount !== 1 ? 's' : ''}</td>
+                    <td>
+                      <button
+                        className="btn-view-missing"
+                        onClick={() => setMissingDialog({ name: client.name, products: client.activeMissingProducts })}
+                      >
+                        Ver faltantes
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {clientsToAttack.all.length > 20 && (
+              <div className="action-table-note">
+                Mostrando os 20 primeiros. Use o filtro de cidade/industria para focar a rota do dia.
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Gráficos (Gráfico de Barras Corrigido) */}
@@ -321,7 +523,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
 
       {/* Top 10 Produtos (mantido) */}
       <div className="section-card">
-        <h3 className="section-title">🏆 Top 10 Produtos Mais Vendidos</h3>
+        <h3 className="section-title">🏆 Produtos mais positivados</h3>
         <div className="top-products-grid">
           {analytics.topProducts.map((product, index) => (
             <div key={index} className="top-product-item">
@@ -335,16 +537,16 @@ const Analytics = ({ campaign, clients, onClose }) => {
       
       {/* Top 10 Clientes (mantido) */}
       <div className="section-card">
-        <h3 className="section-title">💎 Top 10 Clientes por Valor</h3>
+        <h3 className="section-title">💎 Clientes com maior valor positivado</h3>
         <div className="table-responsive"><table className="analytics-table">
-            <thead><tr><th>#</th><th>Cliente</th><th>Cidade</th><th>Positivados</th><th>%</th><th>Valor</th><th>Status</th></tr></thead>
+           <thead><tr><th>#</th><th>Cliente</th><th>Cidade</th><th>Positivados</th><th>%</th><th>Valor</th><th>Status</th></tr></thead>
             <tbody>
               {analytics.topClients.map((client, index) => (
                 <tr key={client.id}>
                   <td><strong>#{index + 1}</strong></td><td>{client.name}</td><td>{client.city}</td>
                   <td>{client.positivated}/{client.totalProducts}</td>
                   <td><div className="progress-bar-small"><div className="progress-fill-small" style={{ width: `${client.percentage}%` }}></div><span>{client.percentage.toFixed(0)}%</span></div></td>
-                  <td className="value-cell">R$ {client.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                  <td className="value-cell">{formatCurrency(client.value)}</td>
                   <td>{client.isComplete ? (<span className="badge-complete">✅ 100%</span>) : (<span className="badge-pending">⏳ Pendente</span>)}</td>
                 </tr>
               ))}
@@ -356,7 +558,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
       {/* ⭐️ SEÇÃO "TODOS OS CLIENTES" ATUALIZADA ⭐️ */}
       {/* ================================== */}
       <div className="section-card">
-        <h3 className="section-title">📋 Lista de Clientes (Filtrada)</h3>
+        <h3 className="section-title">📋 Lista completa da campanha</h3>
         
         {/* Filtros Multi-Select */}
         <div className="filter-section">
@@ -405,14 +607,14 @@ const Analytics = ({ campaign, clients, onClose }) => {
           <table className="analytics-table">
             <thead>
               <tr>
-                <th>Cliente</th><th>Cidade</th><th>CNPJ</th>
+                <th>Cliente</th><th>Cidade</th><th>Bairro</th><th>CNPJ</th>
                 <th>Produtos</th><th>Progresso</th><th>Valor</th><th>Faltam</th>
               </tr>
             </thead>
             <tbody>
               {filteredClientList.length === 0 ? (
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center' }}>Nenhum cliente encontrado para este filtro.</td>
+                  <td colSpan="8" style={{ textAlign: 'center' }}>Nenhum cliente encontrado para este filtro.</td>
                 </tr>
               ) : (
                 filteredClientList.map((client) => (
@@ -422,6 +624,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
                       {client.isComplete && <span className="icon-complete" title="Cliente 100% completo!">🏆</span>}
                     </td>
                     <td>{client.city}</td>
+                    <td>{client.neighborhood || '-'}</td>
                     <td><small>{client.cnpj}</small></td>
                     <td>{client.positivated}/{client.totalProducts}</td>
                     <td>
@@ -430,7 +633,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
                         <span>{client.percentage.toFixed(0)}%</span>
                       </div>
                     </td>
-                    <td className="value-cell">R$ {client.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                    <td className="value-cell">{formatCurrency(client.value)}</td>
                     <td>
                       {Object.keys(client.missingProducts).length > 0 ? (
                         <button
@@ -454,7 +657,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
       {/* Produtos Faltantes (mantido) */}
       {analytics.industriesData.map(industry => (
         <div key={industry.name} className="section-card">
-          <h3 className="section-title">🏭 {industry.name} - Produtos Faltantes</h3>
+          <h3 className="section-title">🏭 {industry.name} - O que ainda falta vender</h3>
           <div className="products-missing-grid">
             {industry.products.map(productName => {
               const positivatedCount = industry.productsPositivated[productName];

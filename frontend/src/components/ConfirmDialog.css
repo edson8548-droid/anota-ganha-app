@@ -3,7 +3,7 @@
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
-  z-index: 1000;
+  z-index: 10000;
   animation: cd-fade-in 0.15s ease;
 }
 
@@ -12,7 +12,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 1001;
+  z-index: 10001;
   background: #363940;
   border: 1px solid #4A4D52;
   border-radius: 16px;

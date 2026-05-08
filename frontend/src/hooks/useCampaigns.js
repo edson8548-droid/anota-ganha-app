@@ -17,6 +17,8 @@ import {
 } from 'firebase/firestore';
 import { useAuthContext } from '../contexts/AuthContext'; // ✅ useAuthContext
 
+const INDUSTRY_META_FIELDS = ['targetValue', 'alreadySoldValue'];
+
 export const useCampaigns = () => {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -139,7 +141,9 @@ export const useCampaigns = () => {
           Object.keys(campaignData.industries).forEach(industryName => {
             newIndustries[industryName] = {};
             
-            Object.keys(campaignData.industries[industryName]).forEach(productName => {
+            Object.keys(campaignData.industries[industryName])
+              .filter(productName => !INDUSTRY_META_FIELDS.includes(productName))
+              .forEach(productName => {
               newIndustries[industryName][productName] = {
                 positivado: false,
                 valor: 0
@@ -151,6 +155,7 @@ export const useCampaigns = () => {
         const newClientData = {
           CNPJ: client.CNPJ,
           CLIENTE: client.CLIENTE,
+          CONTATO: client.CONTATO || '',
           CIDADE: client.CIDADE,
           ESTADO: client.ESTADO,
           ENDERECO: client.ENDERECO || '',
@@ -257,7 +262,8 @@ export const useCampaigns = () => {
       // Deletar todos os clientes desta campanha
       const clientsQuery = query(
         collection(db, 'clients'),
-        where('campaignId', '==', campaignId)
+        where('campaignId', '==', campaignId),
+        where('userId', '==', userId)
       );
       
       const clientsSnapshot = await getDocs(clientsQuery);

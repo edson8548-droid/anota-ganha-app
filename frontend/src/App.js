@@ -1,9 +1,6 @@
-// SUBSTITUA COMPLETAMENTE: src/App.js
-// VERSÃO V2 - Adiciona a Rota de Admin protegida
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuthContext } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
 import { SubscriptionProvider } from './contexts/SubscriptionContext';
 
 // Páginas Normais
@@ -24,33 +21,7 @@ import Vitrine from './pages/Vitrine';
 import VitrineEditar from './pages/VitrineEditar';
 import VitrinePublica from './pages/VitrinePublica';
 
-// ⭐️ 1. IMPORTAR A NOVA PÁGINA DE ADMIN
-import AdminDashboard from './pages/AdminDashboard';
-
 import './App.css';
-
-// ⭐️ 2. CRIAR A ROTA PROTEGIDA PARA O ADMIN
-const AdminRoute = ({ children }) => {
-  const { user, loading } = useAuthContext();
-
-  if (loading) {
-    // Aguarda o 'useAuth' (v2) verificar se o utilizador é admin
-    return <div>Carregando verificação de admin...</div>; 
-  }
-
-  if (!user) {
-    // Se não está logado, volta ao login
-    return <Navigate to="/login" replace />;
-  }
-  
-  if (user.isAdmin === true) {
-    // Se está logado E é Admin, permite o acesso
-    return children;
-  }
-  
-  // Se está logado mas NÃO é Admin, volta ao dashboard normal
-  return <Navigate to="/dashboard" replace />;
-};
 
 function App() {
   return (
@@ -83,16 +54,8 @@ function App() {
             <Route path="/payment-success" element={<PaymentSuccess />} />
             <Route path="/payment-failure" element={<PaymentFailure />} />
             <Route path="/payment-pending" element={<PaymentFailure />} />
-            
-            {/* ⭐️ 3. ADICIONAR A ROTA DE ADMIN PROTEGIDA ⭐️ */}
-            <Route 
-              path="/admin" 
-              element={
-                <AdminRoute>
-                  <AdminDashboard />
-                </AdminRoute>
-              } 
-            />
+            {/* Admin frontend desativado: operações administrativas devem ficar no backend. */}
+            <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
             
             {/* Rota 404 */}
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -6,11 +6,8 @@ import { toast } from 'sonner';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
+import { apiUrl, MP_PUBLIC_KEY } from '../config/api';
 import './Checkout.css';
-
-// VARIÁVEIS DE PRODUÇÃO (Mantidas)
-const BACKEND_URL = "https://anota-ganha-app-production.up.railway.app";
-const MERCADOPAGO_PUBLIC_KEY = "APP_USR-5f6e941d-3514-489a-9241-d8a42099b2d0";
 
 
 // ⭐️ NOVA FUNÇÃO HELPER: Espera o SDK e obtém o Device ID ⭐️
@@ -84,7 +81,7 @@ const Checkout = () => {
     script.onload = () => {
       try {
         // Esta é a chave: 'mpInstance' é criada QUANDO o script carrega
-        window.mpInstance = new window.MercadoPago(MERCADOPAGO_PUBLIC_KEY, { locale: 'pt-BR' });
+        window.mpInstance = new window.MercadoPago(MP_PUBLIC_KEY, { locale: 'pt-BR' });
         console.log("✅ MP SDK (mpInstance) inicializado.");
       } catch (e) {
         console.error("Falha ao inicializar MP:", e);
@@ -119,9 +116,7 @@ const Checkout = () => {
       const deviceIdValue = await getDeviceIdFromSDK();
 
       // 2. CHAMAR O BACKEND DO RAILWAY
-      const apiUrl = `${BACKEND_URL}/api/mercadopago/create-preference`;
-      
-      const response = await fetch(apiUrl, {
+      const response = await fetch(apiUrl('/mercadopago/create-preference'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
