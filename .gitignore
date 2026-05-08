@@ -2,6 +2,11 @@
 __pycache__/
 *.pyc
 .env
+.env.production
+.env.local
+backend/.env
+backend/.env.production
+backend/.env.txt
 .DS_Store
 *.log
 build/
