@@ -120,21 +120,44 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
 rate_limit_enabled = os.environ.get("RATE_LIMIT_ENABLED", "true").lower() != "false"
 app.add_middleware(SimpleRateLimitMiddleware, enabled=rate_limit_enabled)
 
-# ==================== CORS (Correção Final) ====================
+def parse_cors_origins():
+    raw_origins = os.environ.get("CORS_ORIGINS", "").strip()
+    if raw_origins:
+        parsed = [origin.strip().rstrip("/") for origin in raw_origins.split(",") if origin.strip()]
+        if parsed:
+            logger.info("[CORS] Usando CORS_ORIGINS do ambiente com %s origem(ns)", len(parsed))
+            return parsed
 
-# ⭐️ URLs PERMITIDAS HARDCODED ⭐️
-origins = [
+    logger.info("[CORS] CORS_ORIGINS não configurado; usando fallback padrão")
+    return [
+        "https://venpro.com.br",
+        "https://www.venpro.com.br",
+        "https://anota-ganha-app.web.app",
+        "https://anota-ganha-app.firebaseapp.com",
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ]
+
+
+# ==================== CORS ====================
+origins = parse_cors_origins()
+
+logger.info("[CORS] Origens permitidas: %s", ", ".join(origins))
+
+# Origens esperadas para produção. Se faltar alguma, o log avisa antes de quebrar fluxo.
+expected_prod_origins = [
     "https://venpro.com.br",               # Domínio principal
     "https://www.venpro.com.br",           # Com www
     "https://anota-ganha-app.web.app",     # Firebase Hosting (backup)
     "https://anota-ganha-app.firebaseapp.com",
-    "http://localhost:3000",
-    "http://localhost:5173",
 ]
+for expected_origin in expected_prod_origins:
+    if expected_origin not in origins:
+        logger.warning("[CORS] Origem de produção ausente em CORS_ORIGINS: %s", expected_origin)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,                  # Usamos a lista de origens específica
+    allow_origins=origins,
     allow_credentials=True,                 
     allow_methods=["*"],
     allow_headers=["*"],
