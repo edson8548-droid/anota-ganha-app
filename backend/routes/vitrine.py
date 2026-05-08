@@ -11,7 +11,7 @@ import asyncio
 import logging
 import unicodedata
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, time
 from typing import List, Optional, Any
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
@@ -93,6 +93,61 @@ def doc_to_dict(doc: dict) -> dict:
         else:
             out[k] = v
     return out
+
+
+def _parse_public_expiration(value: Any) -> Optional[datetime]:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return None
+        try:
+            if re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
+                return datetime.combine(datetime.fromisoformat(raw).date(), time.max, tzinfo=timezone.utc)
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        except ValueError:
+            logger.warning(f"[vitrine_publica] expires_at inválido ignorado: {raw!r}")
+    return None
+
+
+def _public_offer_response(doc: dict) -> dict:
+    result = doc_to_dict(doc)
+    items_ativos = [i for i in result.get("items", []) if i.get("active", True)]
+
+    for item in items_ativos:
+        _normalizar_precos_vitrine_item(item)
+
+    items_ativos = sorted(items_ativos, key=lambda x: x.get("sort_order", 0))
+    item_fields = {
+        "id",
+        "product_name",
+        "category",
+        "price",
+        "unit",
+        "units_per_package",
+        "unit_price",
+        "image_url",
+    }
+
+    return {
+        "slug": result.get("slug"),
+        "title": result.get("title"),
+        "company_name": result.get("company_name"),
+        "company_logo_url": result.get("company_logo_url"),
+        "rca_name": result.get("rca_name"),
+        "rca_whatsapp": result.get("rca_whatsapp"),
+        "minimum_order_value": result.get("minimum_order_value"),
+        "expires_at": result.get("expires_at"),
+        "notes": result.get("notes"),
+        "items": [
+            {key: item.get(key) for key in item_fields if key in item}
+            for item in items_ativos
+        ],
+    }
 
 
 # ═══════════════════════════════════════
@@ -1073,17 +1128,15 @@ async def sugerir_imagens(product_name: str, uid: str = Depends(get_user_id)):
 
 @router.get("/publica/{slug}")
 async def pagina_publica(slug: str):
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{2,80}", slug):
+        raise HTTPException(404, "Vitrine não encontrada ou inativa")
+
     doc = await _db.vitrine_offers.find_one({"slug": slug, "status": "active"})
     if not doc:
         raise HTTPException(404, "Vitrine não encontrada ou inativa")
-    result = doc_to_dict(doc)
-    # Remover dados internos
-    result.pop("created_by", None)
-    # Filtrar apenas itens ativos e ordenar
-    items_ativos = [i for i in result.get("items", []) if i.get("active", True)]
 
-    for item in items_ativos:
-        _normalizar_precos_vitrine_item(item)
+    expires_at = _parse_public_expiration(doc.get("expires_at"))
+    if expires_at and datetime.now(timezone.utc) > expires_at:
+        raise HTTPException(410, "Vitrine expirada")
 
-    result["items"] = sorted(items_ativos, key=lambda x: x.get("sort_order", 0))
-    return result
+    return _public_offer_response(doc)
