@@ -9,6 +9,7 @@ import {
   updateDoc,
   deleteDoc,
   doc, 
+  getDoc,
   query, 
   where, 
   onSnapshot,
@@ -126,9 +127,17 @@ export const useClients = () => {
       }
 
       const clientRef = doc(db, 'clients', clientId);
+      const currentSnap = await getDoc(clientRef);
+      const currentData = currentSnap.exists() ? currentSnap.data() : {};
+      const protectedData = { ...updatedData };
+      ['CNPJ', 'CLIENTE', 'CONTATO', 'CIDADE', 'ESTADO', 'ENDERECO', 'BAIRRO', 'CEP', 'TELEFONE', 'EMAIL'].forEach(field => {
+        if (!String(protectedData[field] || '').trim() && currentData?.[field]) {
+          protectedData[field] = currentData[field];
+        }
+      });
       
       await updateDoc(clientRef, {
-        ...updatedData,
+        ...protectedData,
         updated_at: serverTimestamp()
       });
 

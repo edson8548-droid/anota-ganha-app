@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
+import { isValidCPF, onlyDigits } from '../utils/documentValidators';
 import './Register.css';
 
 // ⭐️ INÍCIO: Funções de Máscara (para formatar os campos) ⭐️
@@ -63,8 +64,8 @@ const Register = () => {
     if (!touched[field]) return null;
     switch (field) {
       case 'name': return !name.trim() ? 'Nome é obrigatório' : null;
-      case 'cpf': return cpf.replace(/\D/g, '').length !== 11 ? 'CPF inválido (11 dígitos)' : null;
-      case 'telefone': return telefone.replace(/\D/g, '').length < 10 ? 'Telefone inválido' : null;
+      case 'cpf': return !isValidCPF(cpf) ? 'CPF inválido' : null;
+      case 'telefone': return onlyDigits(telefone).length < 10 ? 'Telefone inválido' : null;
       case 'email': return !email.includes('@') || !email.includes('.') ? 'Email inválido' : null;
       case 'password': return password.length < 6 ? 'Mínimo 6 caracteres' : null;
       case 'confirmPassword': return confirmPassword !== password ? 'As senhas não coincidem' : null;
@@ -101,13 +102,13 @@ const Register = () => {
     }
     
     // ⭐️ Novas validações de CPF e Telefone
-    const cpfDigits = cpf.replace(/\D/g, '');
-    if (cpfDigits.length !== 11) {
-      setError('CPF inválido. Deve conter 11 dígitos.');
+    const cpfDigits = onlyDigits(cpf);
+    if (!isValidCPF(cpfDigits)) {
+      setError('CPF inválido. Verifique o número digitado.');
       return;
     }
     
-    const telDigits = telefone.replace(/\D/g, '');
+    const telDigits = onlyDigits(telefone);
     if (telDigits.length < 10 || telDigits.length > 11) {
       setError('Telefone inválido. Inclua o DDD (mínimo 10 dígitos).');
       return;
@@ -131,6 +132,12 @@ const Register = () => {
       console.error('Erro no registro:', err);
       
       switch (err.code) {
+        case 'auth/invalid-cpf':
+          setError('CPF inválido. Verifique o número digitado.');
+          break;
+        case 'auth/invalid-phone':
+          setError('Telefone inválido. Inclua o DDD.');
+          break;
         case 'auth/email-already-in-use':
           setError('Este email já está cadastrado');
           break;

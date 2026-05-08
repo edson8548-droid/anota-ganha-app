@@ -5,8 +5,7 @@ import { useAuthContext } from '../contexts/AuthContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { auth } from '../firebase/config';
 import ConfirmDialog from '../components/ConfirmDialog';
-
-const API_URL = 'https://api.venpro.com.br';
+import { apiUrl } from '../config/api';
 
 const MinhaLicenca = () => {
   const navigate = useNavigate();
@@ -28,7 +27,7 @@ const MinhaLicenca = () => {
     setCupomMsg(null);
     try {
       const token = await auth.currentUser.getIdToken();
-      const resp = await fetch(`${API_URL}/api/license/apply-coupon`, {
+      const resp = await fetch(apiUrl('/license/apply-coupon'), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ coupon_code: cupomCodigo.trim() }),

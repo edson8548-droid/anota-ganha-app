@@ -3,8 +3,34 @@
    ============================================ */
 
 /* O overlay usa a classe do EditClientModal para ser consistente */
-/* .modal-overlay { ... } */
-/* .btn-close-edit { ... } */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 2rem;
+}
+
+.btn-close-edit {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  position: relative;
+  z-index: 2;
+}
 
 .edit-client-info-modal {
   background: white;
@@ -110,6 +136,28 @@
   background: white;
 }
 
+.cnpj-edit-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.btn-search-client-cnpj {
+  padding: 0 18px;
+  border: none;
+  border-radius: 12px;
+  background: #3A85A8;
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-search-client-cnpj:disabled {
+  opacity: .65;
+  cursor: wait;
+}
+
 .form-group-edit-info input:focus,
 .form-group-edit-info textarea:focus {
   outline: none;
@@ -136,6 +184,10 @@
 /* Responsivo */
 @media (max-width: 768px) {
   .form-grid-edit-info {
+    grid-template-columns: 1fr;
+  }
+
+  .cnpj-edit-row {
     grid-template-columns: 1fr;
   }
 }

@@ -1,0 +1,70 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function ownsExistingDoc() {
+      return signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    function createsOwnDoc() {
+      return signedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    function userAdminFieldsUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny([
+          'role',
+          'license_key',
+          'license_type',
+          'trial_ends_at',
+          'subscription',
+          'isAdmin'
+        ]);
+    }
+
+    match /users/{userId} {
+      allow read: if isSelf(userId);
+      allow create: if isSelf(userId)
+        && (!('role' in request.resource.data) || request.resource.data.role == 'user');
+      allow update: if isSelf(userId) && userAdminFieldsUnchanged();
+      allow delete: if false;
+    }
+
+    match /subscriptions/{userId} {
+      allow read: if isSelf(userId);
+      allow create, update: if isSelf(userId)
+        && (!('userId' in request.resource.data) || request.resource.data.userId == userId);
+      allow delete: if false;
+    }
+
+    match /campaigns/{campaignId} {
+      allow read, update, delete: if ownsExistingDoc();
+      allow create: if createsOwnDoc();
+    }
+
+    match /clients/{clientId} {
+      allow read, update, delete: if ownsExistingDoc();
+      allow create: if createsOwnDoc();
+    }
+
+    match /coupons/{couponId} {
+      allow read, write: if false;
+    }
+
+    match /whatsapp_campaigns/{userId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

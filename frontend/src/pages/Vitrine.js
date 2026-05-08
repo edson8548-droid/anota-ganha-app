@@ -5,8 +5,6 @@ import { Store, Plus, Pencil, Trash2, Copy, Eye, X, Check, Image, Search } from 
 import { vitrineService } from '../services/vitrine.service';
 import './Vitrine.css';
 
-const API_URL = 'https://api.venpro.com.br';
-
 const UNIDADES = ['UN', 'CX', 'FD', 'PC', 'PCT', 'KG', 'L', 'ML', 'G', 'FRD', 'BAG'];
 
 const toNumber = (value) => {

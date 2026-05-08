@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { auth } from '../firebase/config';
-
-const API_URL = 'https://api.venpro.com.br';
+import { BACKEND_URL, apiUrl, backendUrl } from '../config/api';
 
 async function getHeaders() {
   const token = await auth.currentUser?.getIdToken();
@@ -17,49 +16,49 @@ export const vitrineService = {
   // ── Ofertas ──────────────────────────────────────
   async listar() {
     const headers = await getHeaders();
-    return axios.get(`${API_URL}/api/vitrine/ofertas`, { headers });
+    return axios.get(apiUrl('/vitrine/ofertas'), { headers });
   },
 
   async criar(data) {
     const headers = await getHeaders();
-    return axios.post(`${API_URL}/api/vitrine/ofertas`, data, { headers });
+    return axios.post(apiUrl('/vitrine/ofertas'), data, { headers });
   },
 
   async obter(id) {
     const headers = await getHeaders();
-    return axios.get(`${API_URL}/api/vitrine/ofertas/${id}`, { headers });
+    return axios.get(apiUrl(`/vitrine/ofertas/${id}`), { headers });
   },
 
   async atualizar(id, data) {
     const headers = await getHeaders();
-    return axios.put(`${API_URL}/api/vitrine/ofertas/${id}`, data, { headers });
+    return axios.put(apiUrl(`/vitrine/ofertas/${id}`), data, { headers });
   },
 
   async excluir(id) {
     const headers = await getHeaders();
-    return axios.delete(`${API_URL}/api/vitrine/ofertas/${id}`, { headers });
+    return axios.delete(apiUrl(`/vitrine/ofertas/${id}`), { headers });
   },
 
   // ── Itens ─────────────────────────────────────────
   async adicionarItem(offerId, item) {
     const headers = await getHeaders();
-    return axios.post(`${API_URL}/api/vitrine/ofertas/${offerId}/items`, item, { headers });
+    return axios.post(apiUrl(`/vitrine/ofertas/${offerId}/items`), item, { headers });
   },
 
   async atualizarItem(offerId, itemId, data) {
     const headers = await getHeaders();
-    return axios.put(`${API_URL}/api/vitrine/ofertas/${offerId}/items/${itemId}`, data, { headers });
+    return axios.put(apiUrl(`/vitrine/ofertas/${offerId}/items/${itemId}`), data, { headers });
   },
 
   async removerItem(offerId, itemId) {
     const headers = await getHeaders();
-    return axios.delete(`${API_URL}/api/vitrine/ofertas/${offerId}/items/${itemId}`, { headers });
+    return axios.delete(apiUrl(`/vitrine/ofertas/${offerId}/items/${itemId}`), { headers });
   },
 
   // ── Parse de lista ───────────────────────────────
   async parseLista(lista) {
     const headers = await getHeaders();
-    return axios.post(`${API_URL}/api/vitrine/parse-lista`, { lista }, { headers });
+    return axios.post(apiUrl('/vitrine/parse-lista'), { lista }, { headers });
   },
 
   // ── Imagens ──────────────────────────────────────
@@ -67,19 +66,19 @@ export const vitrineService = {
     const headers = await getMultipartHeaders();
     const form = new FormData();
     form.append('arquivo', file);
-    return axios.post(`${API_URL}/api/vitrine/ofertas/${offerId}/items/${itemId}/imagem`, form, { headers });
+    return axios.post(apiUrl(`/vitrine/ofertas/${offerId}/items/${itemId}/imagem`), form, { headers });
   },
 
   async uploadLogo(offerId, file) {
     const headers = await getMultipartHeaders();
     const form = new FormData();
     form.append('arquivo', file);
-    return axios.post(`${API_URL}/api/vitrine/ofertas/${offerId}/logo`, form, { headers });
+    return axios.post(apiUrl(`/vitrine/ofertas/${offerId}/logo`), form, { headers });
   },
 
   async sugerirImagem(productName) {
     const headers = await getHeaders();
-    return axios.get(`${API_URL}/api/vitrine/sugerir-imagem`, {
+    return axios.get(apiUrl('/vitrine/sugerir-imagem'), {
       headers,
       params: { product_name: productName },
     });
@@ -87,7 +86,7 @@ export const vitrineService = {
 
   async sugerirImagens(productName) {
     const headers = await getHeaders();
-    return axios.get(`${API_URL}/api/vitrine/sugerir-imagens`, {
+    return axios.get(apiUrl('/vitrine/sugerir-imagens'), {
       headers,
       params: { product_name: productName },
     });
@@ -95,7 +94,7 @@ export const vitrineService = {
 
   // ── Página pública (sem auth) ─────────────────────
   async obterPublica(slug) {
-    return axios.get(`${API_URL}/api/vitrine/publica/${slug}`);
+    return axios.get(apiUrl(`/vitrine/publica/${slug}`));
   },
 
   // ── Helpers ──────────────────────────────────────
@@ -106,6 +105,7 @@ export const vitrineService = {
   imagemUrl(path) {
     if (!path) return null;
     if (path.startsWith('http')) return path;
-    return `${API_URL}${path}`;
+    if (!BACKEND_URL) return path;
+    return backendUrl(path);
   },
 };

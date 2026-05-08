@@ -1,10 +1,9 @@
 import axios from 'axios';
 import { auth } from '../firebase/config';
-
-const API_URL = "https://api.venpro.com.br/api"
+import { API_BASE_URL } from '../config/api';
 
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: API_BASE_URL,
 });
 
 // Attach Firebase ID token to every request

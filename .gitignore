@@ -13,3 +13,11 @@ build/
 dist/
 .vscode/
 .idea/
+.firebase/
+frontend/.firebase/
+.superpowers/**/state/server.log
+.superpowers/**/state/server.pid
+.superpowers/**/state/server-stopped
+*.zip
+!frontend/public/venpro-cotatudo-extension.zip
+!frontend/public/venpro-whatsapp-extension.zip

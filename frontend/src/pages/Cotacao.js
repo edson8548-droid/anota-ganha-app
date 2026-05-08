@@ -6,8 +6,6 @@ import { listarTabelas, uploadTabela, excluirTabela, processarCotacao, previewCo
 import ReviewMatches from './ReviewMatches';
 import ConfirmDialog from '../components/ConfirmDialog';
 
-const API_URL = 'https://api.venpro.com.br';
-
 export default function Cotacao() {
   const navigate = useNavigate();
   const { user } = useAuthContext();

@@ -1,0 +1,22 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Caption,Arial,34,&H00FFFFFF,&H000000FF,&H00101518,&HCC101418,-1,0,0,0,100,100,0,0,1,2,0,2,70,70,42,1
+Style: Tag,Arial,24,&H002ECC8A,&H000000FF,&H00101518,&HCC101418,-1,0,0,0,100,100,0,0,1,2,0,8,60,60,34,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.30,0:00:06.00,Tag,,0,0,0,,Vitrine Inteligente VenPro
+Dialogue: 0,0:00:01.00,0:00:08.80,Caption,,0,0,0,,Crie a oferta com nome da campanha, empresa e dados do RCA.
+Dialogue: 0,0:00:09.00,0:00:19.50,Caption,,0,0,0,,Cole a lista de produtos. O VenPro interpreta tudo em poucos segundos.
+Dialogue: 0,0:00:20.00,0:00:32.00,Caption,,0,0,0,,Produtos, preços e embalagens ficam organizados para revisão.
+Dialogue: 0,0:00:32.50,0:00:45.00,Caption,,0,0,0,,As fotos aparecem automaticamente. Se alguma vier errada, escolha outra.
+Dialogue: 0,0:00:45.50,0:01:02.00,Caption,,0,0,0,,Revise preço unitário, preço da caixa e quantidade por embalagem antes de salvar.
+Dialogue: 0,0:01:02.50,0:01:12.00,Caption,,0,0,0,,Gere o link da vitrine e envie para seus clientes no WhatsApp.
+Dialogue: 0,0:01:12.50,0:01:27.00,Caption,,0,0,0,,O cliente escolhe as quantidades e monta o pedido direto pelo celular.
+Dialogue: 0,0:01:27.50,0:01:37.60,Caption,,0,0,0,,O pedido volta pronto no WhatsApp do representante. Menos digitação, mais venda.

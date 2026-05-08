@@ -1,6 +1,8 @@
 import React from 'react';
 import './ClientCard.css';
 
+const INDUSTRY_META_FIELDS = ['targetValue', 'alreadySoldValue'];
+
 const ClientCard = ({ client, campaign, onEdit, onDelete }) => {
   // Calcular progresso de cada indústria
   const getIndustryProgress = (industryName) => {
@@ -9,7 +11,7 @@ const ClientCard = ({ client, campaign, onEdit, onDelete }) => {
     }
 
     const products = client.industries[industryName];
-    const productKeys = Object.keys(products);
+    const productKeys = Object.keys(products).filter(key => !INDUSTRY_META_FIELDS.includes(key));
     const total = productKeys.length;
     const completed = productKeys.filter(key => products[key].positivado).length;
 

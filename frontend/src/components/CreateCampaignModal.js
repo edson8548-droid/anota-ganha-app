@@ -7,6 +7,7 @@ import ConfirmDialog from './ConfirmDialog';
 import './CreateCampaignModal.css';
 
 const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
+  const INDUSTRY_META_FIELDS = ['targetValue', 'alreadySoldValue'];
   const [formData, setFormData] = useState({
     name: '',
     startDate: '',
@@ -18,6 +19,7 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
   const [currentIndustry, setCurrentIndustry] = useState({
     name: '',
     targetValue: 0,
+    alreadySoldValue: 0,
     products: []
   });
   
@@ -41,11 +43,13 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
         ? Object.keys(campaign.industries).map(industryName => {
             const industryData = campaign.industries[industryName];
             const targetValue = industryData.targetValue || 0;
-            const products = Object.keys(industryData).filter(key => key !== 'targetValue');
+            const alreadySoldValue = industryData.alreadySoldValue || 0;
+            const products = Object.keys(industryData).filter(key => !INDUSTRY_META_FIELDS.includes(key));
             return {
               id: Date.now() + Math.random(), // ID local para o array
               name: industryName,
               targetValue: targetValue,
+              alreadySoldValue: alreadySoldValue,
               products: products
             };
           })
@@ -80,6 +84,14 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
     if (parts.length > 2) value = parts[0] + ',' + parts.slice(1).join('');
     const numValue = value.replace(',', '.');
     setCurrentIndustry(prev => ({ ...prev, targetValue: parseFloat(numValue) || 0 }));
+  };
+
+  const handleAlreadySoldValueChange = (e) => {
+    let value = e.target.value.replace(/[^\d,]/g, '');
+    const parts = value.split(',');
+    if (parts.length > 2) value = parts[0] + ',' + parts.slice(1).join('');
+    const numValue = value.replace(',', '.');
+    setCurrentIndustry(prev => ({ ...prev, alreadySoldValue: parseFloat(numValue) || 0 }));
   };
 
   const handleAddProduct = () => {
@@ -137,7 +149,7 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
   // NOVA FUNÇÃO: Limpa o formulário e o modo de edição
   const handleCancelEdit = () => {
     setEditingIndustry(null);
-    setCurrentIndustry({ name: '', targetValue: 0, products: [] });
+    setCurrentIndustry({ name: '', targetValue: 0, alreadySoldValue: 0, products: [] });
     setCurrentProduct('');
   };
 
@@ -170,16 +182,13 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (editingIndustry) {
-      toast.warning('⚠️ Termine de editar a indústria antes de salvar a campanha.');
-      return;
-    }
     if (!validate()) return;
 
     const industriesObj = {};
     formData.industries.forEach(industry => {
       industriesObj[industry.name] = {
-        targetValue: industry.targetValue
+        targetValue: industry.targetValue,
+        alreadySoldValue: industry.alreadySoldValue || 0
       };
       industry.products.forEach(product => {
         const existingProduct = campaign?.industries?.[industry.name]?.[product];
@@ -204,6 +213,19 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
   const formatTargetValueInput = () => {
     if (currentIndustry.targetValue === 0) return '';
     return currentIndustry.targetValue.toString().replace('.', ',');
+  };
+
+  const formatAlreadySoldValueInput = () => {
+    if (currentIndustry.alreadySoldValue === 0) return '';
+    return currentIndustry.alreadySoldValue.toString().replace('.', ',');
+  };
+
+  const formatCurrency = (value) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+
+  const getIndustryProgress = (industry) => {
+    if (!industry.targetValue) return 0;
+    return Math.min(((industry.alreadySoldValue || 0) / industry.targetValue) * 100, 100);
   };
 
   // ============================================
@@ -249,48 +271,93 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
             {/* Indústrias Adicionadas (COM BOTÃO DE EDITAR) */}
             {formData.industries.length > 0 && (
               <div className="industries-list">
-                <h3>Indústrias Adicionadas</h3>
-                {formData.industries.map(industry => (
-                  <div key={industry.id} className="industry-item">
-                    <div className="industry-header">
-                      <div className="industry-header-info">
-                        <strong>{industry.name}</strong>
-                        <span className="industry-target">
-                          Meta: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(industry.targetValue)}
-                        </span>
-                      </div>
-                      <div className="industry-header-actions">
-                        {/* ⭐️ NOVO BOTÃO DE EDITAR ⭐️ */}
-                        <button
-                          type="button"
-                          className="btn-edit-industry"
-                          onClick={() => handleSelectIndustryToEdit(industry)}
-                          title="Editar Indústria"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-remove"
-                          onClick={() => handleRemoveIndustry(industry.id)}
-                          title="Remover Indústria"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </div>
-                    <div className="industry-products">
-                      <strong>Produtos:</strong> {industry.products.join(', ')}
-                    </div>
+                <div className="industries-list-header">
+                  <div>
+                    <h3>Indústrias da campanha</h3>
+                    <p>Confira metas, avanço e produtos antes de salvar.</p>
                   </div>
-                ))}
+                  <span>{formData.industries.length} indústria{formData.industries.length > 1 ? 's' : ''}</span>
+                </div>
+                <div className="industries-card-grid">
+                  {formData.industries.map(industry => {
+                    const remainingValue = Math.max((industry.targetValue || 0) - (industry.alreadySoldValue || 0), 0);
+                    const progress = getIndustryProgress(industry);
+
+                    return (
+                      <div key={industry.id} className="industry-item">
+                        <div className="industry-header">
+                          <div className="industry-header-info">
+                            <span className="industry-label">Indústria</span>
+                            <strong>{industry.name}</strong>
+                            <small>{industry.products.length} produto{industry.products.length !== 1 ? 's' : ''} acompanhado{industry.products.length !== 1 ? 's' : ''}</small>
+                          </div>
+                          <div className="industry-header-actions">
+                            <button
+                              type="button"
+                              className="btn-edit-industry"
+                              onClick={() => handleSelectIndustryToEdit(industry)}
+                              title="Editar indústria"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-remove"
+                              onClick={() => handleRemoveIndustry(industry.id)}
+                              title="Remover indústria"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="industry-metrics">
+                          <div>
+                            <span>Meta</span>
+                            <strong>{formatCurrency(industry.targetValue)}</strong>
+                          </div>
+                          <div>
+                            <span>Já vendido</span>
+                            <strong>{formatCurrency(industry.alreadySoldValue)}</strong>
+                          </div>
+                          <div className="remaining">
+                            <span>Falta</span>
+                            <strong>{formatCurrency(remainingValue)}</strong>
+                          </div>
+                        </div>
+
+                        <div className="industry-progress">
+                          <div>
+                            <span>Avanço da meta</span>
+                            <strong>{Math.round(progress)}%</strong>
+                          </div>
+                          <div className="industry-progress-track">
+                            <span style={{ width: `${progress}%` }} />
+                          </div>
+                        </div>
+
+                        <div className="industry-products">
+                          <strong>Produtos</strong>
+                          <div className="industry-product-list">
+                            {industry.products.slice(0, 6).map(product => (
+                              <span key={product}>{product}</span>
+                            ))}
+                            {industry.products.length > 6 && (
+                              <span className="more-products">+{industry.products.length - 6}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
             {errors.industries && <span className="error-message">{errors.industries}</span>}
 
             {/* Adicionar Indústria (Formulário dinâmico) */}
             <div className="add-industry-section">
-              <h3>{editingIndustry ? '✏️ Atualizar Indústria' : '➕ Adicionar Nova Indústria'}</h3>
+              <h3>➕ Adicionar Nova Indústria</h3>
               
               <div className="campaign-form-group">
                 <label>Nome da Indústria</label>
@@ -299,6 +366,10 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
               <div className="campaign-form-group">
                 <label>Meta de Valor (R$)</label>
                 <input type="text" placeholder="0,00" value={formatTargetValueInput()} onChange={handleTargetValueChange} />
+              </div>
+              <div className="campaign-form-group">
+                <label>Ja vendido antes/fora do VenPro (R$)</label>
+                <input type="text" placeholder="0,00" value={formatAlreadySoldValueInput()} onChange={handleAlreadySoldValueChange} />
               </div>
               <div className="campaign-form-group">
                 <label>Produtos</label>
@@ -324,19 +395,8 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
                 className="btn-add-industry"
                 onClick={handleSaveIndustry}
               >
-                {editingIndustry ? '💾 Atualizar Indústria' : '➕ Adicionar Indústria'}
+                ➕ Adicionar Indústria
               </button>
-              
-              {/* Botão de Cancelar Edição */}
-              {editingIndustry && (
-                <button
-                  type="button"
-                  className="btn-cancel-edit-industry"
-                  onClick={handleCancelEdit}
-                >
-                  Cancelar Edição
-                </button>
-              )}
             </div>
           </div>
 
@@ -358,6 +418,61 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
         onConfirm={() => { confirmDialog.onConfirm?.(); closeConfirm(); }}
         onCancel={closeConfirm}
       />
+
+      {editingIndustry && (
+        <div className="industry-edit-overlay" onClick={handleCancelEdit}>
+          <div className="industry-edit-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="industry-edit-header">
+              <div>
+                <h3>Editar indústria</h3>
+                <p>Atualize metas e produtos desta indústria.</p>
+              </div>
+              <button type="button" onClick={handleCancelEdit}>×</button>
+            </div>
+
+            <div className="industry-edit-body">
+              <div className="campaign-form-group">
+                <label>Nome da Indústria</label>
+                <input type="text" name="name" value={currentIndustry.name} onChange={handleIndustryChange} placeholder="Ex: Ambev"/>
+              </div>
+              <div className="campaign-form-group">
+                <label>Meta de Valor (R$)</label>
+                <input type="text" placeholder="0,00" value={formatTargetValueInput()} onChange={handleTargetValueChange} />
+              </div>
+              <div className="campaign-form-group">
+                <label>Ja vendido antes/fora do VenPro (R$)</label>
+                <input type="text" placeholder="0,00" value={formatAlreadySoldValueInput()} onChange={handleAlreadySoldValueChange} />
+              </div>
+              <div className="campaign-form-group">
+                <label>Produtos</label>
+                <div className="input-with-button">
+                  <input type="text" value={currentProduct} onChange={(e) => setCurrentProduct(e.target.value)} placeholder="Ex: Skol" onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddProduct())}/>
+                  <button type="button" className="btn-add-product" onClick={handleAddProduct}>Adicionar</button>
+                </div>
+                {currentIndustry.products.length > 0 && (
+                  <div className="products-tags">
+                    {currentIndustry.products.map((product, idx) => (
+                      <span key={idx} className="product-tag">
+                        {product}
+                        <button type="button" onClick={() => handleRemoveProduct(product)}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="industry-edit-footer">
+              <button type="button" className="btn-cancel-campaign" onClick={handleCancelEdit}>
+                Cancelar
+              </button>
+              <button type="button" className="btn-save-campaign" onClick={handleSaveIndustry}>
+                Salvar indústria
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -2,11 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import './CreateClientModal.css';
 
+const INDUSTRY_META_FIELDS = ['targetValue', 'alreadySoldValue'];
+
+const buildAddressFromCnpj = (data) => {
+  const streetParts = [
+    data.descricao_tipo_logradouro,
+    data.logradouro
+  ].filter(Boolean);
+  const street = streetParts.join(' ').trim();
+  const number = String(data.numero || '').trim();
+  const complement = String(data.complemento || '').trim();
+  const addressParts = [];
+
+  if (street) addressParts.push(street);
+  if (number) addressParts.push(number);
+  let address = addressParts.join(', ');
+  if (complement) address = address ? `${address} - ${complement}` : complement;
+
+  return address.trim();
+};
+
 const CreateClientModal = ({ onClose, onSave, campaign }) => {
   const [cnpj, setCnpj] = useState('');
   const [searchingCNPJ, setSearchingCNPJ] = useState(false);
   const [clientData, setClientData] = useState({
     CLIENTE: '',
+    CONTATO: '',
     TELEFONE: '',
     EMAIL: '',
     ENDERECO: '',
@@ -36,7 +57,7 @@ const CreateClientModal = ({ onClose, onSave, campaign }) => {
         let products = [];
         if (typeof industry === 'object' && !Array.isArray(industry)) {
           // Formato: { "Produto1": { valor: 0, positivado: false }, "Produto2": ... }
-          products = Object.keys(industry);
+          products = Object.keys(industry).filter(key => !INDUSTRY_META_FIELDS.includes(key));
         } else if (Array.isArray(industry.products)) {
           // Formato: { products: ["Produto1", "Produto2"] }
           products = industry.products;
@@ -104,18 +125,20 @@ const CreateClientModal = ({ onClose, onSave, campaign }) => {
       
       const data = await response.json();
       console.log('✅ Dados recebidos:', data);
+      const address = buildAddressFromCnpj(data);
       
       // Preencher dados do cliente
-      setClientData({
+      setClientData(prev => ({
         CLIENTE: data.razao_social || data.nome_fantasia || '',
+        CONTATO: prev.CONTATO || '',
         TELEFONE: data.ddd_telefone_1 || '',
         EMAIL: data.email || '',
-        ENDERECO: `${data.logradouro || ''}, ${data.numero || ''}${data.complemento ? ' - ' + data.complemento : ''}`,
+        ENDERECO: address || prev.ENDERECO || '',
         CIDADE: data.municipio || '',
         ESTADO: data.uf || '',
         BAIRRO: data.bairro || '',
         CEP: data.cep || ''
-      });
+      }));
 
       toast.success('✅ Dados encontrados com sucesso!');
     } catch (error) {
@@ -218,6 +241,7 @@ const CreateClientModal = ({ onClose, onSave, campaign }) => {
     const clientDataToSave = {
       CNPJ: formatCNPJFinal(cnpj),
       CLIENTE: clientData.CLIENTE,
+      CONTATO: clientData.CONTATO,
       TELEFONE: clientData.TELEFONE,
       EMAIL: clientData.EMAIL,
       ENDERECO: clientData.ENDERECO,
@@ -287,6 +311,17 @@ const CreateClientModal = ({ onClose, onSave, campaign }) => {
               placeholder="Nome ou Razão Social"
               value={clientData.CLIENTE}
               onChange={(e) => setClientData({ ...clientData, CLIENTE: e.target.value })}
+              disabled={loading}
+            />
+          </div>
+
+          <div className="client-form-group">
+            <label>Nome do contato para WhatsApp</label>
+            <input
+              type="text"
+              placeholder="Ex: João, Maria, comprador..."
+              value={clientData.CONTATO}
+              onChange={(e) => setClientData({ ...clientData, CONTATO: e.target.value })}
               disabled={loading}
             />
           </div>
@@ -363,7 +398,7 @@ const CreateClientModal = ({ onClose, onSave, campaign }) => {
                 // Extrair produtos em diferentes formatos
                 let products = [];
                 if (typeof industry === 'object' && !Array.isArray(industry)) {
-                  products = Object.keys(industry);
+                  products = Object.keys(industry).filter(key => !INDUSTRY_META_FIELDS.includes(key));
                 } else if (Array.isArray(industry.products)) {
                   products = industry.products;
                 } else if (Array.isArray(industry)) {

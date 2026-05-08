@@ -1,260 +1,287 @@
-// SUBSTITUA: src/components/EditClientModal.js
-// CORRIGIDO: Tag </Sspan> trocada para </p>
+import React, { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import './EditClientInfoModal.css';
 
-import React, { useState, useEffect } from 'react';
-import './EditClientModal.css'; 
+const onlyDigits = (value = '') => String(value).replace(/\D/g, '');
 
-const EditClientModal = ({ isOpen, onClose, client, onSave, campaign }) => {
+const formatCnpjDisplay = (value = '') => {
+  const cleaned = onlyDigits(value).slice(0, 14);
+  return cleaned
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1/$2')
+    .replace(/(\d{4})(\d)/, '$1-$2');
+};
+
+const formatCnpjFinal = (value = '') => {
+  const cleaned = onlyDigits(value);
+  if (cleaned.length !== 14) return value;
+  return cleaned.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+};
+
+const buildAddressFromCnpj = (data) => {
+  const streetParts = [
+    data.descricao_tipo_logradouro,
+    data.logradouro
+  ].filter(Boolean);
+  const street = streetParts.join(' ').trim();
+  const number = String(data.numero || '').trim();
+  const complement = String(data.complemento || '').trim();
+  const addressParts = [];
+
+  if (street) addressParts.push(street);
+  if (number) addressParts.push(number);
+  let address = addressParts.join(', ');
+  if (complement) address = address ? `${address} - ${complement}` : complement;
+
+  return address.trim();
+};
+
+const EditClientInfoModal = ({ isOpen, onClose, client, onSave }) => {
   const [formData, setFormData] = useState({
-    CNPJ: '', CLIENTE: '', industries: {}, notes: ''
+    CNPJ: '',
+    CLIENTE: '',
+    CONTATO: '',
+    CIDADE: '',
+    ESTADO: '',
+    ENDERECO: '',
+    BAIRRO: '',
+    CEP: '',
+    TELEFONE: '',
+    EMAIL: '',
+    notes: ''
   });
+  const [searchingCnpj, setSearchingCnpj] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const [selectAll, setSelectAll] = useState({});
-  const [totalValue, setTotalValue] = useState(0);
-  const [progressByIndustry, setProgressByIndustry] = useState({});
-
-  // Hook de Carregamento
   useEffect(() => {
-    if (client && campaign && isOpen) {
-      const hydratedIndustries = {};
-      if (campaign.industries) {
-        Object.entries(campaign.industries).forEach(([industryName, products]) => {
-          hydratedIndustries[industryName] = {};
-          Object.keys(products).filter(p => p !== 'targetValue').forEach(productName => {
-            const clientProductData = client.industries?.[industryName]?.[productName];
-            const valorNum = clientProductData?.valor;
-            const valorString = (valorNum === 0 || !valorNum) 
-              ? '' 
-              : String(valorNum).replace('.', ',');
-            hydratedIndustries[industryName][productName] = {
-              valor: valorString,
-              positivado: clientProductData?.positivado || false,
-            };
-          });
-        });
-      }
-      setFormData({
-        CNPJ: client.CNPJ || '', CLIENTE: client.CLIENTE || '',
-        CIDADE: client.CIDADE || '', ESTADO: client.ESTADO || '',
-        ENDERECO: client.ENDERECO || '', BAIRRO: client.BAIRRO || '',
-        CEP: client.CEP || '', TELEFONE: client.TELEFONE || '',
-        EMAIL: client.EMAIL || '', notes: client.notes || '',
-        industries: hydratedIndustries,
-      });
-    }
-  }, [client, campaign, isOpen]);
-
-  // Hook de Cálculo
-  useEffect(() => {
-    let total = 0;
-    const progress = {};
-    if (formData.industries) {
-      Object.entries(formData.industries).forEach(([industryName, products]) => {
-        let industryTotal = 0;
-        let positivatedCount = 0;
-        let totalProducts = 0;
-        Object.entries(products).forEach(([productName, productData]) => {
-          totalProducts++;
-          if (productData.positivado) {
-            positivatedCount++;
-            const value = parseFloat(String(productData.valor).replace(',', '.')) || 0;
-            industryTotal += value;
-            total += value;
-          }
-        });
-        progress[industryName] = {
-          percentage: totalProducts > 0 ? (positivatedCount / totalProducts) * 100 : 0,
-          positivated: positivatedCount,
-          total: totalProducts,
-          value: industryTotal
-        };
-      });
-    }
-    setTotalValue(total);
-    setProgressByIndustry(progress);
-  }, [formData.industries]);
-
-  // Handler de Inputs
-  const handleProductChange = (industryName, productName, field, value) => {
-    setFormData(prev => {
-        const newFormData = { ...prev };
-        const product = newFormData.industries[industryName][productName];
-
-        if (field === 'positivado') {
-            product.positivado = value;
-            if (value === false) product.valor = '';
-        } 
-        
-        if (field === 'valor') {
-            let newValue = value.replace(/[^\d,]/g, ''); 
-            const parts = newValue.split(',');
-            if (parts.length > 2) newValue = parts[0] + ',' + parts.slice(1).join('');
-            if (parts[1] && parts[1].length > 2) newValue = parts[0] + ',' + parts[1].substring(0, 2);
-            if (newValue.length > 1 && newValue.startsWith('0') && !newValue.startsWith('0,')) newValue = newValue.substring(1);
-            if (newValue.startsWith(',')) newValue = '0' + newValue;
-            product.valor = newValue;
-        }
-        return newFormData;
+    if (!client || !isOpen) return;
+    setFormData({
+      CNPJ: client.CNPJ || '',
+      CLIENTE: client.CLIENTE || client.NOME || client.nome || client.RAZAO_SOCIAL || client.razao_social || '',
+      CONTATO: client.CONTATO || client.contato || client.NOME_CONTATO || '',
+      CIDADE: client.CIDADE || '',
+      ESTADO: client.ESTADO || '',
+      ENDERECO: client.ENDERECO || '',
+      BAIRRO: client.BAIRRO || '',
+      CEP: client.CEP || '',
+      TELEFONE: client.TELEFONE || '',
+      EMAIL: client.EMAIL || '',
+      notes: client.notes || ''
     });
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSelectAll = (industryName) => {
-    const newValue = !selectAll[industryName];
-    setSelectAll(prev => ({ ...prev, [industryName]: newValue }));
-    setFormData(prev => {
-      const updatedIndustry = { ...prev.industries[industryName] };
-      Object.keys(updatedIndustry).forEach(productName => {
-        updatedIndustry[productName] = {
-          ...updatedIndustry[productName],
-          positivado: newValue,
-          valor: newValue ? updatedIndustry[productName].valor : ''
-        };
-      });
-      return { ...prev, industries: { ...prev.industries, [industryName]: updatedIndustry } };
-    });
-  };
-
-  // Handler de Submissão
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const dataToSave = JSON.parse(JSON.stringify(formData));
-    if (dataToSave.industries) {
-      Object.keys(dataToSave.industries).forEach(industryName => {
-        Object.keys(dataToSave.industries[industryName]).forEach(productName => {
-          const product = dataToSave.industries[industryName][productName];
-          product.valor = parseFloat(String(product.valor).replace(',', '.')) || 0;
-        });
-      });
-    }
-    onSave({ ...client, ...dataToSave }); 
-    onClose();
-  };
-
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-  };
+  }, [client, isOpen]);
 
   if (!isOpen) return null;
 
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSearchCnpj = async () => {
+    const cnpj = onlyDigits(formData.CNPJ);
+    if (cnpj.length !== 14) {
+      toast.warning('Digite um CNPJ valido com 14 digitos');
+      return;
+    }
+
+    setSearchingCnpj(true);
+    try {
+      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+      if (!response.ok) throw new Error('CNPJ nao encontrado');
+      const data = await response.json();
+      const address = buildAddressFromCnpj(data);
+      setFormData(prev => ({
+        ...prev,
+        CNPJ: formatCnpjFinal(cnpj),
+        CLIENTE: data.razao_social || data.nome_fantasia || prev.CLIENTE || '',
+        CONTATO: prev.CONTATO || '',
+        TELEFONE: data.ddd_telefone_1 || prev.TELEFONE || '',
+        EMAIL: data.email || prev.EMAIL || '',
+        ENDERECO: address || prev.ENDERECO || '',
+        CIDADE: data.municipio || prev.CIDADE || '',
+        ESTADO: data.uf || prev.ESTADO || '',
+        BAIRRO: data.bairro || prev.BAIRRO || '',
+        CEP: data.cep || prev.CEP || ''
+      }));
+      toast.success('Dados encontrados pelo CNPJ');
+    } catch (error) {
+      toast.warning(`Nao consegui buscar o CNPJ. ${error.message}`);
+    } finally {
+      setSearchingCnpj(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!String(formData.CLIENTE || '').trim()) {
+      toast.warning('Informe o nome do cliente');
+      return;
+    }
+    if (!String(formData.CIDADE || '').trim()) {
+      toast.warning('Informe a cidade do cliente');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await onSave({
+        ...client,
+        ...formData,
+        CNPJ: formatCnpjFinal(formData.CNPJ),
+        industries: client.industries || {},
+      });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="edit-client-modal" onClick={(e) => e.stopPropagation()}>
-        
+      <div className="edit-client-info-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header-edit">
           <div className="modal-header-content">
-            <h2>🏭 Positivar Produtos</h2>
-            <p>Marque os produtos positivados e insira os valores</p>
+            <h2>Editar cliente</h2>
+            <p>Corrija nome, CNPJ, cidade, bairro e contato do cliente.</p>
           </div>
-          <button className="btn-close-edit" onClick={onClose}>
-            ✕
-          </button>
+          <button className="btn-close-edit" onClick={onClose} type="button">x</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-body-edit">
-          {/* Produtos por Indústria */}
+        <form onSubmit={handleSubmit} className="modal-body-edit-info">
           <div className="section-edit">
             <h3 className="section-title-edit">
-              <span className="section-icon">🏭</span>
-              Produtos e Valores
+              <span className="section-icon">Cliente</span>
             </h3>
-            {formData.industries && Object.entries(formData.industries).map(([industryName, products]) => (
-              <div key={industryName} className="industry-card-edit">
-                <div className="industry-header-edit">
-                  <div className="industry-info-edit">
-                    <h4>{industryName}</h4>
-                    <span className="product-count">
-                      {progressByIndustry[industryName]?.positivated || 0} de {progressByIndustry[industryName]?.total || 0} produtos
-                    </span>
-                  </div>
-                  <button type="button" className="btn-select-all" onClick={() => handleSelectAll(industryName)}>
-                    {selectAll[industryName] ? '✓ Desmarcar Todos' : '☐ Marcar Todos'}
+
+            <div className="form-grid-edit-info">
+              <div className="form-group-edit-info full-width">
+                <label>CNPJ</label>
+                <div className="cnpj-edit-row">
+                  <input
+                    type="text"
+                    value={formatCnpjDisplay(formData.CNPJ)}
+                    onChange={(e) => handleChange('CNPJ', e.target.value)}
+                    placeholder="00.000.000/0000-00"
+                    maxLength={18}
+                    disabled={saving || searchingCnpj}
+                  />
+                  <button type="button" className="btn-search-client-cnpj" onClick={handleSearchCnpj} disabled={saving || searchingCnpj}>
+                    {searchingCnpj ? 'Buscando...' : 'Buscar CNPJ'}
                   </button>
                 </div>
-                <div className="progress-bar-edit">
-                  <div
-                    className="progress-fill-edit"
-                    style={{ width: `${progressByIndustry[industryName]?.percentage || 0}%` }}
-                  />
-                </div>
-                
-                {/* ⭐️ CORREÇÃO AQUI ⭐️ */}
-                <p className="progress-text-edit">
-                  {Math.round(progressByIndustry[industryName]?.percentage || 0)}% concluído
-                </p>
-                {/* ⭐️ </Sspan> foi corrigido para </p> ⭐️ */}
-
-                <div className="products-grid-edit">
-                  {products && Object.entries(products).map(([productName, productData]) => (
-                    <div
-                      key={productName}
-                      className={`product-card-edit ${productData.positivado ? 'positivated' : ''}`}
-                    >
-                      <div className="product-header-edit">
-                        <label className="checkbox-label-edit">
-                          <input
-                            type="checkbox"
-                            checked={productData.positivado || false}
-                            onChange={(e) =>
-                              handleProductChange(industryName, productName, 'positivado', e.target.checked)
-                            }
-                            className="checkbox-custom"
-                          />
-                          <span className="checkbox-custom-design"></span>
-                          <span className="product-name-edit">{productName}</span>
-                        </label>
-                        {productData.positivado && ( <span className="check-badge">✓</span> )}
-                      </div>
-                      {productData.positivado && (
-                        <div className="product-value-input">
-                          <label>Valor</label>
-                          <div className="input-currency">
-                            <span className="currency-symbol">R$</span>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={productData.valor}
-                              onChange={(e) =>
-                                handleProductChange(industryName, productName, 'valor', e.target.value)
-                              }
-                              placeholder="0,00"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <div className="industry-total-edit">
-                  <span>Total {industryName}:</span>
-                  <span className="total-value-edit">
-                    {formatCurrency(progressByIndustry[industryName]?.value || 0)}
-                  </span>
-                </div>
               </div>
-            ))}
-          </div>
 
-          {/* Total Geral */}
-          <div className="total-section-edit">
-            <div className="total-content-edit">
-              <span className="total-label-edit">VALOR TOTAL</span>
-              <span className="total-amount-edit">{formatCurrency(totalValue)}</span>
+              <div className="form-group-edit-info full-width">
+                <label>Nome do cliente *</label>
+                <input
+                  type="text"
+                  value={formData.CLIENTE}
+                  onChange={(e) => handleChange('CLIENTE', e.target.value)}
+                  placeholder="Nome ou razao social"
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="form-group-edit-info full-width">
+                <label>Nome do contato para WhatsApp</label>
+                <input
+                  type="text"
+                  value={formData.CONTATO}
+                  onChange={(e) => handleChange('CONTATO', e.target.value)}
+                  placeholder="Ex: Joao, Maria, comprador..."
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="form-group-edit-info full-width">
+                <label>Endereco</label>
+                <input
+                  type="text"
+                  value={formData.ENDERECO}
+                  onChange={(e) => handleChange('ENDERECO', e.target.value)}
+                  placeholder="Rua, numero e complemento"
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="form-group-edit-info">
+                <label>Cidade *</label>
+                <input
+                  type="text"
+                  value={formData.CIDADE}
+                  onChange={(e) => handleChange('CIDADE', e.target.value)}
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="form-group-edit-info">
+                <label>Bairro</label>
+                <input
+                  type="text"
+                  value={formData.BAIRRO}
+                  onChange={(e) => handleChange('BAIRRO', e.target.value)}
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="form-group-edit-info">
+                <label>Estado</label>
+                <input
+                  type="text"
+                  value={formData.ESTADO}
+                  onChange={(e) => handleChange('ESTADO', e.target.value)}
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="form-group-edit-info">
+                <label>CEP</label>
+                <input
+                  type="text"
+                  value={formData.CEP}
+                  onChange={(e) => handleChange('CEP', e.target.value)}
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="form-group-edit-info">
+                <label>Telefone</label>
+                <input
+                  type="text"
+                  value={formData.TELEFONE}
+                  onChange={(e) => handleChange('TELEFONE', e.target.value)}
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="form-group-edit-info">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={formData.EMAIL}
+                  onChange={(e) => handleChange('EMAIL', e.target.value)}
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="form-group-edit-info full-width">
+                <label>Observacoes</label>
+                <textarea
+                  rows="3"
+                  value={formData.notes}
+                  onChange={(e) => handleChange('notes', e.target.value)}
+                  disabled={saving}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Botões de Ação */}
           <div className="modal-footer-edit">
-            <button type="button" className="btn-cancel-edit" onClick={onClose}>
+            <button type="button" className="btn-cancel-edit" onClick={onClose} disabled={saving}>
               Cancelar
             </button>
-            <button type="submit" className="btn-save-edit">
-              <span>💾</span>
-              Salvar Alterações
+            <button type="submit" className="btn-save-edit" disabled={saving}>
+              {saving ? 'Salvando...' : 'Salvar cliente'}
             </button>
           </div>
         </form>
@@ -263,4 +290,4 @@ const EditClientModal = ({ isOpen, onClose, client, onSave, campaign }) => {
   );
 };
 
-export default EditClientModal;
+export default EditClientInfoModal;
