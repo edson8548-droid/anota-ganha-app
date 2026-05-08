@@ -2,9 +2,12 @@
 
 import os
 import logging
+import time
+from collections import defaultdict, deque
 from dotenv import load_dotenv
 load_dotenv()
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -46,6 +49,67 @@ class LogCorsPreflightMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(LogCorsPreflightMiddleware)
+
+# ========== Rate limit simples por IP ==========
+class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, enabled=True):
+        super().__init__(app)
+        self.enabled = enabled
+        self.requests = defaultdict(deque)
+
+    def _client_ip(self, request):
+        forwarded_for = request.headers.get("x-forwarded-for", "")
+        if forwarded_for:
+            return forwarded_for.split(",")[0].strip()
+        if request.client:
+            return request.client.host
+        return "unknown"
+
+    def _rate_config_for_path(self, path):
+        if path in {"/", "/health"}:
+            return None
+        if path == "/api/mercadopago/webhook":
+            return (300, 60, "/api/mercadopago/webhook")
+        if path == "/api/license/validate":
+            return (30, 60, "/api/license/validate")
+        if path.startswith("/api/vitrine/publica/"):
+            return (180, 60, "/api/vitrine/publica")
+        if path.startswith("/api/vitrine/imagens/") or path.startswith("/api/whatsapp/fotos/") or path.startswith("/api/users/avatars/"):
+            return (300, 60, "/api/public-images")
+        if path.startswith("/api/"):
+            return (900, 60, "/api")
+        return None
+
+    async def dispatch(self, request, call_next):
+        if not self.enabled or request.method == "OPTIONS":
+            return await call_next(request)
+
+        limit_config = self._rate_config_for_path(request.url.path)
+        if not limit_config:
+            return await call_next(request)
+
+        max_requests, window_seconds, bucket = limit_config
+        now = time.monotonic()
+        key = f"{self._client_ip(request)}:{bucket}"
+        timestamps = self.requests[key]
+
+        while timestamps and now - timestamps[0] > window_seconds:
+            timestamps.popleft()
+
+        if len(timestamps) >= max_requests:
+            retry_after = max(1, int(window_seconds - (now - timestamps[0])))
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Muitas tentativas. Aguarde um pouco e tente novamente."},
+                headers={"Retry-After": str(retry_after)},
+            )
+
+        timestamps.append(now)
+        return await call_next(request)
+
+
+rate_limit_enabled = os.environ.get("RATE_LIMIT_ENABLED", "true").lower() != "false"
+app.add_middleware(SimpleRateLimitMiddleware, enabled=rate_limit_enabled)
 
 # ==================== CORS (Correção Final) ====================
 
