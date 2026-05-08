@@ -18,6 +18,12 @@ service cloud.firestore {
       return signedIn() && request.resource.data.userId == request.auth.uid;
     }
 
+    function keepsOwnership() {
+      return signedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+    }
+
     function userAdminFieldsUnchanged() {
       return !request.resource.data.diff(resource.data).affectedKeys()
         .hasAny([
@@ -46,12 +52,14 @@ service cloud.firestore {
     }
 
     match /campaigns/{campaignId} {
-      allow read, update, delete: if ownsExistingDoc();
+      allow read, delete: if ownsExistingDoc();
+      allow update: if keepsOwnership();
       allow create: if createsOwnDoc();
     }
 
     match /clients/{clientId} {
-      allow read, update, delete: if ownsExistingDoc();
+      allow read, delete: if ownsExistingDoc();
+      allow update: if keepsOwnership();
       allow create: if createsOwnDoc();
     }
 
