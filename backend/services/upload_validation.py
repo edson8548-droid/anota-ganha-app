@@ -1,9 +1,11 @@
+import logging
 from pathlib import Path
 from io import BytesIO
 from zipfile import BadZipFile, ZipFile
 
 from fastapi import HTTPException, UploadFile
 
+logger = logging.getLogger(__name__)
 
 IMAGE_CONTENT_TYPES = {"image/jpeg", "image/jpg", "image/pjpeg", "image/png", "image/webp"}
 PDF_CONTENT_TYPES = {"application/pdf", "application/octet-stream"}
@@ -56,25 +58,44 @@ def validate_upload(
     extension = Path(filename).suffix.lower()
     content_type = (arquivo.content_type or "").lower()
 
+    def reject(message: str, reason: str):
+        logger.warning(
+            "[SECURITY] upload_blocked label=%s reason=%s ext=%s content_type=%s size=%s",
+            label,
+            reason,
+            extension or "none",
+            content_type or "none",
+            len(content) if content is not None else 0,
+        )
+        raise HTTPException(400, message)
+
     if not content:
-        raise HTTPException(400, f"{label} vazio.")
+        reject(f"{label} vazio.", "empty")
 
     if len(content) > max_bytes:
         max_mb = max_bytes // (1024 * 1024)
-        raise HTTPException(400, f"{label} muito grande. Máximo {max_mb} MB.")
+        reject(f"{label} muito grande. Máximo {max_mb} MB.", "too_large")
 
     if extension not in allowed_extensions:
         allowed = ", ".join(sorted(allowed_extensions))
-        raise HTTPException(400, f"Extensão não permitida para {label}. Use: {allowed}.")
+        reject(f"Extensão não permitida para {label}. Use: {allowed}.", "bad_extension")
 
     if content_type and content_type not in allowed_content_types:
-        raise HTTPException(400, f"Tipo não permitido para {label}: {content_type}")
+        reject(f"Tipo não permitido para {label}: {content_type}", "bad_content_type")
 
     detected = _detected_kind(content)
     if detected not in allowed_kinds:
+        logger.warning(
+            "[SECURITY] upload_blocked label=%s reason=bad_signature ext=%s content_type=%s detected=%s size=%s",
+            label,
+            extension or "none",
+            content_type or "none",
+            detected,
+            len(content),
+        )
         raise HTTPException(400, f"{label} inválido ou em formato não suportado.")
 
     if detected == "text" and extension != ".csv":
-        raise HTTPException(400, f"{label} inválido ou em formato não suportado.")
+        reject(f"{label} inválido ou em formato não suportado.", "text_not_csv")
 
     return filename

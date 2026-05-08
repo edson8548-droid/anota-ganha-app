@@ -42,6 +42,7 @@ def _gridfs():
 
 async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
     if not credentials:
+        logger.warning("[SECURITY] auth_missing route=whatsapp")
         raise HTTPException(401, "Token obrigatório")
     try:
         decoded = await asyncio.to_thread(
@@ -49,6 +50,7 @@ async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(securi
         )
         return decoded['uid']
     except Exception:
+        logger.warning("[SECURITY] auth_invalid route=whatsapp")
         raise HTTPException(401, "Token inválido")
 
 

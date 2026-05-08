@@ -136,12 +136,14 @@ async def get_or_create_license_key(
     """
     # Verifica o Firebase ID token
     if not credentials:
+        logger.warning("[SECURITY] auth_missing route=license_key")
         raise HTTPException(status_code=401, detail="Token de autenticação obrigatório")
 
     try:
         decoded = firebase_auth.verify_id_token(credentials.credentials)
         uid_token = decoded.get("uid")
     except Exception:
+        logger.warning("[SECURITY] auth_invalid route=license_key")
         raise HTTPException(status_code=401, detail="Token inválido ou expirado")
 
     # Só o próprio usuário ou admin pode ver a chave
@@ -156,6 +158,7 @@ async def get_or_create_license_key(
     is_admin = user_data.get("role") == "admin"
 
     if uid_token != user_id and not is_admin:
+        logger.warning("[SECURITY] access_denied route=license_key reason=user_mismatch")
         raise HTTPException(status_code=403, detail="Acesso negado")
 
     license_key = user_data.get("license_key")
@@ -179,12 +182,14 @@ async def regenerate_license_key(
     Use quando o assinante achar que a chave foi comprometida.
     """
     if not credentials:
+        logger.warning("[SECURITY] auth_missing route=license_regenerate")
         raise HTTPException(status_code=401, detail="Token obrigatório")
 
     try:
         decoded = firebase_auth.verify_id_token(credentials.credentials)
         user_id = decoded.get("uid")
     except Exception:
+        logger.warning("[SECURITY] auth_invalid route=license_regenerate")
         raise HTTPException(status_code=401, detail="Token inválido")
 
     db = get_db()
@@ -210,12 +215,14 @@ async def apply_coupon(
     Chamado pelo painel web quando o usuário digita o código.
     """
     if not credentials:
+        logger.warning("[SECURITY] auth_missing route=license_coupon")
         raise HTTPException(status_code=401, detail="Token obrigatório")
 
     try:
         decoded = firebase_auth.verify_id_token(credentials.credentials)
         user_id = decoded.get("uid")
     except Exception:
+        logger.warning("[SECURITY] auth_invalid route=license_coupon")
         raise HTTPException(status_code=401, detail="Token inválido")
 
     code = payload.coupon_code.strip().upper()
@@ -307,17 +314,20 @@ async def admin_create_coupon(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     if not credentials:
+        logger.warning("[SECURITY] auth_missing route=license_admin_coupon")
         raise HTTPException(status_code=401, detail="Token obrigatório")
 
     try:
         decoded = firebase_auth.verify_id_token(credentials.credentials)
         user_id = decoded.get("uid")
     except Exception:
+        logger.warning("[SECURITY] auth_invalid route=license_admin_coupon")
         raise HTTPException(status_code=401, detail="Token inválido")
 
     db = get_db()
     user_doc = db.collection("users").document(user_id).get()
     if not user_doc.exists or user_doc.to_dict().get("role") != "admin":
+        logger.warning("[SECURITY] access_denied route=license_admin_coupon reason=not_admin")
         raise HTTPException(status_code=403, detail="Apenas admins podem criar cupons")
 
     code = payload.code.strip().upper()
