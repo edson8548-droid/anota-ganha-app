@@ -12,6 +12,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
+import { isValidCPF, onlyDigits } from '../utils/documentValidators';
 
 export const useAuth = () => {
   const [user, setUser] = useState(null);
@@ -82,6 +83,21 @@ export const useAuth = () => {
   const register = async (email, password, additionalData) => {
     try {
       setError(null);
+
+      const cpf = onlyDigits(additionalData?.cpf);
+      const telefone = onlyDigits(additionalData?.telefone);
+
+      if (!isValidCPF(cpf)) {
+        const invalidCpfError = new Error('CPF inválido');
+        invalidCpfError.code = 'auth/invalid-cpf';
+        throw invalidCpfError;
+      }
+
+      if (telefone.length < 10 || telefone.length > 11) {
+        const invalidPhoneError = new Error('Telefone inválido');
+        invalidPhoneError.code = 'auth/invalid-phone';
+        throw invalidPhoneError;
+      }
       
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
@@ -95,8 +111,8 @@ export const useAuth = () => {
         email: email,
         name: additionalData.name,
         displayName: additionalData.name,
-        cpf: additionalData.cpf,         // ⭐️ NOVO CAMPO
-        telefone: additionalData.telefone, // ⭐️ NOVO CAMPO
+        cpf,
+        telefone,
         role: 'user', 
         license_type: 'trial',
         trial_ends_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 dias
@@ -187,7 +203,9 @@ const getErrorMessage = (errorCode) => {
     'auth/weak-password': 'Senha muito fraca. Use no mínimo 6 caracteres',
     'auth/network-request-failed': 'Erro de conexão. Verifique sua internet',
     'auth/too-many-requests': 'Muitas tentativas. Tente novamente mais tarde',
-    'auth/invalid-credential': 'Credenciais inválidas'
+    'auth/invalid-credential': 'Credenciais inválidas',
+    'auth/invalid-cpf': 'CPF inválido. Verifique o número digitado.',
+    'auth/invalid-phone': 'Telefone inválido. Inclua o DDD.'
   };
 
   return errorMessages[errorCode] || 'Ocorreu um erro. Tente novamente';
