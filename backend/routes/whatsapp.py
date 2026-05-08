@@ -18,6 +18,7 @@ from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel
 import firebase_admin
 from firebase_admin import auth as firebase_auth, firestore
+from services.upload_validation import CSV_CONTENT_TYPES, IMAGE_CONTENT_TYPES, PDF_CONTENT_TYPES, validate_upload
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -215,6 +216,15 @@ async def upload_contatos(
     uid: str = Depends(get_user_id),
 ):
     content = await arquivo.read()
+    validate_upload(
+        arquivo,
+        content,
+        label="Arquivo de contatos",
+        allowed_extensions={".csv"},
+        allowed_kinds={"text"},
+        allowed_content_types=CSV_CONTENT_TYPES,
+        max_bytes=5 * 1024 * 1024,
+    )
     try:
         contacts, invalidos = await asyncio.to_thread(parse_csv_contacts, content)
     except ValueError as e:
@@ -239,12 +249,18 @@ async def upload_fotos(
     new_urls = []
     for arq in arquivos:
         content = await arq.read()
+        validate_upload(
+            arq,
+            content,
+            label="Foto ou PDF",
+            allowed_extensions={".jpg", ".jpeg", ".png", ".webp", ".pdf"},
+            allowed_kinds={"jpg", "png", "webp", "pdf"},
+            allowed_content_types=IMAGE_CONTENT_TYPES | PDF_CONTENT_TYPES,
+            max_bytes=10 * 1024 * 1024,
+        )
         total_bytes += len(content)
         if total_bytes > MAX_TOTAL_BYTES:
             raise HTTPException(400, "Limite de 50 MB total excedido")
-        allowed = ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')
-        if arq.content_type not in allowed:
-            raise HTTPException(400, f"Tipo não permitido: {arq.content_type}")
         url = await _upload_photo(arq.filename, content, arq.content_type)
         new_urls.append(url)
 

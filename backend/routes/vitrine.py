@@ -22,6 +22,7 @@ from pydantic import BaseModel
 from bson import ObjectId
 import firebase_admin
 from firebase_admin import auth as firebase_auth
+from services.upload_validation import IMAGE_CONTENT_TYPES, safe_filename, validate_upload
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -882,13 +883,16 @@ async def upload_imagem_item(
     except Exception:
         raise HTTPException(400, "ID inválido")
 
-    # Validar tipo
-    if not arquivo.content_type.startswith("image/"):
-        raise HTTPException(400, "Apenas imagens são aceitas")
-
     conteudo = await arquivo.read()
-    if len(conteudo) > 5 * 1024 * 1024:
-        raise HTTPException(400, "Imagem muito grande — máximo 5 MB")
+    filename = validate_upload(
+        arquivo,
+        conteudo,
+        label="Imagem",
+        allowed_extensions={".jpg", ".jpeg", ".png", ".webp"},
+        allowed_kinds={"jpg", "png", "webp"},
+        allowed_content_types=IMAGE_CONTENT_TYPES,
+        max_bytes=5 * 1024 * 1024,
+    )
 
     # Remover imagem anterior se existir
     doc = await _db.vitrine_offers.find_one({"_id": oid, "created_by": uid})
@@ -907,7 +911,7 @@ async def upload_imagem_item(
 
     # Salvar nova imagem
     grid_id = await _gridfs().upload_from_stream(
-        arquivo.filename,
+        safe_filename(filename, "produto.jpg"),
         io.BytesIO(conteudo),
         metadata={"content_type": arquivo.content_type, "offer_id": offer_id, "item_id": item_id},
     )
@@ -973,13 +977,18 @@ async def upload_logo(
         oid = ObjectId(offer_id)
     except Exception:
         raise HTTPException(400, "ID inválido")
-    if not arquivo.content_type.startswith("image/"):
-        raise HTTPException(400, "Apenas imagens são aceitas")
     conteudo = await arquivo.read()
-    if len(conteudo) > 3 * 1024 * 1024:
-        raise HTTPException(400, "Logo muito grande — máximo 3 MB")
+    filename = validate_upload(
+        arquivo,
+        conteudo,
+        label="Logo",
+        allowed_extensions={".jpg", ".jpeg", ".png", ".webp"},
+        allowed_kinds={"jpg", "png", "webp"},
+        allowed_content_types=IMAGE_CONTENT_TYPES,
+        max_bytes=3 * 1024 * 1024,
+    )
     grid_id = await _gridfs().upload_from_stream(
-        arquivo.filename,
+        safe_filename(filename, "logo.jpg"),
         io.BytesIO(conteudo),
         metadata={"content_type": arquivo.content_type, "tipo": "logo"},
     )

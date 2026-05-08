@@ -11,6 +11,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from firebase_admin import auth as firebase_auth, firestore
 from bson import ObjectId
+from services.upload_validation import IMAGE_CONTENT_TYPES, safe_filename, validate_upload
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -59,13 +60,16 @@ async def upload_avatar(
     uid: str = Depends(get_user_id),
 ):
     """Upload de foto de perfil — substitui a anterior automaticamente."""
-    allowed = ('image/jpeg', 'image/png', 'image/webp')
-    if arquivo.content_type not in allowed:
-        raise HTTPException(400, f"Tipo não permitido: {arquivo.content_type}")
-
     content = await arquivo.read()
-    if len(content) > 5 * 1024 * 1024:
-        raise HTTPException(400, "Imagem muito grande. Máximo 5 MB")
+    filename = validate_upload(
+        arquivo,
+        content,
+        label="Imagem",
+        allowed_extensions={".jpg", ".jpeg", ".png", ".webp"},
+        allowed_kinds={"jpg", "png", "webp"},
+        allowed_content_types=IMAGE_CONTENT_TYPES,
+        max_bytes=5 * 1024 * 1024,
+    )
 
     # Apaga avatar antigo se estava no nosso GridFS
     def _get_old():
@@ -81,7 +85,7 @@ async def upload_avatar(
         except Exception:
             pass
 
-    safe = re.sub(r'[^a-zA-Z0-9._-]', '_', arquivo.filename or 'avatar.jpg')
+    safe = re.sub(r'[^a-zA-Z0-9._-]', '_', safe_filename(filename, 'avatar.jpg'))
     grid_id = await _gridfs().upload_from_stream(
         f"avatar_{uid}_{safe}",
         io.BytesIO(content),

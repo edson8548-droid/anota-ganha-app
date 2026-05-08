@@ -28,6 +28,7 @@ from services.excel_processor import (
     detectar_prazos_disponiveis,
 )
 from services.matching_engine import normalizar_nome
+from services.upload_validation import PDF_CONTENT_TYPES, XLSX_CONTENT_TYPES, validate_upload
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -39,6 +40,9 @@ db = None
 _background_tasks: set = set()
 
 MAX_TABELAS = 5
+MAX_EXCEL_BYTES = 20 * 1024 * 1024
+MAX_COTACAO_PREVIEW_BYTES = 14 * 1024 * 1024
+MAX_TABELA_PRAZOS_BYTES = 25 * 1024 * 1024
 
 
 def init_cotacao(database):
@@ -103,6 +107,15 @@ async def upload_tabela(
         raise HTTPException(400, f"Máximo de {MAX_TABELAS} tabelas permitidas")
 
     conteudo = await arquivo.read()
+    validate_upload(
+        arquivo,
+        conteudo,
+        label="Tabela mestre",
+        allowed_extensions={".xlsx"},
+        allowed_kinds={"xlsx"},
+        allowed_content_types=XLSX_CONTENT_TYPES,
+        max_bytes=MAX_EXCEL_BYTES,
+    )
     bucket = _bucket()
     grid_id = await bucket.upload_from_stream(
         arquivo.filename,
@@ -239,6 +252,17 @@ async def processar_cotacao(
     if not doc:
         raise HTTPException(404, "Tabela mestre não encontrada")
 
+    conteudo_cotacao = await arquivo.read()
+    validate_upload(
+        arquivo,
+        conteudo_cotacao,
+        label="Arquivo de cotação",
+        allowed_extensions={".xlsx"},
+        allowed_kinds={"xlsx"},
+        allowed_content_types=XLSX_CONTENT_TYPES,
+        max_bytes=MAX_EXCEL_BYTES,
+    )
+
     # Baixar tabela mestre do GridFS
     grid_out = await _bucket().open_download_stream(doc["grid_id"])
     conteudo_mestre = await grid_out.read()
@@ -247,7 +271,6 @@ async def processar_cotacao(
     tmp_mestre.write(conteudo_mestre)
     tmp_mestre.close()
 
-    conteudo_cotacao = await arquivo.read()
     tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
     tmp_cotacao.write(conteudo_cotacao)
     tmp_cotacao.close()
@@ -307,6 +330,17 @@ async def preview_cotacao(
     if not doc:
         raise HTTPException(404, "Tabela mestre não encontrada")
 
+    conteudo_cotacao = await arquivo.read()
+    validate_upload(
+        arquivo,
+        conteudo_cotacao,
+        label="Arquivo de cotação",
+        allowed_extensions={".xlsx"},
+        allowed_kinds={"xlsx"},
+        allowed_content_types=XLSX_CONTENT_TYPES,
+        max_bytes=MAX_COTACAO_PREVIEW_BYTES,
+    )
+
     grid_out = await _bucket().open_download_stream(doc["grid_id"])
     conteudo_mestre = await grid_out.read()
 
@@ -314,7 +348,6 @@ async def preview_cotacao(
     tmp_mestre.write(conteudo_mestre)
     tmp_mestre.close()
 
-    conteudo_cotacao = await arquivo.read()
     tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
     tmp_cotacao.write(conteudo_cotacao)
     tmp_cotacao.close()
@@ -346,9 +379,6 @@ async def preview_cotacao(
         preview_items = _resultados_para_preview(itens, resultados)
 
         # Salvar sessão para uso pelo /confirmar
-        if len(conteudo_cotacao) > 14_000_000:
-            raise HTTPException(400, "Arquivo de cotação muito grande (máx 14MB)")
-
         session_id = str(uuid.uuid4())
         await db.cotacao_sessoes.insert_one({
             "_id": session_id,
@@ -386,7 +416,16 @@ async def gerar_tabela_prazos(
     uid = await get_user_id(credentials)
 
     conteudo = await arquivo.read()
-    ext = ".pdf" if arquivo.filename.lower().endswith(".pdf") else ".xlsx"
+    validate_upload(
+        arquivo,
+        conteudo,
+        label="Tabela para prazos",
+        allowed_extensions={".xlsx", ".pdf"},
+        allowed_kinds={"xlsx", "pdf"},
+        allowed_content_types=XLSX_CONTENT_TYPES | PDF_CONTENT_TYPES,
+        max_bytes=MAX_TABELA_PRAZOS_BYTES,
+    )
+    ext = ".pdf" if (arquivo.filename or "").lower().endswith(".pdf") else ".xlsx"
 
     job_id = str(uuid.uuid4())
     await db.cotacao_jobs.insert_one({
