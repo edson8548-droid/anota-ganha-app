@@ -1,46 +1,43 @@
-# Anota Ganha App - Render Deployment Configuration
-# 🚀 Deploy automatizado para o backend FastAPI
-
-service: anota-ganha-api
-runtime: python
-plan: free
-region: oregon
-
-# ============================================
-# Build Configuration
-# ============================================
-
-buildCommand: pip install -r requirements.txt && uvicorn server:app --host 0.0.0.0 --port $PORT
-
-# ============================================
-# Environment Variables
-# ============================================
-# As variáveis abaixo devem ser configuradas no Render:
-#
-# FRONTEND_URL=https://anota-ganha-app.web.app
-# BACKEND_URL=https://api.venpro.com.br
-# CORS_ORIGINS=https://venpro.com.br,https://www.venpro.com.br,https://anota-ganha-app.web.app
-# MONGO_URL=mongodb+srv://usuario:senha@cluster.mongodb.net/database
-# RATE_LIMIT_ENABLED=true
-# FIREBASE_PROJECT_ID=anota-ganha-app
-# FIREBASE_PRIVATE_KEY_ID=chave-id
-# FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nSUA_CHAVE\n-----END PRIVATE KEY-----\n"
-# FIREBASE_CLIENT_EMAIL=firebase-adminsdk@anota-ganha-app.iam.gserviceaccount.com
-# FIREBASE_CLIENT_ID=seu-client-id
-# FIREBASE_STORAGE_BUCKET=anota-ganha-app.appspot.com
-# GROQ_API_KEY=seu_groq_api_key
-# GEMINI_API_KEY=seu_gemini_api_key
-# SENDGRID_API_KEY=seu_sendgrid_api_key
-# SENDER_EMAIL=suporte@anotaganha.com
-
-# ============================================
-# Health Check
-# ============================================
-
-healthCheckPath: /health
-
-# ============================================
-# Auto-Deploy
-# ============================================
-# Quando houver push no branch deploy-api, o Render faz deploy automático
-# Configure webhook do Render em: https://dashboard.render.com/webhooks
+services:
+  - type: web
+    name: anota-ganha-backend
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      - key: CORS_ORIGINS
+        value: https://venpro.com.br,https://www.venpro.com.br,https://anota-ganha-app.web.app,https://anota-ganha-app.firebaseapp.com
+      - key: MONGO_URL
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+      - key: MP_ACCESS_TOKEN
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: SENDER_EMAIL
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY_ID
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_CLIENT_ID
+        sync: false
+      - key: FIREBASE_STORAGE_BUCKET
+        sync: false
+      - key: SERPER_API_KEY
+        sync: false
