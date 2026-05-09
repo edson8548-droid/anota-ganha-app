@@ -211,6 +211,61 @@
 }
 
 /* ── Métodos de pagamento ─────────────────────── */
+.payer-form {
+  background: #2B2D31;
+  border: 1px solid #4A4D52;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.payer-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.payer-form label span {
+  font-size: 11px;
+  font-weight: 700;
+  color: #A0A3A8;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.payer-form input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #363940;
+  border: 1px solid #4A4D52;
+  border-radius: 8px;
+  color: #E1E1E1;
+  font-size: 14px;
+  padding: 11px 12px;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+
+.payer-form input:focus {
+  border-color: #3A85A8;
+  box-shadow: 0 0 0 3px rgba(58,133,168,.14);
+}
+
+.payer-form input:disabled {
+  opacity: .65;
+  cursor: not-allowed;
+}
+
+.payer-form p {
+  margin: 0;
+  color: #A0A3A8;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .payment-methods {
   display: flex;
   flex-direction: column;
