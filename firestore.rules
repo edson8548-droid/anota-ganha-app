@@ -71,6 +71,41 @@ service cloud.firestore {
       ]);
     }
 
+    function validTrialSubscriptionCreate(userId) {
+      return isSelf(userId)
+        && request.resource.data.keys().hasOnly([
+          'userId',
+          'planId',
+          'status',
+          'trialEndsAt',
+          'createdAt',
+          'updatedAt',
+          'paymentMethod',
+          'mercadoPagoSubscriptionId',
+          'mercadoPagoCustomerId'
+        ])
+        && request.resource.data.userId == userId
+        && request.resource.data.planId == 'trial'
+        && request.resource.data.status == 'trialing'
+        && request.resource.data.paymentMethod == null
+        && request.resource.data.mercadoPagoSubscriptionId == null
+        && request.resource.data.mercadoPagoCustomerId == null;
+    }
+
+    function validTrialSubscriptionExpire(userId) {
+      return isSelf(userId)
+        && resource.data.userId == userId
+        && resource.data.planId == 'trial'
+        && resource.data.status == 'trialing'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'updatedAt'
+        ])
+        && request.resource.data.userId == userId
+        && request.resource.data.planId == 'trial'
+        && request.resource.data.status == 'trial_expired';
+    }
+
     match /users/{userId} {
       allow read: if isSelf(userId);
       allow create: if isSelf(userId)
@@ -84,8 +119,8 @@ service cloud.firestore {
 
     match /subscriptions/{userId} {
       allow read: if isSelf(userId);
-      allow create, update: if isSelf(userId)
-        && (!('userId' in request.resource.data) || request.resource.data.userId == userId);
+      allow create: if validTrialSubscriptionCreate(userId);
+      allow update: if validTrialSubscriptionExpire(userId);
       allow delete: if false;
     }
 
