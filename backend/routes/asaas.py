@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import firebase_admin
@@ -161,6 +161,40 @@ def _find_subscription_user_id(payment: dict = None, subscription: dict = None) 
     return None
 
 
+def _as_datetime(value) -> Optional[datetime]:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    if hasattr(value, "timestamp"):
+        return datetime.fromtimestamp(value.timestamp(), tz=timezone.utc)
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
+
+
+def _access_end_for_cancel(subscription_data: dict) -> datetime:
+    now = datetime.now(timezone.utc)
+    candidates = [
+        _as_datetime(subscription_data.get("accessEndsAt")),
+        _as_datetime(subscription_data.get("currentPeriodEnd")),
+        _as_datetime(subscription_data.get("nextBillingDate")),
+        _as_datetime(subscription_data.get("nextDueDate")),
+    ]
+    future_candidates = [candidate for candidate in candidates if candidate and candidate > now]
+    if future_candidates:
+        return min(future_candidates)
+
+    last_payment = _as_datetime(subscription_data.get("lastPaymentDate"))
+    if last_payment and last_payment + timedelta(days=30) > now:
+        return last_payment + timedelta(days=30)
+
+    return now + timedelta(days=30)
+
+
 @router.post("/create-subscription")
 async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Depends(get_user_id)):
     if payload.planId != ASAAS_PLAN_ID:
@@ -240,20 +274,29 @@ async def cancel_subscription(uid: str = Depends(get_user_id)):
     if asaas_subscription_id:
         _cancel_asaas_subscription(asaas_subscription_id)
 
+    access_ends_at = _access_end_for_cancel(subscription_data)
+
     subscription_ref.set(
         {
             "userId": uid,
-            "status": "canceled",
+            "status": "canceling",
             "provider": subscription_data.get("provider") or "asaas",
             "canceledAt": datetime.now(timezone.utc),
+            "accessEndsAt": access_ends_at,
+            "cancelAtPeriodEnd": True,
             "updatedAt": datetime.now(timezone.utc),
             "cancelReason": "user_requested",
         },
         merge=True,
     )
 
-    logger.info("[ASAAS] Assinatura cancelada pelo usuário uid=%s asaasSubscriptionId=%s", uid, asaas_subscription_id)
-    return {"status": "canceled"}
+    logger.info(
+        "[ASAAS] Recorrência cancelada, acesso mantido até o fim do período uid=%s asaasSubscriptionId=%s accessEndsAt=%s",
+        uid,
+        asaas_subscription_id,
+        access_ends_at.isoformat(),
+    )
+    return {"status": "canceling", "accessEndsAt": access_ends_at.isoformat()}
 
 
 @router.post("/webhook")
@@ -305,10 +348,33 @@ async def asaas_webhook(
             }
         )
     elif event in {"SUBSCRIPTION_INACTIVATED", "SUBSCRIPTION_DELETED"}:
+        existing_doc = _fs().collection("subscriptions").document(uid).get()
+        existing_data = existing_doc.to_dict() if existing_doc.exists else {}
+        existing_access_end = _as_datetime(existing_data.get("accessEndsAt"))
+        if existing_data.get("cancelAtPeriodEnd") and existing_access_end and existing_access_end > datetime.now(timezone.utc):
+            update.update(
+                {
+                    "status": "canceling",
+                    "asaasSubscriptionId": subscription.get("id") or payment.get("subscription"),
+                    "canceledAt": existing_data.get("canceledAt") or datetime.now(timezone.utc),
+                    "accessEndsAt": existing_access_end,
+                    "cancelAtPeriodEnd": True,
+                }
+            )
+        else:
+            update.update(
+                {
+                    "status": "canceled",
+                    "asaasSubscriptionId": subscription.get("id") or payment.get("subscription"),
+                    "canceledAt": datetime.now(timezone.utc),
+                }
+            )
+    elif event in {"PAYMENT_DELETED", "PAYMENT_REFUNDED"}:
         update.update(
             {
                 "status": "canceled",
-                "asaasSubscriptionId": subscription.get("id") or payment.get("subscription"),
+                "asaasPaymentId": payment.get("id"),
+                "asaasSubscriptionId": payment.get("subscription") or subscription.get("id"),
                 "canceledAt": datetime.now(timezone.utc),
             }
         )

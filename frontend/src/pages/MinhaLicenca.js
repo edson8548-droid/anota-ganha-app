@@ -49,6 +49,18 @@ const MinhaLicenca = () => {
     showConfirm('Sair', 'Deseja realmente sair?', () => { logout(); navigate('/login'); });
   };
 
+  const toDate = (value) => {
+    if (!value) return null;
+    if (typeof value.toDate === 'function') return value.toDate();
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const explicitAccessEnd = toDate(subscription?.accessEndsAt);
+  const lastPaymentDate = toDate(subscription?.lastPaymentDate);
+  const accessEndsAt = explicitAccessEnd || (lastPaymentDate ? new Date(lastPaymentDate.getTime() + 30 * 24 * 60 * 60 * 1000) : null);
+  const hasCanceledPaidAccess = ['canceling', 'canceled'].includes(subscription?.status) && accessEndsAt && accessEndsAt > new Date();
+
   const cancelarAssinatura = async () => {
     closeConfirm();
     setCancelLoading(true);
@@ -60,7 +72,11 @@ const MinhaLicenca = () => {
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(data.detail || 'Erro ao cancelar assinatura');
-      toast.success('Assinatura cancelada. Novas cobranças foram interrompidas.');
+      const end = data.accessEndsAt ? new Date(data.accessEndsAt).toLocaleDateString('pt-BR') : null;
+      toast.success(end
+        ? `Recorrência cancelada. Seu acesso continua até ${end}.`
+        : 'Recorrência cancelada. Seu acesso continua até o fim do período pago.'
+      );
     } catch (e) {
       toast.error(e.message || 'Não foi possível cancelar a assinatura.');
     } finally {
@@ -71,6 +87,9 @@ const MinhaLicenca = () => {
   const statusInfo = () => {
     const s = subscription?.status;
     if (s === 'active')        return { cor: '#10b981', icone: '✅', texto: `Ativa — Plano ${currentPlan?.name || ''}` };
+    if (s === 'canceling' || (s === 'canceled' && hasCanceledPaidAccess)) {
+      return { cor: '#f59e0b', icone: '⏳', texto: `Cancelada — acesso até ${accessEndsAt ? accessEndsAt.toLocaleDateString('pt-BR') : 'o fim do período pago'}` };
+    }
     if (s === 'trialing')      return { cor: '#f59e0b', icone: '🎁', texto: `Trial — ${trialEndsAt ? `até ${trialEndsAt.toLocaleDateString('pt-BR')}` : ''}` };
     if (s === 'trial_expired') return { cor: '#ef4444', icone: '⏰', texto: 'Trial expirado' };
     if (s === 'canceled')      return { cor: '#ef4444', icone: '❌', texto: 'Cancelada' };
@@ -78,7 +97,7 @@ const MinhaLicenca = () => {
   };
 
   const status = statusInfo();
-  const assinaturaAtiva = subscription?.status === 'active' || isTrialActive;
+  const assinaturaAtiva = subscription?.status === 'active' || isTrialActive || hasCanceledPaidAccess;
 
   return (
     <div style={s.page}>
@@ -117,7 +136,7 @@ const MinhaLicenca = () => {
             <button
               onClick={() => showConfirm(
                 'Cancelar assinatura',
-                'Deseja cancelar sua assinatura? Novas cobranças serão interrompidas e o acesso às ferramentas será bloqueado.',
+                'Deseja cancelar sua assinatura? Novas cobranças serão interrompidas agora, mas seu acesso continua até o fim do período já pago.',
                 cancelarAssinatura
               )}
               disabled={cancelLoading}

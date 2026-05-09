@@ -50,7 +50,11 @@ const Plans = () => {
     { icon: <MessageCircle size={22} color="#3A85A8" />, text: 'Suporte via WhatsApp' },
   ];
 
-  const assinaturaAtiva = subscription?.status === 'active';
+  const explicitAccessEnd = subscription?.accessEndsAt?.toDate?.() || (subscription?.accessEndsAt ? new Date(subscription.accessEndsAt) : null);
+  const lastPaymentDate = subscription?.lastPaymentDate?.toDate?.() || (subscription?.lastPaymentDate ? new Date(subscription.lastPaymentDate) : null);
+  const paidAccessEnd = explicitAccessEnd || (lastPaymentDate ? new Date(lastPaymentDate.getTime() + 30 * 24 * 60 * 60 * 1000) : null);
+  const assinaturaAtiva = subscription?.status === 'active'
+    || (['canceling', 'canceled'].includes(subscription?.status) && paidAccessEnd && paidAccessEnd > new Date());
 
   return (
     <div className="plans-page">

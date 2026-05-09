@@ -96,6 +96,23 @@ const SubscriptionRequired = () => {
   );
 };
 
+const toDate = (value) => {
+  if (!value) return null;
+  if (typeof value.toDate === 'function') return value.toDate();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const getPaidAccessEnd = (subscription) => {
+  const explicitEnd = toDate(subscription?.accessEndsAt);
+  if (explicitEnd) return explicitEnd;
+
+  const lastPayment = toDate(subscription?.lastPaymentDate);
+  if (!lastPayment) return null;
+
+  return new Date(lastPayment.getTime() + 30 * 24 * 60 * 60 * 1000);
+};
+
 const ProtectedRoute = ({ children, requireSubscription = false }) => {
   const { user, loading } = useAuthContext();
   const subscriptionState = useSubscription();
@@ -115,7 +132,10 @@ const ProtectedRoute = ({ children, requireSubscription = false }) => {
       return <LoadingScreen text="Verificando assinatura..." />;
     }
 
-    const hasAccess = subscriptionState.subscription?.status === 'active' || subscriptionState.isTrialActive;
+    const subscription = subscriptionState.subscription;
+    const accessEndsAt = getPaidAccessEnd(subscription);
+    const hasCanceledPaidAccess = ['canceling', 'canceled'].includes(subscription?.status) && accessEndsAt && accessEndsAt > new Date();
+    const hasAccess = subscription?.status === 'active' || subscriptionState.isTrialActive || hasCanceledPaidAccess;
     if (!hasAccess) {
       return <SubscriptionRequired />;
     }
