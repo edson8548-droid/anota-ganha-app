@@ -15,13 +15,13 @@ from datetime import datetime, timezone, time
 from typing import List, Optional, Any
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
-from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel
 from bson import ObjectId
 import firebase_admin
 from firebase_admin import auth as firebase_auth
+from services.public_files import stream_public_gridfs_file
 from services.subscription_access import ensure_subscription_access
 from services.upload_validation import IMAGE_CONTENT_TYPES, safe_filename, validate_upload
 
@@ -966,12 +966,7 @@ async def upload_imagem_item(
 @router.get("/imagens/{grid_id}")
 async def servir_imagem(grid_id: str):
     """Serve imagem pública via GridFS — sem autenticação."""
-    try:
-        grid_out = await _gridfs().open_download_stream(ObjectId(grid_id))
-        content_type = (grid_out.metadata or {}).get("content_type", "image/jpeg")
-        return StreamingResponse(grid_out, media_type=content_type)
-    except Exception:
-        raise HTTPException(404, "Imagem não encontrada")
+    return await stream_public_gridfs_file(_gridfs(), grid_id, label="Imagem")
 
 
 @router.post("/ofertas/{offer_id}/logo")

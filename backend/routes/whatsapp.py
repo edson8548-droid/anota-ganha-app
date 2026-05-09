@@ -12,12 +12,12 @@ from typing import Optional
 
 import pandas as pd
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
-from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel
 import firebase_admin
 from firebase_admin import auth as firebase_auth, firestore
+from services.public_files import stream_public_gridfs_file
 from services.subscription_access import ensure_subscription_access
 from services.upload_validation import CSV_CONTENT_TYPES, IMAGE_CONTENT_TYPES, PDF_CONTENT_TYPES, validate_upload
 
@@ -196,13 +196,7 @@ async def _delete_photo(url: str):
 @router.get("/fotos/{grid_id}")
 async def servir_foto(grid_id: str):
     """Serve photo from GridFS — public endpoint used by Chrome extension."""
-    from bson import ObjectId
-    try:
-        grid_out = await _gridfs().open_download_stream(ObjectId(grid_id))
-        content_type = (grid_out.metadata or {}).get("content_type", "image/jpeg")
-        return StreamingResponse(grid_out, media_type=content_type)
-    except Exception:
-        raise HTTPException(404, "Foto não encontrada")
+    return await stream_public_gridfs_file(_gridfs(), grid_id, label="Foto")
 
 
 @router.get("/campanha")
