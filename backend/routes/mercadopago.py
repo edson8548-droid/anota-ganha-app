@@ -31,6 +31,7 @@ class PreferencePayload(BaseModel):
     planId: str
     user: UserInfoPayload
     deviceId: Optional[str] = None 
+    paymentMethod: Optional[str] = None
 
 # ============================================
 # FUNÇÕES AUXILIARES DE E-MAIL (Mantidas)
@@ -199,6 +200,7 @@ async def create_preference(payload: PreferencePayload, authenticated_uid: str =
         user_id = authenticated_uid
         plan = PLANS[plan_id]
         frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+        payment_method = payload.paymentMethod if payload.paymentMethod in {"credit_card", "pix"} else "credit_card"
 
         # ⭐️ 2. BUSCAR DADOS COMPLETOS DO UTILIZADOR (CPF/TELEFONE) DO FIREBASE ⭐️
         user_cpf = None
@@ -239,6 +241,21 @@ async def create_preference(payload: PreferencePayload, authenticated_uid: str =
                 "number": user_telefone[2:]  # O resto
             }
         
+        payment_methods = {"installments": plan.get("installments", 1)}
+        if payment_method == "pix":
+            payment_methods["excluded_payment_types"] = [
+                {"id": "credit_card"},
+                {"id": "debit_card"},
+                {"id": "ticket"},
+                {"id": "atm"},
+            ]
+        else:
+            payment_methods["excluded_payment_types"] = [
+                {"id": "bank_transfer"},
+                {"id": "ticket"},
+                {"id": "atm"},
+            ]
+
         # 4. DADOS DA PREFERÊNCIA (Usando o 'payer_data' otimizado)
         preference_data = {
             "items": [{ 
@@ -249,7 +266,7 @@ async def create_preference(payload: PreferencePayload, authenticated_uid: str =
             }],
             "payer": payer_data, # ⭐️ USA O NOVO OBJETO 'PAYER'
             "back_urls": { "success": f"{frontend_url}/payment-success", "failure": f"{frontend_url}/payment-failure", "pending": f"{frontend_url}/payment-pending" },
-            "payment_methods": { "installments": plan.get("installments", 1) },
+            "payment_methods": payment_methods,
             "external_reference": f"{user_id}-{plan_id}-{plan.get('price')}",
             "statement_descriptor": "VENPRO",
         }

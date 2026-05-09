@@ -142,7 +142,8 @@ const Checkout = () => {
             id: user.uid 
           },
           // Envia o deviceId (seja o valor ou null)
-          deviceId: deviceIdValue 
+          deviceId: deviceIdValue,
+          paymentMethod
         })
       });
       clearTimeout(timeoutId);
