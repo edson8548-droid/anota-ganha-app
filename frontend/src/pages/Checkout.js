@@ -218,7 +218,7 @@ const Checkout = () => {
                   <div className="trial-info-checkout" style={{ marginTop: 12 }}>
                     <div>
                       <strong>Preço de lançamento por tempo limitado</strong>
-                      <p>Cobrança mensal recorrente até o cancelamento.</p>
+                      <p>Recorrente até cancelar. Você pode cancelar quando quiser.</p>
                     </div>
                   </div>
                 </>
@@ -251,8 +251,8 @@ const Checkout = () => {
                 <div className="payment-method-content">
                   <span className="payment-icon">💳</span>
                   <div>
-                    <strong>Assinatura recorrente</strong>
-                    <p>Cobrança mensal automática via Mercado Pago até o cancelamento.</p>
+                    <strong>Assinatura recorrente até cancelar</strong>
+                    <p>Cobrança mensal automática via Mercado Pago. Cancele quando quiser.</p>
                   </div>
                 </div>
               </label>

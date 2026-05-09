@@ -55,7 +55,7 @@ export const PLANS = {
     price: 69.90,
     period: 'monthly',
     duration: 'por mês',
-    billingCycle: 'Cobrança mensal recorrente até cancelar',
+    billingCycle: 'Recorrente até cancelar. Cancele quando quiser.',
     mercadoPagoPreapprovalPlanId: null,
     limits: {
       campaigns: 999999,
@@ -79,7 +79,7 @@ export const PLANS = {
     price: 69.90,
     period: 'monthly',
     duration: 'por mês',
-    billingCycle: 'Cobrança mensal recorrente até cancelar',
+    billingCycle: 'Recorrente até cancelar. Cancele quando quiser.',
     mercadoPagoPreapprovalPlanId: null,
     limits: {
       campaigns: 999999,
@@ -103,7 +103,7 @@ export const PLANS = {
     price: 69.90,
     period: 'monthly',
     duration: 'por mês',
-    billingCycle: 'Cobrança mensal recorrente até cancelar',
+    billingCycle: 'Recorrente até cancelar. Cancele quando quiser.',
     mercadoPagoPreapprovalPlanId: null,
     limits: {
       campaigns: 999999,

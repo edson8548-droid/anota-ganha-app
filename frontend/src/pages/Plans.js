@@ -99,7 +99,7 @@ const Plans = () => {
               <span style={{ fontSize: 64, fontWeight: 800, color: '#ffffff', lineHeight: 1 }}>69</span>
               <span style={{ fontSize: 28, fontWeight: 700, color: '#ffffff', alignSelf: 'flex-end', marginBottom: 6 }}>,90</span>
             </div>
-            <div style={{ fontSize: 14, color: '#A0A3A8', marginTop: 4 }}>cobrança mensal recorrente · cancele quando quiser</div>
+            <div style={{ fontSize: 14, color: '#A0A3A8', marginTop: 4 }}>recorrente até cancelar · cancele quando quiser</div>
             <div style={{ margin: '14px auto 0', padding: '9px 12px', border: '1px solid rgba(58,133,168,.45)', borderRadius: 10, color: '#DDEFF7', background: 'rgba(58,133,168,.14)', fontSize: 13, fontWeight: 700 }}>
               Garanta o valor de lançamento enquanto a oferta estiver ativa.
             </div>
