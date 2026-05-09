@@ -4,8 +4,49 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import { apiUrl, backendUrl } from '../config/api';
-import { auth } from '../firebase/config';
+import { auth, db } from '../firebase/config';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import './Checkout.css';
+
+const onlyDigits = (value) => String(value || '').replace(/\D/g, '');
+
+const formatCpf = (value) => {
+  const digits = onlyDigits(value).slice(0, 11);
+  return digits
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+};
+
+const formatPhone = (value) => {
+  const digits = onlyDigits(value).slice(0, 11);
+  if (digits.length <= 10) {
+    return digits
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{4})(\d)/, '$1-$2');
+  }
+  return digits
+    .replace(/(\d{2})(\d)/, '($1) $2')
+    .replace(/(\d{5})(\d)/, '$1-$2');
+};
+
+const isValidCpf = (cpf) => {
+  const digits = onlyDigits(cpf);
+  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
+
+  const calcDigit = (base) => {
+    let sum = 0;
+    for (let i = 0; i < base.length; i += 1) {
+      sum += Number(base[i]) * (base.length + 1 - i);
+    }
+    const rest = (sum * 10) % 11;
+    return rest === 10 ? 0 : rest;
+  };
+
+  const d1 = calcDigit(digits.slice(0, 9));
+  const d2 = calcDigit(digits.slice(0, 10));
+  return d1 === Number(digits[9]) && d2 === Number(digits[10]);
+};
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -16,6 +57,8 @@ const Checkout = () => {
 
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [payerData, setPayerData] = useState({ name: '', cpf: '', telefone: '' });
 
   // Carregar plano selecionado (Mantido)
   useEffect(() => {
@@ -30,6 +73,31 @@ const Checkout = () => {
   useEffect(() => {
     fetch(backendUrl('/health'), { method: 'GET', mode: 'cors' }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user?.uid) {
+        setProfileLoading(false);
+        return;
+      }
+
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        const data = userDoc.exists() ? userDoc.data() : {};
+        setPayerData({
+          name: data.name || data.displayName || data.nome || user.displayName || user.email || '',
+          cpf: formatCpf(data.cpf || data.cpfCnpj || ''),
+          telefone: formatPhone(data.telefone || data.phone || '')
+        });
+      } catch (error) {
+        console.error('Erro ao carregar dados do pagador:', error);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, [user]);
   
 
   // ============================================
@@ -38,6 +106,25 @@ const Checkout = () => {
   const handleCheckout = async () => {
     if (!selectedPlan || !user) {
       toast.warning('⚠️ Erro ao processar pagamento. Tente novamente.');
+      return;
+    }
+
+    const cleanCpf = onlyDigits(payerData.cpf);
+    const cleanPhone = onlyDigits(payerData.telefone);
+    const payerName = payerData.name.trim();
+
+    if (!payerName) {
+      toast.warning('Informe seu nome completo antes de continuar.');
+      return;
+    }
+
+    if (!isValidCpf(cleanCpf)) {
+      toast.warning('Informe um CPF válido antes de continuar.');
+      return;
+    }
+
+    if (cleanPhone.length < 10) {
+      toast.warning('Informe um telefone válido com DDD.');
       return;
     }
 
@@ -52,6 +139,13 @@ const Checkout = () => {
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 25000);
+
+      await setDoc(doc(db, 'users', user.uid), {
+        name: payerName,
+        cpf: cleanCpf,
+        telefone: cleanPhone,
+        updated_at: new Date()
+      }, { merge: true });
 
       const response = await fetch(apiUrl('/asaas/create-subscription'), {
         method: 'POST',
@@ -165,6 +259,38 @@ const Checkout = () => {
           {/* Coluna Direita — Pagamento */}
           <div className="checkout-card">
             <h2>Método de Pagamento</h2>
+            <div className="payer-form">
+              <label>
+                <span>Nome completo</span>
+                <input
+                  value={payerData.name}
+                  onChange={(e) => setPayerData((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="Digite seu nome completo"
+                  disabled={profileLoading || loading}
+                />
+              </label>
+              <label>
+                <span>CPF</span>
+                <input
+                  value={payerData.cpf}
+                  onChange={(e) => setPayerData((prev) => ({ ...prev, cpf: formatCpf(e.target.value) }))}
+                  placeholder="000.000.000-00"
+                  inputMode="numeric"
+                  disabled={profileLoading || loading}
+                />
+              </label>
+              <label>
+                <span>Telefone com DDD</span>
+                <input
+                  value={payerData.telefone}
+                  onChange={(e) => setPayerData((prev) => ({ ...prev, telefone: formatPhone(e.target.value) }))}
+                  placeholder="(00) 00000-0000"
+                  inputMode="tel"
+                  disabled={profileLoading || loading}
+                />
+              </label>
+              <p>Esses dados são usados apenas para gerar a cobrança segura no Asaas.</p>
+            </div>
             <div className="payment-methods">
               <label className="payment-method-option selected">
                 <input type="radio" name="paymentMethod" value="asaas" checked readOnly />
@@ -177,8 +303,8 @@ const Checkout = () => {
                 </div>
               </label>
             </div>
-            <button className="btn-checkout" onClick={handleCheckout} disabled={loading}>
-              {loading ? 'Processando...' : 'Continuar para pagamento'}
+            <button className="btn-checkout" onClick={handleCheckout} disabled={loading || profileLoading}>
+              {loading ? 'Processando...' : profileLoading ? 'Carregando dados...' : 'Continuar para pagamento'}
             </button>
             <div className="security-badges">
               <p>🔒 Pagamento 100% seguro</p>
