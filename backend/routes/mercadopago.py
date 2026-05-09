@@ -3,6 +3,7 @@
 
 import os
 import mercadopago
+import requests
 from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -179,13 +180,38 @@ PLANS = {
   "annual_upfront": { "id": "annual_upfront", "price": 360.00, "title": "Plano Anual à Vista" }
 }
 
+
+def get_mp_access_token() -> str:
+    access_token = os.environ.get("MERCADOPAGO_ACCESS_TOKEN")
+    if not access_token:
+        logger.error("❌ MERCADOPAGO_ACCESS_TOKEN não configurado")
+        raise HTTPException(status_code=500, detail="Mercado Pago não configurado")
+    return access_token
+
+
+def mp_headers() -> dict:
+    return {
+        "Authorization": f"Bearer {get_mp_access_token()}",
+        "Content-Type": "application/json",
+    }
+
+
+def fetch_preapproval(preapproval_id: str) -> dict:
+    response = requests.get(
+        f"https://api.mercadopago.com/preapproval/{preapproval_id}",
+        headers=mp_headers(),
+        timeout=20,
+    )
+    if response.status_code >= 400:
+        logger.warning("❌ Erro ao buscar assinatura MP %s: %s", preapproval_id, response.text)
+        raise HTTPException(status_code=502, detail="Erro ao consultar assinatura no Mercado Pago")
+    return response.json()
+
 # ============================================
 # ⭐️ ROTA DE PREFERÊNCIA (OTIMIZADA PARA APROVAÇÃO) ⭐️
 # ============================================
 @router.post("/create-preference")
 async def create_preference(payload: PreferencePayload, authenticated_uid: str = Depends(get_authenticated_uid)):
-    if not sdk: raise HTTPException(status_code=500, detail="Mercado Pago SDK não está configurado")
-    
     # ⭐️ 1. INICIALIZAR O FIREBASE ADMIN (NOVO NESTA ROTA) ⭐️
     db_firestore = initialize_firebase()
     if not db_firestore:
@@ -200,7 +226,6 @@ async def create_preference(payload: PreferencePayload, authenticated_uid: str =
         user_id = authenticated_uid
         plan = PLANS[plan_id]
         frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
-        payment_method = payload.paymentMethod if payload.paymentMethod in {"credit_card", "pix"} else "credit_card"
 
         # ⭐️ 2. BUSCAR DADOS COMPLETOS DO UTILIZADOR (CPF/TELEFONE) DO FIREBASE ⭐️
         user_cpf = None
@@ -221,76 +246,65 @@ async def create_preference(payload: PreferencePayload, authenticated_uid: str =
             except Exception as e:
                 logger.error(f"❌ Erro ao buscar dados do utilizador {user_id} no Firestore: {e}")
 
-        # ⭐️ 3. MONTAR O OBJETO 'PAYER' OTIMIZADO ⭐️
-        payer_data = {
-            "name": user_info_dict.get('name', user_info_dict.get('email')),
-            "email": user_info_dict.get('email')
-        }
+        payer_email = user_info_dict.get("email")
+        if not payer_email:
+            raise HTTPException(status_code=400, detail="Usuário sem e-mail cadastrado")
 
-        # Adiciona CPF (Obrigatório para flexibilização)
-        if user_cpf:
-            payer_data["identification"] = {
-                "type": "CPF",
-                "number": user_cpf # O CPF já deve estar limpo (só dígitos)
-            }
-
-        # Adiciona Telefone (Obrigatório para flexibilização)
-        if user_telefone and len(user_telefone) >= 10:
-            payer_data["phone"] = {
-                "area_code": user_telefone[:2], # Primeiros 2 dígitos (DDD)
-                "number": user_telefone[2:]  # O resto
-            }
-        
-        payment_methods = {"installments": plan.get("installments", 1)}
-        if payment_method == "pix":
-            payment_methods["excluded_payment_types"] = [
-                {"id": "credit_card"},
-                {"id": "debit_card"},
-                {"id": "ticket"},
-                {"id": "atm"},
-            ]
-        else:
-            payment_methods["excluded_payment_types"] = [
-                {"id": "bank_transfer"},
-                {"id": "ticket"},
-                {"id": "atm"},
-            ]
-
-        # 4. DADOS DA PREFERÊNCIA (Usando o 'payer_data' otimizado)
-        preference_data = {
-            "items": [{ 
-                "title": plan["title"], 
-                "unit_price": plan["price"], 
-                "quantity": 1, 
+        external_reference = f"{user_id}-{plan_id}-{plan.get('price')}"
+        subscription_data = {
+            "reason": plan["title"],
+            "external_reference": external_reference,
+            "payer_email": payer_email,
+            "auto_recurring": {
+                "frequency": 1,
+                "frequency_type": "months",
+                "transaction_amount": plan["price"],
                 "currency_id": "BRL",
-            }],
-            "payer": payer_data, # ⭐️ USA O NOVO OBJETO 'PAYER'
-            "back_urls": { "success": f"{frontend_url}/payment-success", "failure": f"{frontend_url}/payment-failure", "pending": f"{frontend_url}/payment-pending" },
-            "payment_methods": payment_methods,
-            "external_reference": f"{user_id}-{plan_id}-{plan.get('price')}",
-            "statement_descriptor": "VENPRO",
+            },
+            "back_url": f"{frontend_url}/payment-success",
+            "status": "pending",
         }
 
-        # 5. OPÇÕES DA REQUISIÇÃO (Device ID - Mantido)
-        request_options = {}
+        headers = mp_headers()
         if payload.deviceId and payload.deviceId.strip():
-            request_options["headers"] = {
-                "X-meli-session-id": payload.deviceId
-            }
+            headers["X-meli-session-id"] = payload.deviceId.strip()
 
-        # 6. CRIA A PREFERÊNCIA (Mantido)
-        if request_options:
-            preference_response = sdk.preference().create(preference_data, request_options=request_options)
-        else:
-            preference_response = sdk.preference().create(preference_data)
+        subscription_response = requests.post(
+            "https://api.mercadopago.com/preapproval",
+            headers=headers,
+            json=subscription_data,
+            timeout=25,
+        )
 
-        if preference_response["status"] != 201:
-            error_details = preference_response.get("response", {}).get("message", "Nenhum detalhe do erro retornado")
-            raise HTTPException(status_code=500, detail=f"Erro ao criar preferência no MP: {error_details}")
-            
-        preference = preference_response["response"]
-        return { "preferenceId": preference["id"], "initPoint": preference["init_point"], "sandboxInitPoint": preference.get("sandbox_init_point") }
-        
+        if subscription_response.status_code >= 400:
+            logger.error("❌ Erro ao criar assinatura MP: %s", subscription_response.text)
+            raise HTTPException(status_code=502, detail="Erro ao criar assinatura no Mercado Pago")
+
+        subscription = subscription_response.json()
+        preapproval_id = subscription.get("id")
+
+        db_firestore.collection('subscriptions').document(user_id).set({
+            "userId": user_id,
+            "planId": plan_id,
+            "status": "pending",
+            "mercadoPagoPreapprovalId": preapproval_id,
+            "mercadoPagoSubscriptionId": preapproval_id,
+            "externalReference": external_reference,
+            "amount": plan["price"],
+            "currency": "BRL",
+            "updatedAt": datetime.now(timezone.utc),
+            "trialEndsAt": None,
+        }, merge=True)
+
+        return {
+            "preferenceId": preapproval_id,
+            "preapprovalId": preapproval_id,
+            "initPoint": subscription.get("init_point"),
+            "sandboxInitPoint": subscription.get("sandbox_init_point"),
+            "status": subscription.get("status"),
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Erro grave ao criar preferência: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erro interno do servidor: {str(e)}")
@@ -301,10 +315,6 @@ async def create_preference(payload: PreferencePayload, authenticated_uid: str =
 # ============================================
 @router.post("/webhook")
 async def webhook(request: Request):
-    if not sdk:
-        logger.error("❌ Webhook falhou: SDK MP não inicializado.")
-        return {"status": "error", "message": "SDK MP not initialized"}
-    
     db_firestore = initialize_firebase()
     if not db_firestore:
         logger.error("❌ Webhook falhou: Firebase Admin não inicializado.")
@@ -312,7 +322,58 @@ async def webhook(request: Request):
         
     try:
         body = await request.json()
-        if body.get("type") != "payment": return {"status": "ok"}
+        notification_type = body.get("type")
+
+        if notification_type in {"subscription_preapproval", "preapproval"}:
+            preapproval_id = body.get("data", {}).get("id")
+            if not preapproval_id:
+                return {"status": "ok"}
+
+            preapproval_data = fetch_preapproval(preapproval_id)
+            external_reference = str(preapproval_data.get("external_reference") or "")
+            user_id = external_reference.split('-')[0] if external_reference else None
+            plan_id = external_reference.split('-')[1] if len(external_reference.split('-')) > 1 else "monthly"
+            status = preapproval_data.get("status")
+            amount = preapproval_data.get("auto_recurring", {}).get("transaction_amount")
+
+            if not user_id:
+                logger.warning("⚠️ Assinatura MP sem external_reference: %s", preapproval_id)
+                return {"status": "ok"}
+
+            mapped_status = {
+                "authorized": "active",
+                "pending": "pending",
+                "paused": "suspended",
+                "cancelled": "canceled",
+                "cancelled_process": "canceled",
+            }.get(status, status or "pending")
+
+            subscription_update = {
+                "userId": user_id,
+                "planId": plan_id,
+                "status": mapped_status,
+                "mercadoPagoPreapprovalId": preapproval_id,
+                "mercadoPagoSubscriptionId": preapproval_id,
+                "externalReference": external_reference,
+                "amount": amount,
+                "currency": preapproval_data.get("auto_recurring", {}).get("currency_id", "BRL"),
+                "nextBillingDate": preapproval_data.get("next_payment_date"),
+                "lastPaymentDate": datetime.now(timezone.utc) if mapped_status == "active" else None,
+                "updatedAt": datetime.now(timezone.utc),
+            }
+            if mapped_status == "active":
+                subscription_update["trialEndsAt"] = None
+
+            db_firestore.collection('subscriptions').document(user_id).set(subscription_update, merge=True)
+
+            logger.info("✅ Assinatura MP atualizada: user=%s preapproval=%s status=%s", user_id, preapproval_id, mapped_status)
+            return {"status": "ok"}
+
+        if notification_type != "payment": return {"status": "ok"}
+
+        if not sdk:
+            logger.error("❌ Webhook payment falhou: SDK MP não inicializado.")
+            return {"status": "error", "message": "SDK MP not initialized"}
 
         payment_id = body.get("data", {}).get("id")
         if not payment_id: return {"status": "ok"}
