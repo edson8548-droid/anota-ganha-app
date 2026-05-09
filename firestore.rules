@@ -65,6 +65,7 @@ service cloud.firestore {
         'name',
         'nome',
         'displayName',
+        'cpf',
         'telefone',
         'photoURL',
         'updated_at'
