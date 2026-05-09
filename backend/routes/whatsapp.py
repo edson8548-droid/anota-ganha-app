@@ -18,6 +18,7 @@ from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel
 import firebase_admin
 from firebase_admin import auth as firebase_auth, firestore
+from services.subscription_access import ensure_subscription_access
 from services.upload_validation import CSV_CONTENT_TYPES, IMAGE_CONTENT_TYPES, PDF_CONTENT_TYPES, validate_upload
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,11 @@ async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(securi
         decoded = await asyncio.to_thread(
             firebase_auth.verify_id_token, credentials.credentials
         )
-        return decoded['uid']
+        uid = decoded['uid']
+        await ensure_subscription_access(uid)
+        return uid
+    except HTTPException:
+        raise
     except Exception:
         logger.warning("[SECURITY] auth_invalid route=whatsapp")
         raise HTTPException(401, "Token inválido")
