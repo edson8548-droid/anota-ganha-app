@@ -173,7 +173,7 @@ def setup_mercadopago():
         sdk = None
 
 PLANS = {
-  "monthly": { "id": "monthly", "price": 39.00, "title": "Plano Mensal - Venpro" },
+  "monthly": { "id": "monthly", "price": 99.90, "title": "Plano Mensal - Venpro" },
   "annual_installments": { "id": "annual_installments", "price": 394.80, "title": "Plano Anual Parcelado" },
   "annual_upfront": { "id": "annual_upfront", "price": 360.00, "title": "Plano Anual à Vista" }
 }
