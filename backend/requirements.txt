@@ -12,6 +12,7 @@ python-multipart
 
 pydantic
 pydantic-settings
+email-validator
 
 python-dotenv
 sendgrid
