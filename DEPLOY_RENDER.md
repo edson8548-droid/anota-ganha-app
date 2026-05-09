@@ -33,15 +33,15 @@ E adicione estas variáveis:
 | `MONGO_URL` | `mongodb+srv://usuario:senha@cluster.mongodb.net/database` | URL do MongoDB |
 | `DB_NAME` | `anota_ganha` | Nome do banco |
 | `JWT_SECRET_KEY` | `gerar-um-segredo-muito-longo-aqui` | Chave secreta para JWT |
-| `MP_ACCESS_TOKEN` | `seu_token_mercadopago_producao` | Token do Mercado Pago |
-| `MP_PUBLIC_KEY` | `APP_USR-5f6e941d-3514-489a-9241-d8a42099b2d0` | Chave pública do Mercado Pago |
+| `ASAAS_API_KEY` | `sua_chave_asaas` | Chave da API Asaas |
+| `ASAAS_WEBHOOK_TOKEN` | `seu_token_webhook` | Token de autenticação do webhook Asaas |
 | `SENDGRID_API_KEY` | `SG.suas-chave-sendgrid` | Chave do SendGrid |
 | `SENDER_EMAIL` | `suporte@anotaganha.com` | Email remetente |
 | `RATE_LIMIT_ENABLED` | `true` | Rate limiting habilitado |
 
 ---
 
-### 4. Verificar webhook do Mercado Pago
+### 4. Verificar webhook do Asaas
 
 Configure o webhook para receber notificações de pagamento:
 - Acesse: https://www.mercadopago.com.br/developers/panel/credentials

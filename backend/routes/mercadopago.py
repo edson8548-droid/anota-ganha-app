@@ -212,6 +212,12 @@ def fetch_preapproval(preapproval_id: str) -> dict:
 # ============================================
 @router.post("/create-preference")
 async def create_preference(payload: PreferencePayload, authenticated_uid: str = Depends(get_authenticated_uid)):
+    logger.warning("[SECURITY] mercado_pago_create_preference_disabled uid=%s", authenticated_uid)
+    raise HTTPException(
+        status_code=410,
+        detail="Mercado Pago desativado para novas assinaturas. Use o checkout Asaas.",
+    )
+
     # ⭐️ 1. INICIALIZAR O FIREBASE ADMIN (NOVO NESTA ROTA) ⭐️
     db_firestore = initialize_firebase()
     if not db_firestore:

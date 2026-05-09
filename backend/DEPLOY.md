@@ -18,7 +18,9 @@ services:
         sync: false
       - key: JWT_SECRET_KEY
         generateValue: true
-      - key: MP_ACCESS_TOKEN
+      - key: ASAAS_API_KEY
+        sync: false
+      - key: ASAAS_WEBHOOK_TOKEN
         sync: false
       - key: SENDGRID_API_KEY
         sync: false
@@ -56,7 +58,8 @@ Antes do deploy, configure estas variáveis de ambiente:
 | `MONGO_URL` | URL de conexão do MongoDB |
 | `DB_NAME` | Nome do banco de dados |
 | `JWT_SECRET_KEY` | Chave secreta para JWT |
-| `MP_ACCESS_TOKEN` | Token do Mercado Pago |
+| `ASAAS_API_KEY` | Chave da API Asaas |
+| `ASAAS_WEBHOOK_TOKEN` | Token de autenticação do webhook Asaas |
 | `SENDGRID_API_KEY` | Chave do SendGrid |
 | `FRONTEND_URL` | URL do frontend |
 | `BACKEND_URL` | URL do backend |
