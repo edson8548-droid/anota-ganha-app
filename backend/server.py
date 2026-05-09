@@ -15,6 +15,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 # ... (restante dos imports) ...
 from routes.mercadopago import router as mercadopago_router
 from routes.mercadopago import setup_mercadopago, initialize_firebase
+from routes.asaas import router as asaas_router
 from routes.license import router as license_router
 from routes.ia import router as ia_router
 from routes.cotacao import router as cotacao_router, init_cotacao
@@ -70,6 +71,8 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
             return None
         if path == "/api/mercadopago/webhook":
             return (300, 60, "/api/mercadopago/webhook")
+        if path == "/api/asaas/webhook":
+            return (300, 60, "/api/asaas/webhook")
         if path == "/api/license/validate":
             return (30, 60, "/api/license/validate")
         if path.startswith("/api/vitrine/publica/"):
@@ -168,7 +171,7 @@ app.add_middleware(
 # ==================== Health ====================
 @app.get("/")
 async def root():
-    return { "message": "Venpro API", "status": "running", "version": "1.0.0", "mercadopago": "enabled" }
+    return { "message": "Venpro API", "status": "running", "version": "1.0.0", "payments": ["asaas", "mercadopago"] }
 
 @app.get("/health")
 async def health_check():
@@ -196,6 +199,7 @@ api_router = APIRouter(prefix="/api")
 
 # ⭐⭐⭐ ADICIONAR ROTAS DO MERCADO PAGO ⭐⭐⭐
 app.include_router(mercadopago_router, prefix="/api/mercadopago", tags=["Mercado Pago"])
+app.include_router(asaas_router, prefix="/api/asaas", tags=["Asaas"])
 app.include_router(license_router, prefix="/api/license", tags=["Licença"])
 app.include_router(ia_router, prefix="/api/ia", tags=["Assistente IA"])
 app.include_router(cotacao_router, prefix="/api/cotacao", tags=["Cotação"])
@@ -243,6 +247,7 @@ async def startup_event():
     except Exception as e:
         logger.warning(f"⚠️  Cleanup de jobs orphaned: {e}")
     logger.info("✅ Mercado Pago integrado em /api/mercadopago")
+    logger.info("✅ Asaas integrado em /api/asaas")
     logger.info("✅ Cotação integrado em /api/cotacao")
 
 @app.on_event("shutdown")
