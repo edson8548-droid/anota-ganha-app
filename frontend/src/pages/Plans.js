@@ -9,7 +9,7 @@ import './Plans.css';
 
 const Plans = () => {
   const navigate = useNavigate();
-  const { currentPlan, isTrialActive, trialEndsAt } = useSubscription();
+  const { subscription, isTrialActive, trialEndsAt } = useSubscription();
   const authData = useAuthContext();
 
   const [loading, setLoading] = useState(false);
@@ -50,7 +50,7 @@ const Plans = () => {
     { icon: <MessageCircle size={22} color="#3A85A8" />, text: 'Suporte via WhatsApp' },
   ];
 
-  const assinaturaAtiva = currentPlan?.id === 'monthly' && !isTrialActive;
+  const assinaturaAtiva = subscription?.status === 'active';
 
   return (
     <div className="plans-page">
