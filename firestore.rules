@@ -36,11 +36,49 @@ service cloud.firestore {
         ]);
     }
 
+    function validUserCreateFields() {
+      return request.resource.data.keys().hasOnly([
+        'email',
+        'name',
+        'nome',
+        'displayName',
+        'cpf',
+        'telefone',
+        'role',
+        'license_type',
+        'trial_ends_at',
+        'created_at',
+        'updated_at'
+      ]);
+    }
+
+    function validUserCreateValues() {
+      return request.resource.data.role == 'user'
+        && request.resource.data.license_type == 'trial'
+        && request.resource.data.email is string
+        && request.resource.data.cpf is string
+        && request.resource.data.telefone is string;
+    }
+
+    function onlySafeUserProfileFieldsChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'name',
+        'nome',
+        'displayName',
+        'telefone',
+        'photoURL',
+        'updated_at'
+      ]);
+    }
+
     match /users/{userId} {
       allow read: if isSelf(userId);
       allow create: if isSelf(userId)
-        && (!('role' in request.resource.data) || request.resource.data.role == 'user');
-      allow update: if isSelf(userId) && userAdminFieldsUnchanged();
+        && validUserCreateFields()
+        && validUserCreateValues();
+      allow update: if isSelf(userId)
+        && userAdminFieldsUnchanged()
+        && onlySafeUserProfileFieldsChanged();
       allow delete: if false;
     }
 
