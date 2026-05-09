@@ -22,6 +22,7 @@ from pydantic import BaseModel
 from bson import ObjectId
 import firebase_admin
 from firebase_admin import auth as firebase_auth
+from services.subscription_access import ensure_subscription_access
 from services.upload_validation import IMAGE_CONTENT_TYPES, safe_filename, validate_upload
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,11 @@ async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(securi
         raise HTTPException(401, "Token obrigatório")
     try:
         decoded = await asyncio.to_thread(firebase_auth.verify_id_token, credentials.credentials)
-        return decoded["uid"]
+        uid = decoded["uid"]
+        await ensure_subscription_access(uid)
+        return uid
+    except HTTPException:
+        raise
     except Exception:
         logger.warning("[SECURITY] auth_invalid route=vitrine")
         raise HTTPException(401, "Token inválido")

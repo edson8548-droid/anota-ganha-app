@@ -28,6 +28,7 @@ from services.excel_processor import (
     detectar_prazos_disponiveis,
 )
 from services.matching_engine import normalizar_nome
+from services.subscription_access import ensure_subscription_access
 from services.upload_validation import PDF_CONTENT_TYPES, XLSX_CONTENT_TYPES, validate_upload
 
 logger = logging.getLogger(__name__)
@@ -89,7 +90,11 @@ async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(securi
         raise HTTPException(401, "Token obrigatório")
     try:
         decoded = firebase_auth.verify_id_token(credentials.credentials)
-        return decoded['uid']
+        uid = decoded['uid']
+        await ensure_subscription_access(uid)
+        return uid
+    except HTTPException:
+        raise
     except Exception:
         logger.warning("[SECURITY] auth_invalid route=cotacao")
         raise HTTPException(401, "Token inválido")
