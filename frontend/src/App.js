@@ -21,8 +21,11 @@ import ForgotPassword from './pages/ForgotPassword';
 import Vitrine from './pages/Vitrine';
 import VitrineEditar from './pages/VitrineEditar';
 import VitrinePublica from './pages/VitrinePublica';
+import { startExtensionTokenBridge } from './utils/extensionTokenBridge';
 
 import './App.css';
+
+startExtensionTokenBridge();
 
 function App() {
   return (
