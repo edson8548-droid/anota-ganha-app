@@ -7,11 +7,10 @@ import asyncio
 import logging
 import os
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
-from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from firebase_admin import auth as firebase_auth, firestore
-from bson import ObjectId
+from services.public_files import stream_public_gridfs_file
 from services.upload_validation import IMAGE_CONTENT_TYPES, safe_filename, validate_upload
 from pydantic import BaseModel, EmailStr, Field, validator
 
@@ -131,12 +130,7 @@ def _fs():
 @router.get("/avatars/{grid_id}")
 async def servir_avatar(grid_id: str):
     """Serve avatar público via GridFS."""
-    try:
-        grid_out = await _gridfs().open_download_stream(ObjectId(grid_id))
-        content_type = (grid_out.metadata or {}).get("content_type", "image/jpeg")
-        return StreamingResponse(grid_out, media_type=content_type)
-    except Exception:
-        raise HTTPException(404, "Avatar não encontrado")
+    return await stream_public_gridfs_file(_gridfs(), grid_id, label="Avatar")
 
 
 @router.post("/avatar")
