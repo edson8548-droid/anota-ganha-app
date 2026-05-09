@@ -5,6 +5,7 @@ import io
 import re
 import asyncio
 import logging
+import os
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -136,6 +137,56 @@ async def servir_avatar(grid_id: str):
         return StreamingResponse(grid_out, media_type=content_type)
     except Exception:
         raise HTTPException(404, "Avatar não encontrado")
+
+
+@router.post("/avatar")
+async def upload_avatar(
+    arquivo: UploadFile = File(...),
+    uid: str = Depends(get_user_id)
+):
+    """Recebe a foto do perfil, salva no GridFS e atualiza o perfil do usuário."""
+    content = await arquivo.read()
+    filename = validate_upload(
+        arquivo,
+        content,
+        label="foto de perfil",
+        allowed_extensions={".jpg", ".jpeg", ".png", ".webp"},
+        allowed_kinds={"jpg", "png", "webp"},
+        allowed_content_types=IMAGE_CONTENT_TYPES,
+        max_bytes=2 * 1024 * 1024,
+    )
+
+    try:
+        grid_id = await _gridfs().upload_from_stream(
+            filename,
+            io.BytesIO(content),
+            metadata={
+                "user_id": uid,
+                "content_type": arquivo.content_type or "image/jpeg",
+                "original_filename": safe_filename(arquivo.filename, filename),
+            },
+        )
+    except Exception:
+        logger.exception("[USERS] Erro ao salvar avatar no GridFS")
+        raise HTTPException(500, "Erro ao salvar foto de perfil")
+
+    backend_url = os.environ.get("BACKEND_URL", "https://api.venpro.com.br").rstrip("/")
+    photo_url = f"{backend_url}/api/users/avatars/{str(grid_id)}"
+
+    try:
+        await asyncio.to_thread(
+            _fs().collection("users").document(uid).set,
+            {
+                "photoURL": photo_url,
+                "updated_at": firestore.SERVER_TIMESTAMP,
+            },
+            merge=True,
+        )
+    except Exception:
+        logger.exception("[USERS] Erro ao atualizar photoURL do usuário")
+        raise HTTPException(500, "Foto salva, mas não foi possível atualizar o perfil")
+
+    return {"photoURL": photo_url, "gridId": str(grid_id)}
 
 
 class RegisterRequest(BaseModel):
