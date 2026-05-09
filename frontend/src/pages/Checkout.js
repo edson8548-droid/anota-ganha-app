@@ -1,55 +1,11 @@
-// SUBSTITUA: src/pages/Checkout.js
-// ⭐️ CORREÇÃO: Usa o SDK principal ('sdk.mercadopago.com/js/v2') para obter o Device ID.
-
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
-import { apiUrl, backendUrl, MP_PUBLIC_KEY } from '../config/api';
+import { apiUrl, backendUrl } from '../config/api';
 import { auth } from '../firebase/config';
 import './Checkout.css';
-
-
-// ⭐️ NOVA FUNÇÃO HELPER: Espera o SDK e obtém o Device ID ⭐️
-/**
- * Tenta obter o deviceId a partir do SDK (window.mpInstance)
- * @returns {Promise<string|null>} O valor do deviceId ou null se expirar.
- */
-const getDeviceIdFromSDK = () => {
-  return new Promise((resolve) => {
-    const startTime = Date.now();
-    const maxWaitTime = 1500; // Device ID ajuda na aprovação, mas não pode travar o checkout.
-
-    const check = () => {
-      // Verifica se a instância do SDK (mpInstance) está pronta E se a função getDeviceID existe
-      if (window.mpInstance && window.mpInstance.getDeviceID) {
-        
-        // Tenta obter o ID. A função pode demorar um pouco para estar pronta.
-        const deviceId = window.mpInstance.getDeviceID();
-        
-        if (deviceId) {
-            console.log("✅ Device ID capturado do SDK:", deviceId);
-            resolve(deviceId);
-        } else {
-            // SDK está pronto, mas a função ainda não retornou um ID, tenta de novo
-            setTimeout(check, 100);
-        }
-      } 
-      // Se o tempo máximo de espera foi atingido
-      else if (Date.now() - startTime > maxWaitTime) {
-        console.warn("⚠️ Device ID do Mercado Pago não ficou pronto a tempo.");
-        resolve(null); // Resolve com null após o timeout
-      } 
-      // Se ainda não encontrou, tenta novamente em 100ms
-      else {
-        setTimeout(check, 100); 
-      }
-    };
-    check(); // Inicia a verificação
-  });
-};
-
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -60,7 +16,6 @@ const Checkout = () => {
 
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [paymentMethod] = useState('credit_card');
 
   // Carregar plano selecionado (Mantido)
   useEffect(() => {
@@ -72,34 +27,9 @@ const Checkout = () => {
     }
   }, [location, PLANS, navigate]);
 
-  // ⭐️ EFEITO RESTAURADO: Carrega o SDK principal do Mercado Pago ⭐️
   useEffect(() => {
     fetch(backendUrl('/health'), { method: 'GET', mode: 'cors' }).catch(() => {});
-
-    const script = document.createElement('script');
-    script.src = 'https://sdk.mercadopago.com/js/v2';
-    script.async = true;
-    document.body.appendChild(script);
-
-    script.onload = () => {
-      try {
-        // Esta é a chave: 'mpInstance' é criada QUANDO o script carrega
-        window.mpInstance = new window.MercadoPago(MP_PUBLIC_KEY, { locale: 'pt-BR' });
-        console.log("✅ MP SDK (mpInstance) inicializado.");
-      } catch (e) {
-        console.error("Falha ao inicializar MP:", e);
-      }
-    };
-    return () => {
-      // Limpa ao sair da página
-      if (document.body.contains(script)) { document.body.removeChild(script); }
-      if (window.mpInstance) {
-        delete window.mpInstance;
-      }
-    };
-  }, []); // Vazio, carrega uma vez
-
-  // ⭐️ EFEITO REMOVIDO: O script 'security.js' foi removido.
+  }, []);
   
 
   // ============================================
@@ -114,9 +44,6 @@ const Checkout = () => {
     setLoading(true);
 
     try {
-      // ⭐️ PASSO 1: ESPERAR E CAPTURAR O DEVICE ID (do SDK) ⭐️
-      // A função 'await' vai pausar o 'handleCheckout' até o ID ser encontrado ou o tempo esgotar.
-      const deviceIdValue = await getDeviceIdFromSDK();
       const token = await auth.currentUser?.getIdToken();
 
       if (!token) {
@@ -126,8 +53,7 @@ const Checkout = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-      // 2. CHAMAR O BACKEND
-      const response = await fetch(apiUrl('/mercadopago/create-preference'), {
+      const response = await fetch(apiUrl('/asaas/create-subscription'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -135,15 +61,7 @@ const Checkout = () => {
         },
         signal: controller.signal,
         body: JSON.stringify({
-          planId: selectedPlan.id,
-          user: {
-            email: user.email,
-            name: user.displayName || user.email,
-            id: user.uid 
-          },
-          // Envia o deviceId (seja o valor ou null)
-          deviceId: deviceIdValue,
-          paymentMethod
+          planId: selectedPlan.id
         })
       });
       clearTimeout(timeoutId);
@@ -155,10 +73,12 @@ const Checkout = () => {
       }
 
       const data = await response.json();
-      console.log('✅ Preferência criada:', data.preferenceId);
+      const paymentUrl = data.paymentUrl || data.invoiceUrl;
+      if (!paymentUrl) {
+        throw new Error('O Asaas não retornou o link de pagamento.');
+      }
 
-      // ⭐️ 3. REDIRECIONAR A PÁGINA INTEIRA ⭐️
-      window.location.href = data.initPoint;
+      window.location.href = paymentUrl;
 
     } catch (error) {
       console.error('❌ Erro no handleCheckout:', error);
@@ -246,24 +166,24 @@ const Checkout = () => {
           <div className="checkout-card">
             <h2>Método de Pagamento</h2>
             <div className="payment-methods">
-              <label className={`payment-method-option ${paymentMethod === 'credit_card' ? 'selected' : ''}`}>
-                <input type="radio" name="paymentMethod" value="credit_card" checked readOnly />
+              <label className="payment-method-option selected">
+                <input type="radio" name="paymentMethod" value="asaas" checked readOnly />
                 <div className="payment-method-content">
                   <span className="payment-icon">💳</span>
                   <div>
                     <strong>Assinatura recorrente até cancelar</strong>
-                    <p>Cobrança mensal automática via Mercado Pago. Cancele quando quiser.</p>
+                    <p>Pagamento seguro via Asaas. Escolha cartão, Pix ou boleto na próxima tela.</p>
                   </div>
                 </div>
               </label>
             </div>
             <button className="btn-checkout" onClick={handleCheckout} disabled={loading}>
-              {loading ? 'Processando...' : 'Autorizar assinatura recorrente'}
+              {loading ? 'Processando...' : 'Continuar para pagamento'}
             </button>
             <div className="security-badges">
               <p>🔒 Pagamento 100% seguro</p>
               <p>✓ Criptografia SSL</p>
-              <p>✓ Dados protegidos pelo Mercado Pago</p>
+              <p>✓ Dados protegidos pelo Asaas</p>
             </div>
           </div>
 
