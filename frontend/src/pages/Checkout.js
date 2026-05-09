@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
-import { apiUrl, MP_PUBLIC_KEY } from '../config/api';
+import { apiUrl, backendUrl, MP_PUBLIC_KEY } from '../config/api';
 import { auth } from '../firebase/config';
 import './Checkout.css';
 
@@ -19,7 +19,7 @@ import './Checkout.css';
 const getDeviceIdFromSDK = () => {
   return new Promise((resolve) => {
     const startTime = Date.now();
-    const maxWaitTime = 4000; // Espera no máximo 4 segundos
+    const maxWaitTime = 1500; // Device ID ajuda na aprovação, mas não pode travar o checkout.
 
     const check = () => {
       // Verifica se a instância do SDK (mpInstance) está pronta E se a função getDeviceID existe
@@ -38,7 +38,7 @@ const getDeviceIdFromSDK = () => {
       } 
       // Se o tempo máximo de espera foi atingido
       else if (Date.now() - startTime > maxWaitTime) {
-        console.warn("⚠️ Instância do MP SDK não carregou após 4s.");
+        console.warn("⚠️ Device ID do Mercado Pago não ficou pronto a tempo.");
         resolve(null); // Resolve com null após o timeout
       } 
       // Se ainda não encontrou, tenta novamente em 100ms
@@ -74,6 +74,8 @@ const Checkout = () => {
 
   // ⭐️ EFEITO RESTAURADO: Carrega o SDK principal do Mercado Pago ⭐️
   useEffect(() => {
+    fetch(backendUrl('/health'), { method: 'GET', mode: 'cors' }).catch(() => {});
+
     const script = document.createElement('script');
     script.src = 'https://sdk.mercadopago.com/js/v2';
     script.async = true;
@@ -121,13 +123,17 @@ const Checkout = () => {
         throw new Error('Sessão expirada. Faça login novamente.');
       }
 
-      // 2. CHAMAR O BACKEND DO RAILWAY
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
+
+      // 2. CHAMAR O BACKEND
       const response = await fetch(apiUrl('/mercadopago/create-preference'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
+        signal: controller.signal,
         body: JSON.stringify({
           planId: selectedPlan.id,
           user: {
@@ -139,6 +145,7 @@ const Checkout = () => {
           deviceId: deviceIdValue 
         })
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const err = await response.json();
@@ -154,7 +161,10 @@ const Checkout = () => {
 
     } catch (error) {
       console.error('❌ Erro no handleCheckout:', error);
-      toast.warning('Erro ao processar pagamento. Tente novamente.');
+      const message = error.name === 'AbortError'
+        ? 'O pagamento demorou para responder. Tente novamente em alguns segundos.'
+        : error.message || 'Erro ao processar pagamento. Tente novamente.';
+      toast.warning(message);
       setLoading(false);
     }
   };
