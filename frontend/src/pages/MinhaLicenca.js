@@ -16,6 +16,7 @@ const MinhaLicenca = () => {
   const [cupomCodigo, setCupomCodigo] = useState('');
   const [cupomLoading, setCupomLoading] = useState(false);
   const [cupomMsg, setCupomMsg] = useState(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   const showConfirm = (title, description, onConfirm) =>
     setConfirmDialog({ open: true, title, description, onConfirm });
@@ -46,6 +47,25 @@ const MinhaLicenca = () => {
 
   const handleLogout = () => {
     showConfirm('Sair', 'Deseja realmente sair?', () => { logout(); navigate('/login'); });
+  };
+
+  const cancelarAssinatura = async () => {
+    closeConfirm();
+    setCancelLoading(true);
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const resp = await fetch(apiUrl('/asaas/cancel-subscription'), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data.detail || 'Erro ao cancelar assinatura');
+      toast.success('Assinatura cancelada. Novas cobranças foram interrompidas.');
+    } catch (e) {
+      toast.error(e.message || 'Não foi possível cancelar a assinatura.');
+    } finally {
+      setCancelLoading(false);
+    }
   };
 
   const statusInfo = () => {
@@ -91,6 +111,19 @@ const MinhaLicenca = () => {
           {!assinaturaAtiva && (
             <button onClick={() => navigate('/plans')} style={s.btnPrimary}>
               Ver planos e assinar
+            </button>
+          )}
+          {subscription?.status === 'active' && (
+            <button
+              onClick={() => showConfirm(
+                'Cancelar assinatura',
+                'Deseja cancelar sua assinatura? Novas cobranças serão interrompidas e o acesso às ferramentas será bloqueado.',
+                cancelarAssinatura
+              )}
+              disabled={cancelLoading}
+              style={{ ...s.btnDanger, opacity: cancelLoading ? 0.6 : 1 }}
+            >
+              {cancelLoading ? 'Cancelando...' : 'Cancelar assinatura'}
             </button>
           )}
         </div>
@@ -196,6 +229,7 @@ const s = {
   statusBadge: { display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderRadius: 10, marginBottom: 14 },
   statusText: { fontSize: 14, fontWeight: 600 },
   btnPrimary: { background: '#3A85A8', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
+  btnDanger: { background: 'transparent', color: '#f87171', border: '1px solid rgba(248,113,113,.45)', borderRadius: 8, padding: '10px 22px', fontSize: 14, fontWeight: 600, cursor: 'pointer', marginTop: 10 },
   cupomInput: { flex: 1, minWidth: 180, padding: '10px 16px', background: '#2B2D31', border: '1px solid #4A4D52', borderRadius: 8, color: '#E1E1E1', fontSize: 14, fontFamily: 'monospace', letterSpacing: 1 },
   extGrid: { display: 'flex', flexDirection: 'column', gap: 12 },
   extCard: { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: '#2B2D31', borderRadius: 10, border: '1px solid #4A4D52' },

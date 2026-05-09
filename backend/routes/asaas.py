@@ -70,6 +70,17 @@ def _asaas_request(method: str, path: str, **kwargs) -> dict:
     return response.json() if response.content else {}
 
 
+def _cancel_asaas_subscription(subscription_id: str) -> None:
+    url = f"{_asaas_base_url()}/subscriptions/{subscription_id}"
+    response = requests.delete(url, headers=_asaas_headers(), timeout=30)
+    if response.status_code == 404:
+        logger.warning("[ASAAS] Assinatura já não existe no Asaas: %s", subscription_id)
+        return
+    if response.status_code >= 400:
+        logger.error("[ASAAS] DELETE /subscriptions/%s falhou: %s", subscription_id, response.text)
+        raise HTTPException(status_code=502, detail="Erro ao cancelar assinatura no Asaas")
+
+
 def _find_or_create_customer(uid: str, user_data: dict) -> str:
     existing_customer_id = user_data.get("asaasCustomerId")
     if existing_customer_id:
@@ -213,6 +224,36 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
         "paymentUrl": payment_url,
         "invoiceUrl": payment_url,
     }
+
+
+@router.post("/cancel-subscription")
+async def cancel_subscription(uid: str = Depends(get_user_id)):
+    subscription_ref = _fs().collection("subscriptions").document(uid)
+    subscription_doc = subscription_ref.get()
+
+    if not subscription_doc.exists:
+        raise HTTPException(status_code=404, detail="Assinatura não encontrada")
+
+    subscription_data = subscription_doc.to_dict() or {}
+    asaas_subscription_id = subscription_data.get("asaasSubscriptionId")
+
+    if asaas_subscription_id:
+        _cancel_asaas_subscription(asaas_subscription_id)
+
+    subscription_ref.set(
+        {
+            "userId": uid,
+            "status": "canceled",
+            "provider": subscription_data.get("provider") or "asaas",
+            "canceledAt": datetime.now(timezone.utc),
+            "updatedAt": datetime.now(timezone.utc),
+            "cancelReason": "user_requested",
+        },
+        merge=True,
+    )
+
+    logger.info("[ASAAS] Assinatura cancelada pelo usuário uid=%s asaasSubscriptionId=%s", uid, asaas_subscription_id)
+    return {"status": "canceled"}
 
 
 @router.post("/webhook")
