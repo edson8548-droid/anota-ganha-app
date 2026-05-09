@@ -7,6 +7,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import { apiUrl, MP_PUBLIC_KEY } from '../config/api';
+import { auth } from '../firebase/config';
 import './Checkout.css';
 
 
@@ -114,11 +115,19 @@ const Checkout = () => {
       // ⭐️ PASSO 1: ESPERAR E CAPTURAR O DEVICE ID (do SDK) ⭐️
       // A função 'await' vai pausar o 'handleCheckout' até o ID ser encontrado ou o tempo esgotar.
       const deviceIdValue = await getDeviceIdFromSDK();
+      const token = await auth.currentUser?.getIdToken();
+
+      if (!token) {
+        throw new Error('Sessão expirada. Faça login novamente.');
+      }
 
       // 2. CHAMAR O BACKEND DO RAILWAY
       const response = await fetch(apiUrl('/mercadopago/create-preference'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
         body: JSON.stringify({
           planId: selectedPlan.id,
           user: {

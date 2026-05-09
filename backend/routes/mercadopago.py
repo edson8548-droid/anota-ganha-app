@@ -3,11 +3,12 @@
 
 import os
 import mercadopago
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import logging
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, auth as firebase_auth
 from datetime import datetime, timezone
 from typing import Optional 
 
@@ -146,6 +147,19 @@ def initialize_firebase():
 # ... (Configuração, router, sdk, PLANS mantidos) ...
 router = APIRouter()
 sdk = None
+security = HTTPBearer(auto_error=False)
+
+
+def get_authenticated_uid(credentials_token: HTTPAuthorizationCredentials = Depends(security)) -> str:
+    if not credentials_token:
+        logger.warning("[SECURITY] auth_missing route=mercadopago_create_preference")
+        raise HTTPException(status_code=401, detail="Token obrigatório")
+    try:
+        decoded = firebase_auth.verify_id_token(credentials_token.credentials)
+        return decoded.get("uid")
+    except Exception:
+        logger.warning("[SECURITY] auth_invalid route=mercadopago_create_preference")
+        raise HTTPException(status_code=401, detail="Token inválido")
 
 def setup_mercadopago():
     global sdk
@@ -168,7 +182,7 @@ PLANS = {
 # ⭐️ ROTA DE PREFERÊNCIA (OTIMIZADA PARA APROVAÇÃO) ⭐️
 # ============================================
 @router.post("/create-preference")
-async def create_preference(payload: PreferencePayload):
+async def create_preference(payload: PreferencePayload, authenticated_uid: str = Depends(get_authenticated_uid)):
     if not sdk: raise HTTPException(status_code=500, detail="Mercado Pago SDK não está configurado")
     
     # ⭐️ 1. INICIALIZAR O FIREBASE ADMIN (NOVO NESTA ROTA) ⭐️
@@ -178,8 +192,11 @@ async def create_preference(payload: PreferencePayload):
         
     try:
         plan_id = payload.planId
-        user_info_dict = payload.user.model_dump() 
-        user_id = user_info_dict.get('id') # ⭐️ ID do utilizador
+        if plan_id not in PLANS:
+            raise HTTPException(status_code=400, detail="Plano inválido")
+
+        user_info_dict = payload.user.model_dump()
+        user_id = authenticated_uid
         plan = PLANS[plan_id]
         frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
@@ -194,6 +211,8 @@ async def create_preference(payload: PreferencePayload):
                     user_data = user_doc.to_dict()
                     user_cpf = user_data.get('cpf')
                     user_telefone = user_data.get('telefone')
+                    user_info_dict["email"] = user_data.get("email") or user_info_dict.get("email")
+                    user_info_dict["name"] = user_data.get("name") or user_data.get("displayName") or user_data.get("nome") or user_info_dict.get("name")
                     logger.info(f"✅ Dados do utilizador {user_id} encontrados (CPF: {'Sim' if user_cpf else 'Não'})")
                 else:
                     logger.warning(f"⚠️ Documento do utilizador {user_id} não encontrado no Firestore.")
