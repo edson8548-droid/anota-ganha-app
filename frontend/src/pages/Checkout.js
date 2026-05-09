@@ -207,10 +207,21 @@ const Checkout = () => {
                   <div className="price-total-checkout">Total R$ {selectedPlan.price.toFixed(2)}/ano</div>
                 </>
               ) : (
-                <div className="price-main-checkout">
-                  R$ {selectedPlan.price.toFixed(2)}
-                  <span className="price-period-checkout">/{selectedPlan.id === 'monthly' ? 'mês' : 'ano'}</span>
-                </div>
+                <>
+                  <div className="price-total-checkout" style={{ textDecoration: 'line-through', opacity: .7 }}>
+                    De R$ 99,90/mês
+                  </div>
+                  <div className="price-main-checkout">
+                    R$ {selectedPlan.price.toFixed(2)}
+                    <span className="price-period-checkout">/{selectedPlan.id === 'monthly' ? 'mês' : 'ano'}</span>
+                  </div>
+                  <div className="trial-info-checkout" style={{ marginTop: 12 }}>
+                    <div>
+                      <strong>Preço de lançamento por tempo limitado</strong>
+                      <p>Cobrança mensal recorrente até o cancelamento.</p>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
             {selectedPlan.savings && (
