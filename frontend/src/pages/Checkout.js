@@ -60,7 +60,7 @@ const Checkout = () => {
 
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('credit_card');
+  const [paymentMethod] = useState('credit_card');
 
   // Carregar plano selecionado (Mantido)
   useEffect(() => {
@@ -236,28 +236,18 @@ const Checkout = () => {
             <h2>Método de Pagamento</h2>
             <div className="payment-methods">
               <label className={`payment-method-option ${paymentMethod === 'credit_card' ? 'selected' : ''}`}>
-                <input type="radio" name="paymentMethod" value="credit_card" checked={paymentMethod === 'credit_card'} onChange={e => setPaymentMethod(e.target.value)} />
+                <input type="radio" name="paymentMethod" value="credit_card" checked readOnly />
                 <div className="payment-method-content">
                   <span className="payment-icon">💳</span>
                   <div>
-                    <strong>Cartão de Crédito</strong>
-                    <p>Pagamento seguro via Mercado Pago</p>
-                  </div>
-                </div>
-              </label>
-              <label className={`payment-method-option ${paymentMethod === 'pix' ? 'selected' : ''}`}>
-                <input type="radio" name="paymentMethod" value="pix" checked={paymentMethod === 'pix'} onChange={e => setPaymentMethod(e.target.value)} />
-                <div className="payment-method-content">
-                  <span className="payment-icon">⚡</span>
-                  <div>
-                    <strong>PIX</strong>
-                    <p>Aprovação instantânea</p>
+                    <strong>Assinatura recorrente</strong>
+                    <p>Cobrança mensal automática via Mercado Pago até o cancelamento.</p>
                   </div>
                 </div>
               </label>
             </div>
             <button className="btn-checkout" onClick={handleCheckout} disabled={loading}>
-              {loading ? 'Processando...' : 'Finalizar Pagamento'}
+              {loading ? 'Processando...' : 'Autorizar assinatura recorrente'}
             </button>
             <div className="security-badges">
               <p>🔒 Pagamento 100% seguro</p>

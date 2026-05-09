@@ -96,7 +96,7 @@ const Plans = () => {
               <span style={{ fontSize: 64, fontWeight: 800, color: '#ffffff', lineHeight: 1 }}>69</span>
               <span style={{ fontSize: 28, fontWeight: 700, color: '#ffffff', alignSelf: 'flex-end', marginBottom: 6 }}>,90</span>
             </div>
-            <div style={{ fontSize: 14, color: '#A0A3A8', marginTop: 4 }}>por mês nos 3 primeiros meses · cancele quando quiser</div>
+            <div style={{ fontSize: 14, color: '#A0A3A8', marginTop: 4 }}>cobrança mensal recorrente · cancele quando quiser</div>
           </div>
 
           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', display: 'flex', flexDirection: 'column', gap: 12 }}>
