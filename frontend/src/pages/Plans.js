@@ -89,7 +89,10 @@ const Plans = () => {
 
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#3A85A8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
-              Preço de lançamento
+              Preço de lançamento por tempo limitado
+            </div>
+            <div style={{ fontSize: 15, color: '#A0A3A8', marginBottom: 6 }}>
+              De <span style={{ textDecoration: 'line-through', color: '#8C9098' }}>R$ 99,90</span> por
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 4 }}>
               <span style={{ fontSize: 18, fontWeight: 700, color: '#A0A3A8', alignSelf: 'flex-start', marginTop: 8 }}>R$</span>
@@ -97,6 +100,9 @@ const Plans = () => {
               <span style={{ fontSize: 28, fontWeight: 700, color: '#ffffff', alignSelf: 'flex-end', marginBottom: 6 }}>,90</span>
             </div>
             <div style={{ fontSize: 14, color: '#A0A3A8', marginTop: 4 }}>cobrança mensal recorrente · cancele quando quiser</div>
+            <div style={{ margin: '14px auto 0', padding: '9px 12px', border: '1px solid rgba(58,133,168,.45)', borderRadius: 10, color: '#DDEFF7', background: 'rgba(58,133,168,.14)', fontSize: 13, fontWeight: 700 }}>
+              Garanta o valor de lançamento enquanto a oferta estiver ativa.
+            </div>
           </div>
 
           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', display: 'flex', flexDirection: 'column', gap: 12 }}>
