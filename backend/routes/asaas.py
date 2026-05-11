@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from firebase_admin import auth as firebase_auth, firestore
 from pydantic import BaseModel
+from services.security_audit import audit_event
 from services.security_config import is_production_environment
 
 logger = logging.getLogger(__name__)
@@ -199,6 +200,12 @@ def _access_end_for_cancel(subscription_data: dict) -> datetime:
 @router.post("/create-subscription")
 async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Depends(get_user_id)):
     if payload.planId != ASAAS_PLAN_ID:
+        await audit_event(
+            "subscription_create_rejected",
+            uid=uid,
+            status="blocked",
+            metadata={"reason": "invalid_plan", "planId": payload.planId},
+        )
         raise HTTPException(status_code=400, detail="Plano inválido")
 
     user_ref = _fs().collection("users").document(uid)
@@ -251,6 +258,12 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
         },
         merge=True,
     )
+    await audit_event(
+        "subscription_created",
+        uid=uid,
+        status="pending",
+        metadata={"provider": "asaas", "planId": ASAAS_PLAN_ID, "amount": ASAAS_PLAN_PRICE},
+    )
 
     return {
         "provider": "asaas",
@@ -290,6 +303,12 @@ async def cancel_subscription(uid: str = Depends(get_user_id)):
         },
         merge=True,
     )
+    await audit_event(
+        "subscription_cancel_requested",
+        uid=uid,
+        status="canceling",
+        metadata={"provider": subscription_data.get("provider") or "asaas"},
+    )
 
     logger.info(
         "[ASAAS] Recorrência cancelada, acesso mantido até o fim do período uid=%s asaasSubscriptionId=%s accessEndsAt=%s",
@@ -310,9 +329,11 @@ async def asaas_webhook(
     received_token = asaas_access_token or asaas_access_token_underscore
     if not expected_token and is_production_environment():
         logger.error("[SECURITY] asaas_webhook_token_missing_in_production")
+        await audit_event("asaas_webhook_token_missing", status="blocked", request=request)
         raise HTTPException(status_code=503, detail="Webhook Asaas não configurado")
     if expected_token and received_token != expected_token:
         logger.warning("[SECURITY] asaas_webhook_invalid_token")
+        await audit_event("asaas_webhook_invalid_token", status="blocked", request=request)
         raise HTTPException(status_code=401, detail="Token inválido")
 
     body = await request.json()
@@ -323,6 +344,12 @@ async def asaas_webhook(
 
     if not uid:
         logger.info("[ASAAS] Evento sem usuário mapeado event=%s", event)
+        await audit_event(
+            "asaas_webhook_unmapped",
+            status="ignored",
+            metadata={"event": event},
+            request=request,
+        )
         return {"received": True}
 
     update = {
@@ -391,8 +418,22 @@ async def asaas_webhook(
         )
     else:
         logger.info("[ASAAS] Evento ignorado event=%s uid=%s", event, uid)
+        await audit_event(
+            "asaas_webhook_ignored",
+            uid=uid,
+            status="ignored",
+            metadata={"event": event},
+            request=request,
+        )
         return {"received": True}
 
     _fs().collection("subscriptions").document(uid).set(update, merge=True)
+    await audit_event(
+        "asaas_webhook_processed",
+        uid=uid,
+        status=update.get("status") or "processed",
+        metadata={"event": event, "provider": "asaas"},
+        request=request,
+    )
     logger.info("[ASAAS] Evento processado event=%s uid=%s status=%s", event, uid, update.get("status"))
     return {"received": True}

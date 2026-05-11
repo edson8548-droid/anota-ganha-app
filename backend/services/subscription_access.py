@@ -4,6 +4,7 @@ from typing import Optional
 
 from fastapi import HTTPException
 from firebase_admin import firestore
+from services.security_audit import audit_event
 
 
 def _as_datetime(value) -> Optional[datetime]:
@@ -58,6 +59,7 @@ def _has_subscription_access_sync(uid: str) -> bool:
 async def ensure_subscription_access(uid: str) -> str:
     allowed = await asyncio.to_thread(_has_subscription_access_sync, uid)
     if not allowed:
+        await audit_event("subscription_access_denied", uid=uid, status="blocked")
         raise HTTPException(
             status_code=403,
             detail="Assinatura inativa. Assine novamente para usar esta ferramenta.",

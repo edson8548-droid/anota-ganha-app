@@ -18,6 +18,7 @@ from pydantic import BaseModel
 import firebase_admin
 from firebase_admin import auth as firebase_auth, firestore
 from services.public_files import stream_public_gridfs_file
+from services.security_audit import audit_event, hash_identifier
 from services.subscription_access import ensure_subscription_access
 from services.upload_validation import CSV_CONTENT_TYPES, IMAGE_CONTENT_TYPES, PDF_CONTENT_TYPES, validate_upload
 
@@ -234,6 +235,12 @@ async def upload_contatos(
         raise HTTPException(400, str(e))
 
     await _set_campaign(uid, {"contacts": contacts, "sentNumbers": []})
+    await audit_event(
+        "whatsapp_contacts_uploaded",
+        uid=uid,
+        status="success",
+        metadata={"total": len(contacts), "invalidos": invalidos},
+    )
     return {"total": len(contacts), "invalidos": invalidos}
 
 
@@ -269,6 +276,12 @@ async def upload_fotos(
 
     all_urls = existing + new_urls
     await _set_campaign(uid, {"photoUrls": all_urls})
+    await audit_event(
+        "whatsapp_photos_uploaded",
+        uid=uid,
+        status="success",
+        metadata={"files": len(new_urls), "totalBytes": total_bytes, "photosTotal": len(all_urls)},
+    )
     return {"photoUrls": all_urls}
 
 
@@ -279,6 +292,7 @@ async def deletar_fotos(uid: str = Depends(get_user_id)):
     for url in urls:
         await _delete_photo(url)
     await _set_campaign(uid, {"photoUrls": []})
+    await audit_event("whatsapp_photos_deleted", uid=uid, status="success", metadata={"deleted": len(urls)})
     return {"deleted": len(urls)}
 
 
@@ -291,6 +305,12 @@ async def salvar_mensagem(payload: MensagemPayload, uid: str = Depends(get_user_
     if not payload.message.strip():
         raise HTTPException(400, "Mensagem não pode ser vazia")
     await _set_campaign(uid, {"message": payload.message.strip()})
+    await audit_event(
+        "whatsapp_message_saved",
+        uid=uid,
+        status="success",
+        metadata={"messageLength": len(payload.message.strip())},
+    )
     return {"ok": True}
 
 
@@ -304,12 +324,19 @@ async def registrar_enviado(payload: EnviadosPayload, uid: str = Depends(get_use
         ref = _campaign_ref(uid)
         ref.update({"sentNumbers": firestore.ArrayUnion([payload.telefone])})
     await asyncio.to_thread(_append)
+    await audit_event(
+        "whatsapp_sent_registered",
+        uid=uid,
+        status="success",
+        metadata={"phoneHash": hash_identifier(payload.telefone)},
+    )
     return {"ok": True}
 
 
 @router.delete("/campanha/enviados")
 async def limpar_enviados(uid: str = Depends(get_user_id)):
     await _set_campaign(uid, {"sentNumbers": []})
+    await audit_event("whatsapp_sent_reset", uid=uid, status="success")
     return {"ok": True}
 
 
