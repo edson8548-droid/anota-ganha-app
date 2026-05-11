@@ -66,12 +66,6 @@
   color: #e1e1e1; font-size: 14px; resize: vertical; margin-bottom: 10px;
   font-family: inherit;
 }
-.disp-ia-row { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
-.disp-ia-input {
-  flex: 1; min-width: 180px; padding: 9px 10px;
-  background: #2b2d31; border: 1px solid #4a4d52; border-radius: 8px;
-  color: #e1e1e1; font-size: 13px;
-}
 .disp-greeting-hint {
   font-size: 11px; color: #a0a3a8; margin-bottom: 8px;
   background: #2b2d31; border-radius: 6px; padding: 6px 10px;

@@ -20,6 +20,3 @@ export const limparEnviados = () => api.delete('/whatsapp/campanha/enviados');
 
 export const salvarMensagem = (message) =>
   api.put('/whatsapp/campanha/mensagem', { message });
-
-export const sugerirMensagemIA = (descricao) =>
-  api.post('/whatsapp/campanha/ia-mensagem', { descricao });

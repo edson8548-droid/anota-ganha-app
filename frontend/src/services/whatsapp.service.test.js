@@ -4,7 +4,6 @@ import {
   getCampanha,
   limparEnviados,
   salvarMensagem,
-  sugerirMensagemIA,
   uploadContatos,
   uploadFotos,
 } from './whatsapp.service';
@@ -63,13 +62,5 @@ test('salvarMensagem envia a mensagem no corpo esperado', () => {
 
   expect(api.put).toHaveBeenCalledWith('/whatsapp/campanha/mensagem', {
     message: 'Oferta da semana',
-  });
-});
-
-test('sugerirMensagemIA envia a descricao no corpo esperado', () => {
-  sugerirMensagemIA('promo de frios');
-
-  expect(api.post).toHaveBeenCalledWith('/whatsapp/campanha/ia-mensagem', {
-    descricao: 'promo de frios',
   });
 });
