@@ -124,15 +124,31 @@ async function requestTokenFromOpenVenProTab() {
   });
 
   for (const tab of tabs) {
+    const token = await requestTokenFromTab(tab.id);
+    if (token) return token;
+  }
+
+  return null;
+}
+
+async function requestTokenFromTab(tabId) {
+  try {
+    const response = await chrome.tabs.sendMessage(tabId, { action: 'requestToken' });
+    if (response?.token) {
+      await chrome.storage.local.set({ venpro_token: response.token, venpro_token_ts: Date.now() });
+      return response.token;
+    }
+  } catch {
     try {
-      const response = await chrome.tabs.sendMessage(tab.id, { action: 'requestToken' });
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['venpro-content.js'] });
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const response = await chrome.tabs.sendMessage(tabId, { action: 'requestToken' });
       if (response?.token) {
         await chrome.storage.local.set({ venpro_token: response.token, venpro_token_ts: Date.now() });
         return response.token;
       }
     } catch {}
   }
-
   return null;
 }
 
