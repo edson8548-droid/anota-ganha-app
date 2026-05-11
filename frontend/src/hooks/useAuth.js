@@ -13,6 +13,7 @@ import {
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { isValidCPF, onlyDigits } from '../utils/documentValidators';
+import { registerDeviceSession } from '../utils/deviceSession';
 
 export const useAuth = () => {
   const [user, setUser] = useState(null);
@@ -39,6 +40,10 @@ export const useAuth = () => {
             ...userData,
             isAdmin: isAdmin 
           });
+
+          registerDeviceSession().catch((sessionErr) => {
+            console.warn('[Auth] Não foi possível registrar dispositivo:', sessionErr?.message || sessionErr);
+          });
         } catch (err) {
           console.error('Erro ao buscar dados do usuário:', err);
           setUser({
@@ -48,6 +53,10 @@ export const useAuth = () => {
             photoURL: firebaseUser.photoURL,
             emailVerified: firebaseUser.emailVerified,
             isAdmin: false 
+          });
+
+          registerDeviceSession().catch((sessionErr) => {
+            console.warn('[Auth] Não foi possível registrar dispositivo:', sessionErr?.message || sessionErr);
           });
         }
       } else {
