@@ -39,6 +39,36 @@ async function getWhatsAppTab() {
   return tabs.find(tab => tab?.id && tab?.url?.includes('web.whatsapp.com')) || null;
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function sendMessageToTab(tabId, message) {
+  return new Promise(resolve => {
+    chrome.tabs.sendMessage(tabId, message, response => {
+      if (chrome.runtime.lastError) {
+        resolve(null);
+        return;
+      }
+      resolve(response || {});
+    });
+  });
+}
+
+async function sendWhatsAppMessage(tabId, message) {
+  let response = await sendMessageToTab(tabId, message);
+  if (response) return response;
+
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+    await sleep(500);
+    response = await sendMessageToTab(tabId, message);
+    return response || null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchCampaign(token) {
   const r = await fetch(`${API_URL}/whatsapp/campanha`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -165,10 +195,17 @@ btnDisparar.addEventListener('click', async () => {
   cancelWrap.style.display = 'block';
   setStatus('Iniciando disparo...', 'info');
 
-  chrome.tabs.sendMessage(tab.id, {
+  const response = await sendWhatsAppMessage(tab.id, {
     action: 'startDispatch',
     data: { campaign, token, pausaMin, pausaMax },
   });
+
+  if (!response?.ok) {
+    btnDisparar.disabled = false;
+    btnDisparar.textContent = 'Iniciar Disparo';
+    cancelWrap.style.display = 'none';
+    setStatus('Não consegui conectar ao WhatsApp Web. Atualize a aba do WhatsApp e tente novamente.', 'err');
+  }
 });
 
 btnRetomar.addEventListener('click', async () => {
@@ -180,13 +217,19 @@ btnRetomar.addEventListener('click', async () => {
   btnDisparar.disabled = true;
   btnDisparar.textContent = 'Disparando...';
   setStatus('Retomando disparo...', 'info');
-  chrome.tabs.sendMessage(tab.id, { action: 'resumeDispatch', token });
+  const response = await sendWhatsAppMessage(tab.id, { action: 'resumeDispatch', token });
+  if (!response?.ok) {
+    btnDisparar.disabled = false;
+    btnDisparar.textContent = 'Iniciar Disparo';
+    cancelWrap.style.display = 'none';
+    setStatus('Não consegui conectar ao WhatsApp Web. Atualize a aba do WhatsApp e tente novamente.', 'err');
+  }
 });
 
 async function stopDispatch() {
   const tab = await getWhatsAppTab();
   if (tab) {
-    chrome.tabs.sendMessage(tab.id, { action: 'cancelDispatch' });
+    await sendWhatsAppMessage(tab.id, { action: 'cancelDispatch' });
   }
   await new Promise(resolve => chrome.storage.local.remove('whatsappDispatchJob', resolve));
   await new Promise(resolve => {
