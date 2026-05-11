@@ -412,7 +412,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
             <div>
               <h3 className="section-title">Metas de incentivo</h3>
               <p className="goals-panel-subtitle">
-                Some o que voce ja vendeu antes com o que foi positivado no Venpro para enxergar quanto falta vender.
+                Some o que você já vendeu antes com o que foi positivado no Venpro para enxergar quanto falta vender.
               </p>
             </div>
           </div>
@@ -428,7 +428,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
                 </div>
                 <div className="goal-values">
                   <div><span>Meta</span><strong>{formatCurrency(industry.targetValue)}</strong></div>
-                  <div><span>Ja vendido</span><strong>{formatCurrency(industry.alreadySoldValue)}</strong></div>
+                  <div><span>Já vendido</span><strong>{formatCurrency(industry.alreadySoldValue)}</strong></div>
                   <div><span>No Venpro</span><strong>{formatCurrency(industry.venproValue)}</strong></div>
                   <div><span>Falta</span><strong>{formatCurrency(industry.remaining)}</strong></div>
                 </div>
@@ -479,7 +479,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
                   <tr key={client.id}>
                     <td>
                       <span className={`action-status ${client.actionStatus}`}>
-                        {client.actionStatus === 'empty' ? 'Nao vendeu' : 'Vendeu parcial'}
+                        {client.actionStatus === 'empty' ? 'Não vendeu' : 'Vendeu parcial'}
                       </span>
                     </td>
                     <td><strong>{client.name}</strong></td>

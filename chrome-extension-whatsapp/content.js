@@ -262,7 +262,7 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
       chrome.runtime.sendMessage({ action: 'registerSentNumber', token, telefone }, r => resolve(r));
     });
     if (!response?.ok) {
-      await saveState('running', 'Mensagem enviada, mas nao consegui registrar no Venpro. Verifique sua conexao antes de continuar.');
+      await saveState('running', 'Mensagem enviada, mas não consegui registrar no Venpro. Verifique sua conexão antes de continuar.');
       return;
     }
     sentSet.add(telefone);
@@ -305,7 +305,7 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
     const alreadyTyped = await waitForMessageReady(chatInput, fullMsg, 6000);
     const typed = alreadyTyped || await typeMessage(chatInput, fullMsg);
     if (!typed) {
-      await saveState('running', 'Nao consegui escrever a mensagem no WhatsApp Web. Atualize o WhatsApp Web e tente novamente.');
+      await saveState('running', 'Não consegui escrever a mensagem no WhatsApp Web. Atualize o WhatsApp Web e tente novamente.');
       continue;
     }
     await sleep(300);

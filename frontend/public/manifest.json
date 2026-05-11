@@ -1,7 +1,7 @@
 {
   "short_name": "Venpro",
   "name": "Venpro — Ferramentas para RCAs",
-  "description": "Robô de cotação, assistente IA e gestão para representantes comerciais",
+  "description": "Cotação Pronta, Carteira no WhatsApp, Vitrine Inteligente e gestão para representantes comerciais",
   "lang": "pt-BR",
   "dir": "ltr",
   "icons": [
@@ -30,5 +30,4 @@
   "related_applications": [],
   "shortcuts": []
 }
-
 

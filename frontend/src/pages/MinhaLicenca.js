@@ -90,8 +90,8 @@ const MinhaLicenca = () => {
     if (s === 'canceling' || (s === 'canceled' && hasCanceledPaidAccess)) {
       return { cor: '#f59e0b', icone: '⏳', texto: `Cancelada — acesso até ${accessEndsAt ? accessEndsAt.toLocaleDateString('pt-BR') : 'o fim do período pago'}` };
     }
-    if (s === 'trialing')      return { cor: '#f59e0b', icone: '🎁', texto: `Trial — ${trialEndsAt ? `até ${trialEndsAt.toLocaleDateString('pt-BR')}` : ''}` };
-    if (s === 'trial_expired') return { cor: '#ef4444', icone: '⏰', texto: 'Trial expirado' };
+    if (s === 'trialing')      return { cor: '#f59e0b', icone: '🎁', texto: `Teste grátis — ${trialEndsAt ? `até ${trialEndsAt.toLocaleDateString('pt-BR')}` : ''}` };
+    if (s === 'trial_expired') return { cor: '#ef4444', icone: '⏰', texto: 'Teste grátis expirado' };
     if (s === 'canceled')      return { cor: '#ef4444', icone: '❌', texto: 'Cancelada' };
     return { cor: '#6b7280', icone: '⚠️', texto: 'Sem assinatura' };
   };

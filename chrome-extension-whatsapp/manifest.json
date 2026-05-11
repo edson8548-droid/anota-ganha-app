@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Venpro — Carteira no WhatsApp",
-  "version": "1.1.12",
-  "description": "Dispara ofertas para clientes via WhatsApp Web com sua campanha Venpro.",
+  "version": "1.1.13",
+  "description": "Envia ofertas para clientes via WhatsApp Web com sua campanha Venpro.",
   "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel"],
   "host_permissions": [
     "https://web.whatsapp.com/*",

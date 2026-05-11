@@ -368,7 +368,7 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
                 <input type="text" placeholder="0,00" value={formatTargetValueInput()} onChange={handleTargetValueChange} />
               </div>
               <div className="campaign-form-group">
-                <label>Ja vendido antes/fora do Venpro (R$)</label>
+                <label>Já vendido antes/fora do Venpro (R$)</label>
                 <input type="text" placeholder="0,00" value={formatAlreadySoldValueInput()} onChange={handleAlreadySoldValueChange} />
               </div>
               <div className="campaign-form-group">
@@ -440,7 +440,7 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
                 <input type="text" placeholder="0,00" value={formatTargetValueInput()} onChange={handleTargetValueChange} />
               </div>
               <div className="campaign-form-group">
-                <label>Ja vendido antes/fora do Venpro (R$)</label>
+                <label>Já vendido antes/fora do Venpro (R$)</label>
                 <input type="text" placeholder="0,00" value={formatAlreadySoldValueInput()} onChange={handleAlreadySoldValueChange} />
               </div>
               <div className="campaign-form-group">
