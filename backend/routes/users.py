@@ -6,11 +6,12 @@ import re
 import asyncio
 import logging
 import os
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from firebase_admin import auth as firebase_auth, firestore
 from services.public_files import stream_public_gridfs_file
+from services.security_audit import audit_event, hash_identifier
 from services.upload_validation import IMAGE_CONTENT_TYPES, safe_filename, validate_upload
 from pydantic import BaseModel, EmailStr, Field, validator
 
@@ -189,6 +190,60 @@ class RegisterRequest(BaseModel):
     nome: str
     cpf: str
     telefone: str
+
+
+class DeviceSessionPayload(BaseModel):
+    deviceId: str = Field(..., min_length=16, max_length=160)
+    platform: str | None = Field(default=None, max_length=80)
+    language: str | None = Field(default=None, max_length=40)
+    timezone: str | None = Field(default=None, max_length=80)
+    screenWidth: int | None = Field(default=None, ge=0, le=20000)
+    screenHeight: int | None = Field(default=None, ge=0, le=20000)
+    appVersion: str | None = Field(default=None, max_length=40)
+
+
+@router.post("/device-session")
+async def register_device_session(
+    payload: DeviceSessionPayload,
+    request: Request,
+    uid: str = Depends(get_user_id),
+):
+    """Registra uso de dispositivo sem bloquear acesso."""
+    device_hash = hash_identifier(payload.deviceId)
+    if not device_hash:
+        raise HTTPException(400, "Dispositivo inválido")
+
+    device_ref = _fs().collection("users").document(uid).collection("devices").document(device_hash)
+
+    def _write():
+        doc = device_ref.get()
+        new_device = not doc.exists
+        data = {
+            "deviceHash": device_hash,
+            "platform": payload.platform,
+            "language": payload.language,
+            "timezone": payload.timezone,
+            "screenWidth": payload.screenWidth,
+            "screenHeight": payload.screenHeight,
+            "appVersion": payload.appVersion,
+            "userAgent": (request.headers.get("user-agent") or "")[:180],
+            "lastSeenAt": firestore.SERVER_TIMESTAMP,
+            "loginCount": firestore.Increment(1),
+        }
+        if new_device:
+            data["firstSeenAt"] = firestore.SERVER_TIMESTAMP
+        device_ref.set(data, merge=True)
+        return new_device
+
+    new_device = await asyncio.to_thread(_write)
+    await audit_event(
+        "device_session_registered",
+        uid=uid,
+        status="success",
+        metadata={"deviceHash": device_hash, "newDevice": new_device},
+        request=request,
+    )
+    return {"ok": True, "deviceHash": device_hash, "newDevice": new_device}
 
 
 @router.post("/register")
