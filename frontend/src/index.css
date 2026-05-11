@@ -103,6 +103,36 @@ code {
   100% { background-position: -200% 0; }
 }
 
+/* Botao padrao de voltar usado nas ferramentas VenPro */
+.venpro-back-button {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid #4A4D52;
+  background: transparent;
+  color: #A0A3A8;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background .2s, border-color .2s, color .2s;
+}
+
+.venpro-back-button:hover {
+  background: #363940;
+  border-color: #5A5D63;
+  color: #E1E1E1;
+}
+
+.venpro-back-button svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.2;
+}
+
 @layer base {
     [data-debug-wrapper="true"] {
         display: contents !important;

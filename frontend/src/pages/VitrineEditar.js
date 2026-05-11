@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Store, Plus, X, Image, Search } from 'lucide-react';
+import { ArrowLeft, Store, Plus, X, Image, Search } from 'lucide-react';
 import { vitrineService } from '../services/vitrine.service';
 import { backendUrl } from '../config/api';
 import './Vitrine.css';
@@ -270,7 +270,9 @@ export default function VitrineEditar() {
     <div className="vt-page">
       <header className="vt-header">
         <div className="vt-header-left">
-          <button className="vt-btn-back" onClick={() => navigate('/vitrine')}>← Vitrines</button>
+          <button className="venpro-back-button" onClick={() => navigate('/vitrine')} title="Voltar" aria-label="Voltar">
+            <ArrowLeft size={18} />
+          </button>
           <div style={{ width: 1, height: 20, background: '#4A4D52' }} />
           <div>
             <div className="vt-header-title">Editar Vitrine</div>

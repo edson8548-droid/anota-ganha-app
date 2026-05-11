@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Store, Plus, Pencil, Trash2, Copy, Eye, X, Check, Image, Search } from 'lucide-react';
+import { ArrowLeft, Store, Plus, Pencil, Trash2, Copy, Eye, X, Check, Image, Search } from 'lucide-react';
 import { vitrineService } from '../services/vitrine.service';
 import './Vitrine.css';
 
@@ -278,7 +278,9 @@ export default function Vitrine() {
     <div className="vt-page">
       <header className="vt-header">
         <div className="vt-header-left">
-          <button className="vt-btn-back" onClick={() => navigate('/dashboard')}>← Voltar</button>
+          <button className="venpro-back-button" onClick={() => navigate('/dashboard')} title="Voltar" aria-label="Voltar">
+            <ArrowLeft size={18} />
+          </button>
           <div style={{ width: 1, height: 20, background: '#4A4D52' }} />
           <div>
             <div className="vt-header-title">Vitrine Inteligente</div>
@@ -375,7 +377,9 @@ export default function Vitrine() {
     <div className="vt-page">
       <header className="vt-header">
         <div className="vt-header-left">
-          <button className="vt-btn-back" onClick={() => { resetForm(); setView('lista'); }}>← Vitrines</button>
+          <button className="venpro-back-button" onClick={() => { resetForm(); setView('lista'); }} title="Voltar" aria-label="Voltar">
+            <ArrowLeft size={18} />
+          </button>
           <div style={{ width: 1, height: 20, background: '#4A4D52' }} />
           <div>
             <div className="vt-header-title">Nova Vitrine</div>

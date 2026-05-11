@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer
@@ -362,7 +363,9 @@ const Analytics = ({ campaign, clients, onClose }) => {
       {/* Header */}
       <div className="analytics-header">
         <div className="analytics-header-left">
-          <button className="btn-back-analytics" onClick={onClose} title="Voltar"><span>←</span></button>
+          <button className="venpro-back-button" onClick={onClose} title="Voltar" aria-label="Voltar">
+            <ArrowLeft size={18} />
+          </button>
           <div>
             <h1 className="analytics-title">Raio-X da Campanha</h1>
             <p className="analytics-subtitle">{campaign.name}</p>

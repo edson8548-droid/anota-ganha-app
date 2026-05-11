@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { FileSpreadsheet, ClipboardList, BarChart3, Send, Store, Plus, RotateCcw, Trash2, Copy, MessageCircle, Pencil, LifeBuoy, LogOut } from 'lucide-react';
+import { ArrowLeft, FileSpreadsheet, ClipboardList, BarChart3, Send, Store, Plus, RotateCcw, Trash2, Copy, MessageCircle, Pencil, LifeBuoy, LogOut } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useCampaigns } from '../hooks/useCampaigns';
 import { useClients } from '../hooks/useClients';
@@ -663,7 +663,9 @@ const Dashboard = () => {
         <header className="campaign-view-header">
           <div className="campaign-view-header-content">
             <div className="campaign-view-left">
-              <button className="btn-back" onClick={() => setSelectedCampaignId(null)} title="Voltar">←</button>
+              <button className="venpro-back-button" onClick={() => setSelectedCampaignId(null)} title="Voltar" aria-label="Voltar">
+                <ArrowLeft size={18} />
+              </button>
               <div className="campaign-view-info">
                 <h1>{selectedCampaign.name}</h1>
                 <p>{campaignPeriod} | {campaignClients.length} Clientes | {Object.keys(selectedCampaign.industries || {}).length} Indústrias</p>
