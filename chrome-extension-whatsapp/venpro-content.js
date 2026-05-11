@@ -1,4 +1,4 @@
-// Syncs VenPro auth token to chrome.storage without exposing it in page localStorage.
+// Syncs Venpro auth token to chrome.storage without exposing it in page localStorage.
 function requestTokenFromPage() {
   return new Promise((resolve) => {
     const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;

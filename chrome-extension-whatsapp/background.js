@@ -70,10 +70,10 @@ async function getValidToken() {
     return stored.venpro_token;
   }
 
-  return requestTokenFromOpenVenProTab();
+  return requestTokenFromOpenVenproTab();
 }
 
-async function requestTokenFromOpenVenProTab() {
+async function requestTokenFromOpenVenproTab() {
   const tabs = await chrome.tabs.query({
     url: [
       'https://venpro.com.br/*',

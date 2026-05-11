@@ -67,6 +67,13 @@
   letter-spacing: -0.5px;
 }
 
+.register-logo-word {
+  font-size: 28px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+}
+
 .register-header h1 {
   font-size: 20px;
   color: #E1E1E1;
@@ -285,7 +292,8 @@
   }
 
   .register-logo-ven,
-  .register-logo-pro {
+  .register-logo-pro,
+  .register-logo-word {
     font-size: 24px;
   }
 

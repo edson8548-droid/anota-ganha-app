@@ -59,7 +59,7 @@ const SubscriptionRequired = () => {
         <div style={{ fontSize: 34, marginBottom: 12 }}>🔒</div>
         <h2 style={{ margin: '0 0 10px', color: '#fff', fontSize: 22 }}>Assinatura necessária</h2>
         <p style={{ margin: '0 0 22px', color: '#A0A3A8', lineHeight: 1.6, fontSize: 14 }}>
-          Sua assinatura está cancelada ou expirada. Para usar esta ferramenta do VenPro, assine novamente.
+          Sua assinatura está cancelada ou expirada. Para usar esta ferramenta do Venpro, assine novamente.
         </p>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button

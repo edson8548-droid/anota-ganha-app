@@ -561,8 +561,8 @@ const Dashboard = () => {
           <div className="header-content">
             <div className="header-left">
               <a className="logo" href="/dashboard">
-                <img className="logo-icon-img" src="/assets/logo/venpro-logo-icon-transparent.png" alt="VenPro" />
-                <span className="logo-ven">Ven</span><span className="logo-pro">Pro</span>
+                <img className="logo-icon-img" src="/assets/logo/venpro-logo-icon-transparent.png" alt="Venpro" />
+                <span className="logo-word">Venpro</span>
               </a>
             </div>
             <div className="header-actions">

@@ -48,6 +48,12 @@
   color: #3A85A8;
 }
 
+.landing-nav-word {
+  font-size: 27px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
 .landing-nav-actions {
   display: flex;
   gap: 12px;
@@ -122,8 +128,7 @@
   line-height: 1;
 }
 
-.landing-hero-brand-name span:first-child { color: #ffffff; }
-.landing-hero-brand-name span:last-child { color: #3A85A8; }
+.landing-hero-brand-name { color: #ffffff; }
 
 .landing-hero-brand-line {
   margin-top: 8px;

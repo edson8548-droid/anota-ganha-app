@@ -100,7 +100,7 @@ async function runBatches(job, startBatch, preenchidos, naoEncontrados, processa
 function getToken() {
   return getStoredToken().then(async (token) => {
     if (token) return token;
-    return requestTokenFromOpenVenProTab();
+    return requestTokenFromOpenVenproTab();
   });
 }
 
@@ -113,7 +113,7 @@ function getStoredToken() {
   });
 }
 
-async function requestTokenFromOpenVenProTab() {
+async function requestTokenFromOpenVenproTab() {
   const tabs = await chrome.tabs.query({
     url: [
       'https://venpro.com.br/*',

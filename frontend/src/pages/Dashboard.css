@@ -71,6 +71,7 @@
 .logo:hover { opacity: .85; }
 .logo-ven { color: var(--texto); }
 .logo-pro { color: var(--acento); }
+.logo-word { color: var(--texto); }
 .logo-icon-img {
   width: 38px;
   height: 38px;

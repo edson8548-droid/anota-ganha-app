@@ -55,6 +55,13 @@
   letter-spacing: -0.5px;
 }
 
+.login-logo-word {
+  font-size: 30px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+}
+
 .login-subtitle {
   font-size: 15px;
   color: #A0A3A8;
@@ -282,7 +289,7 @@
     padding: 36px 24px;
     border-radius: 16px;
   }
-  .login-logo-ven, .login-logo-pro {
+  .login-logo-ven, .login-logo-pro, .login-logo-word {
     font-size: 26px;
   }
   .whatsapp-float {

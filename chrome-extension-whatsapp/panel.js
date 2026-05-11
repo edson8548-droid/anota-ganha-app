@@ -91,7 +91,7 @@ async function clearSentNumbers(token) {
 async function loadCampaign() {
   const token = await getToken();
   if (!token) {
-    setStatus('Faça login no VenPro e deixe uma aba do painel aberta.', 'err');
+    setStatus('Faça login no Venpro e deixe uma aba do painel aberta.', 'err');
     return;
   }
   try {
@@ -104,7 +104,7 @@ async function loadCampaign() {
 
     const ready = campaign.contacts_count > 0 && campaign.message;
     btnDisparar.disabled = !ready;
-    setStatus(ready ? 'Campanha pronta para disparar.' : 'Configure contatos e mensagem no VenPro', ready ? 'ok' : 'info');
+    setStatus(ready ? 'Campanha pronta para disparar.' : 'Configure contatos e mensagem no Venpro', ready ? 'ok' : 'info');
   } catch (err) {
     setStatus(err.message || 'Erro ao carregar campanha.', 'err');
   }
@@ -172,7 +172,7 @@ btnDisparar.addEventListener('click', async () => {
     return;
   }
   const token = await getToken();
-  if (!token) { setStatus('Login expirado. Abra o painel do VenPro e tente de novo.', 'err'); return; }
+  if (!token) { setStatus('Login expirado. Abra o painel do Venpro e tente de novo.', 'err'); return; }
 
   try {
     campaign = await fetchCampaign(token);
@@ -182,7 +182,7 @@ btnDisparar.addEventListener('click', async () => {
   }
 
   if (!campaign.contacts_count || !campaign.message) {
-    setStatus('Configure contatos e mensagem no VenPro', 'err');
+    setStatus('Configure contatos e mensagem no Venpro', 'err');
     return;
   }
 
@@ -246,7 +246,7 @@ async function cancelAndContinueLater() {
 
 async function cancelAndStartFromZero() {
   const token = await getToken();
-  if (!token) { setStatus('Login expirado. Abra o painel do VenPro e tente de novo.', 'err'); return; }
+  if (!token) { setStatus('Login expirado. Abra o painel do Venpro e tente de novo.', 'err'); return; }
   await stopDispatch();
   try {
     await clearSentNumbers(token);

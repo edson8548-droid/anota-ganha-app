@@ -146,7 +146,7 @@ export default function Cotacao() {
               <path d="M9 14.5L12.5 8.5" stroke="rgba(58,133,168,0.6)" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
             <span style={{ fontWeight: 800, fontSize: 17, color: '#fff' }}>
-              Ven<span style={{ color: '#3A85A8' }}>pro</span>
+              Venpro
             </span>
             <span style={{ color: '#A0A3A8', fontSize: 13, fontWeight: 500 }}>Cotação Pronta</span>
           </div>
