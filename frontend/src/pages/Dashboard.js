@@ -47,7 +47,6 @@ const Dashboard = () => {
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef(null);
-  const campaignSelectorRef = useRef(null);
 
   const showConfirm = (title, description, onConfirm) =>
     setConfirmDialog({ open: true, title, description, onConfirm });
@@ -95,8 +94,10 @@ const Dashboard = () => {
   };
   const handleCreateCampaign = async (campaignData) => {
     try {
-      await createCampaign(campaignData);
+      const newCampaignId = await createCampaign(campaignData);
       setShowCreateCampaign(false);
+      setShowCampaignSelector(false);
+      if (newCampaignId) setSelectedCampaignId(newCampaignId);
     } catch (error) { console.error('Erro ao criar campanha:', error); }
   };
   const handleEditCampaign = (e, campaign) => {
@@ -107,11 +108,20 @@ const Dashboard = () => {
   const handleOpenNewCampaign = (e) => {
     e?.stopPropagation();
     setEditingCampaign(null);
+    setShowCampaignSelector(false);
     setShowCreateCampaign(true);
   };
   const handleOpenCampaignSelector = () => {
+    if (campaignsLoading) {
+      toast.info('Carregando campanhas...');
+      return;
+    }
     if (campaigns.length === 0) {
       setShowCreateCampaign(true);
+      return;
+    }
+    if (campaigns.length === 1) {
+      setSelectedCampaignId(campaigns[0].id);
       return;
     }
     setShowCampaignSelector(true);
@@ -487,14 +497,6 @@ const Dashboard = () => {
     setSelectedNeighborhood('all');
   }, [selectedCity]);
 
-  useEffect(() => {
-    if (!showCampaignSelector) return;
-    const timer = setTimeout(() => {
-      campaignSelectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 80);
-    return () => clearTimeout(timer);
-  }, [showCampaignSelector]);
-
   const campaignClients = useMemo(() => {
     if (!selectedCampaign) return [];
     const legacyClients = clients.filter(c => c.campaignId === selectedCampaign.id);
@@ -640,55 +642,6 @@ const Dashboard = () => {
             </div>
           </section>
 
-          {showCampaignSelector && (
-            <section className="campaign-selector-panel" ref={campaignSelectorRef}>
-              <div className="campaign-selector-header">
-                <div>
-                  <span>Raio-X da campanha</span>
-                  <h2>Escolha qual incentivo deseja acompanhar</h2>
-                  <p>Selecione uma campanha cadastrada ou crie uma nova para começar outro período.</p>
-                </div>
-                <button type="button" className="btn-new-campaign" onClick={handleOpenNewCampaign}>
-                  <Plus size={16} /> Nova campanha
-                </button>
-              </div>
-
-              <div className="campaign-selector-grid">
-                {campaigns.map(campaign => {
-                  const startDate = campaign.startDate ? new Date(campaign.startDate).toLocaleDateString('pt-BR') : '--';
-                  const endDate = campaign.endDate ? new Date(campaign.endDate).toLocaleDateString('pt-BR') : '--';
-                  const industryCount = Object.keys(campaign.industries || {}).length;
-                  const linkedClientCount = clients.filter(client =>
-                    client.campaignId === campaign.id || (campaign.clientIds || []).includes(client.id)
-                  ).length;
-
-                  return (
-                    <button
-                      key={campaign.id}
-                      type="button"
-                      className="campaign-selector-card"
-                      onClick={() => setSelectedCampaignId(campaign.id)}
-                    >
-                      <div className="campaign-selector-card-top">
-                        <span className={`campaign-selector-status ${campaign.status === 'inactive' ? 'inactive' : 'active'}`}>
-                          {campaign.status === 'inactive' ? 'Encerrada' : 'Ativa'}
-                        </span>
-                        <strong>{campaign.name}</strong>
-                      </div>
-                      <div className="campaign-selector-card-meta">
-                        <span>{startDate} - {endDate}</span>
-                        <span>{industryCount} indústria{industryCount !== 1 ? 's' : ''}</span>
-                        <span>{linkedClientCount} cliente{linkedClientCount !== 1 ? 's' : ''}</span>
-                      </div>
-                      <div className="campaign-selector-card-action">
-                        Abrir Raio-X
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          )}
         </main>
       </div>
     );
@@ -973,6 +926,67 @@ const Dashboard = () => {
   return (
     <>
       {!selectedCampaign ? renderMainDashboard() : renderCampaignView()}
+
+      {showCampaignSelector && !selectedCampaign && (
+        <div className="campaign-selector-overlay" onClick={() => setShowCampaignSelector(false)}>
+          <div className="campaign-selector-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="campaign-selector-header">
+              <div>
+                <span>Raio-X da campanha</span>
+                <h2>Escolha uma campanha</h2>
+                <p>Abra uma campanha existente ou crie um novo período de acompanhamento.</p>
+              </div>
+              <button type="button" className="campaign-selector-close" onClick={() => setShowCampaignSelector(false)} aria-label="Fechar">
+                ×
+              </button>
+            </div>
+
+            <div className="campaign-selector-grid">
+              {campaigns.map(campaign => {
+                const startDate = campaign.startDate ? new Date(campaign.startDate).toLocaleDateString('pt-BR') : '--';
+                const endDate = campaign.endDate ? new Date(campaign.endDate).toLocaleDateString('pt-BR') : '--';
+                const industryCount = Object.keys(campaign.industries || {}).length;
+                const linkedClientCount = clients.filter(client =>
+                  client.campaignId === campaign.id || (campaign.clientIds || []).includes(client.id)
+                ).length;
+
+                return (
+                  <button
+                    key={campaign.id}
+                    type="button"
+                    className="campaign-selector-card"
+                    onClick={() => {
+                      setSelectedCampaignId(campaign.id);
+                      setShowCampaignSelector(false);
+                    }}
+                  >
+                    <div className="campaign-selector-card-top">
+                      <span className={`campaign-selector-status ${campaign.status === 'inactive' ? 'inactive' : 'active'}`}>
+                        {campaign.status === 'inactive' ? 'Encerrada' : 'Ativa'}
+                      </span>
+                      <strong>{campaign.name}</strong>
+                    </div>
+                    <div className="campaign-selector-card-meta">
+                      <span>{startDate} - {endDate}</span>
+                      <span>{industryCount} indústria{industryCount !== 1 ? 's' : ''}</span>
+                      <span>{linkedClientCount} cliente{linkedClientCount !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="campaign-selector-card-action">
+                      Abrir Raio-X
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="campaign-selector-footer">
+              <button type="button" className="btn-new-campaign" onClick={handleOpenNewCampaign}>
+                <Plus size={16} /> Criar campanha
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showCreateCampaign && (
         <CreateCampaignModal
