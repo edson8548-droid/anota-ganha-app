@@ -149,7 +149,7 @@
   align-items: center;
   justify-content: center;
 }
-.btn-logout:hover { background: rgba(239,68,68,.1); border-color: #ef4444; color: #ef4444; }
+.btn-logout:hover { background: rgba(58,133,168,.10); border-color: #3A85A8; color: #bfe4f2; }
 
 /* ==================== MAIN CONTENT ==================== */
 .dashboard-main {
@@ -548,8 +548,8 @@
 }
 .btn-edit { color: var(--acento); }
 .btn-edit:hover { background: rgba(49,112,142,.08); border-color: var(--acento); }
-.btn-delete { color: #ef4444; }
-.btn-delete:hover { background: rgba(239,68,68,.06); border-color: #ef4444; }
+.btn-delete { color: #7A7D83; }
+.btn-delete:hover { background: rgba(58,133,168,.10); border-color: #3A85A8; color: #3A85A8; }
 
 .campaign-status {
   display: inline-block;
@@ -795,11 +795,11 @@
   color: #fff;
 }
 .btn-campaign-action.danger:hover {
-  background: rgba(176,74,83,.13);
-  border-color: rgba(176,74,83,.36);
-  color: #f0a4aa;
+  background: rgba(58,133,168,.10);
+  border-color: rgba(58,133,168,.42);
+  color: #bfe4f2;
 }
-.btn-campaign-action.ghost:hover { background: rgba(239,68,68,.08); color: #ff7a85; }
+.btn-campaign-action.ghost:hover { background: rgba(58,133,168,.10); color: #bfe4f2; }
 
 /* ==================== TABS ==================== */
 .tabs-container {
@@ -1378,12 +1378,13 @@
 }
 .btn-toggle-client:hover { background: rgba(49,112,142,.04); border-color: var(--acento); }
 .client-collapsible-content > .btn-toggle-client {
-  background: rgba(239,68,68,.03);
-  color: #b91c1c;
-  border-color: rgba(239,68,68,.15);
+  background: rgba(58,133,168,.06);
+  color: #3A85A8;
+  border-color: rgba(58,133,168,.22);
 }
 .client-collapsible-content > .btn-toggle-client:hover {
-  background: rgba(239,68,68,.06);
+  background: rgba(58,133,168,.12);
+  border-color: rgba(58,133,168,.42);
 }
 
 .icon-complete { margin-left: 6px; font-size: 16px; }

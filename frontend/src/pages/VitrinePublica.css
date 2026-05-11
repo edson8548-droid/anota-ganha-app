@@ -236,7 +236,7 @@
   line-height: 1;
 }
 .vp-qty-btn:hover { border-color: #3A85A8; color: #3A85A8; }
-.vp-qty-btn.minus:hover { border-color: #ef4444; color: #ef4444; }
+.vp-qty-btn.minus:hover { border-color: #3A85A8; color: #3A85A8; }
 .vp-qty-input {
   width: 48px;
   height: 32px;
