@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ClipboardList } from 'lucide-react';
+import { ArrowLeft, ClipboardList } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { gerarTabelaPrazos } from '../services/cotacao.service';
 import './AssistenteIA.css';
@@ -174,7 +174,9 @@ export default function AssistenteIA() {
       {/* Header */}
       <header className="ia-header">
         <div className="ia-header-left">
-          <button className="ia-btn-back" onClick={() => navigate('/dashboard')}>← Voltar</button>
+          <button className="venpro-back-button" onClick={() => navigate('/dashboard')} title="Voltar" aria-label="Voltar">
+            <ArrowLeft size={18} />
+          </button>
           <div className="ia-status-dot" />
           <div>
             <div className="ia-header-title">Prompts Prontos para RCA</div>

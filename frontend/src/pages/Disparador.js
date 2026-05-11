@@ -100,8 +100,8 @@ export default function Disparador() {
 
       <header className="disp-header">
         <div className="disp-header-inner">
-          <button className="disp-btn disp-btn-ghost" onClick={() => navigate('/dashboard')}>
-            <ArrowLeft size={16} /> Dashboard
+          <button className="venpro-back-button" onClick={() => navigate('/dashboard')} title="Voltar" aria-label="Voltar">
+            <ArrowLeft size={18} />
           </button>
           <span className="disp-header-title">
             <Send size={16} /> Carteira no WhatsApp

@@ -73,8 +73,6 @@
 .disp-btn-danger:hover { background: rgba(176,74,83,.13); color: #f0a4aa; border-color: rgba(176,74,83,.36); }
 .disp-btn-secondary { background: #2e3136; color: #e1e1e1; border: 1px solid #4a4d52; }
 .disp-btn-secondary:hover { background: #363940; }
-.disp-btn-ghost { background: transparent; color: #A0A3A8; border-color: #4A4D52; }
-.disp-btn-ghost:hover { background: #363940; color: #E1E1E1; border-color: #5A5D63; }
 
 .disp-photos-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .disp-photo-thumb {

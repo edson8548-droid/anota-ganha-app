@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { ArrowLeft } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { listarTabelas, uploadTabela, excluirTabela, processarCotacao, previewCotacao, confirmarCotacao } from '../services/cotacao.service';
 import ReviewMatches from './ReviewMatches';
@@ -135,11 +136,9 @@ export default function Cotacao() {
         position: 'sticky', top: 0, zIndex: 10,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => navigate('/dashboard')} style={{
-            background: 'none', border: '1px solid #4A4D52', borderRadius: 8,
-            padding: '6px 14px', fontSize: 13, fontWeight: 600,
-            color: '#A0A3A8', cursor: 'pointer',
-          }}>← Voltar</button>
+          <button className="venpro-back-button" onClick={() => navigate('/dashboard')} title="Voltar" aria-label="Voltar">
+            <ArrowLeft size={18} />
+          </button>
           <div style={{ width: 1, height: 20, background: '#4A4D52' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <svg viewBox="0 0 18 18" fill="none" width="24" height="24">
