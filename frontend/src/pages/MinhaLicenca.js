@@ -12,14 +12,21 @@ const MinhaLicenca = () => {
   const { user, logout } = useAuthContext();
   const { subscription, currentPlan, isTrialActive, trialEndsAt } = useSubscription();
 
-  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null });
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null, confirmLabel: 'Confirmar', cancelLabel: 'Cancelar' });
   const [cupomCodigo, setCupomCodigo] = useState('');
   const [cupomLoading, setCupomLoading] = useState(false);
   const [cupomMsg, setCupomMsg] = useState(null);
   const [cancelLoading, setCancelLoading] = useState(false);
 
-  const showConfirm = (title, description, onConfirm) =>
-    setConfirmDialog({ open: true, title, description, onConfirm });
+  const showConfirm = (title, description, onConfirm, options = {}) =>
+    setConfirmDialog({
+      open: true,
+      title,
+      description,
+      onConfirm,
+      confirmLabel: options.confirmLabel || 'Confirmar',
+      cancelLabel: options.cancelLabel || 'Cancelar',
+    });
   const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false }));
 
   const aplicarCupom = async () => {
@@ -137,7 +144,8 @@ const MinhaLicenca = () => {
               onClick={() => showConfirm(
                 'Cancelar assinatura',
                 'Deseja cancelar sua assinatura? Novas cobranças serão interrompidas agora, mas seu acesso continua até o fim do período já pago.',
-                cancelarAssinatura
+                cancelarAssinatura,
+                { confirmLabel: 'Cancelar assinatura', cancelLabel: 'Voltar' }
               )}
               disabled={cancelLoading}
               style={{ ...s.btnDanger, opacity: cancelLoading ? 0.6 : 1 }}
@@ -223,6 +231,8 @@ const MinhaLicenca = () => {
         open={confirmDialog.open}
         title={confirmDialog.title}
         description={confirmDialog.description}
+        confirmLabel={confirmDialog.confirmLabel}
+        cancelLabel={confirmDialog.cancelLabel}
         onConfirm={() => { confirmDialog.onConfirm?.(); closeConfirm(); }}
         onCancel={closeConfirm}
       />
@@ -248,7 +258,7 @@ const s = {
   statusBadge: { display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderRadius: 10, marginBottom: 14 },
   statusText: { fontSize: 14, fontWeight: 600 },
   btnPrimary: { background: '#3A85A8', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
-  btnDanger: { background: 'transparent', color: '#f87171', border: '1px solid rgba(248,113,113,.45)', borderRadius: 8, padding: '10px 22px', fontSize: 14, fontWeight: 600, cursor: 'pointer', marginTop: 10 },
+  btnDanger: { background: '#2E3136', color: '#D5DBE3', border: '1px solid rgba(145,170,184,.22)', borderRadius: 8, padding: '10px 22px', fontSize: 14, fontWeight: 600, cursor: 'pointer', marginTop: 10, minHeight: 40, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
   cupomInput: { flex: 1, minWidth: 180, padding: '10px 16px', background: '#2B2D31', border: '1px solid #4A4D52', borderRadius: 8, color: '#E1E1E1', fontSize: 14, fontFamily: 'monospace', letterSpacing: 1 },
   extGrid: { display: 'flex', flexDirection: 'column', gap: 12 },
   extCard: { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: '#2B2D31', borderRadius: 10, border: '1px solid #4A4D52' },
