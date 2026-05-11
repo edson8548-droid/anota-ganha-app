@@ -635,9 +635,10 @@
 }
 
 .campaign-view-header {
-  background: var(--bg);
+  background: rgba(43,45,49,.96);
+  backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--borda);
-  padding: 10px 2rem;
+  padding: 9px 2rem;
   min-height: 64px;
   position: sticky;
   top: 0;
@@ -688,63 +689,84 @@
 .campaign-view-actions {
   display: flex;
   justify-content: flex-end;
-  gap: .5rem;
+  align-items: center;
+  gap: .45rem;
   flex-wrap: wrap;
+  max-width: 760px;
+}
+
+.campaign-action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 42px;
+  padding: 4px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 10px;
+  background: rgba(255,255,255,.035);
+}
+
+.campaign-action-group-admin {
+  background: rgba(17,24,39,.18);
+}
+
+.campaign-action-group-account {
+  background: transparent;
 }
 
 .btn-campaign-action {
-  min-height: 38px;
-  padding: 0 .95rem;
+  min-height: 32px;
+  padding: 0 .72rem;
   border-radius: 8px;
-  border: 1px solid var(--borda);
+  border: 1px solid transparent;
   cursor: pointer;
   font-weight: 750;
-  font-size: .82rem;
+  font-size: .78rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: .4rem;
   transition: all .2s;
-  background: var(--bg3);
-  color: var(--texto);
+  background: transparent;
+  color: var(--sub);
   white-space: nowrap;
 }
 .btn-campaign-action.primary {
-  background: linear-gradient(135deg, var(--acento), var(--acento2));
+  background: #3A85A8;
   border-color: transparent;
   color: #fff;
 }
 .btn-campaign-action.warning {
-  border-color: rgba(245, 158, 11, .45);
-  background: rgba(245, 158, 11, .1);
-  color: #f59e0b;
+  border-color: rgba(232,168,48,.32);
+  background: rgba(232,168,48,.08);
+  color: #f4c056;
 }
 .btn-campaign-action.secondary {
-  border-color: rgba(148, 163, 184, .42);
-  background: rgba(148, 163, 184, .10);
+  border-color: transparent;
+  background: transparent;
   color: var(--texto);
 }
 .btn-campaign-action.danger {
-  border-color: rgba(239, 68, 68, .45);
-  background: rgba(239, 68, 68, .1);
-  color: #ef4444;
+  border-color: rgba(239,68,68,.30);
+  background: rgba(239,68,68,.08);
+  color: #ff7a85;
 }
 .btn-campaign-action.support {
-  border-color: rgba(46, 204, 138, .36);
-  background: rgba(46, 204, 138, .10);
-  color: var(--verde);
+  border-color: transparent;
+  background: transparent;
+  color: var(--texto);
 }
 .btn-campaign-action.ghost {
-  border-color: rgba(148, 163, 184, .32);
+  border-color: transparent;
   background: transparent;
   color: var(--sub);
 }
-.btn-campaign-action.primary:hover { filter: brightness(1.06); }
-.btn-campaign-action.secondary:hover { background: rgba(148, 163, 184, .16); border-color: rgba(148, 163, 184, .62); }
-.btn-campaign-action.warning:hover { background: rgba(245, 158, 11, .16); }
-.btn-campaign-action.danger:hover { background: rgba(239, 68, 68, .16); }
-.btn-campaign-action.support:hover { background: rgba(46, 204, 138, .16); border-color: rgba(46, 204, 138, .52); }
-.btn-campaign-action.ghost:hover { background: rgba(239,68,68,.08); border-color: rgba(239,68,68,.45); color: #ef4444; }
+.btn-campaign-action.primary:hover { background: #31708E; }
+.btn-campaign-action.secondary:hover,
+.btn-campaign-action.support:hover { background: rgba(255,255,255,.08); color: #fff; }
+.btn-campaign-action.warning:hover { background: rgba(232,168,48,.14); border-color: rgba(232,168,48,.48); }
+.btn-campaign-action.danger:hover { background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.50); }
+.btn-campaign-action.ghost:hover { background: rgba(239,68,68,.08); color: #ff7a85; }
 
 /* ==================== TABS ==================== */
 .tabs-container {

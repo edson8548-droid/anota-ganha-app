@@ -716,33 +716,41 @@ const Dashboard = () => {
                 <p>{campaignPeriod} | {campaignClients.length} Clientes | {Object.keys(selectedCampaign.industries || {}).length} Indústrias</p>
               </div>
             </div>
-            <div className="campaign-view-actions">
-              <button className="btn-campaign-action primary" onClick={handleOpenNewCampaign}>
-                <Plus size={16} /> Nova campanha
-              </button>
-              <button className="btn-campaign-action secondary" onClick={handleDuplicateCampaign}>
-                <Copy size={16} /> Duplicar
-              </button>
-              {selectedCampaign.status !== 'inactive' && (
-                <button className="btn-campaign-action secondary" onClick={handleCloseCampaign}>
-                  Encerrar
+            <div className="campaign-view-actions" aria-label="Ações do Raio-X">
+              <div className="campaign-action-group">
+                <button className="btn-campaign-action primary" onClick={handleOpenNewCampaign}>
+                  <Plus size={16} /> Nova campanha
                 </button>
-              )}
-              <button className="btn-campaign-action secondary" onClick={(e) => handleEditCampaign(e, selectedCampaign)}>
-                <Pencil size={16} /> Editar
-              </button>
-              <button className="btn-campaign-action warning" onClick={handleResetCampaignProgress}>
-                <RotateCcw size={16} /> Zerar vendas
-              </button>
-              <button className="btn-campaign-action danger" onClick={(e) => handleDeleteCampaign(e, selectedCampaign.id)}>
-                <Trash2 size={16} /> Excluir
-              </button>
-              <button className="btn-campaign-action support" onClick={handleWhatsAppSupport}>
-                <LifeBuoy size={16} /> Suporte
-              </button>
-              <button className="btn-campaign-action ghost" onClick={handleLogout}>
-                <LogOut size={16} /> Sair
-              </button>
+                <button className="btn-campaign-action secondary" onClick={handleDuplicateCampaign}>
+                  <Copy size={16} /> Duplicar
+                </button>
+                {selectedCampaign.status !== 'inactive' && (
+                  <button className="btn-campaign-action secondary" onClick={handleCloseCampaign}>
+                    Encerrar
+                  </button>
+                )}
+              </div>
+
+              <div className="campaign-action-group campaign-action-group-admin">
+                <button className="btn-campaign-action secondary" onClick={(e) => handleEditCampaign(e, selectedCampaign)}>
+                  <Pencil size={16} /> Editar
+                </button>
+                <button className="btn-campaign-action warning" onClick={handleResetCampaignProgress}>
+                  <RotateCcw size={16} /> Zerar vendas
+                </button>
+                <button className="btn-campaign-action danger" onClick={(e) => handleDeleteCampaign(e, selectedCampaign.id)}>
+                  <Trash2 size={16} /> Excluir
+                </button>
+              </div>
+
+              <div className="campaign-action-group campaign-action-group-account">
+                <button className="btn-campaign-action support" onClick={handleWhatsAppSupport}>
+                  <LifeBuoy size={16} /> Suporte
+                </button>
+                <button className="btn-campaign-action ghost" onClick={handleLogout}>
+                  <LogOut size={16} /> Sair
+                </button>
+              </div>
             </div>
           </div>
         </header>
