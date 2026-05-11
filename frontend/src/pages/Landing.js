@@ -101,8 +101,13 @@ const Landing = () => {
             <p>Suba a planilha do cliente e receba a cotação preenchida automaticamente por código de barras ou nome do produto. Menos digitação, mais tempo para vender.</p>
           </div>
           <div className="landing-feature-card">
+            <div className="landing-feature-icon"><Store size={32} /></div>
+            <h3>Vitrine Inteligente</h3>
+            <p>Monte ofertas com produtos, fotos e preços, gere um link profissional com o nome da empresa e receba o pedido direto pelo WhatsApp.</p>
+          </div>
+          <div className="landing-feature-card">
             <div className="landing-feature-icon"><ClipboardList size={32} /></div>
-            <h3>Prompts Prontos para RCA</h3>
+            <h3>Biblioteca de Prompts</h3>
             <p>Copie modelos de comando para organizar tabelas, montar ofertas, revisar mensagens e usar no ChatGPT, Gemini ou outra IA da sua preferência.</p>
           </div>
           <div className="landing-feature-card">
