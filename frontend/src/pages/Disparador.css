@@ -76,7 +76,7 @@
 .disp-btn-primary:hover { background: #31708e; }
 .disp-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 .disp-btn-danger { background: transparent; color: #d5dbe3; border-color: rgba(145,170,184,.18); }
-.disp-btn-danger:hover { background: rgba(176,74,83,.13); color: #f0a4aa; border-color: rgba(176,74,83,.36); }
+.disp-btn-danger:hover { background: rgba(58,133,168,.10); color: #bfe4f2; border-color: rgba(58,133,168,.42); }
 .disp-btn-secondary { background: #2e3136; color: #e1e1e1; border: 1px solid #4a4d52; }
 .disp-btn-secondary:hover { background: #363940; }
 

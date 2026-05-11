@@ -156,8 +156,7 @@ export default function Cotacao() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button onClick={() => navigate('/assistente')} style={navBtnStyle}>IA</button>
           <button onClick={() => navigate('/minha-licenca')} style={navBtnStyle}>Licença</button>
-          <button onClick={handleLogout}
-                  style={{ ...navBtnStyle, color: '#ef4444', borderColor: 'rgba(239,68,68,.3)' }}>Sair</button>
+          <button onClick={handleLogout} style={navBtnStyle}>Sair</button>
         </div>
       </header>
 
@@ -616,8 +615,8 @@ const secondaryBtnStyle = {
 };
 
 const deleteBtnStyle = {
-  background: 'rgba(239,68,68,.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,.3)',
-  padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+  background: 'transparent', color: '#A0A3A8', border: '1px solid #4A4D52',
+  padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer',
 };
 
 const labelStyle = {

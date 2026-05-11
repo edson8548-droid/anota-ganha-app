@@ -299,7 +299,7 @@
   width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
   line-height: 1;
 }
-.vt-btn-remove:hover { color: #ef4444; background: rgba(239,68,68,.08); border-color: rgba(239,68,68,.24); }
+.vt-btn-remove:hover { color: #3A85A8; background: rgba(58,133,168,.10); border-color: rgba(58,133,168,.24); }
 
 @media (max-width: 640px) {
   .vt-body { padding: 16px; }

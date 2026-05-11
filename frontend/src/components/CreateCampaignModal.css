@@ -175,9 +175,9 @@
 .btn-edit-industry:hover { background: #e0e7ff; border-color: #818cf8; }
 
 .btn-remove {
-  background: #fff1f2;
-  border: 1px solid #fecdd3;
-  color: #e11d48;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
   width: 34px;
   height: 34px;
   border-radius: 50%;
@@ -187,7 +187,7 @@
   display: flex; align-items: center; justify-content: center;
   line-height: 1;
 }
-.btn-remove:hover { background: #ffe4e6; border-color: #fb7185; }
+.btn-remove:hover { background: #e0f2fe; border-color: #3A85A8; color: #3A85A8; }
 
 .industry-metrics {
   display: grid;

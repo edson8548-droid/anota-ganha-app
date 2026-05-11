@@ -277,14 +277,17 @@
 }
 
 .btn-delete {
-  background: #ef4444;
-  color: white;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
 }
 
 .btn-delete:hover {
-  background: #dc2626;
+  background: #e0f2fe;
+  border-color: #3A85A8;
+  color: #3A85A8;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  box-shadow: 0 4px 12px rgba(58, 133, 168, 0.22);
 }
 
 /* Confetti Animation para 100% */
