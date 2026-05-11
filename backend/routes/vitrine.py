@@ -22,6 +22,7 @@ from bson import ObjectId
 import firebase_admin
 from firebase_admin import auth as firebase_auth
 from services.public_files import stream_public_gridfs_file
+from services.security_audit import audit_event
 from services.subscription_access import ensure_subscription_access
 from services.upload_validation import IMAGE_CONTENT_TYPES, safe_filename, validate_upload
 
@@ -698,6 +699,12 @@ async def criar_oferta(req: CreateOfferRequest, uid: str = Depends(get_user_id))
     }
     result = await _db.vitrine_offers.insert_one(doc)
     doc["_id"] = str(result.inserted_id)
+    await audit_event(
+        "vitrine_offer_created",
+        uid=uid,
+        status="success",
+        metadata={"offerId": str(result.inserted_id), "items": len(items), "status": doc["status"]},
+    )
     return doc_to_dict(doc)
 
 
@@ -733,6 +740,12 @@ async def atualizar_oferta(offer_id: str, req: UpdateOfferRequest, uid: str = De
     if result.matched_count == 0:
         raise HTTPException(404, "Oferta não encontrada")
     doc = await _db.vitrine_offers.find_one({"_id": oid})
+    await audit_event(
+        "vitrine_offer_updated",
+        uid=uid,
+        status="success",
+        metadata={"offerId": offer_id, "fields": sorted(k for k in updates.keys() if k != "updated_at")},
+    )
     return doc_to_dict(doc)
 
 
@@ -748,6 +761,7 @@ async def excluir_oferta(offer_id: str, uid: str = Depends(get_user_id)):
     )
     if result.matched_count == 0:
         raise HTTPException(404, "Oferta não encontrada")
+    await audit_event("vitrine_offer_deleted", uid=uid, status="success", metadata={"offerId": offer_id})
     return {"ok": True}
 
 
@@ -777,6 +791,12 @@ async def adicionar_item(offer_id: str, item: OfferItem, uid: str = Depends(get_
     )
     if result.matched_count == 0:
         raise HTTPException(404, "Oferta não encontrada")
+    await audit_event(
+        "vitrine_item_created",
+        uid=uid,
+        status="success",
+        metadata={"offerId": offer_id, "itemId": new_item["id"]},
+    )
     return new_item
 
 
@@ -819,6 +839,12 @@ async def atualizar_item(offer_id: str, item_id: str, req: UpdateItemRequest, ui
     )
     if result.matched_count == 0:
         raise HTTPException(404, "Oferta ou item não encontrado")
+    await audit_event(
+        "vitrine_item_updated",
+        uid=uid,
+        status="success",
+        metadata={"offerId": offer_id, "itemId": item_id, "fields": sorted(updates.keys())},
+    )
     return {"ok": True}
 
 
@@ -834,6 +860,12 @@ async def remover_item(offer_id: str, item_id: str, uid: str = Depends(get_user_
     )
     if result.matched_count == 0:
         raise HTTPException(404, "Oferta não encontrada")
+    await audit_event(
+        "vitrine_item_deleted",
+        uid=uid,
+        status="success",
+        metadata={"offerId": offer_id, "itemId": item_id},
+    )
     return {"ok": True}
 
 
@@ -857,6 +889,12 @@ async def reordenar_items(offer_id: str, order: List[str], uid: str = Depends(ge
         {"_id": oid},
         {"$set": {"items": items, "updated_at": datetime.now(timezone.utc)}}
     )
+    await audit_event(
+        "vitrine_items_reordered",
+        uid=uid,
+        status="success",
+        metadata={"offerId": offer_id, "items": len(order)},
+    )
     return {"ok": True}
 
 
@@ -871,6 +909,7 @@ async def parse_lista(req: ParseListRequest, uid: str = Depends(get_user_id)):
     items = await parse_lista_codigo(req.lista)
     if not items:
         raise HTTPException(422, "Não foi possível interpretar a lista. Verifique o formato e tente novamente.")
+    await audit_event("vitrine_list_parsed", uid=uid, status="success", metadata={"items": len(items)})
     return {"items": items, "total": len(items)}
 
 
@@ -960,6 +999,12 @@ async def upload_imagem_item(
             )
             break
 
+    await audit_event(
+        "vitrine_item_image_uploaded",
+        uid=uid,
+        status="success",
+        metadata={"offerId": offer_id, "itemId": item_id, "bytes": len(conteudo)},
+    )
     return {"image_url": image_url}
 
 
@@ -998,6 +1043,12 @@ async def upload_logo(
     await _db.vitrine_offers.update_one(
         {"_id": oid, "created_by": uid},
         {"$set": {"company_logo_url": logo_url, "updated_at": datetime.now(timezone.utc)}}
+    )
+    await audit_event(
+        "vitrine_logo_uploaded",
+        uid=uid,
+        status="success",
+        metadata={"offerId": offer_id, "bytes": len(conteudo)},
     )
     return {"logo_url": logo_url}
 

@@ -12,6 +12,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from services.security_audit import audit_event
 from services.security_config import PRODUCTION_CORS_ORIGINS, parse_cors_origins
 from services.security_headers import SecurityHeadersMiddleware
 # ... (restante dos imports) ...
@@ -54,6 +55,22 @@ class LogCorsPreflightMiddleware(BaseHTTPMiddleware):
 app.add_middleware(LogCorsPreflightMiddleware)
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+class SecurityAuditMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/api/") and response.status_code in {401, 403, 429}:
+            await audit_event(
+                "api_request_blocked",
+                status="blocked",
+                metadata={"statusCode": response.status_code},
+                request=request,
+            )
+        return response
+
+
+app.add_middleware(SecurityAuditMiddleware)
 
 # ========== Rate limit simples por IP ==========
 class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
