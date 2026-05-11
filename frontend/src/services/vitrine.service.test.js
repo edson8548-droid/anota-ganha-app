@@ -76,3 +76,13 @@ test('obterPublica busca oferta publica sem auth', async () => {
 test('gerarLinkPublico usa origem atual', () => {
   expect(vitrineService.gerarLinkPublico('oferta-teste')).toBe('http://localhost/oferta/oferta-teste');
 });
+
+test('gerarLinkPublico inclui nome da empresa quando informado', () => {
+  expect(vitrineService.gerarLinkPublico('oferta-teste', 'Spani Atacadista')).toBe(
+    'http://localhost/spani-atacadista/ofertas/oferta-teste',
+  );
+});
+
+test('gerarEmpresaSlug remove acentos e caracteres especiais', () => {
+  expect(vitrineService.gerarEmpresaSlug('São José Distribuição')).toBe('sao-jose-distribuicao');
+});

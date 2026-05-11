@@ -55,6 +55,7 @@ function App() {
             <Route path="/vitrine" element={<ProtectedRoute requireSubscription><Vitrine /></ProtectedRoute>} />
             <Route path="/vitrine/:id/editar" element={<ProtectedRoute requireSubscription><VitrineEditar /></ProtectedRoute>} />
             <Route path="/oferta/:slug" element={<VitrinePublica />} />
+            <Route path="/:empresa/ofertas/:slug" element={<VitrinePublica />} />
             <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
             <Route path="/payment-failure" element={<ProtectedRoute><PaymentFailure /></ProtectedRoute>} />
             <Route path="/payment-pending" element={<ProtectedRoute><PaymentFailure /></ProtectedRoute>} />

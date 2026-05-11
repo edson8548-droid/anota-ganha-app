@@ -67,10 +67,10 @@ export default function Vitrine() {
   useEffect(() => { carregar(); }, [carregar]);
 
   // ── Copiar link ──────────────────────────────────────
-  const copiarLink = (slug) => {
-    const link = `${window.location.origin}/oferta/${slug}`;
+  const copiarLink = (oferta) => {
+    const link = vitrineService.gerarLinkPublico(oferta.slug, oferta.company_name);
     navigator.clipboard.writeText(link);
-    setCopiedSlug(slug);
+    setCopiedSlug(oferta.slug);
     toast.success('Link copiado!');
     setTimeout(() => setCopiedSlug(null), 2000);
   };
@@ -345,12 +345,12 @@ export default function Vitrine() {
               </div>
               <div className="vt-card-actions">
                 <div className="vt-link-box">
-                  {`${window.location.origin}/oferta/${oferta.slug}`}
+                  {vitrineService.gerarLinkPublico(oferta.slug, oferta.company_name)}
                 </div>
-                <button className="vt-btn-sm" title="Copiar link" onClick={() => copiarLink(oferta.slug)}>
+                <button className="vt-btn-sm" title="Copiar link" onClick={() => copiarLink(oferta)}>
                   {copiedSlug === oferta.slug ? <Check size={14} /> : <Copy size={14} />}
                 </button>
-                <button className="vt-btn-sm" title="Ver vitrine" onClick={() => window.open(`/oferta/${oferta.slug}`, '_blank')}>
+                <button className="vt-btn-sm" title="Ver vitrine" onClick={() => window.open(vitrineService.gerarLinkPublico(oferta.slug, oferta.company_name), '_blank')}>
                   <Eye size={14} />
                 </button>
                 <button className="vt-btn-sm primary" onClick={() => navigate(`/vitrine/${oferta._id}/editar`)}>
