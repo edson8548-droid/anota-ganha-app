@@ -9,7 +9,7 @@ import './Plans.css';
 
 const Plans = () => {
   const navigate = useNavigate();
-  const { subscription, isTrialActive, trialEndsAt } = useSubscription();
+  const { subscription, isTrialActive, trialEndsAt, PLANS } = useSubscription();
   const authData = useAuthContext();
 
   const [loading, setLoading] = useState(false);
@@ -36,9 +36,9 @@ const Plans = () => {
     }
   };
 
-  const handleAssinar = () => {
+  const handleAssinar = (planId) => {
     setLoading(true);
-    navigate('/checkout', { state: { planId: 'monthly' } });
+    navigate('/checkout', { state: { planId } });
   };
 
   const features = [
@@ -48,6 +48,26 @@ const Plans = () => {
     { icon: <Puzzle size={22} color="#3A85A8" />, text: 'Extensão Cotatudo Automático' },
     { icon: <BarChart3 size={22} color="#3A85A8" />, text: 'Raio-X dos Incentivos' },
     { icon: <MessageCircle size={22} color="#3A85A8" />, text: 'Suporte via WhatsApp' },
+  ];
+
+  const planCards = [
+    {
+      ...PLANS.monthly,
+      label: 'Mensal',
+      priceLine: 'R$ 99,00',
+      periodLine: 'por mês',
+      note: 'Recorrência mensal. Cancele quando quiser.',
+      highlight: false,
+    },
+    {
+      ...PLANS.annual_upfront,
+      label: 'Anual',
+      priceLine: 'R$ 69,00',
+      periodLine: 'por mês',
+      note: 'Cobrado anualmente em R$ 828,00.',
+      highlight: true,
+      badge: 'Melhor custo-benefício',
+    },
   ];
 
   const explicitAccessEnd = subscription?.accessEndsAt?.toDate?.() || (subscription?.accessEndsAt ? new Date(subscription.accessEndsAt) : null);
@@ -87,51 +107,49 @@ const Plans = () => {
         </div>
       )}
 
-      {/* Plano único */}
-      <div style={{ display: 'flex', justifyContent: 'center', margin: '8px 0 28px' }}>
-        <div style={card}>
+      {/* Planos */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 18, margin: '8px auto 28px', maxWidth: 760 }}>
+        {planCards.map(plan => (
+          <div key={plan.id} style={{ ...card, borderColor: plan.highlight ? '#3A85A8' : '#4A4D52' }}>
+            <div style={{ textAlign: 'center', marginBottom: 28 }}>
+              {plan.badge && (
+                <div style={{ margin: '0 auto 12px', width: 'fit-content', padding: '7px 11px', border: '1px solid rgba(58,133,168,.45)', borderRadius: 999, color: '#DDEFF7', background: 'rgba(58,133,168,.14)', fontSize: 12, fontWeight: 800 }}>
+                  {plan.badge}
+                </div>
+              )}
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#3A85A8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
+                {plan.label}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 8 }}>
+                <span style={{ fontSize: 54, fontWeight: 850, color: '#ffffff', lineHeight: 1 }}>{plan.priceLine}</span>
+              </div>
+              <div style={{ fontSize: 14, color: '#A0A3A8', marginTop: 8 }}>{plan.periodLine}</div>
+              <div style={{ fontSize: 13, color: '#A0A3A8', marginTop: 10, minHeight: 38 }}>{plan.note}</div>
+            </div>
 
-          <div style={{ textAlign: 'center', marginBottom: 28 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#3A85A8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
-              Preço de lançamento por tempo limitado
-            </div>
-            <div style={{ fontSize: 15, color: '#A0A3A8', marginBottom: 6 }}>
-              De <span style={{ textDecoration: 'line-through', color: '#8C9098' }}>R$ 99,90</span> por
-            </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 4 }}>
-              <span style={{ fontSize: 18, fontWeight: 700, color: '#A0A3A8', alignSelf: 'flex-start', marginTop: 8 }}>R$</span>
-              <span style={{ fontSize: 64, fontWeight: 800, color: '#ffffff', lineHeight: 1 }}>69</span>
-              <span style={{ fontSize: 28, fontWeight: 700, color: '#ffffff', alignSelf: 'flex-end', marginBottom: 6 }}>,90</span>
-            </div>
-            <div style={{ fontSize: 14, color: '#A0A3A8', marginTop: 4 }}>recorrente até cancelar · cancele quando quiser</div>
-            <div style={{ margin: '14px auto 0', padding: '9px 12px', border: '1px solid rgba(58,133,168,.45)', borderRadius: 10, color: '#DDEFF7', background: 'rgba(58,133,168,.14)', fontSize: 13, fontWeight: 700 }}>
-              Garanta o valor de lançamento enquanto a oferta estiver ativa.
-            </div>
+            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {features.map((f, i) => (
+                <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, color: '#E1E1E1' }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{f.icon}</span>
+                  {f.text}
+                </li>
+              ))}
+            </ul>
+
+            <button
+              onClick={() => handleAssinar(plan.id)}
+              disabled={loading || assinaturaAtiva}
+              style={{
+                width: '100%', padding: '15px', border: 'none', borderRadius: 10,
+                background: assinaturaAtiva ? '#2e3136' : '#3A85A8',
+                color: assinaturaAtiva ? '#A0A3A8' : '#fff',
+                fontSize: 16, fontWeight: 700, cursor: assinaturaAtiva ? 'default' : 'pointer',
+              }}
+            >
+              {assinaturaAtiva ? '✓ Plano ativo' : loading ? 'Aguarde...' : `Assinar plano ${plan.label.toLowerCase()}`}
+            </button>
           </div>
-
-          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {features.map((f, i) => (
-              <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, color: '#E1E1E1' }}>
-                <span style={{ fontSize: 20, flexShrink: 0 }}>{f.icon}</span>
-                {f.text}
-              </li>
-            ))}
-          </ul>
-
-          <button
-            onClick={handleAssinar}
-            disabled={loading || assinaturaAtiva}
-            style={{
-              width: '100%', padding: '15px', border: 'none', borderRadius: 10,
-              background: assinaturaAtiva ? '#2e3136' : '#3A85A8',
-              color: assinaturaAtiva ? '#A0A3A8' : '#fff',
-              fontSize: 16, fontWeight: 700, cursor: assinaturaAtiva ? 'default' : 'pointer',
-            }}
-          >
-            {assinaturaAtiva ? '✓ Plano ativo' : loading ? 'Aguarde...' : 'Assinar agora'}
-          </button>
-
-        </div>
+        ))}
       </div>
 
       {/* Cupom */}
@@ -166,7 +184,7 @@ const Plans = () => {
 
 const card = {
   background: '#363940', border: '1px solid #3A85A8', borderRadius: 20,
-  padding: '40px 36px', width: '100%', maxWidth: 440,
+  padding: '36px 30px', width: '100%',
   boxShadow: '0 0 40px rgba(58,133,168,0.15)',
 };
 const couponBox = {

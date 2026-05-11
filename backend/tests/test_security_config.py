@@ -7,7 +7,7 @@ from fastapi import HTTPException
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from routes.asaas import asaas_webhook
+from routes.asaas import ASAAS_PLANS, _find_subscription_user_id, asaas_webhook
 from services.security_config import LOCAL_CORS_ORIGINS, PRODUCTION_CORS_ORIGINS, parse_cors_origins
 
 
@@ -65,3 +65,16 @@ def test_asaas_webhook_rejects_invalid_token(monkeypatch):
         asyncio.run(asaas_webhook(FakeRequest(), asaas_access_token="token-errado"))
 
     assert exc.value.status_code == 401
+
+
+def test_asaas_plan_prices_match_public_offer():
+    assert ASAAS_PLANS["monthly"]["price"] == 99.00
+    assert ASAAS_PLANS["monthly"]["cycle"] == "MONTHLY"
+    assert ASAAS_PLANS["annual_upfront"]["price"] == 828.00
+    assert ASAAS_PLANS["annual_upfront"]["cycle"] == "YEARLY"
+
+
+def test_asaas_finds_user_from_annual_external_reference():
+    payment = {"externalReference": "usuario-com-hifen-annual_upfront-828.00"}
+
+    assert _find_subscription_user_id(payment=payment) == "usuario-com-hifen"

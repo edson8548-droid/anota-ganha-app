@@ -17,13 +17,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 security = HTTPBearer(auto_error=False)
 
-ASAAS_PLAN_ID = "monthly"
-ASAAS_PLAN_PRICE = 69.90
-ASAAS_PLAN_DESCRIPTION = "Assinatura mensal VenPro - preco de lancamento"
+DEFAULT_ASAAS_PLAN_ID = "monthly"
+ASAAS_PLANS = {
+    "monthly": {
+        "id": "monthly",
+        "price": 99.00,
+        "cycle": "MONTHLY",
+        "description": "Assinatura mensal VenPro",
+    },
+    "annual_upfront": {
+        "id": "annual_upfront",
+        "price": 828.00,
+        "cycle": "YEARLY",
+        "description": "Assinatura anual VenPro",
+    },
+    "annual_installments": {
+        "id": "annual_installments",
+        "price": 828.00,
+        "cycle": "YEARLY",
+        "description": "Assinatura anual VenPro",
+    },
+}
 
 
 class CreateSubscriptionRequest(BaseModel):
-    planId: str = ASAAS_PLAN_ID
+    planId: str = DEFAULT_ASAAS_PLAN_ID
 
 
 def _fs():
@@ -61,6 +79,18 @@ def _asaas_headers() -> dict:
 
 def _only_digits(value: Optional[str]) -> str:
     return "".join(ch for ch in str(value or "") if ch.isdigit())
+
+
+def _asaas_plan(plan_id: str) -> dict:
+    plan = ASAAS_PLANS.get(plan_id)
+    if not plan:
+        raise HTTPException(status_code=400, detail="Plano inválido")
+    return plan
+
+
+def _period_end_for_plan(plan_id: str) -> datetime:
+    days = 365 if ASAAS_PLANS.get(plan_id, {}).get("cycle") == "YEARLY" else 30
+    return datetime.now(timezone.utc) + timedelta(days=days)
 
 
 def _asaas_request(method: str, path: str, **kwargs) -> dict:
@@ -146,8 +176,10 @@ def _find_subscription_user_id(payment: dict = None, subscription: dict = None) 
     subscription = subscription or {}
 
     external_reference = payment.get("externalReference") or subscription.get("externalReference") or ""
-    if "-monthly-" in external_reference:
-        return external_reference.split("-monthly-", 1)[0]
+    for plan_id in ASAAS_PLANS:
+        marker = f"-{plan_id}-"
+        if marker in external_reference:
+            return external_reference.split(marker, 1)[0]
 
     asaas_subscription_id = payment.get("subscription") or subscription.get("id")
     if asaas_subscription_id:
@@ -199,14 +231,16 @@ def _access_end_for_cancel(subscription_data: dict) -> datetime:
 
 @router.post("/create-subscription")
 async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Depends(get_user_id)):
-    if payload.planId != ASAAS_PLAN_ID:
+    try:
+        plan = _asaas_plan(payload.planId)
+    except HTTPException:
         await audit_event(
             "subscription_create_rejected",
             uid=uid,
             status="blocked",
             metadata={"reason": "invalid_plan", "planId": payload.planId},
         )
-        raise HTTPException(status_code=400, detail="Plano inválido")
+        raise
 
     user_ref = _fs().collection("users").document(uid)
     user_doc = user_ref.get()
@@ -215,15 +249,15 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
 
     user_data = user_doc.to_dict() or {}
     customer_id = _find_or_create_customer(uid, user_data)
-    external_reference = f"{uid}-{ASAAS_PLAN_ID}-{ASAAS_PLAN_PRICE}"
+    external_reference = f"{uid}-{plan['id']}-{plan['price']:.2f}"
 
     subscription_payload = {
         "customer": customer_id,
         "billingType": "UNDEFINED",
-        "value": ASAAS_PLAN_PRICE,
+        "value": plan["price"],
         "nextDueDate": date.today().isoformat(),
-        "cycle": "MONTHLY",
-        "description": ASAAS_PLAN_DESCRIPTION,
+        "cycle": plan["cycle"],
+        "description": plan["description"],
         "externalReference": external_reference,
         "callback": {
             "successUrl": os.environ.get("FRONTEND_URL", "https://venpro.com.br").rstrip("/") + "/payment-success",
@@ -243,14 +277,14 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
     _fs().collection("subscriptions").document(uid).set(
         {
             "userId": uid,
-            "planId": ASAAS_PLAN_ID,
+            "planId": plan["id"],
             "status": "pending",
             "provider": "asaas",
             "asaasCustomerId": customer_id,
             "asaasSubscriptionId": subscription_id,
             "asaasPaymentId": first_payment.get("id"),
             "externalReference": external_reference,
-            "amount": ASAAS_PLAN_PRICE,
+            "amount": plan["price"],
             "currency": "BRL",
             "paymentUrl": payment_url,
             "updatedAt": datetime.now(timezone.utc),
@@ -262,7 +296,7 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
         "subscription_created",
         uid=uid,
         status="pending",
-        metadata={"provider": "asaas", "planId": ASAAS_PLAN_ID, "amount": ASAAS_PLAN_PRICE},
+        metadata={"provider": "asaas", "planId": plan["id"], "amount": plan["price"]},
     )
 
     return {
@@ -352,6 +386,16 @@ async def asaas_webhook(
         )
         return {"received": True}
 
+    subscription_ref = _fs().collection("subscriptions").document(uid)
+    existing_doc = subscription_ref.get()
+    existing_data = existing_doc.to_dict() if existing_doc.exists else {}
+    plan_id = existing_data.get("planId") or DEFAULT_ASAAS_PLAN_ID
+    external_reference = payment.get("externalReference") or subscription.get("externalReference") or ""
+    for known_plan_id in ASAAS_PLANS:
+        if f"-{known_plan_id}-" in external_reference:
+            plan_id = known_plan_id
+            break
+
     update = {
         "provider": "asaas",
         "updatedAt": datetime.now(timezone.utc),
@@ -361,10 +405,12 @@ async def asaas_webhook(
         update.update(
             {
                 "status": "active",
-                "planId": ASAAS_PLAN_ID,
+                "planId": plan_id,
                 "asaasPaymentId": payment.get("id"),
                 "asaasSubscriptionId": payment.get("subscription") or subscription.get("id"),
                 "lastPaymentDate": datetime.now(timezone.utc),
+                "currentPeriodEnd": _period_end_for_plan(plan_id),
+                "amount": ASAAS_PLANS.get(plan_id, ASAAS_PLANS[DEFAULT_ASAAS_PLAN_ID])["price"],
                 "nextDueDate": payment.get("dueDate"),
                 "trialEndsAt": None,
             }
@@ -379,8 +425,6 @@ async def asaas_webhook(
             }
         )
     elif event in {"SUBSCRIPTION_INACTIVATED", "SUBSCRIPTION_DELETED"}:
-        existing_doc = _fs().collection("subscriptions").document(uid).get()
-        existing_data = existing_doc.to_dict() if existing_doc.exists else {}
         existing_access_end = _as_datetime(existing_data.get("accessEndsAt"))
         if existing_data.get("cancelAtPeriodEnd") and existing_access_end and existing_access_end > datetime.now(timezone.utc):
             update.update(
@@ -427,7 +471,7 @@ async def asaas_webhook(
         )
         return {"received": True}
 
-    _fs().collection("subscriptions").document(uid).set(update, merge=True)
+    subscription_ref.set(update, merge=True)
     await audit_event(
         "asaas_webhook_processed",
         uid=uid,
