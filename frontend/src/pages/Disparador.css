@@ -12,7 +12,7 @@
   backdrop-filter: blur(12px);
   border-bottom: 1px solid #4A4D52;
   padding: 0 24px;
-  height: 64px;
+  height: 60px;
   display: flex;
   align-items: center;
   position: sticky;
@@ -25,9 +25,7 @@
   justify-content: flex-start;
   align-items: center;
   width: 100%;
-  max-width: 700px;
-  margin: 0 auto;
-  gap: 12px;
+  gap: 14px;
 }
 
 .disp-header-divider {
