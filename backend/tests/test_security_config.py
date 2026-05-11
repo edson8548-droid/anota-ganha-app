@@ -1,0 +1,67 @@
+import asyncio
+import os
+import sys
+
+import pytest
+from fastapi import HTTPException
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from routes.asaas import asaas_webhook
+from services.security_config import LOCAL_CORS_ORIGINS, PRODUCTION_CORS_ORIGINS, parse_cors_origins
+
+
+class FakeRequest:
+    async def json(self):
+        return {"event": "IGNORED"}
+
+
+def test_cors_fallback_in_production_does_not_include_localhost(monkeypatch):
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    monkeypatch.setenv("APP_ENV", "production")
+
+    origins = parse_cors_origins()
+
+    assert origins == PRODUCTION_CORS_ORIGINS
+    assert not any(origin in origins for origin in LOCAL_CORS_ORIGINS)
+
+
+def test_cors_fallback_in_development_keeps_localhost(monkeypatch):
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    monkeypatch.delenv("APP_ENV", raising=False)
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    monkeypatch.delenv("ENV", raising=False)
+    monkeypatch.delenv("PYTHON_ENV", raising=False)
+    monkeypatch.delenv("RENDER_SERVICE_ID", raising=False)
+
+    origins = parse_cors_origins()
+
+    assert "http://localhost:3000" in origins
+    assert "https://venpro.com.br" in origins
+
+
+def test_cors_uses_explicit_environment_origins(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("CORS_ORIGINS", "https://venpro.com.br/, https://app.exemplo.com")
+
+    assert parse_cors_origins() == ["https://venpro.com.br", "https://app.exemplo.com"]
+
+
+def test_asaas_webhook_requires_configured_token_in_production(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.delenv("ASAAS_WEBHOOK_TOKEN", raising=False)
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(asaas_webhook(FakeRequest()))
+
+    assert exc.value.status_code == 503
+
+
+def test_asaas_webhook_rejects_invalid_token(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("ASAAS_WEBHOOK_TOKEN", "token-correto")
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(asaas_webhook(FakeRequest(), asaas_access_token="token-errado"))
+
+    assert exc.value.status_code == 401
