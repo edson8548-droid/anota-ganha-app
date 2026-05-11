@@ -14,6 +14,18 @@ async function getMultipartHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function slugifyPathSegment(value, fallback = 'empresa') {
+  const slug = String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+
+  return slug || fallback;
+}
+
 export const vitrineService = {
   // ── Ofertas ──────────────────────────────────────
   async listar() {
@@ -100,7 +112,14 @@ export const vitrineService = {
   },
 
   // ── Helpers ──────────────────────────────────────
-  gerarLinkPublico(slug) {
+  gerarEmpresaSlug(companyName) {
+    return slugifyPathSegment(companyName);
+  },
+
+  gerarLinkPublico(slug, companyName) {
+    if (companyName) {
+      return `${window.location.origin}/${slugifyPathSegment(companyName)}/ofertas/${slug}`;
+    }
     return `${window.location.origin}/oferta/${slug}`;
   },
 
