@@ -22,9 +22,10 @@
 }
 .vt-header-left { display: flex; align-items: center; gap: 14px; }
 .vt-btn-back {
-  background: none; border: 1px solid #4A4D52; border-radius: 8px;
-  padding: 6px 14px; font-size: 13px; font-weight: 600;
+  min-height: 36px; background: transparent; border: 1px solid #4A4D52; border-radius: 8px;
+  padding: 0 14px; font-size: 13px; font-weight: 750;
   color: #A0A3A8; cursor: pointer; transition: all .2s;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
 }
 .vt-btn-back:hover { border-color: #3A85A8; color: #3A85A8; }
 .vt-header-title { font-size: 15px; font-weight: 700; color: #E1E1E1; }
@@ -40,9 +41,10 @@
 .vt-list-title { font-size: 18px; font-weight: 700; color: #E1E1E1; }
 .vt-list-sub   { font-size: 13px; color: #6B6E74; margin-top: 2px; }
 .vt-btn-new {
-  background: #3A85A8; color: #fff; border: none;
-  padding: 10px 20px; border-radius: 10px; font-size: 14px; font-weight: 700;
-  cursor: pointer; transition: background .2s;
+  min-height: 40px; background: #3A85A8; color: #fff; border: 1px solid #3A85A8;
+  padding: 0 18px; border-radius: 8px; font-size: 14px; font-weight: 750;
+  cursor: pointer; transition: background .2s, border-color .2s;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
 }
 .vt-btn-new:hover { background: #31708E; }
 
@@ -70,12 +72,14 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
 }
 .vt-btn-sm {
-  background: none; border: 1px solid #4A4D52; border-radius: 8px;
-  padding: 6px 14px; font-size: 12px; font-weight: 600; color: #A0A3A8;
+  min-height: 34px; background: transparent; border: 1px solid #4A4D52; border-radius: 8px;
+  padding: 0 12px; font-size: 12px; font-weight: 750; color: #A0A3A8;
   cursor: pointer; transition: all .2s; white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
 .vt-btn-sm:hover { border-color: #3A85A8; color: #3A85A8; }
-.vt-btn-sm.danger:hover { border-color: rgba(239,68,68,.5); color: #ef4444; }
+.vt-btn-sm.danger { color: #ff6b7a; border-color: rgba(239,68,68,.34); background: rgba(239,68,68,.08); }
+.vt-btn-sm.danger:hover { border-color: rgba(239,68,68,.58); color: #ff8b96; background: rgba(239,68,68,.14); }
 .vt-btn-sm.primary { background: #3A85A8; border-color: #3A85A8; color: #fff; }
 .vt-btn-sm.primary:hover { background: #31708E; }
 
@@ -132,16 +136,18 @@
 /* Botões de ação do form */
 .vt-form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
 .vt-btn-primary {
-  background: #3A85A8; color: #fff; border: none;
-  padding: 12px 28px; border-radius: 10px; font-size: 14px; font-weight: 700;
-  cursor: pointer; transition: background .2s;
+  min-height: 40px; background: #3A85A8; color: #fff; border: 1px solid #3A85A8;
+  padding: 0 22px; border-radius: 8px; font-size: 14px; font-weight: 750;
+  cursor: pointer; transition: background .2s, border-color .2s, opacity .2s;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
 }
 .vt-btn-primary:hover:not(:disabled) { background: #31708E; }
 .vt-btn-primary:disabled { background: #4A4D52; cursor: not-allowed; }
 .vt-btn-secondary {
-  background: none; border: 1px solid #4A4D52; color: #A0A3A8;
-  padding: 12px 28px; border-radius: 10px; font-size: 14px; font-weight: 700;
+  min-height: 40px; background: transparent; border: 1px solid #4A4D52; color: #A0A3A8;
+  padding: 0 22px; border-radius: 8px; font-size: 14px; font-weight: 750;
   cursor: pointer; transition: all .2s;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
 }
 .vt-btn-secondary:hover { border-color: #3A85A8; color: #3A85A8; }
 
@@ -288,12 +294,12 @@
 
 /* Remover item */
 .vt-btn-remove {
-  background: none; border: none; color: #6B6E74; cursor: pointer; padding: 4px;
-  border-radius: 6px; transition: color .2s;
-  width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid transparent; color: #6B6E74; cursor: pointer; padding: 4px;
+  border-radius: 8px; transition: color .2s, background .2s, border-color .2s;
+  width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
   line-height: 1;
 }
-.vt-btn-remove:hover { color: #ef4444; }
+.vt-btn-remove:hover { color: #ef4444; background: rgba(239,68,68,.08); border-color: rgba(239,68,68,.24); }
 
 @media (max-width: 640px) {
   .vt-body { padding: 16px; }
