@@ -1,6 +1,6 @@
 # Checklist de Testes Manuais
 
-## Extensão Disparador WhatsApp
+## Extensão Carteira no WhatsApp
 
 1. Instalar `frontend/public/venpro-whatsapp-extension.zip` no Chrome.
 2. Abrir uma aba do Venpro logado e manter a aba aberta.

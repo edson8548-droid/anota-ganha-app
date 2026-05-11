@@ -182,7 +182,7 @@ export default function Disparador() {
           <ExternalLink size={16} /> Abrir WhatsApp Web
         </a>
         <p>
-          Depois clique no ícone da extensão "Venpro Campanhas" para iniciar o envio.
+          Depois clique no ícone da extensão "Carteira no WhatsApp" para iniciar o envio.
         </p>
       </div>
 
@@ -191,7 +191,7 @@ export default function Disparador() {
           href="/venpro-whatsapp-extension.zip"
           download
         >
-          <Download size={14} /> Baixar extensão Venpro Campanhas
+          <Download size={14} /> Baixar extensão Carteira no WhatsApp
         </a>
       </div>
 

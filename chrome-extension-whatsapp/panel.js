@@ -270,7 +270,7 @@ btnPararZerar.addEventListener('click', cancelAndStartFromZero);
 // Init
 getWhatsAppTab().then(tab => {
   if (!tab) {
-    setStatus('Abra o WhatsApp Web para usar o disparador.', 'err');
+    setStatus('Abra o WhatsApp Web para usar a Carteira no WhatsApp.', 'err');
     campaignInfo.style.display = 'none';
     return;
   }
