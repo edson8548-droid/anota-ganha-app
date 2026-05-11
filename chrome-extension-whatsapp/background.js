@@ -34,6 +34,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg.action === 'registerSentNumber') {
+    fetch(`${API_URL}/whatsapp/campanha/enviados`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${msg.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telefone: msg.telefone }),
+    })
+      .then(r => sendResponse({ ok: r.ok, status: r.status }))
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+
   if (msg.action === 'getDispatchState') {
     chrome.storage.local.get('dispatchState', (data) => {
       sendResponse({ state: data.dispatchState || null });
