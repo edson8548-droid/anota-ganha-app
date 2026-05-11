@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import './Login.css';
 
@@ -9,6 +10,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [touched, setTouched] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
   const { login } = useAuthContext();
   const navigate = useNavigate();
 
@@ -77,16 +79,28 @@ const Login = () => {
 
           <div className="form-group">
             <label>Senha</label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onBlur={() => touch('password')}
-              className={getFieldError('password') ? 'input-error' : touched.password && password ? 'input-valid' : ''}
-              disabled={loading}
-              autoComplete="current-password"
-            />
+            <div className="password-input-wrap">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onBlur={() => touch('password')}
+                className={getFieldError('password') ? 'input-error' : touched.password && password ? 'input-valid' : ''}
+                disabled={loading}
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword(prev => !prev)}
+                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                title={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                disabled={loading}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             {getFieldError('password') && <span className="field-error">{getFieldError('password')}</span>}
           </div>
 
