@@ -622,7 +622,7 @@ const Dashboard = () => {
               <div className="tool-card" onClick={() => navigate('/disparador-whatsapp')}>
                 <div className="tool-card-icon"><MessageCircle size={32} /></div>
                 <div className="tool-card-title">Carteira no WhatsApp</div>
-                <div className="tool-card-desc">Monte sua oferta uma vez e envie para todos os seus clientes pelo WhatsApp Web, com mensagens personalizadas, fotos dos produtos ou link de venda. Menos copia e cola, mais clientes avisados e mais tempo para vender.</div>
+                <div className="tool-card-desc">Monte sua oferta uma vez e envie para todos os seus clientes pelo WhatsApp Web, com mensagens personalizadas, fotos dos produtos ou link de venda. Menos copiar e colar, mais clientes avisados e mais tempo para vender.</div>
               </div>
               <div className="tool-card" onClick={handleOpenCampaignSelector}>
                 <div className="tool-card-icon"><BarChart3 size={32} /></div>

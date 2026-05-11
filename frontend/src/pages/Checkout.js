@@ -247,7 +247,7 @@ const Checkout = () => {
               <div className="trial-icon-checkout">🎁</div>
               <div>
                 <strong>15 dias grátis</strong>
-                <p>O plano pago começa após o trial.</p>
+                <p>O plano pago começa após o teste gratuito.</p>
               </div>
             </div>
           </div>

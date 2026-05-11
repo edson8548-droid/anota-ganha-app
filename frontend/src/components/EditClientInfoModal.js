@@ -80,14 +80,14 @@ const EditClientInfoModal = ({ isOpen, onClose, client, onSave }) => {
   const handleSearchCnpj = async () => {
     const cnpj = onlyDigits(formData.CNPJ);
     if (cnpj.length !== 14) {
-      toast.warning('Digite um CNPJ valido com 14 digitos');
+      toast.warning('Digite um CNPJ válido com 14 dígitos');
       return;
     }
 
     setSearchingCnpj(true);
     try {
       const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
-      if (!response.ok) throw new Error('CNPJ nao encontrado');
+      if (!response.ok) throw new Error('CNPJ não encontrado');
       const data = await response.json();
       const address = buildAddressFromCnpj(data);
       setFormData(prev => ({
@@ -105,7 +105,7 @@ const EditClientInfoModal = ({ isOpen, onClose, client, onSave }) => {
       }));
       toast.success('Dados encontrados pelo CNPJ');
     } catch (error) {
-      toast.warning(`Nao consegui buscar o CNPJ. ${error.message}`);
+      toast.warning(`Não consegui buscar o CNPJ. ${error.message}`);
     } finally {
       setSearchingCnpj(false);
     }
@@ -177,7 +177,7 @@ const EditClientInfoModal = ({ isOpen, onClose, client, onSave }) => {
                   type="text"
                   value={formData.CLIENTE}
                   onChange={(e) => handleChange('CLIENTE', e.target.value)}
-                  placeholder="Nome ou razao social"
+                  placeholder="Nome ou razão social"
                   disabled={saving}
                 />
               </div>
@@ -188,18 +188,18 @@ const EditClientInfoModal = ({ isOpen, onClose, client, onSave }) => {
                   type="text"
                   value={formData.CONTATO}
                   onChange={(e) => handleChange('CONTATO', e.target.value)}
-                  placeholder="Ex: Joao, Maria, comprador..."
+                  placeholder="Ex: João, Maria, comprador..."
                   disabled={saving}
                 />
               </div>
 
               <div className="form-group-edit-info full-width">
-                <label>Endereco</label>
+                <label>Endereço</label>
                 <input
                   type="text"
                   value={formData.ENDERECO}
                   onChange={(e) => handleChange('ENDERECO', e.target.value)}
-                  placeholder="Rua, numero e complemento"
+                  placeholder="Rua, número e complemento"
                   disabled={saving}
                 />
               </div>
