@@ -3,7 +3,7 @@
 ## Extensão Disparador WhatsApp
 
 1. Instalar `frontend/public/venpro-whatsapp-extension.zip` no Chrome.
-2. Abrir uma aba do VenPro logado e manter a aba aberta.
+2. Abrir uma aba do Venpro logado e manter a aba aberta.
 3. Abrir `https://web.whatsapp.com/` e confirmar que a conta está conectada.
 4. Abrir o painel lateral da extensão.
 5. Confirmar que a campanha carrega contatos, fotos e mensagem.
@@ -17,7 +17,7 @@
 
 1. Instalar `frontend/public/venpro-cotatudo-extension.zip` no Chrome.
 2. Abrir uma cotação no Cotatudo.
-3. Abrir uma aba do VenPro logado.
+3. Abrir uma aba do Venpro logado.
 4. Confirmar que a extensão reconhece o token.
 5. Processar uma cotação pequena e revisar preenchidos/não encontrados.
 

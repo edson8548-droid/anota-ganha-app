@@ -23,7 +23,7 @@ ASAAS_PLANS = {
         "id": "monthly",
         "price": 69.90,
         "cycle": "MONTHLY",
-        "description": "Assinatura mensal VenPro - preco de lancamento",
+        "description": "Assinatura mensal Venpro - preco de lancamento",
     },
 }
 
@@ -124,7 +124,7 @@ def _find_or_create_customer(uid: str, user_data: dict) -> str:
         or user_data.get("displayName")
         or user_data.get("nome")
         or user_data.get("email")
-        or "Cliente VenPro"
+        or "Cliente Venpro"
     )
     cpf_cnpj = _only_digits(user_data.get("cpf") or user_data.get("cpfCnpj"))
     phone = _only_digits(user_data.get("telefone") or user_data.get("phone"))

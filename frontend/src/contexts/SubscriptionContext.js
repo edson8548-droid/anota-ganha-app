@@ -1,5 +1,5 @@
 // COLE EM: src/contexts/SubscriptionContext.js
-// Context para gerenciar assinaturas do VenPro
+// Context para gerenciar assinaturas do Venpro
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuthContext } from './AuthContext';

@@ -38,7 +38,7 @@ def chat_completion(messages, *, temperature=0.4, max_tokens=1200, model=None):
         headers={
             "Authorization": f"Bearer {_api_key()}",
             "Content-Type": "application/json",
-            "User-Agent": "VenProBackend/1.0",
+            "User-Agent": "VenproBackend/1.0",
         },
         method="POST",
     )

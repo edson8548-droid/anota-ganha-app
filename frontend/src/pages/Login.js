@@ -49,8 +49,8 @@ const Login = () => {
       <div className="login-card">
         <div className="login-header">
           <div className="login-logo">
-            <img className="login-logo-icon" src="/assets/logo/venpro-logo-icon-transparent.png" alt="VenPro" />
-            <span className="login-logo-ven">Ven</span><span className="login-logo-pro">Pro</span>
+            <img className="login-logo-icon" src="/assets/logo/venpro-logo-icon-transparent.png" alt="Venpro" />
+            <span className="login-logo-word">Venpro</span>
           </div>
           <p className="login-subtitle">Entre na sua conta</p>
         </div>
