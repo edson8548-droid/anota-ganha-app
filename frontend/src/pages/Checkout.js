@@ -220,25 +220,16 @@ const Checkout = () => {
             <h2>Resumo do Pedido</h2>
             <p className="plan-summary-name">{selectedPlan.name}</p>
             <div className="plan-summary-price-block">
-              {selectedPlan.period === 'annual' ? (
-                <>
-                  <div className="price-main-checkout">
-                    R$ {formatMoney(selectedPlan.pricePerMonth)}
-                    <span className="price-period-checkout">/mês</span>
-                  </div>
-                  <div className="price-total-checkout">Cobrado anualmente: R$ {formatMoney(selectedPlan.price)}/ano</div>
-                </>
-              ) : (
-                <>
-                  <div className="price-main-checkout">
-                    R$ {formatMoney(selectedPlan.price)}
-                    <span className="price-period-checkout">/mês</span>
-                  </div>
-                </>
-              )}
+              <div className="price-total-checkout" style={{ textDecoration: 'line-through', opacity: .7 }}>
+                De R$ 99,90/mês
+              </div>
+              <div className="price-main-checkout">
+                R$ {formatMoney(selectedPlan.price)}
+                <span className="price-period-checkout">/mês</span>
+              </div>
               <div className="trial-info-checkout" style={{ marginTop: 12 }}>
                 <div>
-                  <strong>{selectedPlan.displayName}</strong>
+                  <strong>Preço de lançamento por tempo limitado</strong>
                   <p>{selectedPlan.billingCycle}</p>
                 </div>
               </div>

@@ -50,12 +50,12 @@ export const PLANS = {
   },
   monthly: {
     id: 'monthly',
-    name: 'Venpro Mensal',
-    displayName: 'Venpro Mensal',
-    price: 99,
+    name: 'Venpro',
+    displayName: 'Venpro',
+    price: 69.90,
     period: 'monthly',
     duration: 'por mês',
-    billingCycle: 'R$ 99,00 por mês. Recorrente até cancelar.',
+    billingCycle: 'Recorrente até cancelar. Cancele quando quiser.',
     mercadoPagoPreapprovalPlanId: null,
     limits: {
       campaigns: 999999,
@@ -71,57 +71,6 @@ export const PLANS = {
       'Suporte via WhatsApp',
     ],
     highlight: true
-  },
-  annual_installments: {
-    id: 'annual_installments',
-    name: 'Venpro Anual',
-    displayName: 'Venpro Anual',
-    price: 828,
-    pricePerMonth: 69,
-    period: 'annual',
-    duration: 'por ano',
-    billingCycle: 'R$ 69,00 por mês, cobrado anualmente em R$ 828,00.',
-    mercadoPagoPreapprovalPlanId: null,
-    limits: {
-      campaigns: 999999,
-      clients: 999999,
-      industries: 999999
-    },
-    features: [
-      'Cotação Pronta — planilha preenchida automática',
-      'Carteira no WhatsApp — envio em massa',
-      'Prompts Prontos para RCA',
-      'Extensão Cotatudo Automático',
-      'Raio-X dos Incentivos',
-      'Suporte via WhatsApp',
-    ],
-    highlight: true
-  },
-  annual_upfront: {
-    id: 'annual_upfront',
-    name: 'Venpro Anual',
-    displayName: 'Venpro Anual',
-    price: 828,
-    pricePerMonth: 69,
-    period: 'annual',
-    duration: 'por ano',
-    billingCycle: 'R$ 69,00 por mês, cobrado anualmente em R$ 828,00.',
-    mercadoPagoPreapprovalPlanId: null,
-    limits: {
-      campaigns: 999999,
-      clients: 999999,
-      industries: 999999
-    },
-    features: [
-      'Cotação Pronta — planilha preenchida automática',
-      'Carteira no WhatsApp — envio em massa',
-      'Prompts Prontos para RCA',
-      'Extensão Cotatudo Automático',
-      'Raio-X dos Incentivos',
-      'Suporte via WhatsApp',
-      '💰 Melhor custo-benefício!'
-    ],
-    highlight: false
   }
 };
 

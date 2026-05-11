@@ -21,21 +21,9 @@ DEFAULT_ASAAS_PLAN_ID = "monthly"
 ASAAS_PLANS = {
     "monthly": {
         "id": "monthly",
-        "price": 99.00,
+        "price": 69.90,
         "cycle": "MONTHLY",
-        "description": "Assinatura mensal VenPro",
-    },
-    "annual_upfront": {
-        "id": "annual_upfront",
-        "price": 828.00,
-        "cycle": "YEARLY",
-        "description": "Assinatura anual VenPro",
-    },
-    "annual_installments": {
-        "id": "annual_installments",
-        "price": 828.00,
-        "cycle": "YEARLY",
-        "description": "Assinatura anual VenPro",
+        "description": "Assinatura mensal VenPro - preco de lancamento",
     },
 }
 
