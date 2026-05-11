@@ -1,0 +1,62 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+const root = process.cwd();
+
+function readJson(path) {
+  return JSON.parse(readFileSync(join(root, path), 'utf8'));
+}
+
+function readText(path) {
+  return readFileSync(join(root, path), 'utf8');
+}
+
+function assertFilesExist(baseDir, files) {
+  for (const file of files) {
+    assert.ok(existsSync(join(root, baseDir, file)), `${baseDir}/${file} nao existe`);
+  }
+}
+
+describe('extensoes Chrome', () => {
+  it('manifest da extensao Cotatudo referencia arquivos existentes', () => {
+    const manifest = readJson('chrome-extension/manifest.json');
+
+    assert.equal(manifest.manifest_version, 3);
+    assertFilesExist('chrome-extension', [
+      manifest.background.service_worker,
+      manifest.action.default_popup,
+      ...manifest.content_scripts.flatMap(script => script.js || []),
+    ]);
+    assert.ok(manifest.host_permissions.includes('https://api.venpro.com.br/*'));
+  });
+
+  it('manifest da extensao WhatsApp referencia arquivos existentes', () => {
+    const manifest = readJson('chrome-extension-whatsapp/manifest.json');
+
+    assert.equal(manifest.manifest_version, 3);
+    assertFilesExist('chrome-extension-whatsapp', [
+      manifest.background.service_worker,
+      manifest.side_panel.default_path,
+      ...manifest.content_scripts.flatMap(script => script.js || []),
+    ]);
+    assert.ok(manifest.host_permissions.includes('https://web.whatsapp.com/*'));
+    assert.ok(manifest.host_permissions.includes('https://api.venpro.com.br/*'));
+  });
+
+  it('painel WhatsApp possui os controles usados pelo JavaScript', () => {
+    const html = readText('chrome-extension-whatsapp/panel.html');
+    const panelJs = readText('chrome-extension-whatsapp/panel.js');
+    const ids = [...panelJs.matchAll(/getElementById\('([^']+)'\)/g)].map(match => match[1]);
+
+    for (const id of ids) {
+      assert.match(html, new RegExp(`id="${id}"`), `panel.html precisa do id ${id}`);
+    }
+  });
+
+  it('ZIPs publicos das extensoes existem para download no site', () => {
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-whatsapp-extension.zip')));
+  });
+});

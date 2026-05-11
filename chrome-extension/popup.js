@@ -83,11 +83,25 @@ function applyState(state) {
     setProgress(100, `${state.processados} / ${state.total} itens`);
     setStatus('Preenchimento concluído!', 'ok');
     resultsEl.style.display = 'block';
-    resultsEl.innerHTML = `
-      <div class="ok">✓ Preenchidos: ${state.preenchidos} preços</div>
-      ${state.naoEncontrados > 0 ? `<div class="warn">Não encontrados: ${state.naoEncontrados}</div>` : ''}
-      <div style="margin-top:4px;color:#A0A3A8;">Total: ${state.processados} itens</div>
-    `;
+    resultsEl.replaceChildren();
+
+    const preenchidos = document.createElement('div');
+    preenchidos.className = 'ok';
+    preenchidos.textContent = `✓ Preenchidos: ${state.preenchidos} preços`;
+    resultsEl.appendChild(preenchidos);
+
+    if (state.naoEncontrados > 0) {
+      const naoEncontrados = document.createElement('div');
+      naoEncontrados.className = 'warn';
+      naoEncontrados.textContent = `Não encontrados: ${state.naoEncontrados}`;
+      resultsEl.appendChild(naoEncontrados);
+    }
+
+    const total = document.createElement('div');
+    total.style.marginTop = '4px';
+    total.style.color = '#A0A3A8';
+    total.textContent = `Total: ${state.processados} itens`;
+    resultsEl.appendChild(total);
   }
 
   if (state.status === 'error') {

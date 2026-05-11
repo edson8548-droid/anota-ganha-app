@@ -101,8 +101,10 @@ def _parse_single_phone(text: str) -> Optional[str]:
         return None
     if num.startswith('0'):
         num = num[1:]
-    if len(num) <= 11:
+    if len(num) in (10, 11):
         num = '55' + num
+    if len(num) not in (12, 13):
+        return None
     return num or None
 
 
@@ -302,6 +304,12 @@ async def registrar_enviado(payload: EnviadosPayload, uid: str = Depends(get_use
         ref = _campaign_ref(uid)
         ref.update({"sentNumbers": firestore.ArrayUnion([payload.telefone])})
     await asyncio.to_thread(_append)
+    return {"ok": True}
+
+
+@router.delete("/campanha/enviados")
+async def limpar_enviados(uid: str = Depends(get_user_id)):
+    await _set_campaign(uid, {"sentNumbers": []})
     return {"ok": True}
 
 

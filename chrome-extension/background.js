@@ -11,11 +11,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.action === 'getToken') {
-    chrome.storage.local.get(['venpro_token', 'venpro_token_ts'], (data) => {
-      const age = Date.now() - (data.venpro_token_ts || 0);
-      const token = data.venpro_token && age < 55 * 60 * 1000 ? data.venpro_token : null;
-      sendResponse({ token });
-    });
+    getToken().then(token => sendResponse({ token }));
     return true;
   }
 
@@ -102,12 +98,42 @@ async function runBatches(job, startBatch, preenchidos, naoEncontrados, processa
 }
 
 function getToken() {
+  return getStoredToken().then(async (token) => {
+    if (token) return token;
+    return requestTokenFromOpenVenProTab();
+  });
+}
+
+function getStoredToken() {
   return new Promise(resolve => {
     chrome.storage.local.get(['venpro_token', 'venpro_token_ts'], (data) => {
       const age = Date.now() - (data.venpro_token_ts || 0);
       resolve(data.venpro_token && age < 55 * 60 * 1000 ? data.venpro_token : null);
     });
   });
+}
+
+async function requestTokenFromOpenVenProTab() {
+  const tabs = await chrome.tabs.query({
+    url: [
+      'https://venpro.com.br/*',
+      'https://www.venpro.com.br/*',
+      'https://anota-ganha-app.web.app/*',
+      'https://anota-ganha-app.firebaseapp.com/*',
+    ],
+  });
+
+  for (const tab of tabs) {
+    try {
+      const response = await chrome.tabs.sendMessage(tab.id, { action: 'requestToken' });
+      if (response?.token) {
+        await chrome.storage.local.set({ venpro_token: response.token, venpro_token_ts: Date.now() });
+        return response.token;
+      }
+    } catch {}
+  }
+
+  return null;
 }
 
 function saveState(state) {

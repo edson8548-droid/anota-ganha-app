@@ -16,7 +16,8 @@ const stuckWrap     = document.getElementById('stuckWrap');
 const cancelWrap    = document.getElementById('cancelWrap');
 const btnRetomar    = document.getElementById('btnRetomar');
 const btnCancelar   = document.getElementById('btnCancelar');
-const btnParar      = document.getElementById('btnParar');
+const btnPararContinuar = document.getElementById('btnPararContinuar');
+const btnPararZerar = document.getElementById('btnPararZerar');
 const pausaMinEl    = document.getElementById('pausaMin');
 const pausaMaxEl    = document.getElementById('pausaMax');
 
@@ -33,6 +34,30 @@ async function getToken() {
   });
 }
 
+async function getWhatsAppTab() {
+  const tabs = await chrome.tabs.query({ url: 'https://web.whatsapp.com/*' });
+  return tabs.find(tab => tab?.id && tab?.url?.includes('web.whatsapp.com')) || null;
+}
+
+async function fetchCampaign(token) {
+  const r = await fetch(`${API_URL}/whatsapp/campanha`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (r.status === 403) {
+    throw new Error('Assinatura inativa. Renove em venpro.com.br');
+  }
+  if (!r.ok) throw new Error(`Erro ${r.status}`);
+  return r.json();
+}
+
+async function clearSentNumbers(token) {
+  const r = await fetch(`${API_URL}/whatsapp/campanha/enviados`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!r.ok) throw new Error(`Erro ${r.status}`);
+}
+
 async function loadCampaign() {
   const token = await getToken();
   if (!token) {
@@ -40,15 +65,7 @@ async function loadCampaign() {
     return;
   }
   try {
-    const r = await fetch(`${API_URL}/whatsapp/campanha`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (r.status === 403) {
-      setStatus('Assinatura inativa. Renove em venpro.com.br', 'err');
-      return;
-    }
-    if (!r.ok) throw new Error(`Erro ${r.status}`);
-    campaign = await r.json();
+    campaign = await fetchCampaign(token);
 
     infoContatos.textContent = campaign.contacts_count;
     infoFotos.textContent    = campaign.photoUrls.length;
@@ -58,8 +75,8 @@ async function loadCampaign() {
     const ready = campaign.contacts_count > 0 && campaign.message;
     btnDisparar.disabled = !ready;
     setStatus(ready ? 'Campanha pronta para disparar.' : 'Configure contatos e mensagem no VenPro', ready ? 'ok' : 'info');
-  } catch {
-    setStatus('Erro ao carregar campanha.', 'err');
+  } catch (err) {
+    setStatus(err.message || 'Erro ao carregar campanha.', 'err');
   }
 }
 
@@ -119,14 +136,25 @@ chrome.runtime.onMessage.addListener((msg) => {
 });
 
 btnDisparar.addEventListener('click', async () => {
-  if (!campaign) return;
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.url?.includes('web.whatsapp.com')) {
+  const tab = await getWhatsAppTab();
+  if (!tab) {
     setStatus('Abra o WhatsApp Web primeiro.', 'err');
     return;
   }
   const token = await getToken();
   if (!token) { setStatus('Login expirado. Abra o painel do VenPro e tente de novo.', 'err'); return; }
+
+  try {
+    campaign = await fetchCampaign(token);
+  } catch (err) {
+    setStatus(err.message || 'Erro ao carregar campanha.', 'err');
+    return;
+  }
+
+  if (!campaign.contacts_count || !campaign.message) {
+    setStatus('Configure contatos e mensagem no VenPro', 'err');
+    return;
+  }
 
   const pausaMin = parseInt(pausaMinEl.value) || 60;
   const pausaMax = Math.max(pausaMin, parseInt(pausaMaxEl.value) || 90);
@@ -144,8 +172,8 @@ btnDisparar.addEventListener('click', async () => {
 });
 
 btnRetomar.addEventListener('click', async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.url?.includes('web.whatsapp.com')) { setStatus('Abra o WhatsApp Web.', 'err'); return; }
+  const tab = await getWhatsAppTab();
+  if (!tab) { setStatus('Abra o WhatsApp Web.', 'err'); return; }
   const token = await getToken();
   stuckWrap.style.display = 'none';
   cancelWrap.style.display = 'block';
@@ -155,22 +183,45 @@ btnRetomar.addEventListener('click', async () => {
   chrome.tabs.sendMessage(tab.id, { action: 'resumeDispatch', token });
 });
 
-function cancelDispatch() {
-  chrome.runtime.sendMessage({ action: 'clearDispatchState' }, () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-      if (tab?.url?.includes('web.whatsapp.com')) {
-        chrome.tabs.sendMessage(tab.id, { action: 'cancelDispatch' });
-      }
-    });
-    resetUI();
+async function stopDispatch() {
+  const tab = await getWhatsAppTab();
+  if (tab) {
+    chrome.tabs.sendMessage(tab.id, { action: 'cancelDispatch' });
+  }
+  await new Promise(resolve => chrome.storage.local.remove('whatsappDispatchJob', resolve));
+  await new Promise(resolve => {
+    chrome.runtime.sendMessage({ action: 'clearDispatchState' }, resolve);
   });
 }
-btnCancelar.addEventListener('click', cancelDispatch);
-btnParar.addEventListener('click', cancelDispatch);
+
+async function cancelAndContinueLater() {
+  await stopDispatch();
+  await loadCampaign();
+  resetUI();
+  setStatus('Disparo cancelado. Ao iniciar de novo, vou pular quem já recebeu.', 'ok');
+}
+
+async function cancelAndStartFromZero() {
+  const token = await getToken();
+  if (!token) { setStatus('Login expirado. Abra o painel do VenPro e tente de novo.', 'err'); return; }
+  await stopDispatch();
+  try {
+    await clearSentNumbers(token);
+    await loadCampaign();
+    resetUI();
+    setStatus('Disparo cancelado. Ao iniciar de novo, começa do primeiro contato.', 'ok');
+  } catch {
+    setStatus('Não consegui zerar os enviados. Tente novamente.', 'err');
+  }
+}
+
+btnCancelar.addEventListener('click', cancelAndContinueLater);
+btnPararContinuar.addEventListener('click', cancelAndContinueLater);
+btnPararZerar.addEventListener('click', cancelAndStartFromZero);
 
 // Init
-chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-  if (!tab?.url?.includes('web.whatsapp.com')) {
+getWhatsAppTab().then(tab => {
+  if (!tab) {
     setStatus('Abra o WhatsApp Web para usar o disparador.', 'err');
     campaignInfo.style.display = 'none';
     return;

@@ -12,6 +12,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from services.security_headers import SecurityHeadersMiddleware
 # ... (restante dos imports) ...
 from routes.mercadopago import router as mercadopago_router
 from routes.mercadopago import setup_mercadopago, initialize_firebase
@@ -50,6 +51,8 @@ class LogCorsPreflightMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(LogCorsPreflightMiddleware)
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 # ========== Rate limit simples por IP ==========
 class SimpleRateLimitMiddleware(BaseHTTPMiddleware):

@@ -57,6 +57,13 @@ let resumedFromNavigation = false;
 // ── Helpers ───────────────────────────────────────────────────────────────
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+async function sleepCancelable(ms) {
+  const end = Date.now() + ms;
+  while (!cancelFlag && Date.now() < end) {
+    await sleep(Math.min(500, end - Date.now()));
+  }
+}
+
 function findFirst(selectors) {
   for (const sel of selectors) {
     const matches = Array.from(document.querySelectorAll(sel));
@@ -227,7 +234,7 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
   const photos   = campaign.photoUrls || [];
   const msgTpl   = campaign.message || '';
 
-  let sent = startIdx;
+  let sent = contacts.filter(contact => sentSet.has(contact.telefone)).length;
   let invalidos = 0;
   const total = contacts.length;
 
@@ -282,7 +289,7 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
     }
     await sleep(300);
     await clickSend();
-    await sleep(15000); // wait 15s before sending photos (same as meu_robo.py)
+    await sleepCancelable(15000); // wait 15s before sending photos (same as meu_robo.py)
 
     // 2. Send photos
     if (cancelFlag) break;
@@ -291,7 +298,7 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
       const photoData = await downloadPhoto(url);
       if (photoData) {
         await attachAndSendPhoto(photoData.base64, photoData.type);
-        await sleep(1500);
+        await sleepCancelable(1500);
       }
     }
 
@@ -310,11 +317,13 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
     // 4. Random pause before next contact
     if (cancelFlag) break;
     const pausa = pausaMin + Math.random() * (pausaMax - pausaMin);
-    await sleep(pausa * 1000);
+    await sleepCancelable(pausa * 1000);
   }
 
   await clearJob();
-  await saveState(cancelFlag ? 'running' : 'done');
+  if (!cancelFlag) {
+    await saveState('done');
+  }
   dispatching = false;
 }
 
