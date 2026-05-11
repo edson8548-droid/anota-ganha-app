@@ -256,16 +256,16 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
 
   async function registerSent(telefone) {
     if (sentSet.has(telefone)) return;
+    const response = await new Promise(resolve => {
+      chrome.runtime.sendMessage({ action: 'registerSentNumber', token, telefone }, r => resolve(r));
+    });
+    if (!response?.ok) {
+      await saveState('running', 'Mensagem enviada, mas nao consegui registrar no VenPro. Verifique sua conexao antes de continuar.');
+      return;
+    }
     sentSet.add(telefone);
     sent++;
     await saveState('running');
-    try {
-      await fetch(`${API_URL}/whatsapp/campanha/enviados`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telefone }),
-      });
-    } catch {}
   }
 
   for (let i = startIdx; i < contacts.length; i++) {
@@ -304,6 +304,7 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
     await sleep(300);
     await clickSend();
     await registerSent(telefone);
+    if (!sentSet.has(telefone)) break;
     await sleepCancelable(15000); // wait 15s before sending photos (same as meu_robo.py)
 
     // 2. Send photos
