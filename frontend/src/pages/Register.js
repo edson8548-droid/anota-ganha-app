@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { isValidCPF, onlyDigits } from '../utils/documentValidators';
 import './Register.css';
@@ -57,6 +58,8 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [touched, setTouched] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const touch = (field) => setTouched(t => ({ ...t, [field]: true }));
 
@@ -244,18 +247,30 @@ const Register = () => {
 
           <div className="form-group">
             <label htmlFor="password">Senha</label>
-            <input
-              id="password"
-              type="password"
-              placeholder="Mínimo 6 caracteres"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onBlur={() => touch('password')}
-              className={getFieldError('password') ? 'input-error' : isFieldValid('password') ? 'input-valid' : ''}
-              disabled={loading}
-              autoComplete="new-password"
-              required
-            />
+            <div className="password-input-wrap">
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Mínimo 6 caracteres"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onBlur={() => touch('password')}
+                className={getFieldError('password') ? 'input-error' : isFieldValid('password') ? 'input-valid' : ''}
+                disabled={loading}
+                autoComplete="new-password"
+                required
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword(prev => !prev)}
+                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                title={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                disabled={loading}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             {getFieldError('password') && <span className="field-error">{getFieldError('password')}</span>}
             {password && (() => {
               const s = getPasswordStrength(password);
@@ -272,18 +287,30 @@ const Register = () => {
 
           <div className="form-group">
             <label htmlFor="confirmPassword">Confirmar Senha</label>
-            <input
-              id="confirmPassword"
-              type="password"
-              placeholder="Digite a senha novamente"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              onBlur={() => touch('confirmPassword')}
-              className={getFieldError('confirmPassword') ? 'input-error' : isFieldValid('confirmPassword') ? 'input-valid' : ''}
-              disabled={loading}
-              autoComplete="new-password"
-              required
-            />
+            <div className="password-input-wrap">
+              <input
+                id="confirmPassword"
+                type={showConfirmPassword ? 'text' : 'password'}
+                placeholder="Digite a senha novamente"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                onBlur={() => touch('confirmPassword')}
+                className={getFieldError('confirmPassword') ? 'input-error' : isFieldValid('confirmPassword') ? 'input-valid' : ''}
+                disabled={loading}
+                autoComplete="new-password"
+                required
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowConfirmPassword(prev => !prev)}
+                aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                title={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                disabled={loading}
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             {getFieldError('confirmPassword') && <span className="field-error">{getFieldError('confirmPassword')}</span>}
           </div>
           

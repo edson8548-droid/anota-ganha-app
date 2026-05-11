@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { FileSpreadsheet, Send, ClipboardList, Puzzle, BarChart3, MessageCircle } from 'lucide-react';
+import { ArrowLeft, FileSpreadsheet, Send, ClipboardList, Puzzle, BarChart3, MessageCircle } from 'lucide-react';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import api from '../services/api';
@@ -67,10 +67,11 @@ const Plans = () => {
         marginBottom: 32,
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: 720, margin: '0 auto' }}>
-          <button onClick={() => navigate('/dashboard')} style={{ background: 'none', border: '1px solid #4A4D52', borderRadius: 8, padding: '6px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#A0A3A8' }}>
-            ← Dashboard
+          <button className="venpro-back-button" onClick={() => navigate('/dashboard')} title="Voltar" aria-label="Voltar">
+            <ArrowLeft size={18} />
           </button>
           <span style={{ fontSize: 15, fontWeight: 700, color: '#ffffff' }}>Planos</span>
+          <span style={{ width: 40, height: 40 }} aria-hidden="true" />
         </div>
       </header>
 
