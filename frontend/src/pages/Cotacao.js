@@ -140,15 +140,17 @@ export default function Cotacao() {
             <ArrowLeft size={18} />
           </button>
           <div style={{ width: 1, height: 20, background: '#4A4D52' }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <svg viewBox="0 0 18 18" fill="none" width="24" height="24">
-              <path d="M2 3.5L9 14.5L16 3.5" stroke="#3A85A8" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M9 14.5L12.5 8.5" stroke="rgba(58,133,168,0.6)" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            <span style={{ fontWeight: 800, fontSize: 17, color: '#fff' }}>
-              Venpro
-            </span>
-            <span style={{ color: '#A0A3A8', fontSize: 13, fontWeight: 500 }}>Cotação Pronta</span>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <h1 style={{
+              margin: 0,
+              color: '#E1E1E1',
+              fontSize: 16,
+              fontWeight: 800,
+              lineHeight: 1.15,
+              letterSpacing: 0,
+            }}>
+              Cotação Pronta
+            </h1>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
