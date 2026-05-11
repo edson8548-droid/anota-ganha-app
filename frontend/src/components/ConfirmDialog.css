@@ -44,12 +44,16 @@
 }
 
 .cd-btn {
-  padding: 10px 22px;
+  min-height: 40px;
+  padding: 0 18px;
   border-radius: 8px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 750;
   cursor: pointer;
-  border: none;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.18s;
 }
 
@@ -65,12 +69,14 @@
 }
 
 .cd-btn-confirm {
-  background: #ef4444;
-  color: #ffffff;
+  background: rgba(239,68,68,.12);
+  border-color: rgba(239,68,68,.48);
+  color: #ff6b7a;
 }
 
 .cd-btn-confirm:hover {
-  background: #dc2626;
+  background: rgba(239,68,68,.18);
+  border-color: rgba(239,68,68,.68);
 }
 
 @keyframes cd-fade-in {

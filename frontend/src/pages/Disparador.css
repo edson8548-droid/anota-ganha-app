@@ -21,19 +21,24 @@
 .disp-status.warn { color: #e8a830; }
 
 .disp-btn {
-  padding: 9px 18px;
-  border: none;
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid transparent;
   border-radius: 8px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 750;
   cursor: pointer;
-  transition: background 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, opacity 0.2s;
 }
-.disp-btn-primary { background: #3a85a8; color: #fff; }
+.disp-btn-primary { background: #3a85a8; color: #fff; border-color: #3a85a8; }
 .disp-btn-primary:hover { background: #31708e; }
 .disp-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-.disp-btn-danger { background: #4a2020; color: #ff6b7a; border: 1px solid #ff6b7a; }
-.disp-btn-danger:hover { background: #5a2828; }
+.disp-btn-danger { background: rgba(239,68,68,.10); color: #ff6b7a; border-color: rgba(239,68,68,.45); }
+.disp-btn-danger:hover { background: rgba(239,68,68,.16); border-color: rgba(239,68,68,.62); }
 .disp-btn-secondary { background: #2e3136; color: #e1e1e1; border: 1px solid #4a4d52; }
 .disp-btn-secondary:hover { background: #363940; }
 

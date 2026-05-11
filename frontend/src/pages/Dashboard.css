@@ -134,15 +134,19 @@
 .user-email { font-size: .72rem; color: var(--sub); }
 
 .btn-logout {
-  padding: .45rem .8rem;
+  min-height: 36px;
+  padding: 0 .9rem;
   background: transparent;
   border: 1px solid var(--borda);
   color: var(--sub);
   border-radius: 8px;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 700;
   font-size: .8rem;
   transition: all .2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .btn-logout:hover { background: rgba(239,68,68,.1); border-color: #ef4444; color: #ef4444; }
 
@@ -514,9 +518,9 @@
   border: 1px solid var(--borda-c);
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  font-size: .95rem;
   transition: all .2s;
   background: var(--branco);
+  flex-shrink: 0;
 }
 .btn-edit { color: var(--acento); }
 .btn-edit:hover { background: rgba(49,112,142,.08); border-color: var(--acento); }
@@ -633,8 +637,8 @@
 .campaign-view-header {
   background: var(--bg);
   border-bottom: 1px solid var(--borda);
-  padding: 0 2rem;
-  height: 64px;
+  padding: 10px 2rem;
+  min-height: 64px;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -681,23 +685,29 @@
   font-size: .82rem;
 }
 
-.campaign-view-actions { display: flex; gap: .5rem; }
+.campaign-view-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
 
-.btn-campaign-action,
-.btn-edit-campaign,
-.btn-whatsapp {
-  padding: .6rem 1.1rem;
+.btn-campaign-action {
+  min-height: 38px;
+  padding: 0 .95rem;
   border-radius: 8px;
   border: 1px solid var(--borda);
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 750;
   font-size: .82rem;
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: .4rem;
   transition: all .2s;
   background: var(--bg3);
   color: var(--texto);
+  white-space: nowrap;
 }
 .btn-campaign-action.primary {
   background: linear-gradient(135deg, var(--acento), var(--acento2));
@@ -719,13 +729,22 @@
   background: rgba(239, 68, 68, .1);
   color: #ef4444;
 }
+.btn-campaign-action.support {
+  border-color: rgba(46, 204, 138, .36);
+  background: rgba(46, 204, 138, .10);
+  color: var(--verde);
+}
+.btn-campaign-action.ghost {
+  border-color: rgba(148, 163, 184, .32);
+  background: transparent;
+  color: var(--sub);
+}
 .btn-campaign-action.primary:hover { filter: brightness(1.06); }
 .btn-campaign-action.secondary:hover { background: rgba(148, 163, 184, .16); border-color: rgba(148, 163, 184, .62); }
 .btn-campaign-action.warning:hover { background: rgba(245, 158, 11, .16); }
 .btn-campaign-action.danger:hover { background: rgba(239, 68, 68, .16); }
-.btn-edit-campaign:hover { border-color: var(--acento); color: var(--acento); }
-.btn-whatsapp { background: rgba(37,211,102,.1); border-color: rgba(37,211,102,.3); color: #25d366; }
-.btn-whatsapp:hover { background: rgba(37,211,102,.15); }
+.btn-campaign-action.support:hover { background: rgba(46, 204, 138, .16); border-color: rgba(46, 204, 138, .52); }
+.btn-campaign-action.ghost:hover { background: rgba(239,68,68,.08); border-color: rgba(239,68,68,.45); color: #ef4444; }
 
 /* ==================== TABS ==================== */
 .tabs-container {

@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { FileSpreadsheet, ClipboardList, BarChart3, Send, Store, Plus, RotateCcw, Trash2, Copy, MessageCircle } from 'lucide-react';
+import { FileSpreadsheet, ClipboardList, BarChart3, Send, Store, Plus, RotateCcw, Trash2, Copy, MessageCircle, Pencil, LifeBuoy, LogOut } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useCampaigns } from '../hooks/useCampaigns';
 import { useClients } from '../hooks/useClients';
@@ -728,15 +728,21 @@ const Dashboard = () => {
                   Encerrar
                 </button>
               )}
-              <button className="btn-edit-campaign" onClick={(e) => handleEditCampaign(e, selectedCampaign)}>✏️ Editar</button>
+              <button className="btn-campaign-action secondary" onClick={(e) => handleEditCampaign(e, selectedCampaign)}>
+                <Pencil size={16} /> Editar
+              </button>
               <button className="btn-campaign-action warning" onClick={handleResetCampaignProgress}>
                 <RotateCcw size={16} /> Zerar vendas
               </button>
               <button className="btn-campaign-action danger" onClick={(e) => handleDeleteCampaign(e, selectedCampaign.id)}>
                 <Trash2 size={16} /> Excluir
               </button>
-              <button className="btn-whatsapp" onClick={handleWhatsAppSupport}>💬 Suporte</button>
-              <button className="btn-logout" onClick={handleLogout}>Sair</button>
+              <button className="btn-campaign-action support" onClick={handleWhatsAppSupport}>
+                <LifeBuoy size={16} /> Suporte
+              </button>
+              <button className="btn-campaign-action ghost" onClick={handleLogout}>
+                <LogOut size={16} /> Sair
+              </button>
             </div>
           </div>
         </header>
@@ -845,8 +851,12 @@ const Dashboard = () => {
                               {client.BAIRRO && <p className="client-neighborhood">{client.BAIRRO}</p>}
                             </div>
                             <div className="client-actions-btns">
-                              <button className="btn-icon btn-edit" onClick={(e) => handleOpenEditInfo(e, client)} title="Editar">✏️</button>
-                              <button className="btn-icon btn-delete" onClick={(e) => handleDeleteClient(e, client.id)} title="Deletar">🗑️</button>
+                              <button className="btn-icon btn-edit" onClick={(e) => handleOpenEditInfo(e, client)} title="Editar" aria-label="Editar cliente">
+                                <Pencil size={16} />
+                              </button>
+                              <button className="btn-icon btn-delete" onClick={(e) => handleDeleteClient(e, client.id)} title="Excluir" aria-label="Excluir cliente">
+                                <Trash2 size={16} />
+                              </button>
                             </div>
                           </div>
                           <div className={`client-priority-badge ${actionMeta.priority}`}>
