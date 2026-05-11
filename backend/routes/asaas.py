@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from firebase_admin import auth as firebase_auth, firestore
 from pydantic import BaseModel
+from services.security_config import is_production_environment
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -307,6 +308,9 @@ async def asaas_webhook(
 ):
     expected_token = os.environ.get("ASAAS_WEBHOOK_TOKEN", "").strip()
     received_token = asaas_access_token or asaas_access_token_underscore
+    if not expected_token and is_production_environment():
+        logger.error("[SECURITY] asaas_webhook_token_missing_in_production")
+        raise HTTPException(status_code=503, detail="Webhook Asaas não configurado")
     if expected_token and received_token != expected_token:
         logger.warning("[SECURITY] asaas_webhook_invalid_token")
         raise HTTPException(status_code=401, detail="Token inválido")
