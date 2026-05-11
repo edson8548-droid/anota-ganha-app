@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Send } from 'lucide-react';
+import { ArrowLeft, Download, ExternalLink, FileUp, ImagePlus, RotateCcw, Save, Send, Trash2 } from 'lucide-react';
 import {
   getCampanha, uploadContatos, uploadFotos, deletarFotos,
   salvarMensagem,
@@ -98,17 +98,12 @@ export default function Disparador() {
   return (
     <div className="disparador-page">
 
-      {/* Header padrão */}
-      <header style={{
-        background: 'rgba(43,45,49,0.95)', backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid #4A4D52', padding: '0 24px', height: 64,
-        display: 'flex', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10,
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: 700, margin: '0 auto' }}>
-          <button onClick={() => navigate('/dashboard')} style={{ background: 'none', border: '1px solid #4A4D52', borderRadius: 8, padding: '6px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#A0A3A8' }}>
-            ← Dashboard
+      <header className="disp-header">
+        <div className="disp-header-inner">
+          <button className="disp-btn disp-btn-ghost" onClick={() => navigate('/dashboard')}>
+            <ArrowLeft size={16} /> Dashboard
           </button>
-          <span style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="disp-header-title">
             <Send size={16} /> Carteira no WhatsApp
           </span>
         </div>
@@ -128,7 +123,7 @@ export default function Disparador() {
           onClick={() => csvRef.current.click()}
           disabled={uploadingCsv}
         >
-          {uploadingCsv ? 'Carregando...' : contactsCount > 0 ? '↺ Substituir lista CSV' : '⬆ Subir lista CSV'}
+          {uploadingCsv ? 'Carregando...' : contactsCount > 0 ? <><RotateCcw size={16} /> Substituir lista CSV</> : <><FileUp size={16} /> Subir lista CSV</>}
         </button>
       </div>
 
@@ -153,11 +148,11 @@ export default function Disparador() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <input ref={fotosRef} type="file" accept="image/*,.pdf" multiple style={{ display: 'none' }} onChange={handleFotosUpload} />
           <button className="disp-btn disp-btn-primary" onClick={() => fotosRef.current.click()} disabled={uploadingFotos}>
-            {uploadingFotos ? 'Enviando...' : '⬆ Adicionar fotos'}
+            {uploadingFotos ? 'Enviando...' : <><ImagePlus size={16} /> Adicionar fotos</>}
           </button>
           {photoUrls.length > 0 && (
             <button className="disp-btn disp-btn-danger" onClick={handleDeletarFotos}>
-              🗑 Limpar todas
+              <Trash2 size={16} /> Limpar todas
             </button>
           )}
         </div>
@@ -176,27 +171,26 @@ export default function Disparador() {
           onChange={e => setMessage(e.target.value)}
         />
         <button className="disp-btn disp-btn-primary" onClick={handleSalvarMensagem} disabled={savingMsg}>
-          {savingMsg ? 'Salvando...' : '💾 Salvar mensagem'}
+          {savingMsg ? 'Salvando...' : <><Save size={16} /> Salvar mensagem</>}
         </button>
       </div>
 
       {/* Abrir WhatsApp Web */}
       <div className="disp-open-wa">
         <a href="https://web.whatsapp.com" target="_blank" rel="noopener noreferrer">
-          Abrir WhatsApp Web →
+          <ExternalLink size={16} /> Abrir WhatsApp Web
         </a>
-        <p style={{ fontSize: 11, color: '#a0a3a8', marginTop: 6 }}>
+        <p>
           Depois clique no ícone da extensão "Venpro Campanhas" para iniciar o envio.
         </p>
       </div>
 
-      <div style={{ textAlign: 'center', marginTop: 12 }}>
+      <div className="disp-download-extension">
         <a
           href="/venpro-whatsapp-extension.zip"
           download
-          style={{ fontSize: 12, color: '#3a85a8' }}
         >
-          ⬇ Baixar extensão Venpro Campanhas
+          <Download size={14} /> Baixar extensão Venpro Campanhas
         </a>
       </div>
 
