@@ -237,6 +237,7 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
   let sent = contacts.filter(contact => sentSet.has(contact.telefone)).length;
   let invalidos = 0;
   const total = contacts.length;
+  let nextIdx = Math.max(0, startIdx || 0);
 
   async function saveJob(nextIdx) {
     await chrome.storage.local.set({
@@ -249,7 +250,8 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
   }
 
   async function saveState(status, errorMsg = '') {
-    const state = { status, sent, total, invalidos, errorMsg, ts: Date.now(), startIdx: sent };
+    const processed = Math.min(total, Math.max(sent + invalidos, nextIdx));
+    const state = { status, sent, total, invalidos, processed, errorMsg, ts: Date.now(), startIdx: nextIdx };
     await new Promise(r => chrome.runtime.sendMessage({ action: 'saveDispatchState', state }, r));
     chrome.runtime.sendMessage({ action: 'dispatchUpdate' });
   }
@@ -272,7 +274,11 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
     if (cancelFlag) break;
 
     const { nome, telefone } = contacts[i];
-    if (sentSet.has(telefone)) continue;
+    nextIdx = i;
+    if (sentSet.has(telefone)) {
+      nextIdx = i + 1;
+      continue;
+    }
 
     await saveState('running');
     await saveJob(i);
@@ -290,6 +296,7 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
 
     if (!chatInput || isInvalidNumber()) {
       invalidos++;
+      nextIdx = i + 1;
       await saveState('running');
       continue;
     }
@@ -305,6 +312,9 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
     await clickSend();
     await registerSent(telefone);
     if (!sentSet.has(telefone)) break;
+    nextIdx = i + 1;
+    await saveJob(nextIdx);
+    await saveState('running');
     await sleepCancelable(15000); // wait 15s before sending photos (same as meu_robo.py)
 
     // 2. Send photos

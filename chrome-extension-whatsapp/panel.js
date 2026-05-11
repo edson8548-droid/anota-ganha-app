@@ -113,11 +113,16 @@ async function loadCampaign() {
 function applyDispatchState(state) {
   if (!state) return;
   const total = state.total || 1;
-  const pct = Math.round((state.sent / total) * 100);
+  const processed = Math.min(total, Math.max(state.processed || 0, (state.sent || 0) + (state.invalidos || 0)));
+  const rawPct = total ? (processed / total) * 100 : 0;
+  const pctValue = rawPct > 0 && rawPct < 10 ? Math.max(0.1, Math.round(rawPct * 10) / 10) : Math.round(rawPct);
+  const pctLabel = Number.isInteger(pctValue)
+    ? `${pctValue}%`
+    : `${pctValue.toFixed(1).replace('.', ',')}%`;
   progressWrap.style.display = 'block';
-  progressBar.style.width = pct + '%';
-  progressPct.textContent  = pct + '%';
-  progressText.textContent = `${state.sent} / ${total} enviados`;
+  progressBar.style.width = Math.min(100, Math.max(rawPct, processed > 0 ? 1 : 0)) + '%';
+  progressPct.textContent  = pctLabel;
+  progressText.textContent = `${state.sent || 0} / ${total} enviados`;
   if (state.invalidos > 0) invalidosWrap.textContent = `${state.invalidos} número(s) inválido(s)`;
   if (state.errorMsg) setStatus(state.errorMsg, 'err');
 
@@ -128,7 +133,7 @@ function applyDispatchState(state) {
     btnDisparar.disabled = true;
     btnDisparar.textContent = stuck ? 'Pausado' : 'Disparando...';
     if (!state.errorMsg) {
-      setStatus(stuck ? `Pausado em ${pct}% — PC dormiu ou erro` : `Disparando... ${pct}%`, stuck ? 'err' : 'info');
+      setStatus(stuck ? `Pausado em ${pctLabel} — PC dormiu ou erro` : `Disparando... ${pctLabel}`, stuck ? 'err' : 'info');
     }
   }
   if (state.status === 'done') {
