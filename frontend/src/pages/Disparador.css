@@ -22,7 +22,7 @@
 
 .disp-header-inner {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   width: 100%;
   max-width: 700px;
@@ -30,13 +30,21 @@
   gap: 12px;
 }
 
+.disp-header-divider {
+  width: 1px;
+  height: 20px;
+  background: #4A4D52;
+  flex-shrink: 0;
+}
+
 .disp-header-title {
   font-size: 15px;
-  font-weight: 750;
-  color: #ffffff;
+  font-weight: 700;
+  color: #E1E1E1;
   display: flex;
   align-items: center;
-  gap: 8px;
+  line-height: 1.15;
+  letter-spacing: 0;
 }
 
 .disp-block {
@@ -143,7 +151,7 @@
 
 @media (max-width: 480px) {
   .disp-header { padding: 0 12px; }
-  .disp-header-title { font-size: 13px; }
+  .disp-header-title { font-size: 15px; }
   .disp-btn { width: 100%; }
   .disp-header .disp-btn { width: auto; }
 }

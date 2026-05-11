@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, Download, ExternalLink, FileUp, ImagePlus, RotateCcw, Save, Send, Trash2 } from 'lucide-react';
+import { ArrowLeft, Download, ExternalLink, FileUp, ImagePlus, RotateCcw, Save, Trash2 } from 'lucide-react';
 import {
   getCampanha, uploadContatos, uploadFotos, deletarFotos,
   salvarMensagem,
@@ -103,8 +103,9 @@ export default function Disparador() {
           <button className="venpro-back-button" onClick={() => navigate('/dashboard')} title="Voltar" aria-label="Voltar">
             <ArrowLeft size={18} />
           </button>
+          <div className="disp-header-divider" />
           <span className="disp-header-title">
-            <Send size={16} /> Carteira no WhatsApp
+            Carteira no WhatsApp
           </span>
         </div>
       </header>
