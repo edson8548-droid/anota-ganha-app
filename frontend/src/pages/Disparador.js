@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { Send } from 'lucide-react';
 import {
   getCampanha, uploadContatos, uploadFotos, deletarFotos,
-  salvarMensagem, sugerirMensagemIA,
+  salvarMensagem,
 } from '../services/whatsapp.service';
 import './Disparador.css';
 
@@ -16,12 +16,10 @@ export default function Disparador() {
   const [contactsCount, setContactsCount] = useState(0);
   const [photoUrls, setPhotoUrls] = useState([]);
   const [message, setMessage] = useState('');
-  const [iaDescricao, setIaDescricao] = useState('');
   const [loading, setLoading] = useState(true);
   const [uploadingCsv, setUploadingCsv] = useState(false);
   const [uploadingFotos, setUploadingFotos] = useState(false);
   const [savingMsg, setSavingMsg] = useState(false);
-  const [loadingIA, setLoadingIA] = useState(false);
 
   useEffect(() => {
     getCampanha()
@@ -88,20 +86,6 @@ export default function Disparador() {
       toast.error('Erro ao salvar mensagem');
     } finally {
       setSavingMsg(false);
-    }
-  };
-
-  const handleSugerirIA = async () => {
-    if (!iaDescricao.trim()) { toast.warning('Descreva a oferta primeiro'); return; }
-    setLoadingIA(true);
-    try {
-      const r = await sugerirMensagemIA(iaDescricao);
-      setMessage(r.data.sugestao);
-      toast.success('Sugestão gerada — edite se quiser');
-    } catch (err) {
-      toast.error(err.response?.data?.detail || err.message || 'Erro ao gerar sugestão');
-    } finally {
-      setLoadingIA(false);
     }
   };
 
@@ -191,17 +175,6 @@ export default function Disparador() {
           value={message}
           onChange={e => setMessage(e.target.value)}
         />
-        <div className="disp-ia-row" style={{ marginBottom: 10 }}>
-          <input
-            className="disp-ia-input"
-            placeholder="Descreva a oferta para a IA gerar a mensagem..."
-            value={iaDescricao}
-            onChange={e => setIaDescricao(e.target.value)}
-          />
-          <button className="disp-btn disp-btn-secondary" onClick={handleSugerirIA} disabled={loadingIA}>
-            {loadingIA ? '✨ Gerando...' : '✨ Sugerir com IA'}
-          </button>
-        </div>
         <button className="disp-btn disp-btn-primary" onClick={handleSalvarMensagem} disabled={savingMsg}>
           {savingMsg ? 'Salvando...' : '💾 Salvar mensagem'}
         </button>
