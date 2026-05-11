@@ -78,8 +78,8 @@
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
 .vt-btn-sm:hover { border-color: #3A85A8; color: #3A85A8; }
-.vt-btn-sm.danger { color: #ff6b7a; border-color: rgba(239,68,68,.34); background: rgba(239,68,68,.08); }
-.vt-btn-sm.danger:hover { border-color: rgba(239,68,68,.58); color: #ff8b96; background: rgba(239,68,68,.14); }
+.vt-btn-sm.danger { color: #A0A3A8; border-color: #4A4D52; background: transparent; }
+.vt-btn-sm.danger:hover { border-color: #3A85A8; color: #3A85A8; background: rgba(58,133,168,.10); }
 .vt-btn-sm.primary { background: #3A85A8; border-color: #3A85A8; color: #fff; }
 .vt-btn-sm.primary:hover { background: #31708E; }
 
