@@ -28,7 +28,15 @@ function requestTokenFromPage() {
 async function syncToken() {
   const token = await requestTokenFromPage();
   if (token) chrome.runtime.sendMessage({ action: 'saveToken', token });
+  return token;
 }
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.action === 'requestToken') {
+    syncToken().then(token => sendResponse({ token }));
+    return true;
+  }
+});
 
 syncToken();
 setInterval(syncToken, 30000);

@@ -3,7 +3,6 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import * as XLSX from 'xlsx';
 import './Analytics.css';
 
 
@@ -287,8 +286,27 @@ const Analytics = ({ campaign, clients, onClose }) => {
     });
   }, [analytics, selectedIndustries, filterCompletion]);
 
-  const exportToExcel = () => {
+  const escapeCsvValue = (value) => {
+    const text = value === null || value === undefined ? '' : String(value);
+    return /[",\n\r;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+
+  const downloadCsv = (rows, filename) => {
+    const csv = rows.map(row => row.map(escapeCsvValue).join(';')).join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportToCsv = () => {
     if (!analytics) return;
+    const safeCampaignName = (campaign.name || 'campanha').replace(/[^\w-]+/g, '_');
 
     const resumo = [
       ['Campanha', campaign.name],
@@ -317,11 +335,9 @@ const Analytics = ({ campaign, clients, onClose }) => {
       produtosData.push([p.industry, p.product, p.count]);
     });
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumo), 'Resumo');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(clientesData), 'Clientes');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(produtosData), 'Top Produtos');
-    XLSX.writeFile(wb, `relatorio_${campaign.name.replace(/\s+/g, '_')}.xlsx`);
+    downloadCsv(resumo, `relatorio_${safeCampaignName}_resumo.csv`);
+    downloadCsv(clientesData, `relatorio_${safeCampaignName}_clientes.csv`);
+    downloadCsv(produtosData, `relatorio_${safeCampaignName}_top_produtos.csv`);
   };
   const handlePrint = () => { window.print(); };
 
@@ -353,7 +369,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
           </div>
         </div>
         <div className="analytics-header-right">
-          <button className="btn-export" onClick={exportToExcel}><span>📊</span><span>Exportar Excel</span></button>
+          <button className="btn-export" onClick={exportToCsv}><span>📊</span><span>Exportar CSV</span></button>
           <button className="btn-print" onClick={handlePrint}><span>🖨️</span><span>Imprimir</span></button>
         </div>
       </div>

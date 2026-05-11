@@ -1,9 +1,11 @@
 """Tests for whatsapp routes — CSV parsing and phone normalization."""
+import asyncio
 import pytest
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from routes.whatsapp import parse_csv_contacts, normalize_phone
+from routes import whatsapp
+from routes.whatsapp import limpar_enviados, normalize_phone, parse_csv_contacts
 
 
 def test_normalize_phone_adds_country_code():
@@ -39,3 +41,16 @@ def test_parse_csv_detects_english_columns():
     contacts, invalidos = parse_csv_contacts(csv)
     assert len(contacts) == 1
     assert contacts[0]["nome"] == "John"
+
+def test_limpar_enviados_resets_sent_numbers(monkeypatch):
+    calls = []
+
+    async def fake_set_campaign(uid, data):
+        calls.append((uid, data))
+
+    monkeypatch.setattr(whatsapp, "_set_campaign", fake_set_campaign)
+
+    result = asyncio.run(limpar_enviados(uid="user-123"))
+
+    assert result == {"ok": True}
+    assert calls == [("user-123", {"sentNumbers": []})]

@@ -16,6 +16,8 @@ export const uploadFotos = (arquivos) => {
 
 export const deletarFotos = () => api.delete('/whatsapp/campanha/fotos');
 
+export const limparEnviados = () => api.delete('/whatsapp/campanha/enviados');
+
 export const salvarMensagem = (message) =>
   api.put('/whatsapp/campanha/mensagem', { message });
 

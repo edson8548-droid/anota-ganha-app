@@ -59,5 +59,28 @@ async function getValidToken() {
     return stored.venpro_token;
   }
 
+  return requestTokenFromOpenVenProTab();
+}
+
+async function requestTokenFromOpenVenProTab() {
+  const tabs = await chrome.tabs.query({
+    url: [
+      'https://venpro.com.br/*',
+      'https://www.venpro.com.br/*',
+      'https://anota-ganha-app.web.app/*',
+      'https://anota-ganha-app.firebaseapp.com/*',
+    ],
+  });
+
+  for (const tab of tabs) {
+    try {
+      const response = await chrome.tabs.sendMessage(tab.id, { action: 'requestToken' });
+      if (response?.token) {
+        await chrome.storage.local.set({ venpro_token: response.token, venpro_token_ts: Date.now() });
+        return response.token;
+      }
+    } catch {}
+  }
+
   return null;
 }

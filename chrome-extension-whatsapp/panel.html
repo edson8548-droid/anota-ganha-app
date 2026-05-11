@@ -33,8 +33,9 @@
     .stuck-msg { font-size:11px; color:#E8A830; margin-bottom:6px; }
     .stuck-btns { display:flex; gap:6px; }
     .stuck-btns .btn { flex:1; padding:7px; font-size:12px; margin-bottom:0; }
-    #cancelWrap { display:none; margin-top:6px; text-align:right; }
-    #btnParar { background:none; border:none; color:#A0A3A8; font-size:11px; cursor:pointer; text-decoration:underline; }
+    #cancelWrap { display:none; margin-top:8px; }
+    .cancel-btns { display:grid; gap:6px; }
+    .btn-small { padding:8px; font-size:12px; margin-bottom:0; }
     #invalidosWrap { font-size:12px; color:#E8A830; margin-top:4px; }
   </style>
 </head>
@@ -72,11 +73,14 @@
       <div class="stuck-msg">⚠ Disparo pausado (PC dormiu ou erro)</div>
       <div class="stuck-btns">
         <button id="btnRetomar" class="btn btn-primary">Retomar</button>
-        <button id="btnCancelar" class="btn btn-secondary">Recomeçar</button>
+        <button id="btnCancelar" class="btn btn-secondary">Continuar depois</button>
       </div>
     </div>
     <div id="cancelWrap">
-      <button id="btnParar">Cancelar e recomeçar</button>
+      <div class="cancel-btns">
+        <button id="btnPararContinuar" class="btn btn-secondary btn-small">Cancelar e continuar depois</button>
+        <button id="btnPararZerar" class="btn btn-danger btn-small">Cancelar e começar do zero</button>
+      </div>
     </div>
   </div>
 

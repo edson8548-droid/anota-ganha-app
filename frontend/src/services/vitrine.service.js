@@ -4,12 +4,14 @@ import { BACKEND_URL, apiUrl, backendUrl } from '../config/api';
 
 async function getHeaders() {
   const token = await auth.currentUser?.getIdToken();
-  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
 }
 
 async function getMultipartHeaders() {
   const token = await auth.currentUser?.getIdToken();
-  return { Authorization: `Bearer ${token}` };
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export const vitrineService = {
