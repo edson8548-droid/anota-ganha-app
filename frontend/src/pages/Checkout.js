@@ -30,6 +30,11 @@ const formatPhone = (value) => {
     .replace(/(\d{5})(\d)/, '$1-$2');
 };
 
+const formatMoney = (value) => Number(value || 0).toLocaleString('pt-BR', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 const isValidCpf = (cpf) => {
   const digits = onlyDigits(cpf);
   if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
@@ -215,28 +220,28 @@ const Checkout = () => {
             <h2>Resumo do Pedido</h2>
             <p className="plan-summary-name">{selectedPlan.name}</p>
             <div className="plan-summary-price-block">
-              {selectedPlan.id === 'annual_installments' ? (
+              {selectedPlan.period === 'annual' ? (
                 <>
-                  <div className="price-installments-checkout">12x de R$ {selectedPlan.pricePerMonth.toFixed(2)}</div>
-                  <div className="price-total-checkout">Total R$ {selectedPlan.price.toFixed(2)}/ano</div>
+                  <div className="price-main-checkout">
+                    R$ {formatMoney(selectedPlan.pricePerMonth)}
+                    <span className="price-period-checkout">/mês</span>
+                  </div>
+                  <div className="price-total-checkout">Cobrado anualmente: R$ {formatMoney(selectedPlan.price)}/ano</div>
                 </>
               ) : (
                 <>
-                  <div className="price-total-checkout" style={{ textDecoration: 'line-through', opacity: .7 }}>
-                    De R$ 99,90/mês
-                  </div>
                   <div className="price-main-checkout">
-                    R$ {selectedPlan.price.toFixed(2)}
-                    <span className="price-period-checkout">/{selectedPlan.id === 'monthly' ? 'mês' : 'ano'}</span>
-                  </div>
-                  <div className="trial-info-checkout" style={{ marginTop: 12 }}>
-                    <div>
-                      <strong>Preço de lançamento por tempo limitado</strong>
-                      <p>Recorrente até cancelar. Você pode cancelar quando quiser.</p>
-                    </div>
+                    R$ {formatMoney(selectedPlan.price)}
+                    <span className="price-period-checkout">/mês</span>
                   </div>
                 </>
               )}
+              <div className="trial-info-checkout" style={{ marginTop: 12 }}>
+                <div>
+                  <strong>{selectedPlan.displayName}</strong>
+                  <p>{selectedPlan.billingCycle}</p>
+                </div>
+              </div>
             </div>
             {selectedPlan.savings && (
               <div className="savings-checkout">Economize R$ {selectedPlan.savings.toFixed(2)} por ano</div>
