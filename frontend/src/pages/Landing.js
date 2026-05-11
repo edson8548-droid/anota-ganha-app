@@ -107,7 +107,7 @@ const Landing = () => {
           </div>
           <div className="landing-feature-card">
             <div className="landing-feature-icon"><ClipboardList size={32} /></div>
-            <h3>Biblioteca de Prompts</h3>
+            <h3>Prompts Prontos para RCA</h3>
             <p>Copie modelos de comando para organizar tabelas, montar ofertas, revisar mensagens e usar no ChatGPT, Gemini ou outra IA da sua preferência.</p>
           </div>
           <div className="landing-feature-card">
