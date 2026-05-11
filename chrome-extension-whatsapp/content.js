@@ -254,6 +254,20 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
     chrome.runtime.sendMessage({ action: 'dispatchUpdate' });
   }
 
+  async function registerSent(telefone) {
+    if (sentSet.has(telefone)) return;
+    sentSet.add(telefone);
+    sent++;
+    await saveState('running');
+    try {
+      await fetch(`${API_URL}/whatsapp/campanha/enviados`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone }),
+      });
+    } catch {}
+  }
+
   for (let i = startIdx; i < contacts.length; i++) {
     if (cancelFlag) break;
 
@@ -289,6 +303,7 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
     }
     await sleep(300);
     await clickSend();
+    await registerSent(telefone);
     await sleepCancelable(15000); // wait 15s before sending photos (same as meu_robo.py)
 
     // 2. Send photos
@@ -302,19 +317,7 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
       }
     }
 
-    // 3. Register as sent
-    sentSet.add(telefone);
-    sent++;
-    await saveState('running');
-    try {
-      await fetch(`${API_URL}/whatsapp/campanha/enviados`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telefone }),
-      });
-    } catch {}
-
-    // 4. Random pause before next contact
+    // 3. Random pause before next contact
     if (cancelFlag) break;
     const pausa = pausaMin + Math.random() * (pausaMax - pausaMin);
     await sleepCancelable(pausa * 1000);
