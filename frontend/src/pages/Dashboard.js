@@ -600,7 +600,7 @@ const Dashboard = () => {
         {/* Main Content */}
         <main className="dashboard-main">
           <section className="daily-message-card">
-            <div className="daily-message-kicker">Mensagem diaria de incentivo</div>
+            <div className="daily-message-kicker">Motivação do dia</div>
             <h2 className="daily-message-title">{greeting}, {displayName}</h2>
             <p className="daily-message-text">{dailyMessage}</p>
           </section>
