@@ -152,8 +152,59 @@ export const previewCotacao = async (arquivo, tabelaId, modo = 'completo', prazo
   formData.append('modo', modo);
   formData.append('prazo', prazo);
 
-  const response = await api.post('/cotacao/preview', formData);
-  return response.data; // { session_id, itens }
+  const user = auth.currentUser;
+  if (!user) {
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  const userFinal = auth.currentUser;
+  if (!userFinal) throw new Error('Faça login novamente.');
+  const token = await userFinal.getIdToken();
+  const headers = { Authorization: `Bearer ${token}` };
+
+  let submitRes;
+  try {
+    submitRes = await fetch(apiUrl('/cotacao/preview-async'), {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+  } catch {
+    throw new Error('Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.');
+  }
+
+  if (!submitRes.ok) {
+    const text = await submitRes.text();
+    let msg = `Erro ${submitRes.status}`;
+    try { msg = JSON.parse(text).detail || msg; } catch {}
+    throw new Error(msg);
+  }
+
+  const { job_id } = await submitRes.json();
+  const maxAttempts = 400;
+
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+
+    let pollRes;
+    try {
+      pollRes = await fetch(apiUrl(`/cotacao/preview-jobs/${job_id}`), { headers });
+    } catch {
+      continue;
+    }
+
+    if (!pollRes.ok) {
+      const text = await pollRes.text();
+      let msg = `Erro ${pollRes.status}`;
+      try { msg = JSON.parse(text).detail || msg; } catch {}
+      throw new Error(msg);
+    }
+
+    const data = await pollRes.json();
+    if (data.status === 'processing') continue;
+    return data; // { session_id, itens }
+  }
+
+  throw new Error('Tempo esgotado (20 min). Tente novamente com uma cotação menor ou em modo rápido.');
 };
 
 export const confirmarCotacao = async (sessionId, aprovacoes) => {
