@@ -546,7 +546,45 @@ def _ler_pdf_base(caminho_pdf):
     import logging
     logger_local = logging.getLogger(__name__)
 
+    def normalizar_celula(valor):
+        return " ".join(str(valor or "").replace("\n", " ").split()).strip()
+
+    def score_header(headers):
+        score = 0
+        texto = " ".join(headers)
+        if any(k in texto for k in ("PRODUTO", "DESCRI", "ITEM", "MERCADORIA")):
+            score += 2
+        if "EAN" in texto:
+            score += 2
+        if any(k in texto for k in ("PRECO", "PREÇO", "VALOR", "R$", "UNIT")):
+            score += 2
+        return score
+
+    def localizar_colunas(headers):
+        col_nome = None
+        col_ean = None
+        preco_candidates = []
+
+        for i, h in enumerate(headers):
+            if col_nome is None and any(k in h for k in ("PRODUTO", "DESCRI", "ITEM", "MERCADORIA")):
+                col_nome = i
+            if _score_coluna_ean(h) >= 35 or "EAN" in h:
+                col_ean = i
+
+            is_price = any(k in h for k in ("PRECO", "PREÇO", "VALOR", "R$", "UNIT"))
+            if is_price:
+                score = 1
+                if any(k in h for k in ("UNIT", "UNITARIO", "UNITÁRIO")):
+                    score += 6
+                if any(k in h for k in ("TOTAL", "EMB")):
+                    score -= 4
+                preco_candidates.append((score, i))
+
+        col_preco = max(preco_candidates, default=(0, len(headers) - 1))[1]
+        return col_nome if col_nome is not None else 0, col_ean, col_preco
+
     rows_data = []
+    headers_cache = None
     try:
         import pdfplumber
 
@@ -557,27 +595,36 @@ def _ler_pdf_base(caminho_pdf):
                     if not table or len(table) < 2:
                         continue
 
-                    headers = [str(c).upper().strip() if c else "" for c in table[0]]
-                    col_nome = 0
-                    col_ean = None
-                    col_preco = len(headers) - 1
+                    header_idx = None
+                    best_score = 0
+                    for idx, candidate in enumerate(table[:5]):
+                        headers_test = [normalizar_celula(c).upper() for c in candidate]
+                        candidate_score = score_header(headers_test)
+                        if candidate_score > best_score:
+                            best_score = candidate_score
+                            header_idx = idx
 
-                    for i, h in enumerate(headers):
-                        if any(k in h for k in ("PRODUTO", "DESCRI", "ITEM", "MERCADORIA")):
-                            col_nome = i
-                        elif _score_coluna_ean(h) >= 35:
-                            col_ean = i
-                        elif any(k in h for k in ("PRECO", "PREÇO", "VALOR", "R$", "UNIT")):
-                            col_preco = i
+                    if header_idx is not None and best_score >= 4:
+                        headers = [normalizar_celula(c).upper() for c in table[header_idx]]
+                        headers_cache = headers
+                        data_rows = table[header_idx + 1:]
+                    elif headers_cache:
+                        headers = headers_cache
+                        primeira_linha = " ".join(normalizar_celula(c).upper() for c in table[0])
+                        data_rows = table[1:] if "ELEMENTOS QUE COMPÕEM" in primeira_linha else table
+                    else:
+                        continue
 
-                    for row in table[1:]:
+                    col_nome, col_ean, col_preco = localizar_colunas(headers)
+
+                    for row in data_rows:
                         if not row or len(row) <= col_preco:
                             continue
-                        nome = str(row[col_nome]).strip() if row[col_nome] else ""
-                        if not nome or nome.upper() in ("NONE", ""):
+                        nome = normalizar_celula(row[col_nome]) if col_nome < len(row) else ""
+                        if not nome or nome.upper() in ("NONE", "", "PRODUTO", "CÓDIGO", "CODIGO"):
                             continue
-                        ean_raw = str(row[col_ean]).strip() if col_ean is not None and col_ean < len(row) and row[col_ean] else ""
-                        preco_raw = str(row[col_preco]).strip() if row[col_preco] else ""
+                        ean_raw = normalizar_celula(row[col_ean]) if col_ean is not None and col_ean < len(row) else ""
+                        preco_raw = normalizar_celula(row[col_preco]) if row[col_preco] else ""
                         try:
                             preco = float(preco_raw.replace(",", ".").replace("R$", "").replace(" ", "").strip())
                         except (ValueError, TypeError):

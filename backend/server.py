@@ -21,14 +21,14 @@ from routes.mercadopago import setup_mercadopago, initialize_firebase
 from routes.asaas import router as asaas_router
 from routes.license import router as license_router
 from routes.ia import router as ia_router
-from routes.cotacao import router as cotacao_router, init_cotacao
+from routes.cotacao import router as cotacao_router, init_cotacao, resume_cotacao_jobs
 from routes.whatsapp import router as whatsapp_router, init_whatsapp
 from routes.users import router as users_router, init_users
 from routes.vitrine import router as vitrine_router, init_vitrine
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import bcrypt
 import jwt
 import asyncio
@@ -231,17 +231,11 @@ async def startup_event():
         logger.info("✅ Índices MongoDB criados")
     except Exception as e:
         logger.warning(f"⚠️  Índices MongoDB: {e}")
-    # Limpar jobs travados de restarts anteriores
+    # Retomar jobs de tabela de prazos após restart do servidor
     try:
-        cutoff = datetime.now(timezone.utc) - timedelta(seconds=30)
-        result = await db.cotacao_jobs.update_many(
-            {"status": "processing", "created_at": {"$lt": cutoff}},
-            {"$set": {"status": "error", "error": "Servidor reiniciou durante o processamento. Tente novamente."}}
-        )
-        if result.modified_count:
-            logger.info(f"✅ {result.modified_count} job(s) órfão(s) marcados como erro")
+        await resume_cotacao_jobs()
     except Exception as e:
-        logger.warning(f"⚠️  Cleanup de jobs orphaned: {e}")
+        logger.warning(f"⚠️  Retomada de jobs de cotação: {e}")
     logger.info("✅ Mercado Pago integrado em /api/mercadopago")
     logger.info("✅ Asaas integrado em /api/asaas")
     logger.info("✅ Cotação integrado em /api/cotacao")
