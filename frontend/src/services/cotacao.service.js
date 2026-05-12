@@ -39,12 +39,15 @@ export const processarCotacao = async (arquivo, tabelaId, modo = 'completo') => 
 };
 
 export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress) => {
-  const formData = new FormData();
-  formData.append('arquivo', arquivo);
-  formData.append('pct_7',  parseFloat(percentuais[7])  || 0);
-  formData.append('pct_14', parseFloat(percentuais[14]) || 0);
-  formData.append('pct_21', parseFloat(percentuais[21]) || 0);
-  formData.append('pct_28', parseFloat(percentuais[28]) || 0);
+  const buildFormData = () => {
+    const formData = new FormData();
+    formData.append('arquivo', arquivo);
+    formData.append('pct_7',  parseFloat(percentuais[7])  || 0);
+    formData.append('pct_14', parseFloat(percentuais[14]) || 0);
+    formData.append('pct_21', parseFloat(percentuais[21]) || 0);
+    formData.append('pct_28', parseFloat(percentuais[28]) || 0);
+    return formData;
+  };
 
   const user = auth.currentUser;
   if (!user) {
@@ -57,61 +60,85 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress) => {
 
   const headers = { Authorization: `Bearer ${token}` };
 
-  // Wake up backend before sending the file
-  try { await fetch(backendUrl('/health'), { mode: 'cors' }); } catch {}
+  const wakeBackend = async () => {
+    try { await fetch(backendUrl('/health'), { mode: 'cors' }); } catch {}
+  };
 
-  // Submit job
-  let submitRes;
-  try {
-    submitRes = await fetch(apiUrl('/cotacao/gerar-tabela-prazos'), {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
-  } catch (err) {
-    throw new Error('Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.');
-  }
-
-  if (!submitRes.ok) {
-    const text = await submitRes.text();
-    let msg = `Erro ${submitRes.status}`;
-    try { msg = JSON.parse(text).detail || msg; } catch {}
-    throw new Error(msg);
-  }
-
-  const { job_id } = await submitRes.json();
-
-  // Poll for result (up to 10 minutes)
-  const maxAttempts = 200;
-  for (let i = 0; i < maxAttempts; i++) {
-    await new Promise(r => setTimeout(r, 3000));
-    onProgress?.((i + 1) * 3);
-
+  const submitJob = async () => {
+    let submitRes;
     try {
-      var pollRes = await fetch(apiUrl(`/cotacao/jobs/${job_id}`), { headers });
-    } catch {
-      continue; // network glitch, retry
+      submitRes = await fetch(apiUrl('/cotacao/gerar-tabela-prazos'), {
+        method: 'POST',
+        headers,
+        body: buildFormData(),
+      });
+    } catch (err) {
+      throw new Error('Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.');
     }
 
-    if (!pollRes.ok) {
-      const text = await pollRes.text();
-      let msg = `Erro ${pollRes.status}`;
+    if (!submitRes.ok) {
+      const text = await submitRes.text();
+      let msg = `Erro ${submitRes.status}`;
       try { msg = JSON.parse(text).detail || msg; } catch {}
-      if (pollRes.status === 404) continue; // job not found yet, retry
       throw new Error(msg);
     }
 
-    const contentType = pollRes.headers.get('content-type') || '';
-    if (contentType.includes('json')) {
-      const data = await pollRes.json();
-      if (data.status === 'processing') continue;
-      throw new Error(data.error || 'Erro desconhecido');
+    const { job_id } = await submitRes.json();
+    return job_id;
+  };
+
+  const pollJob = async (jobId, retryOffsetSeconds = 0) => {
+    // Poll for result (up to 10 minutes)
+    const maxAttempts = 200;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      onProgress?.(retryOffsetSeconds + ((i + 1) * 3));
+
+      let pollRes;
+      try {
+        pollRes = await fetch(apiUrl(`/cotacao/jobs/${jobId}`), { headers });
+      } catch {
+        continue; // network glitch, retry
+      }
+
+      if (!pollRes.ok) {
+        const text = await pollRes.text();
+        let msg = `Erro ${pollRes.status}`;
+        try { msg = JSON.parse(text).detail || msg; } catch {}
+        if (pollRes.status === 404) continue; // job not found yet, retry
+        throw new Error(msg);
+      }
+
+      const contentType = pollRes.headers.get('content-type') || '';
+      if (contentType.includes('json')) {
+        const data = await pollRes.json();
+        if (data.status === 'processing') continue;
+        throw new Error(data.error || 'Erro desconhecido');
+      }
+
+      return pollRes.blob();
     }
 
-    return pollRes.blob();
-  }
+    throw new Error('Tempo esgotado (10 min). PDFs grandes demoram mais — converta para Excel (.xlsx) antes de enviar para processar mais rápido.');
+  };
 
-  throw new Error('Tempo esgotado (10 min). PDFs grandes demoram mais — converta para Excel (.xlsx) antes de enviar para processar mais rápido.');
+  const isServerRestartError = (err) =>
+    /servidor reiniciou durante o processamento/i.test(err?.message || '');
+
+  await wakeBackend();
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const jobId = await submitJob();
+      return await pollJob(jobId, attempt * 15);
+    } catch (err) {
+      if (attempt === 0 && isServerRestartError(err)) {
+        await wakeBackend();
+        continue;
+      }
+      throw err;
+    }
+  }
 };
 
 export const previewCotacao = async (arquivo, tabelaId, modo = 'completo', prazo = 0) => {
