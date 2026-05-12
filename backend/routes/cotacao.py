@@ -422,18 +422,19 @@ async def preview_cotacao(
 
         precos_dict, precos_lista, itens, resultados = await asyncio.to_thread(_processar_sync)
 
-        # Sobrescrever matches com dados aprendidos do usuário (uma query batched)
-        nomes_norm = [normalizar_nome(item["nome"]) for item in itens]
-        cursor = db.cotacao_aprendizado.find(
-            {"user_id": uid, "produto_cotacao_norm": {"$in": nomes_norm}, "confirmado": True}
-        )
-        aprendizado_map = {doc["produto_cotacao_norm"]: doc async for doc in cursor}
+        if modo != "ean":
+            # Sobrescrever matches com dados aprendidos do usuário (uma query batched)
+            nomes_norm = [normalizar_nome(item["nome"]) for item in itens]
+            cursor = db.cotacao_aprendizado.find(
+                {"user_id": uid, "produto_cotacao_norm": {"$in": nomes_norm}, "confirmado": True}
+            )
+            aprendizado_map = {doc["produto_cotacao_norm"]: doc async for doc in cursor}
 
-        for i, item in enumerate(itens):
-            learned = aprendizado_map.get(normalizar_nome(item["nome"]))
-            if learned:
-                resultados[i]["preco"] = learned["preco"]
-                resultados[i]["tipo"] = "APRENDIDO"
+            for i, item in enumerate(itens):
+                learned = aprendizado_map.get(normalizar_nome(item["nome"]))
+                if learned:
+                    resultados[i]["preco"] = learned["preco"]
+                    resultados[i]["tipo"] = "APRENDIDO"
 
         preview_items = _resultados_para_preview(itens, resultados)
 
@@ -575,17 +576,18 @@ async def _processar_preview_job(job_id):
             timeout=540,
         )
 
-        nomes_norm = [normalizar_nome(item["nome"]) for item in itens]
-        cursor = db.cotacao_aprendizado.find(
-            {"user_id": job["user_id"], "produto_cotacao_norm": {"$in": nomes_norm}, "confirmado": True}
-        )
-        aprendizado_map = {doc["produto_cotacao_norm"]: doc async for doc in cursor}
+        if modo != "ean":
+            nomes_norm = [normalizar_nome(item["nome"]) for item in itens]
+            cursor = db.cotacao_aprendizado.find(
+                {"user_id": job["user_id"], "produto_cotacao_norm": {"$in": nomes_norm}, "confirmado": True}
+            )
+            aprendizado_map = {doc["produto_cotacao_norm"]: doc async for doc in cursor}
 
-        for i, item in enumerate(itens):
-            learned = aprendizado_map.get(normalizar_nome(item["nome"]))
-            if learned:
-                resultados[i]["preco"] = learned["preco"]
-                resultados[i]["tipo"] = "APRENDIDO"
+            for i, item in enumerate(itens):
+                learned = aprendizado_map.get(normalizar_nome(item["nome"]))
+                if learned:
+                    resultados[i]["preco"] = learned["preco"]
+                    resultados[i]["tipo"] = "APRENDIDO"
 
         preview_items = _resultados_para_preview(itens, resultados)
         session_id = str(uuid.uuid4())
@@ -1008,11 +1010,13 @@ async def match_cotatudo(
 
         precos_dict, precos_lista, resultados = await asyncio.to_thread(_match_sync)
 
-        nomes_norm = [normalizar_nome(it["nome"]) for it in itens_para_match]
-        cursor = db.cotacao_aprendizado.find(
-            {"user_id": uid, "produto_cotacao_norm": {"$in": nomes_norm}, "confirmado": True}
-        )
-        aprendizado_map = {d["produto_cotacao_norm"]: d async for d in cursor}
+        aprendizado_map = {}
+        if payload.modo != "ean":
+            nomes_norm = [normalizar_nome(it["nome"]) for it in itens_para_match]
+            cursor = db.cotacao_aprendizado.find(
+                {"user_id": uid, "produto_cotacao_norm": {"$in": nomes_norm}, "confirmado": True}
+            )
+            aprendizado_map = {d["produto_cotacao_norm"]: d async for d in cursor}
 
         precos = []
         preenchidos = 0
@@ -1020,10 +1024,11 @@ async def match_cotatudo(
 
         for i, item in enumerate(itens_para_match):
             res = resultados[i]
-            learned = aprendizado_map.get(normalizar_nome(item["nome"]))
-            if learned:
-                res["preco"] = learned["preco"]
-                res["tipo"] = "APRENDIDO"
+            if payload.modo != "ean":
+                learned = aprendizado_map.get(normalizar_nome(item["nome"]))
+                if learned:
+                    res["preco"] = learned["preco"]
+                    res["tipo"] = "APRENDIDO"
 
             if res.get("preco") is not None:
                 preco_str = f"{res['preco']:.2f}".replace(".", ",")
