@@ -88,8 +88,9 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress) => {
   };
 
   const pollJob = async (jobId, retryOffsetSeconds = 0) => {
-    // Poll for result (up to 10 minutes)
-    const maxAttempts = 200;
+    // Poll for result (up to 20 minutes)
+    const maxAttempts = 400;
+    let notFoundAttempts = 0;
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise(r => setTimeout(r, 3000));
       onProgress?.(retryOffsetSeconds + ((i + 1) * 3));
@@ -105,7 +106,10 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress) => {
         const text = await pollRes.text();
         let msg = `Erro ${pollRes.status}`;
         try { msg = JSON.parse(text).detail || msg; } catch {}
-        if (pollRes.status === 404) continue; // job not found yet, retry
+        if (pollRes.status === 404 && notFoundAttempts < 3) {
+          notFoundAttempts += 1;
+          continue; // short propagation delay after submit/redeploy
+        }
         throw new Error(msg);
       }
 
@@ -119,7 +123,7 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress) => {
       return pollRes.blob();
     }
 
-    throw new Error('Tempo esgotado (10 min). PDFs grandes demoram mais — converta para Excel (.xlsx) antes de enviar para processar mais rápido.');
+    throw new Error('Tempo esgotado (20 min). PDFs grandes demoram mais — converta para Excel (.xlsx) antes de enviar para processar mais rápido.');
   };
 
   const isServerRestartError = (err) =>
