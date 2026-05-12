@@ -5,7 +5,8 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      width: 340px;
+      width: 100%;
+      min-width: 320px;
       font-family: 'Segoe UI', Tahoma, sans-serif;
       background: #2B2D31;
       color: #E1E1E1;
@@ -14,13 +15,13 @@
     .header {
       display: flex;
       align-items: center;
-      gap: 6px;
       margin-bottom: 4px;
     }
-    .header svg { width: 28px; height: 28px; }
-    .header-ven { font-size: 20px; font-weight: 800; color: #fff; }
-    .header-pro { font-size: 20px; font-weight: 800; color: #3A85A8; }
-    .header-word { font-size: 20px; font-weight: 800; color: #fff; }
+    .header-logo {
+      width: 116px;
+      height: auto;
+      display: block;
+    }
     .header-sub { font-size: 11px; color: #A0A3A8; margin-bottom: 14px; }
 
     .status {
@@ -93,11 +94,7 @@
 </head>
 <body>
   <div class="header">
-    <svg viewBox="0 0 18 18" fill="none">
-      <path d="M2 3.5L9 14.5L16 3.5" stroke="#3A85A8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M9 14.5L12.5 8.5" stroke="rgba(58,133,168,0.6)" stroke-width="1.5" stroke-linecap="round"/>
-    </svg>
-    <span class="header-word">Venpro</span>
+    <img class="header-logo" src="logo-horizontal.png" alt="Venpro">
   </div>
   <div class="header-sub">Preencher cotação no Cotatudo</div>
 

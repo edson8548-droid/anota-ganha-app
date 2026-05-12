@@ -3,6 +3,10 @@
 const API_URL = 'https://api.venpro.com.br/api';
 const BATCH   = 50;
 
+chrome.action.onClicked.addListener((tab) => {
+  chrome.sidePanel.open({ tabId: tab.id });
+});
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'saveToken') {
     chrome.storage.local.set({ venpro_token: msg.token, venpro_token_ts: Date.now() });
@@ -84,8 +88,21 @@ async function runBatches(job, startBatch, preenchidos, naoEncontrados, processa
         if (data.precos.length > 0) {
           try { await chrome.tabs.sendMessage(tabId, { action: 'fillPrices', prices: data.precos }); } catch {}
         }
+      } else {
+        let msg = `Erro ${resp.status} ao buscar preços`;
+        try {
+          const data = await resp.json();
+          msg = data.detail || msg;
+        } catch {}
+        await saveState({ status: 'error', msg, total: items.length, processados, preenchidos, naoEncontrados, pct: Math.round((b / totalBatches) * 100), batchIndex: b, ts: Date.now() });
+        notifyPopup();
+        return;
       }
-    } catch {}
+    } catch (err) {
+      await saveState({ status: 'error', msg: err.message || 'Erro de conexão com o servidor', total: items.length, processados, preenchidos, naoEncontrados, pct: Math.round((b / totalBatches) * 100), batchIndex: b, ts: Date.now() });
+      notifyPopup();
+      return;
+    }
 
     const pct = Math.round(((b + 1) / totalBatches) * 100);
     // Save batchIndex = b+1 so resume starts from next batch
