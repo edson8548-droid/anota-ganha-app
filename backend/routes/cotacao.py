@@ -84,6 +84,39 @@ def _bucket():
     return AsyncIOMotorGridFSBucket(db)
 
 
+def _track_background_task(task):
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+
+
+def _start_tabela_prazos_job(job_id):
+    task = asyncio.create_task(_processar_tabela_prazos(job_id))
+    _track_background_task(task)
+    return task
+
+
+async def resume_cotacao_jobs():
+    """Retoma jobs de tabela de prazos que ficaram sem task após restart."""
+    now = datetime.now(timezone.utc)
+    async for job in db.cotacao_jobs.find({"status": "processing"}):
+        job_id = job["_id"]
+        age = (now - job.get("created_at", now)).total_seconds()
+        if age > 15 * 60:
+            await db.cotacao_jobs.update_one(
+                {"_id": job_id},
+                {"$set": {"status": "error", "error": "Processamento demorou demais. Tente novamente — para PDF grande, converta para Excel antes."}},
+            )
+            continue
+        if not job.get("input_grid_id"):
+            await db.cotacao_jobs.update_one(
+                {"_id": job_id},
+                {"$set": {"status": "error", "error": "Servidor reiniciou durante o processamento. Tente novamente."}},
+            )
+            continue
+        logger.info("[Job %s] Retomando processamento após restart", job_id)
+        _start_tabela_prazos_job(job_id)
+
+
 async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
     if not credentials:
         logger.warning("[SECURITY] auth_missing route=cotacao")
@@ -435,24 +468,50 @@ async def gerar_tabela_prazos(
     ext = ".pdf" if (arquivo.filename or "").lower().endswith(".pdf") else ".xlsx"
 
     job_id = str(uuid.uuid4())
+    bucket = _bucket()
+    input_grid_id = await bucket.upload_from_stream(
+        arquivo.filename or f"tabela_base{ext}",
+        BytesIO(conteudo),
+        metadata={"content_type": arquivo.content_type or "application/octet-stream"},
+    )
     await db.cotacao_jobs.insert_one({
         "_id": job_id,
         "user_id": uid,
         "status": "processing",
         "created_at": datetime.now(timezone.utc),
+        "input_grid_id": input_grid_id,
+        "ext": ext,
+        "prazos": {
+            "7": pct_7,
+            "14": pct_14,
+            "21": pct_21,
+            "28": pct_28,
+        },
     })
 
-    task = asyncio.create_task(_processar_tabela_prazos(job_id, conteudo, ext, {
-        7: pct_7, 14: pct_14, 21: pct_21, 28: pct_28,
-    }))
-    _background_tasks.add(task)
-    task.add_done_callback(_background_tasks.discard)
+    _start_tabela_prazos_job(job_id)
 
     return {"job_id": job_id}
 
 
-async def _processar_tabela_prazos(job_id, conteudo, ext, prazos):
+async def _processar_tabela_prazos(job_id):
     try:
+        job = await db.cotacao_jobs.find_one({"_id": job_id})
+        if not job:
+            logger.warning("[Job %s] Job não encontrado para processamento", job_id)
+            return
+
+        grid_out = await _bucket().open_download_stream(job["input_grid_id"])
+        conteudo = await grid_out.read()
+        ext = job.get("ext", ".xlsx")
+        prazos_raw = job.get("prazos") or {}
+        prazos = {int(k): float(v or 0) for k, v in prazos_raw.items()}
+
+        await db.cotacao_jobs.update_one(
+            {"_id": job_id},
+            {"$set": {"status": "processing", "started_at": datetime.now(timezone.utc)}},
+        )
+
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
         tmp.write(conteudo)
         tmp.close()
@@ -509,7 +568,8 @@ async def get_job_status(
         raise HTTPException(404, "Job não encontrado")
 
     if job["status"] == "processing":
-        age = (datetime.now(timezone.utc) - job["created_at"]).total_seconds()
+        age_base = job.get("started_at") or job["created_at"]
+        age = (datetime.now(timezone.utc) - age_base).total_seconds()
         if age > 480:  # 8 min — fires before client's 10-min timeout; catches orphaned jobs
             await db.cotacao_jobs.update_one(
                 {"_id": job_id},
@@ -519,6 +579,12 @@ async def get_job_status(
         return {"status": "processing"}
 
     if job["status"] == "error":
+        input_grid_id = job.get("input_grid_id")
+        if input_grid_id:
+            try:
+                await _bucket().delete(input_grid_id)
+            except Exception:
+                pass
         await db.cotacao_jobs.delete_one({"_id": job_id})
         raise HTTPException(500, job.get("error", "Erro ao processar tabela"))
 
@@ -532,6 +598,12 @@ async def get_job_status(
         await _bucket().delete(grid_id)
     except Exception:
         pass
+    input_grid_id = job.get("input_grid_id")
+    if input_grid_id:
+        try:
+            await _bucket().delete(input_grid_id)
+        except Exception:
+            pass
     await db.cotacao_jobs.delete_one({"_id": job_id})
 
     return Response(
