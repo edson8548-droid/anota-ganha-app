@@ -96,9 +96,9 @@ def _start_tabela_prazos_job(job_id):
 
 
 async def resume_cotacao_jobs():
-    """Retoma jobs de tabela de prazos que ficaram sem task após restart."""
+    """Devolve jobs incompletos para a fila após restart."""
     now = datetime.now(timezone.utc)
-    async for job in db.cotacao_jobs.find({"status": "processing"}):
+    async for job in db.cotacao_jobs.find({"status": {"$in": ["queued", "processing"]}}):
         job_id = job["_id"]
         age = (now - job.get("created_at", now)).total_seconds()
         if age > 15 * 60:
@@ -113,8 +113,11 @@ async def resume_cotacao_jobs():
                 {"$set": {"status": "error", "error": "Servidor reiniciou durante o processamento. Tente novamente."}},
             )
             continue
-        logger.info("[Job %s] Retomando processamento após restart", job_id)
-        _start_tabela_prazos_job(job_id)
+        await db.cotacao_jobs.update_one(
+            {"_id": job_id},
+            {"$set": {"status": "queued"}, "$unset": {"started_at": ""}},
+        )
+        logger.info("[Job %s] Recolocado na fila após restart", job_id)
 
 
 async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
@@ -477,7 +480,7 @@ async def gerar_tabela_prazos(
     await db.cotacao_jobs.insert_one({
         "_id": job_id,
         "user_id": uid,
-        "status": "processing",
+        "status": "queued",
         "created_at": datetime.now(timezone.utc),
         "input_grid_id": input_grid_id,
         "ext": ext,
@@ -488,8 +491,6 @@ async def gerar_tabela_prazos(
             "28": pct_28,
         },
     })
-
-    _start_tabela_prazos_job(job_id)
 
     return {"job_id": job_id}
 
@@ -566,6 +567,12 @@ async def get_job_status(
     job = await db.cotacao_jobs.find_one({"_id": job_id, "user_id": uid})
     if not job:
         raise HTTPException(404, "Job não encontrado")
+
+    if job["status"] == "queued":
+        await _processar_tabela_prazos(job_id)
+        job = await db.cotacao_jobs.find_one({"_id": job_id, "user_id": uid})
+        if not job:
+            raise HTTPException(404, "Job não encontrado")
 
     if job["status"] == "processing":
         age_base = job.get("started_at") or job["created_at"]
