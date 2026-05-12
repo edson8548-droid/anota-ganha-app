@@ -343,8 +343,16 @@ function CotacaoTab({
   const prazoEfetivo = prazoSelecionado || (prazosDisponiveis.length === 1 ? prazosDisponiveis[0] : 0);
 
   const cobertura = resultado?.stats
-    ? ((resultado.stats.ean + resultado.stats.descricao + resultado.stats.ia) / resultado.stats.total * 100).toFixed(1)
+    ? (((resultado.stats.ean || 0) + (resultado.stats.descricao || 0) + (resultado.stats.ia || 0) + (resultado.stats.aprendido || 0)) / resultado.stats.total * 100).toFixed(1)
     : null;
+  const reviewResumo = reviewData?.itens ? {
+    total: reviewData.itens.length,
+    preenchidos: reviewData.itens.filter(i => i.preco != null).length,
+    ean: reviewData.itens.filter(i => i.status === 'aprovado' && i.tipo === 'EAN').length,
+    aprendido: reviewData.itens.filter(i => i.status === 'aprovado' && i.tipo === 'APRENDIDO').length,
+    revisar: reviewData.itens.filter(i => i.status === 'pendente' && i.preco != null).length,
+    semPreco: reviewData.itens.filter(i => i.preco == null).length,
+  } : null;
 
   return (
     <div style={{ background: '#363940', borderRadius: '0 0 12px 12px', padding: 24 }}>
@@ -499,13 +507,12 @@ function CotacaoTab({
               label = `Buscando preços... ${processingSeg}s`;
               color = '#3A85A8';
             } else if (reviewData) {
-              const com = reviewData.itens.filter(i => i.preco != null).length;
-              pct = Math.round(com / reviewData.itens.length * 100);
-              label = `${com} de ${reviewData.itens.length} itens com preço encontrado`;
+              pct = 100;
+              label = `Leitura concluída: ${reviewResumo.total} itens analisados, ${reviewResumo.preenchidos} com preço e ${reviewResumo.semPreco} sem preço`;
               color = '#22c55e';
             } else {
-              const { ean = 0, descricao = 0, ia = 0, total = 1 } = resultado.stats;
-              pct = Math.round((ean + descricao + ia) / total * 100);
+              const { ean = 0, descricao = 0, ia = 0, aprendido = 0, total = 1 } = resultado.stats;
+              pct = Math.round((ean + descricao + ia + aprendido) / total * 100);
               label = `${pct}% de cobertura final`;
               color = '#22c55e';
             }
@@ -527,11 +534,32 @@ function CotacaoTab({
           })()}
 
           {reviewData && (
-            <ReviewMatches
-              itens={reviewData.itens}
-              onConfirmar={handleConfirmar}
-              confirmando={confirmando}
-            />
+            <>
+              <div style={{
+                marginTop: 16, background: '#2B2D31', borderRadius: 10, padding: 16,
+                border: '1px solid #4A4D52',
+              }}>
+                <div style={{ color: '#E1E1E1', fontWeight: 800, fontSize: 14, marginBottom: 12 }}>
+                  Resumo da leitura
+                </div>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <StatCard label="Itens lidos" value={reviewResumo.total} color="#3A85A8" />
+                  <StatCard label="Com preço" value={reviewResumo.preenchidos} color="#22c55e" />
+                  <StatCard label="Por EAN" value={reviewResumo.ean} color="#3b82f6" />
+                  <StatCard label="Aprendidos" value={reviewResumo.aprendido} color="#60a5fa" />
+                  <StatCard label="Para revisar" value={reviewResumo.revisar} color="#f59e0b" />
+                  <StatCard label="Sem preço" value={reviewResumo.semPreco} color="#A0A3A8" />
+                </div>
+                <p style={{ color: '#A0A3A8', fontSize: 12, lineHeight: 1.5, margin: '12px 0 0' }}>
+                  A barra indica que a cotação inteira foi lida. Os cards mostram quantos itens receberam preço e de onde veio o preenchimento.
+                </p>
+              </div>
+              <ReviewMatches
+                itens={reviewData.itens}
+                onConfirmar={handleConfirmar}
+                confirmando={confirmando}
+              />
+            </>
           )}
 
           {/* Resultado */}
@@ -545,6 +573,7 @@ function CotacaoTab({
                           color={parseFloat(cobertura) > 70 ? '#22c55e' : '#eab308'} />
                 <StatCard label="EAN" value={resultado.stats.ean || 0} color="#3b82f6" />
                 <StatCard label="Descrição" value={resultado.stats.descricao || 0} color="#8b5cf6" />
+                <StatCard label="Aprendido" value={resultado.stats.aprendido || 0} color="#60a5fa" />
                 <StatCard label="IA" value={resultado.stats.ia || 0} color="#f59e0b" />
                 <StatCard label="Sem match" value={resultado.stats.sem_match || 0} color="#ef4444" />
               </div>
