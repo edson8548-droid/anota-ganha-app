@@ -39,6 +39,7 @@ db = None
 
 # Keep strong references to background tasks so Python's GC doesn't collect them
 _background_tasks: set = set()
+_running_job_ids: set = set()
 
 MAX_TABELAS = 5
 MAX_EXCEL_BYTES = 20 * 1024 * 1024
@@ -84,14 +85,29 @@ def _bucket():
     return AsyncIOMotorGridFSBucket(db)
 
 
-def _track_background_task(task):
+def _track_background_task(task, job_id=None):
     _background_tasks.add(task)
-    task.add_done_callback(_background_tasks.discard)
+
+    def _cleanup(done_task):
+        _background_tasks.discard(done_task)
+        if job_id:
+            _running_job_ids.discard(job_id)
+
+    task.add_done_callback(_cleanup)
 
 
 def _start_tabela_prazos_job(job_id):
     task = asyncio.create_task(_processar_tabela_prazos(job_id))
     _track_background_task(task)
+    return task
+
+
+def _start_preview_job(job_id):
+    if job_id in _running_job_ids:
+        return None
+    _running_job_ids.add(job_id)
+    task = asyncio.create_task(_processar_preview_job(job_id))
+    _track_background_task(task, job_id=job_id)
     return task
 
 
@@ -445,6 +461,210 @@ async def preview_cotacao(
                 pass
 
     return {"session_id": session_id, "itens": preview_items}
+
+
+@router.post("/preview-async")
+async def preview_cotacao_async(
+    arquivo: UploadFile = File(...),
+    tabela_id: str = Form(...),
+    modo: str = Form("completo"),
+    prazo: int = Form(0),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Cria um job para o preview da Cotação Pronta sem segurar a requisição aberta."""
+    from bson import ObjectId
+
+    uid = await get_user_id(credentials)
+
+    doc = await db.tabelas_mestre.find_one({"_id": ObjectId(tabela_id), "user_id": uid})
+    if not doc:
+        raise HTTPException(404, "Tabela mestre não encontrada")
+
+    conteudo_cotacao = await arquivo.read()
+    validate_upload(
+        arquivo,
+        conteudo_cotacao,
+        label="Arquivo de cotação",
+        allowed_extensions={".xlsx"},
+        allowed_kinds={"xlsx"},
+        allowed_content_types=XLSX_CONTENT_TYPES,
+        max_bytes=MAX_COTACAO_PREVIEW_BYTES,
+    )
+
+    cotacao_grid_id = await _bucket().upload_from_stream(
+        arquivo.filename or "cotacao.xlsx",
+        BytesIO(conteudo_cotacao),
+        metadata={"content_type": arquivo.content_type or "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+    )
+
+    job_id = str(uuid.uuid4())
+    await db.cotacao_jobs.insert_one({
+        "_id": job_id,
+        "type": "preview",
+        "user_id": uid,
+        "status": "queued",
+        "created_at": datetime.now(timezone.utc),
+        "tabela_id": tabela_id,
+        "input_grid_id": cotacao_grid_id,
+        "modo": modo,
+        "prazo": prazo,
+    })
+
+    _start_preview_job(job_id)
+    return {"job_id": job_id}
+
+
+async def _cleanup_job_input(job):
+    input_grid_id = job.get("input_grid_id")
+    if input_grid_id:
+        try:
+            await _bucket().delete(input_grid_id)
+        except Exception:
+            pass
+
+
+async def _processar_preview_job(job_id):
+    from bson import ObjectId
+    from services.excel_processor import ler_cotacao
+    from services.matching_engine import processar_cotacao_com_ia
+
+    tmp_mestre = None
+    tmp_cotacao = None
+    try:
+        job = await db.cotacao_jobs.find_one({"_id": job_id})
+        if not job or job.get("type") != "preview":
+            return
+
+        await db.cotacao_jobs.update_one(
+            {"_id": job_id},
+            {"$set": {"status": "processing", "started_at": datetime.now(timezone.utc)}},
+        )
+
+        doc = await db.tabelas_mestre.find_one({
+            "_id": ObjectId(job["tabela_id"]),
+            "user_id": job["user_id"],
+        })
+        if not doc:
+            raise ValueError("Tabela mestre não encontrada")
+
+        grid_out = await _bucket().open_download_stream(doc["grid_id"])
+        conteudo_mestre = await grid_out.read()
+
+        cotacao_out = await _bucket().open_download_stream(job["input_grid_id"])
+        conteudo_cotacao = await cotacao_out.read()
+
+        tmp_mestre = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+        tmp_mestre.write(conteudo_mestre)
+        tmp_mestre.close()
+
+        tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+        tmp_cotacao.write(conteudo_cotacao)
+        tmp_cotacao.close()
+
+        prazo_efetivo = job.get("prazo") if job.get("prazo", 0) > 0 else doc.get("prazo", 28)
+        modo = job.get("modo", "completo")
+
+        def _processar_sync():
+            pd, pl = ler_tabela_mestre(tmp_mestre.name, prazo=prazo_efetivo)
+            its, _ = ler_cotacao(tmp_cotacao.name)
+            res = processar_cotacao_com_ia(its, pd, pl, modo=modo)
+            return its, res
+
+        itens, resultados = await asyncio.wait_for(
+            asyncio.to_thread(_processar_sync),
+            timeout=540,
+        )
+
+        nomes_norm = [normalizar_nome(item["nome"]) for item in itens]
+        cursor = db.cotacao_aprendizado.find(
+            {"user_id": job["user_id"], "produto_cotacao_norm": {"$in": nomes_norm}, "confirmado": True}
+        )
+        aprendizado_map = {doc["produto_cotacao_norm"]: doc async for doc in cursor}
+
+        for i, item in enumerate(itens):
+            learned = aprendizado_map.get(normalizar_nome(item["nome"]))
+            if learned:
+                resultados[i]["preco"] = learned["preco"]
+                resultados[i]["tipo"] = "APRENDIDO"
+
+        preview_items = _resultados_para_preview(itens, resultados)
+        session_id = str(uuid.uuid4())
+        await db.cotacao_sessoes.insert_one({
+            "_id": session_id,
+            "user_id": job["user_id"],
+            "tabela_id": job["tabela_id"],
+            "prazo": prazo_efetivo,
+            "cotacao_bytes": conteudo_cotacao,
+            "itens": itens,
+            "resultados": resultados,
+            "created_at": datetime.now(timezone.utc),
+        })
+
+        await _cleanup_job_input(job)
+        await db.cotacao_jobs.update_one(
+            {"_id": job_id},
+            {"$set": {"status": "done", "session_id": session_id, "itens": preview_items}},
+        )
+    except asyncio.TimeoutError:
+        await db.cotacao_jobs.update_one(
+            {"_id": job_id},
+            {"$set": {"status": "error", "error": "Processamento demorou demais. Tente novamente com uma cotação menor ou em modo rápido."}},
+        )
+    except Exception as e:
+        logger.error(f"Erro no preview async (job {job_id}): {e}")
+        await db.cotacao_jobs.update_one(
+            {"_id": job_id},
+            {"$set": {"status": "error", "error": f"Erro ao processar: {str(e)}"}},
+        )
+    finally:
+        for tmp in [tmp_mestre, tmp_cotacao]:
+            if not tmp:
+                continue
+            try:
+                os.unlink(tmp.name)
+            except OSError:
+                pass
+
+
+@router.get("/preview-jobs/{job_id}")
+async def get_preview_job_status(
+    job_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    uid = await get_user_id(credentials)
+    job = await db.cotacao_jobs.find_one({"_id": job_id, "user_id": uid, "type": "preview"})
+    if not job:
+        raise HTTPException(404, "Job não encontrado")
+
+    if job["status"] == "queued":
+        _start_preview_job(job_id)
+        return {"status": "processing"}
+
+    if job["status"] == "processing":
+        started_at = job.get("started_at") or job.get("created_at")
+        age = (datetime.now(timezone.utc) - started_at).total_seconds()
+        if job_id not in _running_job_ids and age > 15:
+            await db.cotacao_jobs.update_one(
+                {"_id": job_id},
+                {"$set": {"status": "queued"}, "$unset": {"started_at": ""}},
+            )
+            _start_preview_job(job_id)
+        elif age > 540:
+            await db.cotacao_jobs.update_one(
+                {"_id": job_id},
+                {"$set": {"status": "error", "error": "Processamento demorou demais. Tente novamente com uma cotação menor ou em modo rápido."}},
+            )
+            raise HTTPException(500, "Processamento demorou demais. Tente novamente com uma cotação menor ou em modo rápido.")
+        return {"status": "processing"}
+
+    if job["status"] == "error":
+        await _cleanup_job_input(job)
+        await db.cotacao_jobs.delete_one({"_id": job_id})
+        raise HTTPException(500, job.get("error", "Erro ao processar cotação"))
+
+    result = {"session_id": job["session_id"], "itens": job["itens"]}
+    await db.cotacao_jobs.delete_one({"_id": job_id})
+    return result
 
 
 @router.post("/gerar-tabela-prazos")
