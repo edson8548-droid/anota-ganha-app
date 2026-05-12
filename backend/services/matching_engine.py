@@ -407,6 +407,8 @@ def normalizar_nome(nome):
         nome = nome.replace('&GT;', '>')
         nome = nome.replace('&QUOT;', '"')
         nome = nome.replace('&NBSP;', ' ')
+        nome = nome.replace("HELLMANN'S", "HELLMANNS")
+        nome = nome.replace("HELMANNS", "HELLMANNS")
 
         # 0. SINÔNIMOS DE PREFIXO — alinha cotação com a base de preços
         # Cada tupla: (padrão regex no início do nome, substituto)
@@ -572,6 +574,8 @@ def normalizar_nome(nome):
         nome = nome.replace("EX FORT", "EXTRAFORTE")
         nome = nome.replace("KERO COCO", "KEROCOCO")
         nome = nome.replace("MAIS COCO", "MAISCOCO")
+        nome = re.sub(r'\bEXT\s+VIRG(?:EM)?\b', 'EXTRAVIRGEM', nome)
+        nome = re.sub(r'\bEXT\s+V\b', 'EXTRAVIRGEM', nome)
         nome = nome.replace("EXTRA VIRGEM", "EXTRAVIRGEM")
         nome = nome.replace("EXTRA-VIRGEM", "EXTRAVIRGEM")
         nome = nome.replace("EXT VIRGEM", "EXTRAVIRGEM")
@@ -823,6 +827,32 @@ def _peso_para_numero(peso_str):
         except:
             return None
 
+def _extrair_medidas(nome):
+        """Extrai medidas explícitas, incluindo formatos de pack como 2X500G."""
+        padrao = r'\b\d+(?:\.\d+)?(?:G|KG|ML|L|LT|M|UN)\b'
+        medidas = set(re.findall(padrao, nome))
+        medidas.update(re.findall(r'\b\d+\s*X\s*(\d+(?:\.\d+)?(?:G|KG|ML|L|LT|M|UN))\b', nome))
+        return medidas
+
+def _tem_azeite(nome):
+        return nome.startswith('AZEITE') or ' AZEITE ' in f' {nome} '
+
+def _subtipo_azeite(nome):
+        if 'RESERVA' in nome.split():
+            return 'RESERVA'
+        if 'EXTRAVIRGEM' in nome.split():
+            return 'EXTRAVIRGEM'
+        if 'TIPO UNICO' in nome or 'TIPOUNICO' in nome or 'TRAD' in nome.split():
+            return 'TIPO_UNICO'
+        return ''
+
+def _azeites_incompativeis(nome1, nome2):
+        if not (_tem_azeite(nome1) and _tem_azeite(nome2)):
+            return False
+        subtipo1 = _subtipo_azeite(nome1)
+        subtipo2 = _subtipo_azeite(nome2)
+        return bool(subtipo1 and subtipo2 and subtipo1 != subtipo2)
+
 def nomes_incompativeis_v4(nome1, nome2):
         """
         Lógica v4.8 — travas de categoria, marca, peso, subtipo e variante.
@@ -850,10 +880,13 @@ def nomes_incompativeis_v4(nome1, nome2):
                 _cats2.add(_CAT_EQUIV.get(c, c))
         if _cats1 and _cats2 and not _cats1.intersection(_cats2):
             return True
+
+        if _azeites_incompativeis(nome1, nome2):
+            return True
+
         # 1. TRAVA DE PESO (v5.0) — Relaxada para aceitar pesos próximos
-        padrao = r'\b\d+(?:\.\d+)?(?:G|KG|ML|L|LT|M|UN)\b'
-        c1 = set(re.findall(padrao, nome1))
-        c2 = set(re.findall(padrao, nome2))
+        c1 = _extrair_medidas(nome1)
+        c2 = _extrair_medidas(nome2)
         if c1 and c2 and not c1.intersection(c2):
             # Para vinho: tolerância máx 15% (750ML≠1L); para outros: 30%
             _is_vin = 'VIN ' in nome1 or nome1.startswith('VIN') or 'VIN ' in nome2 or nome2.startswith('VIN')
@@ -1187,6 +1220,9 @@ def _travas_leves(nome1, nome2):
         if _cats1 and _cats2 and not _cats1.intersection(_cats2):
             return True
 
+        if _azeites_incompativeis(nome1, nome2):
+            return True
+
         # 1b. TRAVA DE ÁLCOOL — VODKA ≠ APERITIVO ≠ CACHAÇA ≠ AGUARDENTE ≠ CONHAQUE ≠ WHISKY
         _ALCOOL = {'VODKA', 'APERITIVO', 'CACHAC', 'AGUARD', 'CONHAQUE', 'WHISKY'}
         a1 = set(nome1.split()) & _ALCOOL
@@ -1287,9 +1323,8 @@ def _travas_leves(nome1, nome2):
                         return True
 
         # 7. TRAVA DE PESO — bloqueia pesos incompatíveis
-        _padrao_peso = r'\b\d+(?:\.\d+)?(?:G|KG|ML|L|LT|M|UN)\b'
-        _c1 = set(re.findall(_padrao_peso, nome1))
-        _c2 = set(re.findall(_padrao_peso, nome2))
+        _c1 = _extrair_medidas(nome1)
+        _c2 = _extrair_medidas(nome2)
         if _c1 and _c2 and not _c1.intersection(_c2):
             _is_vin = 'VIN ' in nome1 or nome1.startswith('VIN') or 'VIN ' in nome2 or nome2.startswith('VIN')
             _tol_peso = 0.85 if _is_vin else 0.7

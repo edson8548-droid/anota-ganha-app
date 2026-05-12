@@ -71,3 +71,27 @@ def test_creme_dental_sensitive_sensivel_nao_bloqueia():
         "CR DENT SENSODYNE SENSIVEL 90G",
         "CR DENT SENSODYNE SENSITIVE 90G"
     ), "SENSITIVE vs SENSIVEL não deve bloquear"
+
+def test_azeite_tipo_unico_nao_casa_com_extra_virgem():
+    assert _incompat(
+        "AZEITE GALO 250ML TIPO UNICO",
+        "AZEITE 250ML VD EXT VIRG GALLO",
+    ), "Azeite tipo único/tradicional não deve casar com extra virgem"
+
+def test_azeite_extra_virgem_abreviado_nao_bloqueia():
+    assert not _incompat(
+        "AZEITE GALO 250ML EXTRA VIRGEM",
+        "AZEITE 250ML VD EXT VIRG GALLO",
+    ), "EXT VIRG deve normalizar como extra virgem"
+
+def test_maionese_200g_nao_casa_com_pack_2x500g():
+    assert _incompat(
+        "MAIONESE HELMANNS POTE 200G",
+        "MAIONESE HELLMANNS 2X500G TRAD",
+    ), "Peso em pack 2X500G deve bloquear item 200G"
+
+def test_maionese_hellmanns_nao_casa_com_quero():
+    assert _incompat(
+        "MAIONESE HELMANNS POTE 200G",
+        "MAIONESE QUERO 200G SACHET",
+    ), "Marca Hellmanns não deve casar com Quero mesmo com o mesmo peso"

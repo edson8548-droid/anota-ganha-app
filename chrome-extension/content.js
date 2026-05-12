@@ -70,7 +70,7 @@ function extractCotatudoItems() {
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const inputs = row.querySelectorAll('input[type="text"], input[type="number"]');
+    const inputs = row.querySelectorAll('input[type="text"], input[type="number"], input[type="tel"]');
     if (inputs.length === 0) continue;
     const lastInput = inputs[inputs.length - 1];
     const currentVal = (lastInput.value || '').trim();
@@ -109,23 +109,63 @@ function extractCotatudoItems() {
 function fillCotatudoPrices(prices) {
   const rows = document.querySelectorAll('table#conteudo_gvItem tbody tr');
   let count = 0;
+  const failed = [];
+
+  function isVisible(el) {
+    const rect = el.getBoundingClientRect();
+    const style = window.getComputedStyle(el);
+    return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+  }
+
+  function getPriceInput(row) {
+    const inputs = Array.from(row.querySelectorAll('input[type="text"], input[type="number"], input[type="tel"]'))
+      .filter(input => !input.disabled && !input.readOnly && isVisible(input));
+    if (inputs.length === 0) return null;
+
+    const byName = inputs.find(input => {
+      const meta = `${input.name || ''} ${input.id || ''} ${input.className || ''} ${input.placeholder || ''}`.toLowerCase();
+      return /(preco|preço|valor|vlr|cotacao|cotação|unit)/.test(meta);
+    });
+    return byName || inputs[inputs.length - 1];
+  }
+
+  function setInputValue(input, value) {
+    input.scrollIntoView({ block: 'center', inline: 'nearest' });
+    input.focus();
+
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype, 'value'
+    )?.set;
+    if (nativeInputValueSetter) nativeInputValueSetter.call(input, value);
+    else input.value = value;
+
+    input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Tab' }));
+    input.dispatchEvent(new Event('blur', { bubbles: true }));
+  }
+
+  function hasPrice(value) {
+    const normalized = String(value || '').replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
+    const n = Number(normalized);
+    return Number.isFinite(n) && n > 0;
+  }
 
   for (const item of prices) {
     const row = rows[item.idx];
-    if (!row) continue;
-    const inputs = row.querySelectorAll('input[type="text"], input[type="number"]');
-    if (inputs.length === 0) continue;
-    const input = inputs[inputs.length - 1];
+    if (!row) {
+      failed.push(item.idx);
+      continue;
+    }
+    const input = getPriceInput(row);
+    if (!input) {
+      failed.push(item.idx);
+      continue;
+    }
 
-    // Set value and trigger change event for ASP.NET
-    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype, 'value'
-    ).set;
-    nativeInputValueSetter.call(input, item.price);
-    input.dispatchEvent(new Event('input',  { bubbles: true }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-    input.dispatchEvent(new Event('blur',   { bubbles: true }));
-    count++;
+    setInputValue(input, item.price);
+    if (hasPrice(input.value)) count++;
+    else failed.push(item.idx);
   }
-  return count;
+  return { filled: count, failed };
 }
