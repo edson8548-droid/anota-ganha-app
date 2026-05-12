@@ -33,7 +33,7 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
       }}>
         <div>
           <div style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 16 }}>
-            Revisar Matches
+            Revisar preenchimento
           </div>
           <div style={{ color: '#94a3b8', fontSize: 13, marginTop: 2 }}>
             {aprovados} de {total} itens aprovados
