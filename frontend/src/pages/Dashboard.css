@@ -1136,6 +1136,110 @@
   flex: 1;
 }
 
+/* ==================== FEEDBACK RCA ==================== */
+.rca-feedback-section {
+  background: linear-gradient(180deg, #ffffff 0%, #f4f7fb 100%);
+  border: 1px solid rgba(208,211,218,.95);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: var(--card-shadow);
+  display: grid;
+  grid-template-columns: minmax(260px, .72fr) minmax(0, 1.28fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.rca-feedback-copy h2 {
+  color: var(--texto-c);
+  font-size: 1.28rem;
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+
+.rca-feedback-copy p {
+  color: var(--sub-c);
+  font-size: .88rem;
+  line-height: 1.45;
+  max-width: 520px;
+}
+
+.rca-feedback-form {
+  background: #fff;
+  border: 1px solid #dbe1e8;
+  border-radius: 14px;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.rca-feedback-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.rca-feedback-form label span {
+  color: var(--sub-c);
+  font-size: .7rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.rca-feedback-form select,
+.rca-feedback-form textarea {
+  width: 100%;
+  border: 1px solid #d0d6df;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--texto-c);
+  font-family: inherit;
+  font-size: .84rem;
+  font-weight: 700;
+}
+
+.rca-feedback-form select {
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+.rca-feedback-form textarea {
+  min-height: 88px;
+  padding: 10px 12px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.rca-feedback-form select:focus,
+.rca-feedback-form textarea:focus {
+  outline: none;
+  border-color: var(--acento);
+  box-shadow: 0 0 0 3px rgba(58, 133, 168, .12);
+}
+
+.rca-feedback-form button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--acento);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 850;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
+.rca-feedback-form button:hover {
+  background: var(--acento2);
+}
+
 /* ==================== TOOL CARDS (FERRAMENTAS) ==================== */
 .tools-section { margin-bottom: 2.5rem; }
 .tools-section-title {
@@ -2958,6 +3062,18 @@
     width: 100%;
     margin-right: 0;
     text-align: center;
+  }
+
+  .rca-feedback-section,
+  .rca-feedback-form {
+    grid-template-columns: 1fr;
+  }
+  .rca-feedback-section {
+    padding: 16px;
+    margin-bottom: 18px;
+  }
+  .rca-feedback-form button {
+    width: 100%;
   }
 
   .tools-grid {

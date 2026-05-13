@@ -74,6 +74,10 @@ const Dashboard = () => {
     campaignId: '',
     notes: ''
   });
+  const [feedbackDraft, setFeedbackDraft] = useState({
+    type: 'melhoria',
+    message: ''
+  });
   const agendaLoadedRef = useRef(false);
 
   const [expandedClientId, setExpandedClientId] = useState(null);
@@ -371,6 +375,28 @@ const Dashboard = () => {
     const message = 'Olá, preciso de suporte no Venpro';
     const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
+  };
+  const handleSendDashboardFeedback = (e) => {
+    e.preventDefault();
+    const text = feedbackDraft.message.trim();
+    if (!text) {
+      toast.warning('Escreva sua melhoria, reclamação ou sugestão.');
+      return;
+    }
+
+    const typeLabels = {
+      melhoria: 'melhoria',
+      reclamacao: 'reclamação',
+      duvida: 'dúvida',
+      outro: 'comentário'
+    };
+    const label = typeLabels[feedbackDraft.type] || 'comentário';
+    const userInfo = user?.email ? `\n\nConta: ${user.email}` : '';
+    const message = `Olá, tenho uma ${label} sobre o Venpro:\n\n${text}${userInfo}`;
+    const url = `https://wa.me/5513997501798?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setFeedbackDraft(current => ({ ...current, message: '' }));
+    toast.success('Mensagem preparada no WhatsApp.');
   };
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -1521,6 +1547,7 @@ const Dashboard = () => {
     const currentHour = new Date().getHours();
     const greeting = currentHour < 12 ? 'Bom dia' : currentHour < 18 ? 'Boa tarde' : 'Boa noite';
     const dailyMessage = getDailyMotivationMessage();
+    const showAdvancedRcaBlocks = false;
 
     return (
       <div className="dashboard-container">
@@ -1573,6 +1600,7 @@ const Dashboard = () => {
             <p className="daily-message-text">{dailyMessage}</p>
           </section>
 
+          {showAdvancedRcaBlocks && (
           <section className="rca-day-plan-section">
             <div className="rca-day-plan-header">
               <div>
@@ -1662,6 +1690,7 @@ const Dashboard = () => {
               </>
             )}
           </section>
+          )}
 
           <section className="rca-agenda-section">
             <div className="rca-agenda-header">
@@ -1818,6 +1847,41 @@ const Dashboard = () => {
             </div>
           </section>
 
+          <section className="rca-feedback-section">
+            <div className="rca-feedback-copy">
+              <span className="rca-central-kicker">Feedback</span>
+              <h2>Ajude a melhorar o Venpro</h2>
+              <p>Conte o que ficou confuso, o que precisa melhorar ou qual ferramenta faria diferença no seu dia.</p>
+            </div>
+            <form className="rca-feedback-form" onSubmit={handleSendDashboardFeedback}>
+              <label>
+                <span>Tipo</span>
+                <select
+                  value={feedbackDraft.type}
+                  onChange={(e) => setFeedbackDraft(current => ({ ...current, type: e.target.value }))}
+                >
+                  <option value="melhoria">Melhoria</option>
+                  <option value="reclamacao">Reclamação</option>
+                  <option value="duvida">Dúvida</option>
+                  <option value="outro">Outro</option>
+                </select>
+              </label>
+              <label>
+                <span>Mensagem</span>
+                <textarea
+                  rows="4"
+                  placeholder="Escreva aqui sua sugestão, problema ou ideia..."
+                  value={feedbackDraft.message}
+                  onChange={(e) => setFeedbackDraft(current => ({ ...current, message: e.target.value }))}
+                />
+              </label>
+              <button type="submit">
+                <MessageCircle size={16} /> Enviar pelo WhatsApp
+              </button>
+            </form>
+          </section>
+
+          {showAdvancedRcaBlocks && (
           <section className="rca-central-section">
             <div className="rca-central-header">
               <div>
@@ -1951,6 +2015,7 @@ const Dashboard = () => {
               </>
             )}
           </section>
+          )}
 
           {/* Ferramentas */}
           <section className="tools-section">
