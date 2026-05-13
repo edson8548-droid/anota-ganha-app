@@ -53,6 +53,14 @@
   filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .3));
 }
 
+.register-logo-full {
+  width: 220px;
+  max-width: 86vw;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .3));
+}
+
 .register-logo-ven {
   font-size: 28px;
   font-weight: 800;
