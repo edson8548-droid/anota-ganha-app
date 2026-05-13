@@ -2,10 +2,19 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from services.matching_engine import nomes_incompativeis_v4, normalizar_nome
+from services.matching_engine import encontrar_preco, nomes_incompativeis_v4, normalizar_nome, ordenar_palavras
 
 def _incompat(a, b):
     return nomes_incompativeis_v4(normalizar_nome(a), normalizar_nome(b))
+
+def _price_item(nome, preco):
+    norm = normalizar_nome(nome)
+    return {
+        "orig": nome,
+        "norm": norm,
+        "ord": ordenar_palavras(norm),
+        "preco": preco,
+    }
 
 def test_creme_dental_luminous_vs_mpa():
     assert _incompat(
@@ -155,6 +164,26 @@ def test_coco_nordeste_nao_casa_com_outra_marca():
         "COCO RALADO NORDESTE UM ADOC 100G",
         "COCO RAL SOCOCO 100G",
     ), "Coco Nordeste nao deve casar com outra marca de coco ralado"
+
+def test_coco_ralado_sococo_nao_casa_com_flococo():
+    assert _incompat(
+        "COCO RALADO SOCOCO 100G",
+        "COCO RALADO EM FLOCOS FLOCOCO",
+    ), "Coco ralado Sococo nao deve casar com coco em flocos Flococo"
+
+def test_matching_nao_usa_preco_sococo_para_flococo():
+    item_sococo = _price_item("COCO RALADO SOCOCO 100G", 4.99)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "COCO RALADO EM FLOCOS FLOCOCO",
+        {},
+        [item_sococo],
+        [item_sococo["norm"]],
+    )
+
+    assert preco is None
+    assert tipo is None
 
 def test_desodorante_corpo_a_corpo_nao_casa_com_outra_marca():
     assert _incompat(
