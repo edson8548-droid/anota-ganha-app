@@ -15,12 +15,23 @@
     .header {
       display: flex;
       align-items: center;
+      gap: 10px;
       margin-bottom: 4px;
     }
-    .header-logo {
-      width: 116px;
-      height: auto;
+    .header-logo-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
       display: block;
+      flex-shrink: 0;
+      box-shadow: 0 0 16px rgba(49,112,142,.22);
+    }
+    .header-brand {
+      color: #ffffff;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.2px;
+      line-height: 1;
     }
     .header-sub { font-size: 11px; color: #A0A3A8; margin-bottom: 14px; }
 
@@ -94,7 +105,8 @@
 </head>
 <body>
   <div class="header">
-    <img class="header-logo" src="logo-horizontal.png" alt="Venpro">
+    <img class="header-logo-icon" src="icon128.png" alt="Venpro">
+    <div class="header-brand">Venpro</div>
   </div>
   <div class="header-sub">Preencher cotação no Cotatudo</div>
 
