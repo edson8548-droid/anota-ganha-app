@@ -1,5 +1,4 @@
 import subprocess
-import wave
 from pathlib import Path
 
 import imageio_ffmpeg
@@ -10,43 +9,37 @@ FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 SLIDES = [
     {
         "image": ROOT / "venpro-rca-slide-1.png",
-        "audio": ROOT / "audio-slide-1.wav",
+        "audio": ROOT / "audio-slide-1.mp3",
         "segment": ROOT / "segment-1.mp4",
     },
     {
         "image": ROOT / "venpro-rca-slide-2.png",
-        "audio": ROOT / "audio-slide-2.wav",
+        "audio": ROOT / "audio-slide-2.mp3",
         "segment": ROOT / "segment-2.mp4",
     },
     {
         "image": ROOT / "venpro-rca-slide-3.png",
-        "audio": ROOT / "audio-slide-3.wav",
+        "audio": ROOT / "audio-slide-3.mp3",
         "segment": ROOT / "segment-3.mp4",
     },
     {
         "image": ROOT / "venpro-rca-slide-4.png",
-        "audio": ROOT / "audio-slide-4.wav",
+        "audio": ROOT / "audio-slide-4.mp3",
         "segment": ROOT / "segment-4.mp4",
     },
     {
         "image": ROOT / "venpro-rca-slide-5.png",
-        "audio": ROOT / "audio-slide-5.wav",
+        "audio": ROOT / "audio-slide-5.mp3",
         "segment": ROOT / "segment-5.mp4",
     },
 ]
-
-
-def wav_duration(path):
-    with wave.open(str(path), "rb") as wav:
-        return wav.getnframes() / float(wav.getframerate())
-
 
 def run(command):
     subprocess.run(command, check=True)
 
 
 def make_segment(slide):
-    duration = max(wav_duration(slide["audio"]) + 0.65, 4.5)
+    duration = 20
     run([
         FFMPEG,
         "-y",
