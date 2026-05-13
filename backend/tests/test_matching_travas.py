@@ -95,3 +95,93 @@ def test_maionese_hellmanns_nao_casa_com_quero():
         "MAIONESE HELMANNS POTE 200G",
         "MAIONESE QUERO 200G SACHET",
     ), "Marca Hellmanns não deve casar com Quero mesmo com o mesmo peso"
+
+def test_achocolatado_toddy_nao_casa_com_nescau():
+    assert _incompat(
+        "ACHOC. TODD 370GR",
+        "ACHOC NESCAU 350G",
+    ), "Toddy/Todd nao deve casar com Nescau"
+
+def test_acendedor_tupi_nao_casa_com_taka_fogo():
+    assert _incompat(
+        "ACENDEDOR EM GEL TUPI",
+        "GEL ACENDEDOR TAKA FOGO 500G",
+    ), "Acendedor Tupi nao deve herdar preco Taka Fogo"
+
+def test_alcool_46_liquido_nao_casa_com_gel_70():
+    assert _incompat(
+        "ALCOOL COPERALCOOL 46 GRAUS 500ML",
+        "ALCOOL GEL COPERALCOOL 500G 70",
+    ), "Alcool liquido 46 graus nao deve casar com alcool gel 70"
+
+def test_amaciante_500ml_nao_casa_com_1l_colado():
+    assert _incompat(
+        "AMACIANTE VIDA MACIA 500MLGLICERINA E AMENDOAS",
+        "AMAC VIDA MACIA 1L AMENDOAS",
+    ), "Medida colada 500MLGLICERINA deve ser reconhecida e bloquear 1L"
+
+def test_papel_aluminio_dimensao_diferente_bloqueia():
+    assert _incompat(
+        "PAPEL ALUM. WYDA 7,5MTX30CM",
+        "PAPEL ALUM WYDA 45X4M",
+    ), "Papel aluminio 30x7,5 nao deve casar com 45x4"
+
+def test_vinho_branco_nao_casa_com_tinto():
+    assert _incompat(
+        "VINHO SANGUE DE BOI BRANCO SUAVE",
+        "VIN SANGUEDEBOI 4L TINTO SUAVE",
+    ), "Vinho branco nao deve casar com tinto"
+
+def test_shampoo_unitario_nao_casa_com_kit():
+    assert _incompat(
+        "SH SEDA BAMBU 300ML",
+        "SHAMP PANT 400ML+COND 175ML BAMBU",
+    ), "Shampoo unitario nao deve casar com kit shampoo+condicionador"
+
+def test_bic_soleil_nao_casa_com_sensitive():
+    assert _incompat(
+        "APAR. BARB. BIC SOLEIL C/1",
+        "APAR BIC SENSITIVE LV7 PG5",
+    ), "BIC Soleil nao deve casar com BIC Sensitive"
+
+def test_coco_do_vale_nao_casa_com_outra_marca():
+    assert _incompat(
+        "COCO RALADO COCO DO VALE 100G",
+        "COCO RAL SOCOCO 100G",
+    ), "Coco do Vale nao deve casar com outra marca de coco ralado"
+
+def test_coco_nordeste_nao_casa_com_outra_marca():
+    assert _incompat(
+        "COCO RALADO NORDESTE UM ADOC 100G",
+        "COCO RAL SOCOCO 100G",
+    ), "Coco Nordeste nao deve casar com outra marca de coco ralado"
+
+def test_desodorante_corpo_a_corpo_nao_casa_com_outra_marca():
+    assert _incompat(
+        "DESOD ROLLON CORPO A CORPO 50ML FRESCOR",
+        "DES ROLL REXONA 50ML COTTON DRY",
+    ), "Desodorante Corpo a Corpo nao deve casar com outra marca"
+
+def test_gelatina_royal_nao_casa_com_oetker():
+    assert _incompat(
+        "GELATINA ROYAL 25G MORANGO",
+        "GELATINA OETKER 20G MORANGO",
+    ), "Gelatina Royal nao deve casar com Oetker"
+
+def test_fralda_tamanho_diferente_bloqueia():
+    assert _incompat(
+        "FRAL BABYSEC U G PINTAD MG C32 GD",
+        "FRAL BABYSEC U G PINTAD MG C38 MD",
+    ), "Fralda GD nao deve casar com MD"
+
+def test_salgadinho_torcida_nao_casa_com_piraque():
+    assert _incompat(
+        "SALG LUCKY TORCIDA 60G BACON",
+        "SALG PIRAQUE COMID BUT 50G BACON",
+    ), "Salgadinho Torcida nao deve casar com Piraque"
+
+def test_papel_manteiga_nao_casa_com_aluminio():
+    assert _incompat(
+        "PAPEL MANTEIGA WYDA",
+        "PAPEL ALUM WYDA 30X4 MTS",
+    ), "Papel manteiga nao deve casar com papel aluminio"

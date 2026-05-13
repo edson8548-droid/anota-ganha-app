@@ -257,6 +257,30 @@ table.mt tr:hover td { background:rgba(0,0,0,.02); }
 .sec-h.center { text-align:center; }
 .sec-p { color:var(--sub); font-size:16px; line-height:1.7; max-width:540px; margin-bottom:52px; }
 .sec-p.center { text-align:center; margin-left:auto; margin-right:auto; }
+.pain-grid {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:14px;
+  margin:0 0 34px;
+}
+.pain-card {
+  background:#fff;
+  border:1px solid var(--borda-c);
+  border-radius:14px;
+  padding:18px;
+  color:var(--texto-c);
+}
+.pain-card b {
+  display:block;
+  font-size:15px;
+  margin-bottom:6px;
+}
+.pain-card span {
+  display:block;
+  color:var(--sub-c);
+  font-size:13px;
+  line-height:1.5;
+}
 
 /* ══ FEATURES ══ */
 .feat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:20px; }
@@ -500,6 +524,7 @@ footer {
   .hero-brand img { width:58px; height:58px; }
   .hero-brand-name { font-size:30px; }
   .hero-brand-line { font-size:10px; letter-spacing:1.8px; }
+  .pain-grid { grid-template-columns:1fr; }
   .video-demo { grid-template-columns:1fr; gap:28px; }
   .proof-panel { grid-template-columns:1fr; padding:22px; }
   .proof-metrics { grid-template-columns:1fr; }
@@ -539,7 +564,7 @@ footer {
     </div>
     <div class="hero-tag">Resultado real</div>
     <h1>Veja o sistema<br>em <em>operação.</em></h1>
-    <p class="hero-sub">Uma cotação real processada pelo Venpro. Cada linha identificada por EAN ou similaridade de nome — preço preenchido em segundos.</p>
+    <p class="hero-sub">Preencha cotações, envie ofertas e acompanhe campanhas em um painel feito para a rotina do representante comercial.</p>
     <div class="hero-btns">
       <button class="btn-pri" onclick="window.location.href='/register'">Testar 15 dias grátis →</button>
       <button class="btn-sec" onclick="document.getElementById('vitrine-demo').scrollIntoView({behavior:'smooth'})">Ver demonstração</button>
@@ -593,7 +618,21 @@ footer {
 <div class="sec-inner">
   <div class="sec-lbl">O que você ganha</div>
   <h2 class="sec-h">Cinco ferramentas.<br>Uma assinatura.</h2>
-  <p class="sec-p">Tudo que um representante comercial precisa para trabalhar mais rápido, fechar mais pedidos e ganhar mais incentivos — em um lugar só.</p>
+  <p class="sec-p">O Venpro foi pensado para resolver três tarefas que tomam tempo do RCA todos os dias.</p>
+  <div class="pain-grid">
+    <div class="pain-card">
+      <b>Preencher cotação rápido</b>
+      <span>Menos digitação e menos erro em planilhas grandes.</span>
+    </div>
+    <div class="pain-card">
+      <b>Ativar a carteira</b>
+      <span>Ofertas e vitrines prontas para mandar no WhatsApp.</span>
+    </div>
+    <div class="pain-card">
+      <b>Ganhar campanha</b>
+      <span>Raio-X para saber qual cliente chamar primeiro.</span>
+    </div>
+  </div>
   <div class="feat-grid">
     <div class="feat-card">
       <div class="feat-ico" aria-hidden="true">
@@ -607,7 +646,7 @@ footer {
         </svg>
       </div>
       <div class="feat-h">Cotação Pronta</div>
-      <div class="feat-p">Suba a planilha do cliente e receba a cotação preenchida automaticamente por código de barras ou nome do produto. Menos digitação, menos erro e mais tempo livre para atender clientes, visitar lojas e vender mais.</div>
+      <div class="feat-p">Suba a planilha do cliente e receba preços preenchidos por EAN ou nome do produto.</div>
     </div>
     <div class="feat-card">
       <div class="feat-ico" aria-hidden="true">
@@ -619,7 +658,7 @@ footer {
         </svg>
       </div>
       <div class="feat-h">Prompts Prontos para RCA</div>
-      <div class="feat-p">Copie comandos prontos para organizar tabelas, montar ofertas, revisar mensagens e usar no ChatGPT, Gemini ou outra IA da sua preferência.</div>
+      <div class="feat-p">Comandos prontos para montar ofertas, organizar listas e criar mensagens melhores.</div>
     </div>
     <div class="feat-card">
       <div class="feat-ico" aria-hidden="true">
@@ -628,7 +667,7 @@ footer {
         </svg>
       </div>
       <div class="feat-h">Carteira no WhatsApp</div>
-      <div class="feat-p">Monte sua oferta uma vez e envie para todos os seus clientes pelo WhatsApp Web, com mensagens personalizadas, fotos dos produtos ou link de venda. Menos copiar e colar, mais clientes avisados e mais tempo para vender.</div>
+      <div class="feat-p">Monte uma campanha e envie para sua carteira pelo WhatsApp Web com mensagem personalizada.</div>
     </div>
     <div class="feat-card">
       <div class="feat-ico" aria-hidden="true">
@@ -640,7 +679,7 @@ footer {
         </svg>
       </div>
       <div class="feat-h">Raio-X dos Incentivos</div>
-      <div class="feat-p">Acompanhe sua carteira em um só painel: veja clientes positivados, clientes parados, itens vendidos por cliente, campanhas ativas e oportunidades para ganhar mais incentivos da indústria. Mais controle para saber onde agir e vender melhor.</div>
+      <div class="feat-p">Veja campanhas, metas, clientes parados e quem falta positivar para bater incentivo.</div>
     </div>
     <div class="feat-card">
       <div class="feat-ico" aria-hidden="true">
@@ -653,7 +692,7 @@ footer {
         </svg>
       </div>
       <div class="feat-h">Vitrine Inteligente</div>
-      <div class="feat-p">Monte sua oferta com produtos e preços, gere um link exclusivo e envie para seus clientes. Eles escolhem as quantidades e mandam o pedido direto no seu WhatsApp — sem ligação, sem digitação.</div>
+      <div class="feat-p">Crie um link de ofertas para o cliente escolher quantidades e enviar o pedido no WhatsApp.</div>
     </div>
   </div>
 </div>
@@ -1052,7 +1091,7 @@ footer {
 <div class="cta-box">
   <h2>Comece hoje, grátis.</h2>
   <p>15 dias para experimentar tudo sem compromisso.<br>Sem cartão de crédito.</p>
-  <button class="btn-cta">Criar minha conta grátis →</button>
+  <button class="btn-cta" onclick="window.location.href='/register'">Criar minha conta grátis →</button>
   <p class="cta-note">Sem cartão · Cancele quando quiser · Suporte via WhatsApp</p>
 </div>
 </div>

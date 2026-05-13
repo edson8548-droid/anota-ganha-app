@@ -156,7 +156,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
     topProducts.sort((a, b) => b.count - a.count);
     const topClients = [...clientsAnalysis].sort((a, b) => b.value - a.value).slice(0, 10);
     const goalData = Object.values(industriesData).map(industry => {
-      const totalSold = industry.alreadySoldValue + industry.totalValue;
+      const totalSold = industry.alreadySoldValue;
       const remaining = Math.max(industry.targetValue - totalSold, 0);
       const percentage = industry.targetValue > 0 ? Math.min((totalSold / industry.targetValue) * 100, 100) : 0;
       return {
@@ -412,7 +412,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
             <div>
               <h3 className="section-title">Metas de incentivo</h3>
               <p className="goals-panel-subtitle">
-                Some o que você já vendeu antes com o que foi positivado no Venpro para enxergar quanto falta vender.
+                Use o vendido cadastrado na indústria da campanha para abater da meta e enxergar quanto falta cumprir.
               </p>
             </div>
           </div>
@@ -428,8 +428,7 @@ const Analytics = ({ campaign, clients, onClose }) => {
                 </div>
                 <div className="goal-values">
                   <div><span>Meta</span><strong>{formatCurrency(industry.targetValue)}</strong></div>
-                  <div><span>Já vendido</span><strong>{formatCurrency(industry.alreadySoldValue)}</strong></div>
-                  <div><span>No Venpro</span><strong>{formatCurrency(industry.venproValue)}</strong></div>
+                  <div><span>Vendido campanha</span><strong>{formatCurrency(industry.totalSold)}</strong></div>
                   <div><span>Falta</span><strong>{formatCurrency(industry.remaining)}</strong></div>
                 </div>
               </div>
