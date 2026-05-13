@@ -55,7 +55,7 @@ MARCAS_POR_CATEGORIA = {
     'SARD':   {'COQUEIRO', 'GCOSTA', 'G COSTA', 'G/COSTA', 'GOMES COSTA', 'PESCADOR', '88'},
     'MILHO':  {'QUERO', 'PREDILECTA', 'FUGINI', 'SOFRUTA', 'BONARE', 'SELECT', 'OLE'},
     'ERVILHA': {'QUERO', 'PREDILECTA', 'FUGINI'},
-    'COCO RAL': {'DUCOCO', 'MAIS COCO', 'MENINA', 'ADEL COCO', 'COCO DO VALE', 'NORDESTE', 'S OCOCO', 'SOCOCO', 'BOM COCO', 'LA PREFERIDA'},
+    'COCO RAL': {'DUCOCO', 'MAIS COCO', 'MENINA', 'ADEL COCO', 'COCO DO VALE', 'NORDESTE', 'S OCOCO', 'SOCOCO', 'FLOCOCO', 'BOM COCO', 'LA PREFERIDA'},
     'MIST BOLO': {'DBENTA', 'D BENTA', 'DONA BENTA', 'ITALAC', 'FLEISCHMANN', 'DR OETKER', 'OETKER', 'RENATA', 'SOL', 'TIO JOAO', 'APTI', 'ANA MARIA', 'BAUDUC', 'BAUDUCCO'},
     'ISOT':    {'GATORADE', 'BALY', 'POWERADE'},
     'GATORADE': {'GATORADE'},
@@ -983,6 +983,16 @@ def _extrair_dimensoes_papel_alum(nome):
             dims.add(vals)
         return dims
 
+def _coco_ralado_flocos_incompativeis(nome1, nome2):
+        """Coco ralado tradicional nao deve casar com coco em flocos/Flococo."""
+        if 'COCO' not in nome1 or 'COCO' not in nome2:
+            return False
+        tokens1 = set(nome1.split())
+        tokens2 = set(nome2.split())
+        flocos1 = bool(tokens1 & {'FLOCOS', 'FLOCOCO'})
+        flocos2 = bool(tokens2 & {'FLOCOS', 'FLOCOCO'})
+        return flocos1 != flocos2
+
 def nomes_incompativeis_v4(nome1, nome2):
         """
         Lógica v4.8 — travas de categoria, marca, peso, subtipo e variante.
@@ -1284,11 +1294,8 @@ def nomes_incompativeis_v4(nome1, nome2):
 
         # 9. TRAVA COCO FLOCOS vs COCO RALADO/TRAD
         # Flocos (lascas) são produto diferente de ralado tradicional
-        if 'COCO' in nome1 and 'COCO' in nome2:
-            flocos1 = 'FLOCOS' in nome1.split()
-            flocos2 = 'FLOCOS' in nome2.split()
-            if flocos1 != flocos2:
-                return True
+        if _coco_ralado_flocos_incompativeis(nome1, nome2):
+            return True
 
         # 10. TRAVA ALCOOL COM FRAGRÂNCIA — fragrância ≠ sem fragrância (CLASSICO/TRAD)
         if 'ALCOOL' in nome1 and 'ALCOOL' in nome2:
@@ -1405,6 +1412,9 @@ def _travas_leves(nome1, nome2):
             return True
 
         if ('QUEROSENE' in nome1 and 'DESINF' in nome2) or ('QUEROSENE' in nome2 and 'DESINF' in nome1):
+            return True
+
+        if _coco_ralado_flocos_incompativeis(nome1, nome2):
             return True
 
         # 1b. TRAVA DE ÁLCOOL — VODKA ≠ APERITIVO ≠ CACHAÇA ≠ AGUARDENTE ≠ CONHAQUE ≠ WHISKY
