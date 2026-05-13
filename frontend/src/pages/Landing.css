@@ -342,6 +342,179 @@
   margin: 0;
 }
 
+/* RCA Guide */
+.landing-rca-guide {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px 78px;
+}
+
+.landing-rca-heading {
+  max-width: 720px;
+  margin: 0 auto 30px;
+  text-align: center;
+}
+
+.landing-rca-heading h2 {
+  color: #ffffff;
+  font-size: 30px;
+  line-height: 1.2;
+  margin: 0 0 12px;
+}
+
+.landing-rca-heading p {
+  color: #A0A3A8;
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.landing-rca-slider {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  gap: 18px;
+  align-items: stretch;
+}
+
+.landing-rca-arrow {
+  width: 48px;
+  min-height: 100%;
+  border: 1px solid #4A4D52;
+  border-radius: 8px;
+  background: #33363d;
+  color: #E1E1E1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color .2s, color .2s, background .2s;
+}
+
+.landing-rca-arrow:hover {
+  border-color: #3A85A8;
+  color: #75B9D6;
+  background: #383c44;
+}
+
+.landing-rca-slide {
+  min-height: 390px;
+  border: 1px solid #4A4D52;
+  border-radius: 12px;
+  background: #363940;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+}
+
+.landing-rca-slide-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.landing-rca-step {
+  color: #E8A830;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 2px;
+}
+
+.landing-rca-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  background: rgba(58, 133, 168, .14);
+  color: #75B9D6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.landing-rca-slide h3 {
+  color: #ffffff;
+  font-size: 27px;
+  line-height: 1.2;
+  margin: 0 0 12px;
+}
+
+.landing-rca-slide > p {
+  color: #A0A3A8;
+  font-size: 16px;
+  line-height: 1.62;
+  margin: 0 0 22px;
+}
+
+.landing-rca-message {
+  border: 1px solid #4A4D52;
+  border-radius: 8px;
+  background: #2F3238;
+  padding: 16px;
+  margin: 0 0 22px;
+}
+
+.landing-rca-message span {
+  display: block;
+  color: #E8A830;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.landing-rca-message p {
+  color: #E1E1E1;
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0 0 14px;
+}
+
+.landing-rca-message button {
+  border: 1px solid #4A4D52;
+  border-radius: 8px;
+  background: transparent;
+  color: #E1E1E1;
+  min-height: 38px;
+  padding: 8px 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.landing-rca-message button:hover {
+  border-color: #3A85A8;
+  color: #75B9D6;
+}
+
+.landing-rca-slide .landing-btn-cta {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+.landing-rca-dots {
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.landing-rca-dots button {
+  width: 34px;
+  height: 8px;
+  border: 0;
+  border-radius: 999px;
+  background: #555960;
+  cursor: pointer;
+}
+
+.landing-rca-dots button.active {
+  background: #3A85A8;
+}
+
 /* Product Video */
 .landing-video-section {
   display: grid;
@@ -440,6 +613,22 @@
 @media (max-width: 600px) {
   .landing-nav {
     padding: 12px 20px;
+    gap: 10px;
+  }
+  .landing-nav-logo img {
+    width: 40px;
+    height: 40px;
+  }
+  .landing-nav-word {
+    font-size: 23px;
+  }
+  .landing-nav-actions {
+    gap: 8px;
+  }
+  .landing-btn-outline,
+  .landing-btn-primary {
+    padding: 9px 14px;
+    font-size: 13px;
   }
   .landing-hero {
     padding: 50px 20px 40px;
@@ -472,6 +661,40 @@
   }
   .landing-features-title {
     font-size: 22px;
+  }
+  .landing-rca-guide {
+    padding: 0 20px 56px;
+  }
+  .landing-rca-heading h2 {
+    font-size: 24px;
+  }
+  .landing-rca-heading p {
+    font-size: 15px;
+  }
+  .landing-rca-slider {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .landing-rca-arrow {
+    width: 100%;
+    min-height: 42px;
+  }
+  .landing-rca-slider .landing-rca-arrow:first-child {
+    order: 2;
+  }
+  .landing-rca-slide {
+    order: 1;
+    min-height: auto;
+    padding: 22px;
+  }
+  .landing-rca-slider .landing-rca-arrow:last-child {
+    order: 3;
+  }
+  .landing-rca-slide h3 {
+    font-size: 22px;
+  }
+  .landing-rca-slide > p {
+    font-size: 15px;
   }
   .landing-video-section {
     grid-template-columns: 1fr;
