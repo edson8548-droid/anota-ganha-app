@@ -25,11 +25,11 @@ TAXA_SIMILARIDADE = 0.82  # era 0.75
 MARCAS_POR_CATEGORIA = {
     # Adoçantes
     'ADOC': {'ADOCYL', 'ZERO', 'MARATA', 'ASSUGRIN', 'TAL QUAL', 'FINN', 'LINEA', 'VIST', 'UNIAO', 'GOLD', 'DIET'},
-    'ACHOC': {'NESCAU', 'TODDY', 'NESQUIK', 'OVOMALTINE', 'APTI', 'ITALAC', 'MUKY', 'CHOCOLATTO', 'GOLD', 'NESTLE', 'SUSTAGEN'},
-    'AGUA COCO': {'DUCOCO', 'SOCOCO', 'KEROCOCO', 'KERO COCO', 'MAISCOCO', 'MAIS COCO', 'QUADRADO', 'COCO QUADRADO', 'PURO COCO', 'PUROCOCO', 'NOCOKO', 'COCO SUPER', 'COCOSUPER', 'AQUA', 'VITA COCO', 'QUALICOCO'},
+    'ACHOC': {'NESCAU', 'TODDY', 'TODD', 'NESQUIK', 'OVOMALTINE', 'APTI', 'ITALAC', 'MUKY', 'CHOCOLATTO', 'GOLD', 'NESTLE', 'SUSTAGEN'},
+    'AGUA COCO': {'DUCOCO', 'SOCOCO', 'KERO', 'KEROCOCO', 'KERO COCO', 'MAISCOCO', 'MAIS COCO', 'QUADRADO', 'COCO QUADRADO', 'PURO COCO', 'PUROCOCO', 'NOCOKO', 'COCO SUPER', 'COCOSUPER', 'AQUA', 'VITA COCO', 'QUALICOCO'},
     'LEITE COCO': {'DUCOCO', 'SOCOCO', 'KEROCOCO', 'KERO COCO', 'MAISCOCO', 'MAIS COCO', 'NOCOKO', 'PURO COCO', 'PUROCOCO', 'VITA COCO', 'QUALICOCO'},
-    'AZEITE': {'GALLO', 'ANDORINHA', 'BORGES', 'CARBONELL', 'COCINERO', 'FILIPPO BERIO', 'FILLIPO BERIO', 'COLAVITA', 'DELEYDA', 'LA ESPANOLA', 'LA ESPANHOLA', 'MONINI', 'ESPORAO', 'DE CECCO', 'PAGANINI', 'SINTRA', 'CASA DO AZEITE', 'RESERVA', 'ESPECIAL'},
-    'BISC': {'ADRIA', 'MARILAN', 'VITARELLA', 'VITAR', 'PIRAQUE', 'BAUDUCCO', 'BAUDUC', 'MABEL', 'RANCHEIRO', 'OREO', 'CLUBSOCIAL', 'TRAKINAS', 'TRAKI', 'TODDY', 'NIKITO', 'NABISCO', 'LACTA', 'ARCOR', 'TORTINHA', 'TUC', 'TUCS', 'BELVITA', 'NAGA', 'DADINHO', 'GALO', 'PASSATEMPO', 'BONO', 'PITSTOP', 'TRIUNFO', 'PRODASA', 'LOLI', 'GIRASSOL', 'TORTUGUITA', 'LUANITOS', 'NESTLE', 'LIANE', 'COOKIES', 'NESTLE RECH'},
+    'AZEITE': {'GALLO', 'GALO', 'ANDORINHA', 'BORGES', 'CARBONELL', 'COCINERO', 'COCINEIRO', 'FILIPPO BERIO', 'FILLIPO BERIO', 'COLAVITA', 'DELEYDA', 'LA ESPANOLA', 'LA ESPANHOLA', 'MONINI', 'ESPORAO', 'DE CECCO', 'PAGANINI', 'SINTRA', 'CASA DO AZEITE', 'TRADICAO', 'VALE FERTIL', 'RESERVA', 'ESPECIAL'},
+    'BISC': {'ADRIA', 'MARILAN', 'VITARELLA', 'VITAR', 'PIRAQUE', 'BAUDUCCO', 'BAUDUCO', 'BAUDUC', 'MABEL', 'RANCHEIRO', 'OREO', 'CLUBSOCIAL', 'TRAKINAS', 'TRAKI', 'TODDY', 'NIKITO', 'NABISCO', 'LACTA', 'ARCOR', 'TORTINHA', 'TUC', 'TUCS', 'BELVITA', 'NAGA', 'DADINHO', 'GALO', 'PASSATEMPO', 'BONO', 'PITSTOP', 'TRIUNFO', 'PRODASA', 'LOLI', 'GIRASSOL', 'TORTUGUITA', 'LUANITOS', 'NESTLE', 'LIANE', 'COOKIES', 'SALT PLUS', 'AGUIA', 'NESTLE RECH'},
     'CAFE': {'3 CORACOES', '3CORACOES', 'PILAO', 'BRASILEIRO', 'CABOCLO', 'SELETO', 'UNIAO', 'PELE', 'MELITTA', 'NESCAFE', 'FORT', 'CANECAO', 'SANTO ANDRE', 'FAZENDA MINEIRA', 'MOKA'},
     'CATCHUP': {'HEINZ', 'QUERO', 'HELLMANNS', 'HELLMANN', 'HEMMER', 'KONSUMO'},
     'KETCHUP': {'HEINZ', 'QUERO', 'HELLMANNS', 'HELLMANN', 'HEMMER', 'KONSUMO'},  # alias pós-normalização
@@ -43,7 +43,7 @@ MARCAS_POR_CATEGORIA = {
     'MACAR': {'ADRIA', 'CAMIL', 'BARILLA', 'RENATA', 'FLOR DE LIS', 'D BENTA', 'DBENTA', 'TODESCHINI', 'SANTA AMALIA', 'JOIA', 'LIANE', 'DONA BENTA', 'GALO'},
     'MAC': {'ADRIA', 'CAMIL', 'BARILLA', 'RENATA', 'FLOR DE LIS', 'D BENTA', 'DBENTA', 'TODESCHINI', 'SANTA AMALIA', 'JOIA', 'LIANE', 'DONA BENTA', 'GALO'},
     'MOL TOM': {'POMAROLA', 'QUERO', 'FUGINI', 'PREDILECTA', 'HEINZ', 'TARANTELLA', 'HEMMER', 'SALSARETTI', 'SACCIALI', 'STELLA DORO', 'KNORR', 'CEPERA', 'BARILLA', 'MAMMA DORO'},
-    'OLEO': {'SOYA', 'LIZA', 'MAZOLA', 'SINHA', 'SUAVIT', 'COAMO', 'COCAMAR', 'CONCORDIA', 'TRADICAO', 'MARIA', 'SALADA'},
+    'OLEO': {'SOYA', 'LIZA', 'MAZOLA', 'SINHA', 'SUAVIT', 'COAMO', 'COCAMAR', 'CONCORDIA', 'TRADICAO', 'MARIA', 'GALLO', 'GALO', 'FAISAO', 'SALADA'},
     'REFR': {'TANG', 'FRISCO', 'CLIGHT', 'MAGUARY', 'MID'},
     'REFRESCO': {'MAGUARY', 'SUCO KAPO', 'GUARA', 'GUARAVITON', 'MID'},
     'SUCO': {'MAGUARY', 'DAFRUTA', 'SERIGY', 'KAPO', 'AURORA', 'TAMPICO', 'DEL VALLE'},
@@ -55,7 +55,7 @@ MARCAS_POR_CATEGORIA = {
     'SARD':   {'COQUEIRO', 'GCOSTA', 'G COSTA', 'G/COSTA', 'GOMES COSTA', 'PESCADOR', '88'},
     'MILHO':  {'QUERO', 'PREDILECTA', 'FUGINI', 'SOFRUTA', 'BONARE', 'SELECT', 'OLE'},
     'ERVILHA': {'QUERO', 'PREDILECTA', 'FUGINI'},
-    'COCO RAL': {'DUCOCO', 'MAIS COCO', 'MENINA', 'S OCOCO', 'SOCOCO', 'BOM COCO', 'LA PREFERIDA'},
+    'COCO RAL': {'DUCOCO', 'MAIS COCO', 'MENINA', 'ADEL COCO', 'COCO DO VALE', 'NORDESTE', 'S OCOCO', 'SOCOCO', 'BOM COCO', 'LA PREFERIDA'},
     'MIST BOLO': {'DBENTA', 'D BENTA', 'DONA BENTA', 'ITALAC', 'FLEISCHMANN', 'DR OETKER', 'OETKER', 'RENATA', 'SOL', 'TIO JOAO', 'APTI', 'ANA MARIA', 'BAUDUC', 'BAUDUCCO'},
     'ISOT':    {'GATORADE', 'BALY', 'POWERADE'},
     'GATORADE': {'GATORADE'},
@@ -65,12 +65,13 @@ MARCAS_POR_CATEGORIA = {
     'DROPS':  {'HALLS', 'FINI'},
     'CR LEITE': {'ITALAC', 'NESTLE', 'MOCOCA', 'PIRACANJ', 'QUATA', 'LIDER', 'ITAMBE', 'PIRACANJUBA'},
     'CERV': {'SKOL', 'BRAHMA', 'ANTARCTICA', 'HEINEKEN', 'CORONA', 'ITAIPAVA', 'AMSTEL', 'BUDWEISER', 'SPATEN'},
-    'CONHAQUE': {'DOMECQ', 'DREHER', 'PRESIDENTE', 'SAO JOAO DA BARRA'},
+    'BEB': {'51', 'SKOL', 'SMIRNOFF', 'FRUIT SHOOT', 'GUARAVITON', 'ITALAC', 'STEMPEL'},
+    'CONHAQUE': {'DOMECQ', 'DOMEC', 'DREHER', 'PRESIDENTE', 'POLINHO', 'SAO JOAO DA BARRA'},
     'LAVA ROUPA': {'OMO', 'SURF', 'TIXAN', 'BRILHANTE', 'ARIEL', 'ACE', 'YPE', 'YPÊ', 'URCA', 'ASSIM', 'MINUANO'},
-    'AMAC': {'DOWNY', 'COMFORT', 'FOFO', 'AMACITEL', 'VIDA MACIA', 'BABYSOFT', 'MONBIJU', 'SOBRILHO', 'SUPREMA', 'TUFF', 'ZULU', 'CANDURA', 'YPE', 'YPÊ'},
+    'AMAC': {'DOWNY', 'COMFORT', 'FOFO', 'AMACITEL', 'VIDA MACIA', 'BABYSOFT', 'BABY SOFT', 'ZERO A DOIS', 'ZEROADOIS', 'GIRANDO SOL', 'URCA', 'MONBIJU', 'SOBRILHO', 'SUPREMA', 'TUFF', 'ZULU', 'CANDURA', 'YPE', 'YPÊ'},
     'SANITARIA': {'CANDURA', 'CANDIDA', 'QBOA', 'Q-BOA', 'YPE', 'YPÊ', 'BARBAREX', 'SUPERCANDIDA', 'BRILUX'},
-    'PAPEL HIG': {'NEVE', 'PERSONAL', 'ELITE', 'MILI', 'COTTON', 'SUBLIME', 'DUETTO', 'DELUXE', 'MAX', 'SCOTT', 'MIMMO', 'NOBRE', 'ISAPEL', 'PALOMA', 'FLORAL', 'QUALITE', 'PRIMACARE', 'FOLHALEV', 'TIFFY', 'FAMILIAR', 'FOFINHO', 'PRIMAVERA'},
-    'PAPEL HIGIENICO': {'NEVE', 'PERSONAL', 'ELITE', 'MILI', 'COTTON', 'SUBLIME', 'DUETTO', 'DELUXE', 'MAX', 'SCOTT', 'MIRIMMO', 'NOBRE', 'ISAPEL', 'PALOMA', 'FLORAL', 'QUALITE', 'FOLHALEV', 'TIFFY', 'FAMILIAR', 'FOFINHO', 'PRIMAVERA'},
+    'PAPEL HIG': {'NEVE', 'PERSONAL', 'ELITE', 'MILI', 'COTTON', 'SUBLIME', 'DUETTO', 'DELUXE', 'MAX', 'SCOTT', 'MIMMO', 'NOBRE', 'ISAPEL', 'FANCY', 'PALOMA', 'FLORAL', 'QUALITE', 'PRIMACARE', 'FOLHALEV', 'TIFFY', 'FAMILIAR', 'FOFINHO', 'PRIMAVERA'},
+    'PAPEL HIGIENICO': {'NEVE', 'PERSONAL', 'ELITE', 'MILI', 'COTTON', 'SUBLIME', 'DUETTO', 'DELUXE', 'MAX', 'SCOTT', 'MIRIMMO', 'NOBRE', 'ISAPEL', 'FANCY', 'PALOMA', 'FLORAL', 'QUALITE', 'FOLHALEV', 'TIFFY', 'FAMILIAR', 'FOFINHO', 'PRIMAVERA'},
     'FILTRO PAPEL': {'3CORACOES', 'BRIGITTA', 'BRITTA', 'MELITTA', 'SENSEO', 'HARIO', 'JAGUARI'},
     'LIMP COALA': {'ALGODAO', 'BAMBU', 'CHA', 'BRANCO', 'CITRONELLA', 'EUCALIPTO', 'EUCAL', 'LAVANDA'},
 
@@ -79,19 +80,19 @@ MARCAS_POR_CATEGORIA = {
     'GOIABADA': {'VAL', 'PREDILECTA', 'XAVANTE', 'BONO', 'CASTANHA', 'CEPERA', 'ROLETTI', 'ANHEMBI'},
     'REPELENTE': {'OFF', 'REPELEX', 'EXPOSIS', 'SBP'},
     'DET': {'YPE', 'YPÊ', 'LIMPOL', 'MINUANO', 'ODD', 'CANDURA', 'CASACLEAN', 'PALMOLIVE', 'FAIRY'},
-    'FERMENTO': {'D BENTA', 'DBENTA', 'FERMIX', 'FLEISCHMANN', 'DR OETKER', 'BIOFLEX'},
+    'FERMENTO': {'D BENTA', 'DBENTA', 'FERMIX', 'FLEISCHMANN', 'DR OETKER', 'OETKER', 'BIOFLEX'},
     'HASTE': {'COTTONETE', 'JOHNSONS', 'JOHNSON', 'COTONELA'},
     'REPEL': {'OFF', 'REPELEX', 'EXPOSIS', 'SBP'},
 
     # Categorias com travas de marca
     'ABS': {'ALWAYS', 'INTIMUS', 'SEMPRE LIVRE', 'S LIVRE'},
-    'DESINF': {'PINHOSOL', 'PINHOBRIL', 'PINHOTROP', 'LYSOFORM', 'BUFALO', 'YPE', 'YPÊ', 'CANDURA', 'PATO', 'VEJA', 'UAU'},
+    'DESINF': {'PINHOSOL', 'PINHOBRIL', 'PINHOTROP', 'LYSOFORM', 'BUFALO', 'URCA', 'SANOL', 'FUZZETO', 'FUZETTO', 'YPE', 'YPÊ', 'CANDURA', 'PATO', 'VEJA', 'UAU'},
     'LV LOUCA': {'YPE', 'YPÊ', 'LIMPOL', 'MINUANO', 'ODD', 'CANDURA', 'CASACLEAN', 'PALMOLIVE', 'FAIRY'},
     'MARG': {'QUALY', 'DELICIA', 'CLAYBOM', 'CREMOSY', 'BECEL', 'VIGOR', 'DORIANA', 'AVIACAO'},
     'SABAO PASTA': {'DIPOL', 'UFE', 'YPE', 'YPÊ', 'URCA'},
     'SABAO BARRA': {'ASSIM', 'MINUANO', 'RAZZO', 'UFE', 'YPE'},
-    'DESOD': {'REXONA', 'DOVE', 'NIVEA', 'AXE', 'OLDSPICE', 'MONANGE', 'BOZZANO', 'HERBISSIMO', 'ABOVE', 'FRANCIS', 'DAVENE', 'GIOVANNABABY', 'TABU', 'HYDRATTA', 'POTY', 'SKALA', 'SECRET', 'GILLETTE', 'ADIDAS', 'PERSPIREX'},
-    'DES':   {'REXONA', 'DOVE', 'NIVEA', 'AXE', 'OLDSPICE', 'MONANGE', 'BOZZANO', 'BOZ', 'HERBISSIMO', 'ABOVE', 'FRANCIS', 'DAVENE', 'GIOV', 'GIOVANNABABY', 'TABU', 'POTY', 'SKALA', 'SECRET', 'GILLETTE', 'ADIDAS', 'PERSPIREX', 'HYDRATTA'},
+    'DESOD': {'REXONA', 'DOVE', 'NIVEA', 'AXE', 'OLDSPICE', 'MONANGE', 'BOZZANO', 'HERBISSIMO', 'ABOVE', 'FRANCIS', 'DAVENE', 'GIOVANNABABY', 'TABU', 'HYDRATTA', 'POTY', 'SKALA', 'SECRET', 'GILLETTE', 'ADIDAS', 'PERSPIREX', 'CORPO A CORPO'},
+    'DES':   {'REXONA', 'DOVE', 'NIVEA', 'AXE', 'OLDSPICE', 'MONANGE', 'BOZZANO', 'BOZ', 'HERBISSIMO', 'ABOVE', 'FRANCIS', 'DAVENE', 'GIOV', 'GIOVANNABABY', 'TABU', 'POTY', 'SKALA', 'SECRET', 'GILLETTE', 'ADIDAS', 'PERSPIREX', 'HYDRATTA', 'CORPO A CORPO'},
     'SH': {'PANTENE', 'SEDA', 'DOVE', 'ELSEVE', 'KOLENE', 'DARLING', 'CLEAR', 'JOHNSONS', 'MONANGE', 'NEUTROX', 'PALMOLIVE', 'POTY', 'SKALA', 'GOTADOURADA', 'TRALALA', 'NOVEX', 'OX', 'VULT', 'BARUEL', 'H&S'},
     'COND': {'PANTENE', 'SEDA', 'DOVE', 'ELSEVE', 'KOLENE', 'MONANGE', 'NEUTROX', 'PALMOLIVE', 'POTY', 'SKALA', 'GOTADOURADA', 'NOVEX', 'VULT'},
     'CR TRAT': {'SKALA', 'NOVEX', 'SEDA', 'ELSEVE', 'POTY', 'PANTENE'},
@@ -99,6 +100,7 @@ MARCAS_POR_CATEGORIA = {
     'SAB': {'DOVE', 'LUX', 'PALMOLIVE', 'FRANCIS', 'JOHNSONS', 'JOHNSON', 'LIVY', 'ALBANY', 'GRANADO', 'PROTEX', 'REXONA', 'NIVEA', 'YPE', 'SIENE', 'MONANGE', 'PHEBO'},
     'INSET': {'BAYGON', 'SBP', 'RAID', 'MATINSET', 'MORTEIN'},
     'FRALDA': {'PAMPERS', 'HUGGIES', 'TURMADAMONICA', 'BABYSEC', 'CREMER', 'MILI', 'PERSONAL'},
+    'FRAL': {'PAMPERS', 'HUGGIES', 'TURMADAMONICA', 'BABYSEC', 'CREMER', 'MILI', 'PERSONAL', 'BIGFRAL'},
     'FIO DENT': {'COLGATE', 'ORALB', 'JOHNSONS', 'CONDOR', 'DENTEK'},
     'COPO DESC': {'COPOMAIS', 'COPOSUL', 'CRISTALCOPO', 'CRSITALCOPO', 'KEROCOPO', 'TERMOPOT', 'TOTALPLAST', 'ALTACOPPO', 'FACILITA', 'COPOBRAS', 'COPAZA'},
     'FILME': {'ROYALPACK', 'WYDA', 'TRAMONTINA', 'DOVER ROLL'},
@@ -121,11 +123,69 @@ MARCAS_POR_CATEGORIA = {
     'TOMATE PELADO': {'POMAROLA', 'PREDILECTA', 'QUERO', 'HEINZ', 'COPEX'},
     'RACAO': {'PEDIGREE', 'GOLDEN', 'SPECIAL DOG', 'WHISKAS', 'FRISKIES', 'PREMIER', 'ROYAL CANIN'},
     'GUARDANAPO': {'KITCHEN', 'SNOB', 'SCOTT'},
-    'ALCOOL': {'COPERALCOOL', 'FLOPS', 'SAFRA', 'TUPI', 'ZULU'},
+    'ALCOOL': {'COPERALCOOL', 'COPERACOOL', 'FLOPS', 'SAFRA', 'TUPI', 'ZULU'},
+    'ACENDEDOR': {'TUPI', 'ZULU', 'TAKA FOGO'},
     'APERITIVO': {'CAMPARI', 'DA ROCHA', 'DAROCHA'},
-    'LIMP': {'VEJA', 'UAU', 'PATO', 'FLASH', 'MR MUSCULO', 'BUFALO', 'AJAX', 'LYSOFORM', 'SCOTCH', 'BRILHOME'},
-    'AVEIA': {'ITALAC', 'NESTLE', 'QUAKER', 'NESTUM', 'TRES CORACOES', '3 CORACOES'},
+    'LIMP': {'VEJA', 'UAU', 'UAL', 'PATO', 'FLASH', 'MR MUSCULO', 'BUFALO', 'AJAX', 'LYSOFORM', 'SCOTCH', 'BRILHOME'},
+    'CHA': {'LEAO', 'REAL', 'MATTE REAL', 'MATE REAL'},
+    'AVEIA': {'ITALAC', 'NESTLE', 'QUAKER', 'NESTUM', 'NEILAR', 'TRES CORACOES', '3 CORACOES'},
     'LEITE EM PO': {'ITAMBE', 'PIRACANJ', 'PIRACANJUBA', 'CCGL', 'LEITESOL', 'AURORA', 'NINHO', 'ITALAC', 'NESTLE'},
+    'SUSTAGEM': {'SUSTAGEM', 'SUSTAGEN'},
+    'PAPEL ALUM': {'WYDA', 'BRICOFLEX', 'KIKO'},
+    'PAPEL': {'MELLO', 'WYDA', 'CHAMEQUINHO'},
+    'SAND': {'HAV', 'HAVAIANAS'},
+    'MOLHO': {'BILLY JACK', 'KISABOR', 'HEINZ', 'HEMMER', 'KNORR', 'POMAROLA', 'PREDIL', 'PREDILECTA', 'QUERO', 'TARANTELLA', 'SALSARETTI', 'LIZA'},
+    'GELATINA': {'OETKER', 'DR OETKER', 'ROYAL', 'SOL', 'NEILAR'},
+    'C.M': {'ALCAFOOD', 'KELLOGGS', 'NESTLE', 'NESCAU', 'NESTON', 'SUCRILHOS'},
+    'BARRA': {'3 CORACOES', '3CORACOES'},
+    'PIL': {'PANASONIC', 'DURACELL', 'RAYOVAC', 'ELGIN'},
+    'SALG': {'LUCKY', 'TORCIDA', 'PIRAQUE', 'KARITOS', 'PRINGLES'},
+    'SAPON': {'SAPOLIO', 'CIF', 'RADIUM'},
+    'TOALHA': {'KITCHEN', 'SCALA', 'HUGGIES', 'MEU BEBE', 'TROPOLINO'},
+    'CHICLE': {'BUBBALOO', 'TRIDENT'},
+    'GUARD': {'COQUETEL', 'KITCHEN', 'MASTER CHEFF'},
+    'REMOVEDOR': {'BUFALO', 'ECOBUFALO', 'KM', 'SUPREMA', 'TACOLAC'},
+    'SACO': {'V FORT', 'EMBAL', 'WYDA', 'BRICOFLEX', 'ZIPAG'},
+    'T MANCHA': {'VANISH', 'CANDURA', 'PLUSH'},
+    'CERA': {'BRILHO FACIL', 'TACOLAC', 'GIRANDO SOL', 'GIOCA'},
+    'ESPONJA': {'WISH', 'LIMPPANO', 'S BRITE', 'YPE', 'CONDOR'},
+    'GARR': {'INVICTA'},
+    'LAMP': {'ELGIN'},
+    'PAST': {'TICTAC'},
+    'APAR': {'BIC', 'PREST', 'GILLETTE', 'VENUS'},
+    'BATATA': {'PRINGLES', 'CROCANTE', 'KARI KARI'},
+    'DOCE': {'AVIACAO', 'TRIANGULO', 'OLIVEIRA', 'ITALAC'},
+    'QUEROSENE': {'BUFALO'},
+    'RUM': {'MONTILLA'},
+    'SAQUE': {'AZUMA KIRIN'},
+    'ALV': {'VANISH'},
+    'AZ': {'V FERTIL', 'VALE FERTIL', 'RIVOLI'},
+    'BALA': {'HALLS', 'BUBBALOO', 'DORI'},
+    'CAPSULA': {'PILAO', 'LOR', 'TRES', '3 CORACOES'},
+    'CATUABA': {'RANDON', 'SELVAGEM'},
+    'CREME': {'KISABOR', 'CESIBON'},
+    'ESC': {'MEDFIO', 'ORALB', 'COLGATE', 'CONDOR'},
+    'KEEP': {'KEEP'},
+    'LUVA': {'DANNY'},
+    'TENYS': {'BARUEL'},
+    'APERIT': {'APEROL', 'CYNAR'},
+    'COB': {'OETKER', 'DR OETKER'},
+    'COPO': {'CRISTALCOPO'},
+    'POTE': {'CRISTALCOPO'},
+    'PRATO': {'CRISTALCOPO'},
+    'ESPUM': {'CHANDON'},
+    'GIN': {'GORDONS', 'TANQUERAY'},
+    'LA ACO': {'BOMBRIL', 'ASSOLAN'},
+    'LUSTRA': {'DESTAC', 'POLIFLOR'},
+    'PACOCA': {'GUIMARAES'},
+    'PANO': {'TOALEX', 'SCOTT'},
+    'PO PREP': {'ITALAC', 'NESQUIK'},
+    'ROUPA INT': {'MOVIMENT'},
+    'SELETA': {'QUERO', 'PREDILECTA'},
+    'SOPAO': {'KISABOR'},
+    'POLPA': {'POMODORO', 'PREDILECTA', 'QUERO'},
+    'SABAO': {'UFE', 'URCA', 'YPE', 'MINUANO', 'ASSIM'},
+    'VERMOUTH': {'CONTINI'},
 }
 
 SUBTIPOS_EXCLUSIVOS = [
@@ -191,6 +251,7 @@ SUBTIPOS_EXCLUSIVOS = [
     # Papel Higiênico — linhas/tipos diferentes (NOVO)
     {'SUPREME', 'TQ SEDA', 'TOQ SEDA'},
     {'FOLHA DUPLA', 'FOLHA SIMPLES', 'F DUPLA', 'F SIMPLES'},
+    {'ALUM', 'ALUMINIO', 'MANTEIGA', 'SULF'},
 
     # Sabão — tipos diferentes (NOVO)
     {'PASTA', 'BARRA', 'PO', 'LIQ'},
@@ -214,11 +275,17 @@ SUBTIPOS_EXCLUSIVOS = [
     {'TOMATE PELADO', 'MOL TOM', 'EXTR TOM', 'POLPA TOM'},
     {'INSET', 'LIMP', 'DESINF'},
     {'FRALDA', 'PAPEL HIG'},
+    {'FRAL', 'PAPEL HIG'},
     {'VODKA', 'APERITIVO', 'CACHAC', 'AGUARD', 'CONHAQUE', 'WHISKY'},
+    {'BEB', 'VODKA', 'APERITIVO', 'CACHAC', 'AGUARD', 'CONHAQUE', 'WHISKY', 'CERV', 'VIN'},
     {'FIO DENT', 'ESC DENT', 'CR DENTAL', 'CR D'},
     {'TORRADA', 'BISC', 'PAO'},
+    {'BISC', 'SALG', 'BATATA', 'TORRADA', 'CHICLE', 'BALA', 'PAST'},
     {'MAC INS', 'MACAR'},   # macarrão instantâneo ≠ massa seca
     {'ARROZ', 'FEIJAO'},    # arroz ≠ feijão
+    {'COPO', 'POTE', 'PRATO', 'DES', 'DESOD'},
+    {'CERA', 'REMOVEDOR', 'QUEROSENE', 'DESINF', 'LIMP', 'SAPON'},
+    {'TOALHA', 'PAPEL HIG', 'LENCO UMED'},
 
     # Arroz — tipos mutuamente exclusivos (PDF)
     {'PARBOILIZADO', 'PARBO'},
@@ -234,10 +301,16 @@ SUBTIPOS_EXCLUSIVOS = [
     {'LUMINOUS WHITE', 'MPA', 'TOTAL12', 'NAT',
      'NEUTRACUCAR', 'SENSIVEL',
      'TRIPLA ACAO', 'WHITENING', 'ANTICARIE', 'MAXFRESH', 'EXTRAFRESH'},
+
+    # Aparelho de barbear — linhas diferentes da mesma marca nao devem cruzar
+    {'SOLEIL', 'SENSITIVE', 'INTENSITY', 'COMFORT', 'VENUS', 'PRESTOBARBA'},
+
+    # Pilhas/baterias — tecnologia diferente nao cruza
+    {'ALC', 'ALCALINA', 'COMUM'},
 ]
 
 # Tamanhos de fralda — mutuamente exclusivos
-TAMANHOS_FRALDA = {'P', 'M', 'G', 'XG', 'XXG', 'XXXG', 'RN', 'PP', 'XP'}
+TAMANHOS_FRALDA = {'P', 'M', 'G', 'PQ', 'MD', 'GD', 'XG', 'XXG', 'XXXG', 'RN', 'PP', 'XP'}
 
 TOKENS_VARIANTE_COMUNS = {
     'ABACAXI', 'ACEROLA', 'ACONCHEGO', 'ALGODAO', 'ALHO', 'AMENDOA', 'AMORA',
@@ -254,7 +327,9 @@ TOKENS_VARIANTE_COMUNS = {
     'RESTAURACAO', 'ROSA', 'ROSAS', 'ROXO', 'SEDA', 'SPORT', 'SUPREME',
     'TALCO', 'TANGERINA', 'TURQUESA', 'TUTTI', 'UVA', 'VERAO', 'VERDE',
     'PICANTE', 'TRAD',
-    'VERMELHAS', 'VERMELHOS', 'YOGURTE',
+    'VERMELHA', 'VERMELHO', 'VERMELHAS', 'VERMELHOS',
+    'AMARELA', 'AMARELO', 'INCOLOR', 'ARDOSIA', 'DOURADO', 'DOURADA',
+    'YOGURTE',
     # Fragrâncias de desodorante/perfume
     'CANDY', 'VANILLA', 'FIERCE', 'PASSION', 'OCEAN', 'ENERGY',
     'EXTREME', 'DETOX', 'CLASS', 'FRESH', 'VANILLE', 'CARVA',
@@ -415,8 +490,11 @@ def normalizar_nome(nome):
         _SINONIMOS = [
             # ── Papel higiênico ─────────────────────────────────────────
             (r'^PAP\.?\s+HIG\.?',             'PAPEL HIG'),
+            (r'^PAPEL\s+ALUMINIO\b',          'PAPEL ALUM'),
+            (r'^PAPEL\s+TOALHA\b',            'TOALHA PAP'),
             # ── Alvejante / Vanish ──────────────────────────────────────
             (r'^VANISH\b',                    'ALV VANISH'),
+            (r'^TIRA\s+MANCHAS?\b',           'T MANCHA'),
             # ── Saponáceo ───────────────────────────────────────────────
             (r'^SAP[OO]LEO\b',                'SAPON SAPOLIO'),
             (r'^SAP[OO]LIO\b',                'SAPON SAPOLIO'),
@@ -434,6 +512,8 @@ def normalizar_nome(nome):
             # ── Sabão em pasta ──────────────────────────────────────────
             (r'^SABAO\s+EM\s+PASTA',           'SABAO PASTA'),
             (r'^SAB[OA]O\s+PASTA',             'SABAO PASTA'),
+            # ── Fralda abreviada na base ────────────────────────────────
+            (r'^FRALDA\b',                     'FRAL'),
             # ── Amaciante concentrado ───────────────────────────────────
             (r'^AMAC\.?\s+(COMFORT|DOWNY)',    'AMAC CONC'),
             # ── Desinf Coala → LIMP COALA ───────────────────────────────
@@ -445,6 +525,15 @@ def normalizar_nome(nome):
             (r'^MAT\s+INSET\b',                'INSET'),
             # ── Mistura de bolo → MIST BOLO ─────────────────────────────
             (r'^MISTURA\s+DE\s+BOLO\b',        'MIST BOLO'),
+            (r'^GELATINA\b',                   'GELATINA'),
+            (r'^PILHA\b',                      'PIL'),
+            (r'^BATERIA\b',                    'PIL'),
+            (r'^CEREAL\s+MATINAL\b',           'C.M'),
+            (r'^CEREAL\b',                     'C.M'),
+            (r'^SALGADINHO\b',                 'SALG'),
+            (r'^GUARDANAPO\b',                 'GUARD'),
+            (r'^SACO\s+LIXO\b',                'SACO LIX'),
+            (r'^LUVA\b',                       'LUVA'),
             # ── Bombom → CHOC (coloca na categoria correta) ─────────────
             (r'^BOMBOM\b',                     'CHOC'),
             # ── Nectar → SUCO ───────────────────────────────────────────
@@ -454,7 +543,10 @@ def normalizar_nome(nome):
             (r'^NESCAU\b',                     'ACHOC NESCAU'),
             # ── Sustagen → SUSTAGEM ─────────────────────────────────────
             (r'^SUSTAGEM\b',                   'SUSTAGEM'),
+            (r'^SUSTAGEN\b',                   'SUSTAGEM'),
+            (r'^ACHOC\.?\s+TODD\b',            'ACHOC TODDY'),
             # ── Toddy sem prefixo → ACHOC TODDY ─────────────────────────
+            (r'^TODD\b',                       'ACHOC TODDY'),
             (r'^TODDY\b',                      'ACHOC TODDY'),
             # ── Pinga → CACHAC ──────────────────────────────────────────
             (r'^PINGA\b',                      'CACHAC'),
@@ -472,6 +564,8 @@ def normalizar_nome(nome):
             (r'^MAGUARY\s+CONCENTRADO',        'SUCO CONC MAGUARY'),
             # ── Limpador Perfumado UAU → LIMP PERF ──────────────────────
             (r'^LIMPADOR\s+PERFUMADO\s+UAU',   'LIMP PERF CASA PERF'),
+            (r'^LIM\.?\s+PERF\.?\s+UAL\b',     'LIMP PERF UAU'),
+            (r'^LIM\.?\s+PERF\.?\s+UAU\b',     'LIMP PERF UAU'),
             (r'^LIMPADOR\s+PERF\b',            'LIMP PERF'),
             # ── Limpador Perf Sanol → LIMP PERF ─────────────────────────
             (r'^LIMPADOR\s+PERF\s+SANOL',      'LIMP PERF CASA PERF'),
@@ -503,6 +597,9 @@ def normalizar_nome(nome):
             (r'^LV\s+ROUPA\s+PO\b',           'LAVA ROUPA PO'),
             (r'^LV\s+ROUPA\b',                'LAVA ROUPA'),
             (r'^CR\s+DENTAL\b',               'CR D'),
+            (r'^COLGATE\b',                   'CR D COLGATE'),
+            (r'^SORRISO\b',                   'CR D SORRISO'),
+            (r'^ORAL\s+B\b',                  'CR D ORALB'),
             (r'^CR\s+LEITE\b',                'CR LEITE'),
             (r'^CR\s+PENTEAR\b',              'CR PENTE'),
             (r'^CR\s+TRAT\b',                 'CR TRAT'),
@@ -537,6 +634,13 @@ def normalizar_nome(nome):
 
         # 0b. Corrige vírgulas em números decimais (46,2 → 46.2, 1,5 → 1.5)
         nome = re.sub(r'(\d+),(\d+)', r'\1.\2', nome)
+        nome = nome.replace('COCINEIRO', 'COCINERO')
+        nome = nome.replace('COPERACOOL', 'COPERALCOOL')
+        nome = nome.replace('KERO 1L', 'KERO COCO 1L')
+        nome = nome.replace('KERO 200ML', 'KERO COCO 200ML')
+        nome = nome.replace('SANGUE DE BOI', 'SANGUEDEBOI')
+        nome = re.sub(r'\bTPA\b', 'TRIPLA ACAO', nome)
+        nome = re.sub(r'\b(AZEITE|OLEO(?:\s+COMPOSTO)?)\s+GALO\b', r'\1 GALLO', nome)
 
         # 1. Corrige vírgulas em medidas (1,5L -> 1.5L) — redundante após 0b, mas mantém segurança
         nome = re.sub(r'(\d+),(\d+\s*(?:G|KG|ML|L|LT|M|MT|MTS|GR|GRAMAS|GRS|GRAMA))', r'\1.\2', nome)
@@ -558,12 +662,15 @@ def normalizar_nome(nome):
 
         # 5. Padroniza LITROS
         nome = re.sub(r'\b(\d+(?:\.\d+)?)\s*(?:L|LT|LITRO|LITROS|LTR)\b', r'\1L', nome)
+        nome = nome.replace('KERO 1L', 'KERO COCO 1L')
 
         # 6. Padroniza METROS
         nome = re.sub(r'\b(\d+(?:\.\d+)?)\s*(?:MT|MTS|METROS|METRO)\b', r'\1M', nome)
 
         # 7. Padroniza UNIDADES do Pacote (C/4 -> C4)
         nome = re.sub(r'\b(?:C/|COM\s+)(\d+)\b', r'C\1', nome)
+        # Corrige OCR/extração colada: 500MLGLICERINA -> 500ML GLICERINA
+        nome = re.sub(r'(\d+(?:\.\d+)?(?:G|KG|ML|L|M|UN))(?=[A-Z])', r'\1 ', nome)
         nome = re.sub(r'\bC\s+(\d+)\b', r'C\1', nome)
         nome = re.sub(r'\b(\d+)\s*(?:UN|UND|UNDS|UNID|UNIDADES|UNIDADE)\b', r'C\1', nome)
 
@@ -853,6 +960,29 @@ def _azeites_incompativeis(nome1, nome2):
         subtipo2 = _subtipo_azeite(nome2)
         return bool(subtipo1 and subtipo2 and subtipo1 != subtipo2)
 
+def _tolerancia_medida(nome1, nome2):
+        """Categorias vendidas por embalagem exata nao devem aceitar peso muito aproximado."""
+        _is_vin = 'VIN ' in nome1 or nome1.startswith('VIN') or 'VIN ' in nome2 or nome2.startswith('VIN')
+        if _is_vin:
+            return 0.85
+        _estritas = (
+            'MAIONESE', 'MAION', 'ACHOC', 'AZEITE', 'OLEO', 'PAPEL ALUM',
+            'TRIDENT', 'SH ', 'COND ', 'CR PENTE', 'SUSTAGEM',
+        )
+        if any(cat in nome1 or cat in nome2 for cat in _estritas):
+            return 0.95
+        return 0.7
+
+def _extrair_dimensoes_papel_alum(nome):
+        """Extrai medidas como 45X4, 30X7.5 ou 4MTX45CM para papel aluminio."""
+        if 'PAPEL ALUM' not in nome:
+            return set()
+        dims = set()
+        for a, b in re.findall(r'\b(\d+(?:\.\d+)?)\s*(?:CM|M)?\s*X\s*(\d+(?:\.\d+)?)\s*(?:CM|M)?\b', nome):
+            vals = tuple(sorted((float(a), float(b))))
+            dims.add(vals)
+        return dims
+
 def nomes_incompativeis_v4(nome1, nome2):
         """
         Lógica v4.8 — travas de categoria, marca, peso, subtipo e variante.
@@ -869,7 +999,10 @@ def nomes_incompativeis_v4(nome1, nome2):
             'CACHACA': 'CACHAC', 'SHAMPOO': 'SH',
             'CONDICIONADOR': 'COND', 'REPELENTE': 'REPEL',
             'MACAR': 'MAC', 'MAIONESE': 'MAION',
-            'POLPA TOM': 'MOL TOM',
+            'POLPA TOM': 'MOL TOM', 'POLPA': 'MOL TOM',
+            'FRALDA': 'FRAL', 'PAPEL HIGIENICO': 'PAPEL HIG',
+            'CATCHUP': 'KETCHUP', 'T MANCHA': 'ALV',
+            'SABAO BARRA': 'SABAO', 'SABAO PASTA': 'SABAO',
         }
         _cats1 = set()
         _cats2 = set()
@@ -884,13 +1017,16 @@ def nomes_incompativeis_v4(nome1, nome2):
         if _azeites_incompativeis(nome1, nome2):
             return True
 
+        d1 = _extrair_dimensoes_papel_alum(nome1)
+        d2 = _extrair_dimensoes_papel_alum(nome2)
+        if d1 and d2 and not d1.intersection(d2):
+            return True
+
         # 1. TRAVA DE PESO (v5.0) — Relaxada para aceitar pesos próximos
         c1 = _extrair_medidas(nome1)
         c2 = _extrair_medidas(nome2)
         if c1 and c2 and not c1.intersection(c2):
-            # Para vinho: tolerância máx 15% (750ML≠1L); para outros: 30%
-            _is_vin = 'VIN ' in nome1 or nome1.startswith('VIN') or 'VIN ' in nome2 or nome2.startswith('VIN')
-            _tol_peso = 0.85 if _is_vin else 0.7
+            _tol_peso = _tolerancia_medida(nome1, nome2)
             pesos_proximos = False
             for p1 in c1:
                 v1 = _peso_para_numero(p1)
@@ -1100,6 +1236,10 @@ def nomes_incompativeis_v4(nome1, nome2):
             gel2 = 'GEL' in nome2.split()
             if gel1 != gel2:
                 return True
+            liq1 = any(t in nome1.split() for t in {'LIQ', 'LIQUIDO'})
+            liq2 = any(t in nome2.split() for t in {'LIQ', 'LIQUIDO'})
+            if (liq1 and not liq2 and gel2) or (liq2 and not liq1 and gel1):
+                return True
             # 5i. TRAVA: grau de álcool diferente (70 vs 80 vs 46)
             _deg = lambda n: set(re.findall(r'(?<!\d)(46(?:\.2)?|70|80|92|96)(?!\d)', n))
             deg1 = _deg(nome1)
@@ -1129,7 +1269,7 @@ def nomes_incompativeis_v4(nome1, nome2):
             return True
 
         # 7. TRAVA DE TAMANHO DE FRALDA (P, M, G, XG, XXG)
-        if 'FRALDA' in nome1 or 'FRALDA' in nome2:
+        if 'FRALDA' in nome1 or 'FRALDA' in nome2 or 'FRAL' in nome1 or 'FRAL' in nome2:
             tam1 = set(t for t in TAMANHOS_FRALDA if re.search(r'(?:^|\s)' + t + r'(?:\s|$)', nome1))
             tam2 = set(t for t in TAMANHOS_FRALDA if re.search(r'(?:^|\s)' + t + r'(?:\s|$)', nome2))
             if tam1 and tam2 and not tam1.intersection(tam2):
@@ -1170,6 +1310,39 @@ def nomes_incompativeis_v4(nome1, nome2):
         if 'AMIDO' in nome2.split() and 'AMIDO' not in nome1.split():
             return True
 
+        if ('QUEROSENE' in nome1 and 'DESINF' in nome2) or ('QUEROSENE' in nome2 and 'DESINF' in nome1):
+            return True
+
+        # 12. TRAVA VINHO: branco, tinto e rose nao podem cruzar.
+        if ('VIN ' in nome1 or nome1.startswith('VIN')) and ('VIN ' in nome2 or nome2.startswith('VIN')):
+            _cores = {'TINTO', 'BRANCO', 'ROSE'}
+            cor1 = set(nome1.split()) & _cores
+            cor2 = set(nome2.split()) & _cores
+            if cor1 and cor2 and not cor1.intersection(cor2):
+                return True
+
+        # 13. TRAVA SH/COND kit: item unitario nao deve pegar kit shampoo+condicionador.
+        if any(cat in nome1 or cat in nome2 for cat in ('SH ', 'COND ')):
+            kit1 = '+COND' in nome1 or 'SH COND' in nome1
+            kit2 = '+COND' in nome2 or 'SH COND' in nome2
+            if kit1 != kit2:
+                return True
+
+        # 14. TRAVA TRIDENT pote/display: embalagem de pote 54G nao e display 21x5.
+        if 'TRIDENT' in nome1 and 'TRIDENT' in nome2:
+            pote1 = 'POTE' in nome1.split()
+            pote2 = 'POTE' in nome2.split()
+            if pote1 != pote2:
+                return True
+
+        # 15. TRAVA aparelho de barbear: linhas BIC femininas/sensiveis nao cruzam.
+        if ('APAR' in nome1 or 'BARB' in nome1) and ('APAR' in nome2 or 'BARB' in nome2):
+            _linhas = {'SOLEIL', 'SENSIVEL', 'SENSITIVE', 'INTENSITY', 'COMFORT', 'VENUS'}
+            l1 = set(nome1.split()) & _linhas
+            l2 = set(nome2.split()) & _linhas
+            if l1 and l2 and not l1.intersection(l2):
+                return True
+
         return False
 
 def _extrair_categoria(nome_normalizado):
@@ -1208,7 +1381,10 @@ def _travas_leves(nome1, nome2):
             'CACHACA': 'CACHAC', 'SHAMPOO': 'SH',
             'CONDICIONADOR': 'COND', 'REPELENTE': 'REPEL',
             'MACAR': 'MAC', 'MAIONESE': 'MAION',
-            'POLPA TOM': 'MOL TOM',
+            'POLPA TOM': 'MOL TOM', 'POLPA': 'MOL TOM',
+            'FRALDA': 'FRAL', 'PAPEL HIGIENICO': 'PAPEL HIG',
+            'CATCHUP': 'KETCHUP', 'T MANCHA': 'ALV',
+            'SABAO BARRA': 'SABAO', 'SABAO PASTA': 'SABAO',
         }
         _cats1 = set()
         _cats2 = set()
@@ -1221,6 +1397,14 @@ def _travas_leves(nome1, nome2):
             return True
 
         if _azeites_incompativeis(nome1, nome2):
+            return True
+
+        d1 = _extrair_dimensoes_papel_alum(nome1)
+        d2 = _extrair_dimensoes_papel_alum(nome2)
+        if d1 and d2 and not d1.intersection(d2):
+            return True
+
+        if ('QUEROSENE' in nome1 and 'DESINF' in nome2) or ('QUEROSENE' in nome2 and 'DESINF' in nome1):
             return True
 
         # 1b. TRAVA DE ÁLCOOL — VODKA ≠ APERITIVO ≠ CACHAÇA ≠ AGUARDENTE ≠ CONHAQUE ≠ WHISKY
@@ -1326,8 +1510,7 @@ def _travas_leves(nome1, nome2):
         _c1 = _extrair_medidas(nome1)
         _c2 = _extrair_medidas(nome2)
         if _c1 and _c2 and not _c1.intersection(_c2):
-            _is_vin = 'VIN ' in nome1 or nome1.startswith('VIN') or 'VIN ' in nome2 or nome2.startswith('VIN')
-            _tol_peso = 0.85 if _is_vin else 0.7
+            _tol_peso = _tolerancia_medida(nome1, nome2)
             _pesos_ok = False
             for _p1 in _c1:
                 _v1 = _peso_para_numero(_p1)
@@ -1366,6 +1549,32 @@ def _travas_leves(nome1, nome2):
             tipo1 = next((t for t in _TIPOS_ATUM if re.search(r'\b' + t + r'\b', nome1)), None)
             tipo2 = next((t for t in _TIPOS_ATUM if re.search(r'\b' + t + r'\b', nome2)), None)
             if tipo1 and tipo2 and tipo1 != tipo2:
+                return True
+
+        if ('VIN ' in nome1 or nome1.startswith('VIN')) and ('VIN ' in nome2 or nome2.startswith('VIN')):
+            _cores = {'TINTO', 'BRANCO', 'ROSE'}
+            cor1 = set(nome1.split()) & _cores
+            cor2 = set(nome2.split()) & _cores
+            if cor1 and cor2 and not cor1.intersection(cor2):
+                return True
+
+        if any(cat in nome1 or cat in nome2 for cat in ('SH ', 'COND ')):
+            kit1 = '+COND' in nome1 or 'SH COND' in nome1
+            kit2 = '+COND' in nome2 or 'SH COND' in nome2
+            if kit1 != kit2:
+                return True
+
+        if 'TRIDENT' in nome1 and 'TRIDENT' in nome2:
+            pote1 = 'POTE' in nome1.split()
+            pote2 = 'POTE' in nome2.split()
+            if pote1 != pote2:
+                return True
+
+        if ('APAR' in nome1 or 'BARB' in nome1) and ('APAR' in nome2 or 'BARB' in nome2):
+            _linhas = {'SOLEIL', 'SENSIVEL', 'SENSITIVE', 'INTENSITY', 'COMFORT', 'VENUS'}
+            l1 = set(nome1.split()) & _linhas
+            l2 = set(nome2.split()) & _linhas
+            if l1 and l2 and not l1.intersection(l2):
                 return True
 
         return False
