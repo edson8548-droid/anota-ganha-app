@@ -6,15 +6,15 @@ import edge_tts
 
 ROOT = Path(__file__).resolve().parent
 VOICE = "pt-BR-FranciscaNeural"
-RATE = "+12%"
+RATE = "+22%"
 VOLUME = "+0%"
 
 TEXTS = [
-    "RCA, suba a sua tabela de preço. Depois pegue a tabela de cotação do seu cliente e veja a mágica acontecer em segundos. Um trabalho que levaria horas acontece em minutos.",
-    "A Cotação Pronta cruza os produtos, organiza as informações e ajuda você a responder o cliente com muito mais agilidade.",
-    "Segundo passo: monte sua vitrine de ofertas. Escolha os produtos de maior giro, coloque fotos, preços e envie um link profissional para o cliente comprar pelo WhatsApp.",
-    "Terceiro passo: divulgue no WhatsApp. Use mensagens curtas, ofertas claras e fale primeiro com clientes parados. O Venpro ajuda você a vender sem perder tempo.",
-    "Quarto passo: acompanhe campanhas e positivação. Veja oportunidades, recupere clientes e aumente seus resultados. Venpro: mais vendas, mais resultados.",
+    "Representante comercial, suba sua tabela de preço no Venpro e depois carregue a cotação do cliente. Em poucos segundos a plataforma compara os itens, encontra os produtos certos e organiza os preços para você responder. Um trabalho de horas vira minutos.",
+    "A Cotação Pronta cruza os produtos, reduz digitação e evita erro de preço. Você ganha velocidade para responder melhor e fechar mais pedidos no mesmo dia.",
+    "Monte sua vitrine de ofertas com produtos de giro, fotos e preços. Gere um link profissional e envie para o cliente comprar direto pelo WhatsApp.",
+    "Divulgue no WhatsApp com mensagens curtas e ofertas claras. Fale primeiro com clientes parados e transforme conversa em pedido sem perder tempo.",
+    "Acompanhe campanhas, positivação e oportunidades da carteira. O Venpro ajuda você a vender mais, recuperar clientes e melhorar seus resultados.",
 ]
 
 
