@@ -185,6 +185,419 @@ def test_matching_nao_usa_preco_sococo_para_flococo():
     assert preco is None
     assert tipo is None
 
+def test_caldo_knorr_bacon_costela_nao_casa_com_galinha_ou_carne():
+    assert _incompat(
+        "CALDO KNORR 57G BACON E COSTELA",
+        "CALDO KNORR 57G GALINHA",
+    ), "Caldo bacon e costela nao deve casar com galinha"
+    assert _incompat(
+        "CALDO KNORR 57G BACON E COSTELA",
+        "CALDO KNORR 57G CARNE",
+    ), "Caldo bacon e costela nao deve casar com carne"
+
+def test_matching_nao_usa_preco_galinha_ou_carne_para_caldo_bacon_costela():
+    item_galinha = _price_item("CALDO KNORR 57G GALINHA", 2.49)
+    item_carne = _price_item("CALDO KNORR 57G CARNE", 2.59)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "CALDO KNORR 57G BACON E COSTELA",
+        {},
+        [item_galinha, item_carne],
+        [item_galinha["norm"], item_carne["norm"]],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_caldo_knorr_114g_nao_cruza_sabores():
+    sabores = ["CARNE", "COSTELA", "GALINHA", "LEGUMES"]
+    for sabor_a in sabores:
+        for sabor_b in sabores:
+            if sabor_a == sabor_b:
+                continue
+            assert _incompat(
+                f"CALDO KNORR 114G {sabor_a}",
+                f"CALDO KNORR 114G {sabor_b}",
+            ), f"Caldo Knorr 114G {sabor_a} nao deve casar com {sabor_b}"
+
+def test_coco_ralado_copra_sem_acucar_nao_casa_com_comum_ou_outra_marca():
+    assert _incompat(
+        "COCO RALADO COPRA S/ADICAO DE ACUCAR",
+        "COCO RALADO COPRA 100G",
+    ), "Coco ralado Copra sem acucar nao deve casar com Copra comum"
+    assert _incompat(
+        "COCO RALADO COPRA S/ADICAO DE ACUCAR",
+        "COCO RALADO SOCOCO 100G",
+    ), "Coco ralado Copra nao deve casar com Sococo"
+
+def test_matching_nao_usa_preco_generico_para_coco_ralado_copra_sem_acucar():
+    itens = [
+        _price_item("COCO RALADO COPRA 100G", 2.00),
+        _price_item("COCO RALADO SOCOCO 100G", 4.99),
+        _price_item("COCO RALADO 100G", 2.00),
+    ]
+
+    preco, tipo = encontrar_preco(
+        "",
+        "COCO RALADO COPRA S/ADICAO DE ACUCAR",
+        {},
+        itens,
+        [item["norm"] for item in itens],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_creme_de_cebola_knorr_nao_casa_com_kisabor():
+    assert _incompat(
+        "CREME DE CEBOLA KNORR",
+        "CREME DE CEBOLA KISABOR",
+    ), "Creme de cebola Knorr nao deve casar com Kisabor"
+
+def test_matching_nao_usa_preco_kisabor_para_creme_de_cebola_knorr():
+    item_kisabor = _price_item("CREME DE CEBOLA KISABOR", 3.99)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "CREME DE CEBOLA KNORR",
+        {},
+        [item_kisabor],
+        [item_kisabor["norm"]],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_extrato_elefante_nao_cruza_variedades():
+    assert not _incompat(
+        "EXTRATO DE TOMATE ELEFANTE POTE 300G TRADICIONAL",
+        "EXTRATO ELEFANTE POTE 300G",
+    ), "Extrato Elefante sem variedade explicita deve equivaler ao tradicional"
+    assert _incompat(
+        "EXTRATO DE TOMATE ELEFANTE POTE 300G TRADICIONAL",
+        "EXTRATO DE TOMATE ELEFANTE POTE 300G CARNE DE PANELA",
+    ), "Extrato tradicional nao deve casar com carne de panela"
+    assert _incompat(
+        "EXTRATO ELEFANTE POTE 300G",
+        "EXTRATO DE TOMATE ELEFANTE POTE 300G CEB/ALHO",
+    ), "Extrato tradicional nao deve casar com cebola/alho"
+
+def test_extrato_tomate_nao_cruza_pote_sache_ou_marca():
+    assert _incompat(
+        "EXTRATO DE TOMATE ELEFANTE SACHÊ 300G",
+        "EXTRATO DE TOMATE ELEFANTE POTE 300G",
+    ), "Extrato Elefante sache nao deve casar com pote"
+    assert _incompat(
+        "EXTRATO DE TOMATE FUGINI SACHÊ 300G",
+        "EXTRATO DE TOMATE ELEFANTE SACHÊ 300G",
+    ), "Extrato Fugini nao deve casar com Elefante"
+
+def test_matching_nao_usa_preco_errado_para_extrato_tomate():
+    itens = [
+        _price_item("EXTRATO DE TOMATE ELEFANTE POTE 300G", 4.29),
+        _price_item("EXTRATO DE TOMATE ELEFANTE POTE 300G CARNE DE PANELA", 4.49),
+        _price_item("EXTRATO DE TOMATE FUGINI POTE 300G", 3.79),
+    ]
+
+    preco_sache, tipo_sache = encontrar_preco(
+        "",
+        "EXTRATO DE TOMATE ELEFANTE SACHÊ 300G",
+        {},
+        itens,
+        [item["norm"] for item in itens],
+    )
+    preco_fugini, tipo_fugini = encontrar_preco(
+        "",
+        "EXTRATO DE TOMATE FUGINI SACHÊ 300G",
+        {},
+        itens,
+        [item["norm"] for item in itens],
+    )
+    preco_trad, tipo_trad = encontrar_preco(
+        "",
+        "EXTRATO DE TOMATE ELEFANTE POTE 300G TRADICIONAL",
+        {},
+        itens,
+        [item["norm"] for item in itens],
+    )
+
+    assert preco_sache is None
+    assert tipo_sache is None
+    assert preco_fugini is None
+    assert tipo_fugini is None
+    assert preco_trad == 4.29
+    assert tipo_trad is not None
+
+def test_matching_nao_usa_preco_errado_para_extrato_quero_sache():
+    itens = [
+        _price_item("EXTRATO DE TOMATE QUERO POTE 300G", 4.19),
+        _price_item("MOLHO DE TOMATE QUERO SACHE 300G", 2.29),
+        _price_item("POLPA DE TOMATE QUERO SACHE 300G", 3.19),
+        _price_item("EXTRATO DE TOMATE ELEFANTE SACHE 300G", 4.39),
+        _price_item("EXTRATO DE TOMATE FUGINI SACHE 300G", 3.89),
+    ]
+
+    preco, tipo = encontrar_preco(
+        "",
+        "EXTRATO DE TOMATE QUERO SACHÊ 300G",
+        {},
+        itens,
+        [item["norm"] for item in itens],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_extrato_salseretti_pote_nao_casa_com_outras_marcas_ou_sache():
+    assert _incompat(
+        "EXTRATO TOMATE SALSERETTI POTE 300G",
+        "EXTRATO TOMATE ELEFANTE POTE 300G",
+    ), "Extrato Salseretti nao deve casar com Elefante"
+    assert _incompat(
+        "EXTRATO TOMATE SALSERETTI POTE 300G",
+        "EXTRATO TOMATE QUERO POTE 300G",
+    ), "Extrato Salseretti nao deve casar com Quero"
+    assert _incompat(
+        "EXTRATO TOMATE SALSERETTI POTE 300G",
+        "EXTRATO TOMATE SALSARETTI SACHE 300G",
+    ), "Extrato Salseretti pote nao deve casar com sache"
+
+def test_matching_nao_usa_preco_errado_para_extrato_salseretti_pote():
+    itens = [
+        _price_item("EXTRATO TOMATE ELEFANTE POTE 300G", 4.29),
+        _price_item("EXTRATO TOMATE QUERO POTE 300G", 4.19),
+        _price_item("EXTRATO TOMATE FUGINI POTE 300G", 3.79),
+        _price_item("EXTRATO TOMATE SALSARETTI SACHE 300G", 3.99),
+        _price_item("EXTRATO TOMATE SALSARETTI POTE 340G", 4.59),
+    ]
+
+    preco, tipo = encontrar_preco(
+        "",
+        "EXTRATO TOMATE SALSERETTI POTE 300G",
+        {},
+        itens,
+        [item["norm"] for item in itens],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_ketchup_cepera_nao_casa_com_outra_marca():
+    assert _incompat(
+        "KETCHUP CEPERA TRADICIONAL 1KG",
+        "KETCHUP QUERO TRADICIONAL 1KG",
+    ), "Ketchup Cepera nao deve casar com Quero"
+    assert _incompat(
+        "KETCHUP CEPERA TRADICIONAL 1KG",
+        "KETCHUP HEINZ TRADICIONAL 1KG",
+    ), "Ketchup Cepera nao deve casar com Heinz"
+
+def test_matching_nao_usa_preco_de_outra_marca_para_ketchup_cepera():
+    itens = [
+        _price_item("KETCHUP QUERO TRADICIONAL 1KG", 8.99),
+        _price_item("KETCHUP HEINZ TRADICIONAL 1KG", 14.99),
+        _price_item("KETCHUP HELLMANNS TRADICIONAL 1KG", 11.49),
+    ]
+
+    preco, tipo = encontrar_preco(
+        "",
+        "Ketchup Cepêra Tradicional 1KG",
+        {},
+        itens,
+        [item["norm"] for item in itens],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_ketchup_consumo_normaliza_para_konsumo_e_nao_casa_com_outra_marca():
+    assert normalizar_nome("KETCHUP CONSUMO 200G") == "KETCHUP KONSUMO 200G"
+    assert _incompat(
+        "KETCHUP CONSUMO 200G",
+        "KETCHUP QUERO 200G",
+    ), "Ketchup Konsumo/Consumo nao deve casar com Quero"
+    assert _incompat(
+        "KETCHUP CONSUMO 200G",
+        "KETCHUP HEINZ 200G",
+    ), "Ketchup Konsumo/Consumo nao deve casar com Heinz"
+
+def test_matching_nao_usa_preco_de_outra_marca_para_ketchup_consumo():
+    itens = [
+        _price_item("KETCHUP 200G", 2.99),
+        _price_item("KETCHUP TRADICIONAL 200G", 3.19),
+        _price_item("KETCHUP QUERO 200G", 3.49),
+        _price_item("KETCHUP HEINZ 200G", 5.99),
+        _price_item("KETCHUP CEPERA 200G", 4.49),
+    ]
+
+    preco, tipo = encontrar_preco(
+        "",
+        "KETCHUP CONSUMO 200G",
+        {},
+        itens,
+        [item["norm"] for item in itens],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_maionese_hellmanns_limao_nao_casa_com_tradicional():
+    assert _incompat(
+        "MAIONESE HELLMANNS LIMAO 500G",
+        "MAIONESE HELLMANNS 500G",
+    ), "Maionese Hellmanns limao nao deve casar com versao sem limao"
+    assert _incompat(
+        "MAIONESE HELLMANNS LIMAO 500G",
+        "MAIONESE HELLMANNS TRADICIONAL 500G",
+    ), "Maionese Hellmanns limao nao deve casar com tradicional"
+
+def test_matching_nao_usa_preco_tradicional_para_maionese_hellmanns_limao():
+    itens = [
+        _price_item("MAIONESE HELLMANNS 500G", 9.99),
+        _price_item("MAIONESE HELLMANNS TRADICIONAL 500G", 10.49),
+        _price_item("MAIONESE HELLMANNS LIGHT 500G", 11.49),
+    ]
+
+    preco, tipo = encontrar_preco(
+        "",
+        "MAIONESE HELLMANNS LIMAO 500G",
+        {},
+        itens,
+        [item["norm"] for item in itens],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_maionese_suavit_nao_casa_com_outra_marca():
+    assert _incompat(
+        "MAIONESE SUAVIT 500G",
+        "MAIONESE QUERO 500G",
+    ), "Maionese Suavit nao deve casar com Quero"
+    assert _incompat(
+        "MAIONESE SUAVIT 500G",
+        "MAIONESE HELLMANNS 500G",
+    ), "Maionese Suavit nao deve casar com Hellmanns"
+
+def test_matching_nao_usa_preco_de_outra_marca_para_maionese_suavit():
+    itens = [
+        _price_item("MAIONESE QUERO 500G", 7.99),
+        _price_item("MAIONESE HELLMANNS 500G", 10.99),
+        _price_item("MAIONESE HEINZ 500G", 11.49),
+    ]
+
+    preco, tipo = encontrar_preco(
+        "",
+        "MAIONESE SUAVIT 500G",
+        {},
+        itens,
+        [item["norm"] for item in itens],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_molho_fugini_bolonhesa_nao_casa_com_quero_ou_tradicional():
+    assert _incompat(
+        "MOLHO FUGINI 300G BOLONHESA",
+        "MOLHO QUERO 300G BOLONHESA",
+    ), "Molho Fugini nao deve casar com Quero"
+    assert _incompat(
+        "MOLHO FUGINI 300G BOLONHESA",
+        "MOLHO FUGINI TRADICIONAL 300G",
+    ), "Molho Fugini bolonhesa nao deve casar com tradicional"
+    assert _incompat(
+        "MOLHO QUERO TRADICIONAL 300G",
+        "MOLHO QUERO 300G BOLONHESA",
+    ), "Molho Quero tradicional nao deve casar com bolonhesa"
+
+def test_matching_nao_usa_preco_errado_para_molho_fugini_e_quero_tradicional():
+    itens_fugini = [
+        _price_item("MOLHO QUERO 300G BOLONHESA", 2.69),
+        _price_item("MOLHO FUGINI TRADICIONAL 300G", 2.49),
+        _price_item("MOLHO QUERO TRADICIONAL 300G", 2.59),
+    ]
+    preco_fugini, tipo_fugini = encontrar_preco(
+        "",
+        "MOLHO FUGINI 300G BOLONHESA",
+        {},
+        itens_fugini,
+        [item["norm"] for item in itens_fugini],
+    )
+
+    itens_quero = [
+        _price_item("MOLHO QUERO 300G BOLONHESA", 2.69),
+        _price_item("MOLHO QUERO 300G PIZZA", 2.79),
+        _price_item("MOLHO FUGINI TRADICIONAL 300G", 2.49),
+    ]
+    preco_quero, tipo_quero = encontrar_preco(
+        "",
+        "MOLHO QUERO TRADICIONAL 300G",
+        {},
+        itens_quero,
+        [item["norm"] for item in itens_quero],
+    )
+
+    assert preco_fugini is None
+    assert tipo_fugini is None
+    assert preco_quero is None
+    assert tipo_quero is None
+
+def test_sardinha_nao_cruza_tipos_de_conserva_ou_sabor():
+    tipos = ["DEFUMADO", "LIMAO", "MOLHO", "PICANTE", "OLEO"]
+    for tipo_a in tipos:
+        for tipo_b in tipos:
+            if tipo_a == tipo_b:
+                continue
+            assert _incompat(
+                f"SARDINHA GOMES DA COSTA {tipo_a} 125G",
+                f"SARDINHA GOMES DA COSTA {tipo_b} 125G",
+            ), f"Sardinha {tipo_a} nao deve casar com {tipo_b}"
+
+def test_matching_nao_usa_mesmo_preco_para_todos_tipos_de_sardinha():
+    itens = [
+        _price_item("SARDINHA GOMES DA COSTA LIMAO 125G", 5.11),
+        _price_item("SARDINHA GOMES DA COSTA MOLHO 125G", 5.11),
+        _price_item("SARDINHA GOMES DA COSTA PICANTE 125G", 5.11),
+        _price_item("SARDINHA GOMES DA COSTA OLEO 125G", 5.11),
+    ]
+
+    preco, tipo = encontrar_preco(
+        "",
+        "SARDINHA GOMES DA COSTA DEFUMADO 125G",
+        {},
+        itens,
+        [item["norm"] for item in itens],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_base_conhecimento_bloqueia_sabores_tang_diferentes():
+    assert _incompat(
+        "REF PO TANG LARANJA 18G",
+        "REF PO TANG UVA 18G",
+    ), "Base externa deve bloquear sabores Tang diferentes"
+
+def test_base_conhecimento_bloqueia_categoria_ype_diferente():
+    assert _incompat(
+        "DETERGENTE YPE NEUTRO 500ML",
+        "DESINFETANTE YPE PINHO LAVANDA 500ML",
+    ), "Base externa deve bloquear detergente contra desinfetante"
+
+def test_base_conhecimento_bloqueia_fragrancia_multiuso_diferente():
+    assert _incompat(
+        "MULTIUSO VEJA LAVANDA 500ML",
+        "MULTIUSO VEJA FLORAL 500ML",
+    ), "Base externa deve bloquear fragrancias diferentes"
+
+def test_base_conhecimento_nao_bloqueia_mesmo_produto():
+    assert not _incompat(
+        "DETERGENTE YPE NEUTRO 500ML",
+        "DETERGENTE YPE NEUTRO 500 ML",
+    ), "Base externa nao deve bloquear o mesmo produto"
+
 def test_desodorante_corpo_a_corpo_nao_casa_com_outra_marca():
     assert _incompat(
         "DESOD ROLLON CORPO A CORPO 50ML FRESCOR",

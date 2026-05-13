@@ -9,6 +9,14 @@ import re
 import unicodedata
 
 try:
+    from services.product_knowledge import recognize_product as _recognize_product
+except Exception:
+    try:
+        from .product_knowledge import recognize_product as _recognize_product
+    except Exception:
+        _recognize_product = None
+
+try:
     from rapidfuzz import fuzz, process as rfprocess
     _USE_RAPIDFUZZ = True
 except ImportError:
@@ -31,13 +39,13 @@ MARCAS_POR_CATEGORIA = {
     'AZEITE': {'GALLO', 'GALO', 'ANDORINHA', 'BORGES', 'CARBONELL', 'COCINERO', 'COCINEIRO', 'FILIPPO BERIO', 'FILLIPO BERIO', 'COLAVITA', 'DELEYDA', 'LA ESPANOLA', 'LA ESPANHOLA', 'MONINI', 'ESPORAO', 'DE CECCO', 'PAGANINI', 'SINTRA', 'CASA DO AZEITE', 'TRADICAO', 'VALE FERTIL', 'RESERVA', 'ESPECIAL'},
     'BISC': {'ADRIA', 'MARILAN', 'VITARELLA', 'VITAR', 'PIRAQUE', 'BAUDUCCO', 'BAUDUCO', 'BAUDUC', 'MABEL', 'RANCHEIRO', 'OREO', 'CLUBSOCIAL', 'TRAKINAS', 'TRAKI', 'TODDY', 'NIKITO', 'NABISCO', 'LACTA', 'ARCOR', 'TORTINHA', 'TUC', 'TUCS', 'BELVITA', 'NAGA', 'DADINHO', 'GALO', 'PASSATEMPO', 'BONO', 'PITSTOP', 'TRIUNFO', 'PRODASA', 'LOLI', 'GIRASSOL', 'TORTUGUITA', 'LUANITOS', 'NESTLE', 'LIANE', 'COOKIES', 'SALT PLUS', 'AGUIA', 'NESTLE RECH'},
     'CAFE': {'3 CORACOES', '3CORACOES', 'PILAO', 'BRASILEIRO', 'CABOCLO', 'SELETO', 'UNIAO', 'PELE', 'MELITTA', 'NESCAFE', 'FORT', 'CANECAO', 'SANTO ANDRE', 'FAZENDA MINEIRA', 'MOKA'},
-    'CATCHUP': {'HEINZ', 'QUERO', 'HELLMANNS', 'HELLMANN', 'HEMMER', 'KONSUMO'},
-    'KETCHUP': {'HEINZ', 'QUERO', 'HELLMANNS', 'HELLMANN', 'HEMMER', 'KONSUMO'},  # alias pós-normalização
-    'MAIONESE': {'HELLMANNS', 'HELLMANN', 'ARISCO', 'SOYA', 'HELLMAN', 'HEMMER', 'LIZA', 'MARIA', 'HEINZ', 'QUERO', 'VIGOR', 'DANCOW'},
-    'MAION': {'HELLMANNS', 'HELLMANN', 'ARISCO', 'SOYA', 'HELLMAN', 'HEMMER', 'LIZA', 'MARIA', 'HEINZ', 'QUERO', 'VIGOR', 'DANCOW'},
+    'CATCHUP': {'HEINZ', 'QUERO', 'HELLMANNS', 'HELLMANN', 'HEMMER', 'KONSUMO', 'CEPERA'},
+    'KETCHUP': {'HEINZ', 'QUERO', 'HELLMANNS', 'HELLMANN', 'HEMMER', 'KONSUMO', 'CEPERA'},  # alias pós-normalização
+    'MAIONESE': {'HELLMANNS', 'HELLMANN', 'ARISCO', 'SOYA', 'HELLMAN', 'HEMMER', 'LIZA', 'MARIA', 'HEINZ', 'QUERO', 'VIGOR', 'DANCOW', 'SUAVIT'},
+    'MAION': {'HELLMANNS', 'HELLMANN', 'ARISCO', 'SOYA', 'HELLMAN', 'HEMMER', 'LIZA', 'MARIA', 'HEINZ', 'QUERO', 'VIGOR', 'DANCOW', 'SUAVIT'},
     'CHOC': {'LACTA', 'NESTLE', 'HERSHEY', 'HERSHEYS', 'GAROTO', 'ARCOR', 'GALAK', 'ALPINO', 'NUTELLA', 'BATON', 'TRENTO', 'BIS', 'KINDER', 'KITKAT', 'APTI', 'BIBS'},
     'ENERG': {'BALY', 'REDBULL', 'MONSTER', 'ENGOV', 'FUSION'},
-    'EXTR TOM': {'ELEFANTE', 'QUERO', 'FUGINI', 'PREDILECTA', 'OLE', 'POMAROLA'},
+    'EXTR TOM': {'ELEFANTE', 'QUERO', 'FUGINI', 'PREDILECTA', 'OLE', 'POMAROLA', 'SALSARETTI'},
     'LEITE COND': {'ITALAC', 'MOCA', 'PIRACANJ', 'PIRACANJUBA', 'MOCOCA', 'CAM', 'JORDAO', 'NESTL', 'CAMPOS DO JORDAO', 'TRIANGULO'},
     'LEITE PO': {'ITAMBE', 'PIRACANJ', 'PIRACANJUBA', 'CCGL', 'LEITESOL', 'AURORA', 'NINHO', 'ITALAC', 'NESTLE'},
     'MACAR': {'ADRIA', 'CAMIL', 'BARILLA', 'RENATA', 'FLOR DE LIS', 'D BENTA', 'DBENTA', 'TODESCHINI', 'SANTA AMALIA', 'JOIA', 'LIANE', 'DONA BENTA', 'GALO'},
@@ -55,7 +63,7 @@ MARCAS_POR_CATEGORIA = {
     'SARD':   {'COQUEIRO', 'GCOSTA', 'G COSTA', 'G/COSTA', 'GOMES COSTA', 'PESCADOR', '88'},
     'MILHO':  {'QUERO', 'PREDILECTA', 'FUGINI', 'SOFRUTA', 'BONARE', 'SELECT', 'OLE'},
     'ERVILHA': {'QUERO', 'PREDILECTA', 'FUGINI'},
-    'COCO RAL': {'DUCOCO', 'MAIS COCO', 'MENINA', 'ADEL COCO', 'COCO DO VALE', 'NORDESTE', 'S OCOCO', 'SOCOCO', 'FLOCOCO', 'BOM COCO', 'LA PREFERIDA'},
+    'COCO RAL': {'DUCOCO', 'MAIS COCO', 'MENINA', 'ADEL COCO', 'COCO DO VALE', 'NORDESTE', 'S OCOCO', 'SOCOCO', 'FLOCOCO', 'COPRA', 'BOM COCO', 'LA PREFERIDA'},
     'MIST BOLO': {'DBENTA', 'D BENTA', 'DONA BENTA', 'ITALAC', 'FLEISCHMANN', 'DR OETKER', 'OETKER', 'RENATA', 'SOL', 'TIO JOAO', 'APTI', 'ANA MARIA', 'BAUDUC', 'BAUDUCCO'},
     'ISOT':    {'GATORADE', 'BALY', 'POWERADE'},
     'GATORADE': {'GATORADE'},
@@ -134,7 +142,7 @@ MARCAS_POR_CATEGORIA = {
     'PAPEL ALUM': {'WYDA', 'BRICOFLEX', 'KIKO'},
     'PAPEL': {'MELLO', 'WYDA', 'CHAMEQUINHO'},
     'SAND': {'HAV', 'HAVAIANAS'},
-    'MOLHO': {'BILLY JACK', 'KISABOR', 'HEINZ', 'HEMMER', 'KNORR', 'POMAROLA', 'PREDIL', 'PREDILECTA', 'QUERO', 'TARANTELLA', 'SALSARETTI', 'LIZA'},
+    'MOLHO': {'BILLY JACK', 'KISABOR', 'HEINZ', 'HEMMER', 'KNORR', 'POMAROLA', 'PREDIL', 'PREDILECTA', 'QUERO', 'FUGINI', 'TARANTELLA', 'SALSARETTI', 'LIZA'},
     'GELATINA': {'OETKER', 'DR OETKER', 'ROYAL', 'SOL', 'NEILAR'},
     'C.M': {'ALCAFOOD', 'KELLOGGS', 'NESTLE', 'NESCAU', 'NESTON', 'SUCRILHOS'},
     'BARRA': {'3 CORACOES', '3CORACOES'},
@@ -163,7 +171,7 @@ MARCAS_POR_CATEGORIA = {
     'BALA': {'HALLS', 'BUBBALOO', 'DORI'},
     'CAPSULA': {'PILAO', 'LOR', 'TRES', '3 CORACOES'},
     'CATUABA': {'RANDON', 'SELVAGEM'},
-    'CREME': {'KISABOR', 'CESIBON'},
+    'CREME': {'KISABOR', 'CESIBON', 'KNORR', 'MAGGI'},
     'ESC': {'MEDFIO', 'ORALB', 'COLGATE', 'CONDOR'},
     'KEEP': {'KEEP'},
     'LUVA': {'DANNY'},
@@ -417,10 +425,10 @@ inteligencia_marcas = {
             "JEQUITI":   "DEO COLONIA",
         }
 
-_CATS_FIXAS = {'MOSTARDA', 'CATCHUP', 'MAIONESE', 'AZEITE', 'OLEO',
+_CATS_FIXAS = {'MOSTARDA', 'CATCHUP', 'KETCHUP', 'MAIONESE', 'AZEITE', 'OLEO',
                'VINAGRE', 'REFRESCO', 'REFR', 'SUCO', 'ACHOC',
                'LEITE', 'CAFE', 'BISC', 'CHOC', 'TORRADA',
-               'MIST', 'FERMENTO', 'AVEIA', 'PAPEL', 'CALDO',
+               'MIST', 'FERMENTO', 'AVEIA', 'PAPEL', 'CALDO', 'EXTR',
                'GOIABADA', 'REPELENTE', 'DET', 'SH', 'COND',
                'SAB', 'DESOD', 'TOMATE', 'RACAO',
                'AMIDO', 'LIMP', 'ALCOOL', 'REMOVEDOR', 'ARROZ', 'FEIJAO'}
@@ -430,6 +438,11 @@ _MULTI_CATS = {
     'YPÊ': {'DET', 'LV LOUCA', 'DETERGENTE', 'SANIT', 'LIMP'},
     'MINUANO': {'DET', 'LV LOUCA', 'DETERGENTE', 'AMAC'},
     'CANDURA': {'DET', 'LV LOUCA', 'DETERGENTE', 'SANIT', 'LIMP', 'LAVA ROUPA'},
+}
+
+SABORES_CALDO = {
+    'BACON', 'CARNE', 'COSTELA', 'GALINHA', 'FRANGO', 'LEGUMES', 'PICANHA',
+    'CAMARAO', 'PEIXE', 'FEIJAO', 'COSTELINHA',
 }
 
 # ─────────────────────────────────────────────
@@ -525,12 +538,24 @@ def normalizar_nome(nome):
             (r'^MAT\s+INSET\b',                'INSET'),
             # ── Mistura de bolo → MIST BOLO ─────────────────────────────
             (r'^MISTURA\s+DE\s+BOLO\b',        'MIST BOLO'),
+            (r'^CREME\s+DE\s+CEBOLA\b',         'CREME CEBOLA'),
+            (r'^EXTRATO\s+DE\s+TOMATE\b',       'EXTR TOM'),
+            (r'^EXTRATO\s+TOMATE\b',            'EXTR TOM'),
+            (r'^EXTRATO\s+ELEFANTE\b',           'EXTR TOM ELEFANTE'),
+            (r'^EXTRATO\s+FUGINI\b',             'EXTR TOM FUGINI'),
+            (r'^EXTRATO\s+QUERO\b',              'EXTR TOM QUERO'),
+            (r'^EXTRATO\s+PREDILECTA\b',         'EXTR TOM PREDILECTA'),
+            (r'^EXTRATO\s+OLE\b',                'EXTR TOM OLE'),
+            (r'^EXTRATO\s+POMAROLA\b',           'EXTR TOM POMAROLA'),
+            (r'^EXTRATO\s+SALSARETTI\b',         'EXTR TOM SALSARETTI'),
+            (r'^EXTRATO\s+SALSERETTI\b',         'EXTR TOM SALSARETTI'),
             (r'^GELATINA\b',                   'GELATINA'),
             (r'^PILHA\b',                      'PIL'),
             (r'^BATERIA\b',                    'PIL'),
             (r'^CEREAL\s+MATINAL\b',           'C.M'),
             (r'^CEREAL\b',                     'C.M'),
             (r'^SALGADINHO\b',                 'SALG'),
+            (r'^SARDINHA\b',                    'SARD'),
             (r'^GUARDANAPO\b',                 'GUARD'),
             (r'^SACO\s+LIXO\b',                'SACO LIX'),
             (r'^LUVA\b',                       'LUVA'),
@@ -639,6 +664,9 @@ def normalizar_nome(nome):
         nome = nome.replace('KERO 1L', 'KERO COCO 1L')
         nome = nome.replace('KERO 200ML', 'KERO COCO 200ML')
         nome = nome.replace('SANGUE DE BOI', 'SANGUEDEBOI')
+        nome = nome.replace('SALSERETTI', 'SALSARETTI')
+        if nome.startswith('KETCHUP CONSUMO') or nome.startswith('CATCHUP CONSUMO'):
+            nome = nome.replace('CONSUMO', 'KONSUMO', 1)
         nome = re.sub(r'\bTPA\b', 'TRIPLA ACAO', nome)
         nome = re.sub(r'\b(AZEITE|OLEO(?:\s+COMPOSTO)?)\s+GALO\b', r'\1 GALLO', nome)
 
@@ -710,8 +738,13 @@ def normalizar_nome(nome):
         nome = re.sub(r'\bFEM\b', 'F', nome)
         nome = re.sub(r'\bMEN\b', 'M', nome)
         nome = nome.replace('/', ' ')
+        nome = nome.replace("S ADICAO DE ACUCAR", "SEMACUCAR")
+        nome = nome.replace("SEM ADICAO DE ACUCAR", "SEMACUCAR")
+        nome = nome.replace("S ACUCAR", "SEMACUCAR")
+        nome = nome.replace("SEM ACUCAR", "SEMACUCAR")
         nome = nome.replace("Q-BOA", "QBOA")
         nome = nome.replace("GOMES COSTA", "GCOSTA")
+        nome = nome.replace("GOMES DA COSTA", "GCOSTA")
         nome = nome.replace("PINHO SOL", "PINHOSOL")
         nome = nome.replace("PINHO BRIL", "PINHOBRIL")
         nome = nome.replace("PINHO TROP", "PINHOTROP")
@@ -967,7 +1000,7 @@ def _tolerancia_medida(nome1, nome2):
             return 0.85
         _estritas = (
             'MAIONESE', 'MAION', 'ACHOC', 'AZEITE', 'OLEO', 'PAPEL ALUM',
-            'TRIDENT', 'SH ', 'COND ', 'CR PENTE', 'SUSTAGEM',
+            'TRIDENT', 'SH ', 'COND ', 'CR PENTE', 'SUSTAGEM', 'EXTR TOM',
         )
         if any(cat in nome1 or cat in nome2 for cat in _estritas):
             return 0.95
@@ -992,6 +1025,188 @@ def _coco_ralado_flocos_incompativeis(nome1, nome2):
         flocos1 = bool(tokens1 & {'FLOCOS', 'FLOCOCO'})
         flocos2 = bool(tokens2 & {'FLOCOS', 'FLOCOCO'})
         return flocos1 != flocos2
+
+def _coco_ralado_sem_acucar_incompativel(nome1, nome2):
+        """Coco ralado sem acucar nao deve casar com versao comum."""
+        if 'COCO RAL' not in nome1 and 'COCO RAL' not in nome2:
+            return False
+        sem_acucar1 = 'SEMACUCAR' in nome1.split()
+        sem_acucar2 = 'SEMACUCAR' in nome2.split()
+        return sem_acucar1 != sem_acucar2
+
+def _extrato_tomate_incompativel(nome1, nome2):
+        """Extrato de tomate exige mesma marca, embalagem e variedade."""
+        if 'EXTR TOM' not in nome1 or 'EXTR TOM' not in nome2:
+            return False
+
+        tokens1 = set(nome1.split())
+        tokens2 = set(nome2.split())
+
+        marcas = MARCAS_POR_CATEGORIA.get('EXTR TOM', set())
+        marcas1 = tokens1 & marcas
+        marcas2 = tokens2 & marcas
+        if marcas1 and marcas2 and not marcas1.intersection(marcas2):
+            return True
+
+        medidas1 = _extrair_medidas(nome1)
+        medidas2 = _extrair_medidas(nome2)
+        if medidas1 and medidas2 and not medidas1.intersection(medidas2):
+            return True
+
+        def _embalagem(tokens):
+            if tokens & {'SACHE', 'SACHET', 'POUCH', 'SC'}:
+                return 'SACHE'
+            if tokens & {'POTE', 'PT'}:
+                return 'POTE'
+            return ''
+
+        emb1 = _embalagem(tokens1)
+        emb2 = _embalagem(tokens2)
+        if emb1 != emb2:
+            return True
+
+        def _variedade(tokens):
+            if 'CARNE' in tokens and 'PANELA' in tokens:
+                return 'CARNE_PANELA'
+            if ('CEB' in tokens or 'CEBOLA' in tokens) and 'ALHO' in tokens:
+                return 'CEB_ALHO'
+            if 'TRAD' in tokens or 'TRADICIONAL' in tokens:
+                return 'TRAD'
+            return 'TRAD'
+
+        return _variedade(tokens1) != _variedade(tokens2)
+
+def _ketchup_marca_incompativel(nome1, nome2):
+        """Ketchup com marca conhecida nao deve casar com outra marca ou generico."""
+        tokens1 = set(nome1.split())
+        tokens2 = set(nome2.split())
+        if 'KETCHUP' not in tokens1 or 'KETCHUP' not in tokens2:
+            return False
+
+        marcas = MARCAS_POR_CATEGORIA.get('KETCHUP', set())
+        marcas1 = tokens1 & marcas
+        marcas2 = tokens2 & marcas
+        if marcas1 and marcas2:
+            return not marcas1.intersection(marcas2)
+        return bool(marcas1 or marcas2)
+
+def _maionese_limao_incompativel(nome1, nome2):
+        """Maionese sabor limao nao deve casar com versao sem limao."""
+        tokens1 = set(nome1.split())
+        tokens2 = set(nome2.split())
+        maionese1 = bool(tokens1 & {'MAIONESE', 'MAION'})
+        maionese2 = bool(tokens2 & {'MAIONESE', 'MAION'})
+        if not (maionese1 and maionese2):
+            return False
+        return ('LIMAO' in tokens1) != ('LIMAO' in tokens2)
+
+def _molho_marca_variedade_incompativel(nome1, nome2):
+        """Molho de tomate exige mesma marca e mesma variedade principal."""
+        tokens1 = set(nome1.split())
+        tokens2 = set(nome2.split())
+        molho1 = 'MOLHO' in tokens1 or 'MOL TOM' in nome1
+        molho2 = 'MOLHO' in tokens2 or 'MOL TOM' in nome2
+        if not (molho1 and molho2):
+            return False
+
+        marcas = MARCAS_POR_CATEGORIA.get('MOLHO', set()) | MARCAS_POR_CATEGORIA.get('MOL TOM', set())
+        marcas1 = tokens1 & marcas
+        marcas2 = tokens2 & marcas
+        if marcas1 and marcas2 and not marcas1.intersection(marcas2):
+            return True
+        if bool(marcas1) != bool(marcas2):
+            return True
+
+        def _variedade(tokens):
+            if 'BOLONHESA' in tokens or 'BOLONHES' in tokens:
+                return 'BOLONHESA'
+            if 'PIZZA' in tokens:
+                return 'PIZZA'
+            if 'MANJERICAO' in tokens:
+                return 'MANJERICAO'
+            if 'PARMEGIANA' in tokens or 'PARM' in tokens:
+                return 'PARMEGIANA'
+            if 'TRAD' in tokens or 'TRADICIONAL' in tokens:
+                return 'TRAD'
+            return 'TRAD'
+
+        return _variedade(tokens1) != _variedade(tokens2)
+
+def _atum_sardinha_variante_incompativel(nome1, nome2):
+        """Atum/sardinha de sabores ou conservas diferentes nao compartilham preco."""
+        tokens1 = set(nome1.split())
+        tokens2 = set(nome2.split())
+        peixe1 = bool(tokens1 & {'ATUM', 'SARD'})
+        peixe2 = bool(tokens2 & {'ATUM', 'SARD'})
+        if not (peixe1 and peixe2):
+            return False
+
+        marcas = MARCAS_POR_CATEGORIA.get('ATUM', set()) | MARCAS_POR_CATEGORIA.get('SARD', set())
+        marcas1 = tokens1 & marcas
+        marcas2 = tokens2 & marcas
+        if marcas1 and marcas2 and not marcas1.intersection(marcas2):
+            return True
+
+        variantes = {'TOMATE', 'MOLHO', 'PICANTE', 'LIMAO', 'OLEO', 'DEFUMADO', 'NATURAL'}
+        var1 = tokens1 & variantes
+        var2 = tokens2 & variantes
+        if var1 and var2 and not var1.intersection(var2):
+            return True
+        return bool(var1) != bool(var2)
+
+def _conhecimento_produto_incompativel(nome1, nome2):
+        """
+        Trava conservadora baseada na base externa de conhecimento.
+
+        So bloqueia quando os dois lados foram reconhecidos com boa confianca
+        e existe conflito explicito de categoria, marca, sabor, fragrancia ou
+        linha. Se a base nao carregar, nao altera o comportamento antigo.
+        """
+        if _recognize_product is None:
+            return False
+        try:
+            p1 = _recognize_product(nome1)
+            p2 = _recognize_product(nome2)
+        except Exception:
+            return False
+
+        if p1.get("confianca", 0) < 0.7 or p2.get("confianca", 0) < 0.7:
+            return False
+
+        cat1 = p1.get("categoria")
+        cat2 = p2.get("categoria")
+        if cat1 and cat2 and cat1 != cat2 and p1.get("confianca", 0) >= 0.85 and p2.get("confianca", 0) >= 0.85:
+            return True
+
+        if not (cat1 and cat2 and cat1 == cat2):
+            return False
+
+        marca1 = p1.get("marca")
+        marca2 = p2.get("marca")
+        if marca1 and marca2 and marca1 != marca2:
+            return True
+
+        for campo in ("sabor", "fragrancia", "linha"):
+            valor1 = p1.get(campo)
+            valor2 = p2.get(campo)
+            if valor1 and valor2 and valor1 != valor2:
+                return True
+
+        return False
+
+def _sabores_caldo_incompativeis(nome1, nome2):
+        """Caldo de sabores diferentes nao deve compartilhar preco."""
+        tokens1 = set(re.findall(r'[A-Z]{3,}', nome1))
+        tokens2 = set(re.findall(r'[A-Z]{3,}', nome2))
+
+        caldo1 = 'CALDO' in tokens1 or bool(tokens1 & {'KNORR', 'MAGGI'} and tokens1 & SABORES_CALDO)
+        caldo2 = 'CALDO' in tokens2 or bool(tokens2 & {'KNORR', 'MAGGI'} and tokens2 & SABORES_CALDO)
+        if not (caldo1 and caldo2):
+            return False
+
+        sabores1 = tokens1 & SABORES_CALDO
+        sabores2 = tokens2 & SABORES_CALDO
+        return bool(sabores1 and sabores2 and sabores1 != sabores2)
 
 def nomes_incompativeis_v4(nome1, nome2):
         """
@@ -1297,6 +1512,31 @@ def nomes_incompativeis_v4(nome1, nome2):
         if _coco_ralado_flocos_incompativeis(nome1, nome2):
             return True
 
+        if _coco_ralado_sem_acucar_incompativel(nome1, nome2):
+            return True
+
+        if _extrato_tomate_incompativel(nome1, nome2):
+            return True
+
+        if _ketchup_marca_incompativel(nome1, nome2):
+            return True
+
+        if _maionese_limao_incompativel(nome1, nome2):
+            return True
+
+        if _molho_marca_variedade_incompativel(nome1, nome2):
+            return True
+
+        if _atum_sardinha_variante_incompativel(nome1, nome2):
+            return True
+
+        if _conhecimento_produto_incompativel(nome1, nome2):
+            return True
+
+        # 9b. TRAVA DE SABOR DE CALDO
+        if _sabores_caldo_incompativeis(nome1, nome2):
+            return True
+
         # 10. TRAVA ALCOOL COM FRAGRÂNCIA — fragrância ≠ sem fragrância (CLASSICO/TRAD)
         if 'ALCOOL' in nome1 and 'ALCOOL' in nome2:
             _FRAG_ALCOOL = {'EUCALIPTO', 'LAVANDA', 'MIMO', 'CITRONELA', 'CRAVO',
@@ -1415,6 +1655,30 @@ def _travas_leves(nome1, nome2):
             return True
 
         if _coco_ralado_flocos_incompativeis(nome1, nome2):
+            return True
+
+        if _coco_ralado_sem_acucar_incompativel(nome1, nome2):
+            return True
+
+        if _extrato_tomate_incompativel(nome1, nome2):
+            return True
+
+        if _ketchup_marca_incompativel(nome1, nome2):
+            return True
+
+        if _maionese_limao_incompativel(nome1, nome2):
+            return True
+
+        if _molho_marca_variedade_incompativel(nome1, nome2):
+            return True
+
+        if _atum_sardinha_variante_incompativel(nome1, nome2):
+            return True
+
+        if _conhecimento_produto_incompativel(nome1, nome2):
+            return True
+
+        if _sabores_caldo_incompativeis(nome1, nome2):
             return True
 
         # 1b. TRAVA DE ÁLCOOL — VODKA ≠ APERITIVO ≠ CACHAÇA ≠ AGUARDENTE ≠ CONHAQUE ≠ WHISKY
