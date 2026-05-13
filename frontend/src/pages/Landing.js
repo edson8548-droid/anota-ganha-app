@@ -1,18 +1,90 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
-import { FileSpreadsheet, ClipboardList, MessageCircle, BarChart3, Store } from 'lucide-react';
+import {
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
+  Clipboard,
+  ClipboardList,
+  FileSpreadsheet,
+  MessageCircle,
+  Send,
+  Sparkles,
+  Store
+} from 'lucide-react';
 import './Landing.css';
+
+const rcaSlides = [
+  {
+    step: '01',
+    icon: FileSpreadsheet,
+    title: 'Receba a lista do cliente',
+    text: 'Pegue a planilha, PDF ou lista de produtos do mercado e suba na Cotação Pronta para reduzir digitação e evitar preço errado.',
+    action: 'Abrir Cotação Pronta',
+    message: 'Me envie sua lista de compras ou cotação. Eu retorno com os preços organizados e as melhores opções para fechar seu pedido.'
+  },
+  {
+    step: '02',
+    icon: Store,
+    title: 'Monte uma vitrine de ofertas',
+    text: 'Escolha os itens com maior giro, coloque preço e foto, gere o link da vitrine e mande para o cliente pedir pelo WhatsApp.',
+    action: 'Criar Vitrine',
+    message: 'Separei uma vitrine com ofertas para sua loja. Acesse o link, escolha os itens e me chame aqui para finalizar o pedido.'
+  },
+  {
+    step: '03',
+    icon: MessageCircle,
+    title: 'Divulgue no WhatsApp',
+    text: 'Use uma mensagem curta, com oferta clara e chamada para resposta. Envie primeiro para clientes parados e depois para a carteira ativa.',
+    action: 'Enviar Divulgação',
+    message: 'Bom dia! Tenho condições especiais hoje em itens de alto giro. Quer que eu te envie a lista com fotos e preços?'
+  },
+  {
+    step: '04',
+    icon: BarChart3,
+    title: 'Acompanhe positivação',
+    text: 'Veja quais clientes compraram, quem ainda falta ativar e quais campanhas podem aumentar seu incentivo no mês.',
+    action: 'Ver Campanhas',
+    message: 'Estou fechando a campanha da semana e consigo montar um pedido enxuto para sua loja não ficar sem produto de giro.'
+  },
+  {
+    step: '05',
+    icon: Sparkles,
+    title: 'Use IA para vender melhor',
+    text: 'Transforme uma lista simples em oferta, argumento de venda, mensagem de recuperação ou roteiro para abordagem de cliente.',
+    action: 'Usar IA',
+    message: 'Tenho uma sugestão de mix para melhorar seu giro essa semana. Posso te mandar uma opção por categoria?'
+  }
+];
 
 const Landing = () => {
   const navigate = useNavigate();
   const { user } = useAuthContext();
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [copiedSlide, setCopiedSlide] = useState(null);
+  const currentSlide = rcaSlides[activeSlide];
+  const CurrentIcon = currentSlide.icon;
 
   const handleCTA = () => {
     if (user) {
       navigate('/dashboard');
     } else {
       navigate('/login');
+    }
+  };
+
+  const goToSlide = index => {
+    setActiveSlide((index + rcaSlides.length) % rcaSlides.length);
+    setCopiedSlide(null);
+  };
+
+  const copySlideMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(currentSlide.message);
+      setCopiedSlide(activeSlide);
+    } catch {
+      setCopiedSlide(null);
     }
   };
 
@@ -120,6 +192,68 @@ const Landing = () => {
             <h3>Carteira no WhatsApp</h3>
             <p>Monte sua oferta uma vez e envie para todos os seus clientes pelo WhatsApp Web com mensagens personalizadas e fotos dos produtos.</p>
           </div>
+        </div>
+      </section>
+
+      <section className="landing-rca-guide">
+        <div className="landing-rca-heading">
+          <span className="landing-video-badge"><Send size={16} /> Roteiro para RCA</span>
+          <h2>Use o Venpro como uma rotina diária de venda</h2>
+          <p>Um passo a passo simples para transformar cotação, vitrine, WhatsApp e campanhas em pedido fechado.</p>
+        </div>
+
+        <div className="landing-rca-slider" aria-live="polite">
+          <button
+            className="landing-rca-arrow"
+            type="button"
+            onClick={() => goToSlide(activeSlide - 1)}
+            aria-label="Passo anterior"
+            title="Passo anterior"
+          >
+            <ChevronLeft size={22} />
+          </button>
+
+          <article className="landing-rca-slide">
+            <div className="landing-rca-slide-top">
+              <span className="landing-rca-step">{currentSlide.step}</span>
+              <div className="landing-rca-icon"><CurrentIcon size={28} /></div>
+            </div>
+            <h3>{currentSlide.title}</h3>
+            <p>{currentSlide.text}</p>
+            <div className="landing-rca-message">
+              <span>Mensagem pronta</span>
+              <p>{currentSlide.message}</p>
+              <button type="button" onClick={copySlideMessage}>
+                <Clipboard size={16} />
+                {copiedSlide === activeSlide ? 'Copiado' : 'Copiar'}
+              </button>
+            </div>
+            <button className="landing-btn-cta" type="button" onClick={handleCTA}>
+              {currentSlide.action}
+            </button>
+          </article>
+
+          <button
+            className="landing-rca-arrow"
+            type="button"
+            onClick={() => goToSlide(activeSlide + 1)}
+            aria-label="Próximo passo"
+            title="Próximo passo"
+          >
+            <ChevronRight size={22} />
+          </button>
+        </div>
+
+        <div className="landing-rca-dots" role="tablist" aria-label="Passos do roteiro">
+          {rcaSlides.map((slide, index) => (
+            <button
+              key={slide.step}
+              type="button"
+              className={index === activeSlide ? 'active' : ''}
+              onClick={() => goToSlide(index)}
+              aria-label={`Ver passo ${slide.step}`}
+            />
+          ))}
         </div>
       </section>
 
