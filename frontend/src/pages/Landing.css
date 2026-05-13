@@ -573,6 +573,12 @@
   object-fit: cover;
 }
 
+.landing-video-frame.demo-square video {
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  background: #101418;
+}
+
 /* CTA Bottom */
 .landing-cta-bottom {
   text-align: center;

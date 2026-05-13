@@ -259,22 +259,19 @@ const Landing = () => {
 
       <section className="landing-video-section">
         <div className="landing-video-copy">
-          <span className="landing-video-badge"><Store size={16} /> Vitrine Inteligente</span>
-          <h2>Monte ofertas com foto e envie o link para o cliente pedir pelo WhatsApp</h2>
+          <span className="landing-video-badge"><Store size={16} /> Veja o Venpro em ação</span>
+          <h2>Cotação, vitrine e WhatsApp trabalhando juntos</h2>
           <p>
-            Cole sua lista de produtos, revise as fotos, gere uma vitrine profissional e mande o
-            link para seus clientes. O pedido volta pronto para o RCA continuar no WhatsApp.
+            Suba a tabela de preços, receba a cotação preenchida, monte ofertas com imagens e
+            envie para o cliente pelo WhatsApp em poucos minutos.
           </p>
           <button className="landing-btn-cta" onClick={handleCTA}>
-            Criar minha vitrine
+            Testar o Venpro grátis
           </button>
         </div>
-        <div className="landing-video-frame">
+        <div className="landing-video-frame demo-square">
           <video
-            src="/videos/venpro-vitrine-inteligente-curto.mp4"
-            autoPlay
-            muted
-            loop
+            src="/videos/venpro-demo-ferramentas-whatsapp-instagram.mp4"
             playsInline
             controls
             preload="metadata"
