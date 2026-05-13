@@ -78,6 +78,12 @@ a { text-decoration: none; color: inherit; }
   flex-shrink:0;
 }
 .logo-mark.small { width:32px; height:32px; }
+.logo-full {
+  width:150px;
+  height:auto;
+  display:block;
+}
+.logo-full.small { width:118px; }
 .logo-text { font-size:24px; font-weight:800; letter-spacing:-0.5px; }
 .logo-ven { color: var(--texto); }
 .logo-pro { color: var(--acento); }
@@ -158,6 +164,12 @@ nav {
   font-weight:800;
   letter-spacing:2.6px;
   text-transform:uppercase;
+}
+.hero-brand img.hero-logo-full {
+  width:min(340px, 88vw);
+  height:auto;
+  display:block;
+  filter: drop-shadow(0 10px 24px rgba(0,0,0,.28));
 }
 .hero-tag {
   display:inline-flex; align-items:center; gap:8px;
@@ -529,6 +541,7 @@ footer {
   .nav-links { display:none; }
   .hero { padding:60px 5% 48px; }
   .hero-brand img { width:58px; height:58px; }
+  .hero-brand .hero-logo-full { width:min(280px, 86vw); height:auto; }
   .hero-brand-name { font-size:30px; }
   .hero-brand-line { font-size:10px; letter-spacing:1.8px; }
   .pain-grid { grid-template-columns:1fr; }
@@ -546,8 +559,7 @@ footer {
 <!-- ── NAV ── -->
 <nav>
   <div class="logo-wrap">
-    <img class="logo-mark" src="/assets/logo/venpro-logo-icon-transparent.png" alt="Venpro">
-    <div class="logo-text">Venpro</div>
+    <img class="logo-full" src="/assets/logo/venpro-logo.svg" alt="Venpro">
   </div>
   <div class="nav-links">
     <a href="#recursos">Recursos</a>
@@ -564,11 +576,7 @@ footer {
 <section class="hero">
   <div class="hero-left">
     <div class="hero-brand">
-      <img src="/assets/logo/venpro-logo-icon-transparent.png" alt="Venpro">
-      <div>
-        <div class="hero-brand-name">Venpro</div>
-        <div class="hero-brand-line">Mais vendas. Mais resultados.</div>
-      </div>
+      <img class="hero-logo-full" src="/assets/logo/venpro-logo.svg" alt="Venpro">
     </div>
     <div class="hero-tag">Resultado real</div>
     <h1>Veja o sistema<br>em <em>operação.</em></h1>
@@ -1107,8 +1115,7 @@ footer {
 <!-- ── FOOTER ── -->
 <footer>
   <div class="logo-wrap">
-    <img class="logo-mark small" src="/assets/logo/venpro-logo-icon-transparent.png" alt="Venpro">
-    <div class="logo-text" style="font-size:17px">Venpro</div>
+    <img class="logo-full small" src="/assets/logo/venpro-logo.svg" alt="Venpro">
   </div>
   <div class="ft-links">
     <a href="#">Política de Privacidade</a>

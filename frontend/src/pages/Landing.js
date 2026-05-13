@@ -93,8 +93,7 @@ const Landing = () => {
       {/* Navbar */}
       <nav className="landing-nav">
         <div className="landing-nav-logo">
-          <img src="/assets/logo/venpro-logo-icon-transparent.png" alt="Venpro" />
-          <span className="landing-nav-word">Venpro</span>
+          <img src="/assets/logo/venpro-logo.svg" alt="Venpro" />
         </div>
         <div className="landing-nav-actions">
           {user ? (
@@ -111,11 +110,7 @@ const Landing = () => {
       {/* Hero */}
       <section className="landing-hero">
         <div className="landing-hero-brand">
-          <img src="/assets/logo/venpro-logo-icon-transparent.png" alt="Venpro" />
-          <div>
-            <div className="landing-hero-brand-name">Venpro</div>
-            <div className="landing-hero-brand-line">Mais vendas. Mais resultados.</div>
-          </div>
+          <img src="/assets/logo/venpro-logo.svg" alt="Venpro" />
         </div>
         <span className="landing-hero-badge">Ferramentas para Representantes Comerciais</span>
         <h1>
