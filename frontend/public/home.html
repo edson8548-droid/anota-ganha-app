@@ -41,10 +41,12 @@ a { text-decoration: none; color: inherit; }
 .sec-wrap.alt .sec-h,
 .feat-card .feat-h, .feat-card .feat-desc,
 .plano .plano-nome, .plano .plano-preco,
-.faq-q, .ia-caso .ia-caso-h { color: var(--texto-c); }
+.faq-q, .ia-caso .ia-caso-h,
+.avalie-banner, .cta-box { color: var(--texto-c); }
 .sec-wrap.alt .sec-sub,
 .feat-card .feat-desc, .ia-caso .ia-caso-p,
-.faq-a, .plano .plano-sub { color: var(--sub-c); }
+.faq-a, .plano .plano-sub,
+.avalie-left p, .cta-box p, .cta-note { color: var(--sub-c); }
 .sec-wrap.alt .feat-card,
 .sec-wrap.alt .plano,
 .sec-wrap.alt .ia-caso { border-color: var(--borda-c); }
@@ -349,7 +351,8 @@ table.mt tr:hover td { background:rgba(0,0,0,.02); }
   margin-bottom:12px;
 }
 .proof-title { font-size:25px; font-weight:900; line-height:1.25; margin-bottom:12px; }
-.proof-sub { color:var(--sub); font-size:15px; line-height:1.7; max-width:620px; margin-bottom:22px; }
+.proof-title { color:#f4f7fa; }
+.proof-sub { color:#c7cbd1; font-size:15px; line-height:1.7; max-width:620px; margin-bottom:22px; }
 .proof-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; max-width:560px; }
 .proof-metric {
   background:rgba(255,255,255,.025);
@@ -358,7 +361,7 @@ table.mt tr:hover td { background:rgba(0,0,0,.02); }
   padding:14px 16px;
 }
 .proof-metric b { display:block; color:var(--texto); font-size:20px; line-height:1; margin-bottom:6px; }
-.proof-metric span { display:block; color:var(--sub2); font-size:12px; line-height:1.45; }
+.proof-metric span { display:block; color:#b9bec6; font-size:12px; line-height:1.45; }
 .proof-phone {
   width:100%;
   max-width:330px;
@@ -378,7 +381,7 @@ table.mt tr:hover td { background:rgba(0,0,0,.02); }
   object-position:top center;
   border-radius:16px;
 }
-.proof-note { color:var(--sub2); font-size:12px; margin-top:14px; }
+.proof-note { color:#aeb4bd; font-size:12px; margin-top:14px; }
 .proof-thumbs { display:flex; gap:8px; margin-top:12px; }
 .proof-thumb {
   width:52px;
@@ -484,7 +487,7 @@ table.mt tr:hover td { background:rgba(0,0,0,.02); }
 /* ══ CTA FINAL ══ */
 .cta-box {
   max-width:720px; margin:0 auto;
-  background:var(--bg2); border:1px solid var(--borda);
+  background:var(--bg2); border:1px solid var(--borda-c);
   border-radius:20px; padding:64px 48px; text-align:center;
   position:relative; overflow:hidden;
 }
@@ -495,8 +498,8 @@ table.mt tr:hover td { background:rgba(0,0,0,.02); }
   background:radial-gradient(ellipse, rgba(49,112,142,.06), transparent 70%);
   pointer-events:none;
 }
-.cta-box h2 { font-size:clamp(28px,4vw,42px); font-weight:900; margin-bottom:14px; position:relative; }
-.cta-box p { color:var(--sub); font-size:17px; line-height:1.65; margin-bottom:36px; position:relative; }
+.cta-box h2 { color:var(--texto-c); font-size:clamp(28px,4vw,42px); font-weight:900; margin-bottom:14px; position:relative; }
+.cta-box p { color:var(--sub-c); font-size:17px; line-height:1.65; margin-bottom:36px; position:relative; }
 .btn-cta {
   background:var(--acento); color:#fff; border:none;
   border-radius:11px; padding:18px 48px;
@@ -506,7 +509,7 @@ table.mt tr:hover td { background:rgba(0,0,0,.02); }
   position:relative;
 }
 .btn-cta:hover { background:var(--acento2); transform:translateY(-2px); box-shadow: inset 0 0 0 999px rgba(90,168,200,.10), 0 8px 26px rgba(58,133,168,.28); }
-.cta-note { color:var(--sub2); font-size:13px; margin-top:16px; position:relative; }
+.cta-note { color:var(--sub-c); font-size:13px; margin-top:16px; position:relative; }
 
 /* ══ GLOW DIVIDER ══ */
 .glow-div { height:1px; background:linear-gradient(90deg,transparent,rgba(49,112,142,.25),transparent); }
@@ -530,6 +533,7 @@ footer {
   .hero-brand-line { font-size:10px; letter-spacing:1.8px; }
   .pain-grid { grid-template-columns:1fr; }
   .video-demo { grid-template-columns:1fr; gap:28px; }
+  .whatsapp-video-frame { display:none; }
   .proof-panel { grid-template-columns:1fr; padding:22px; }
   .proof-metrics { grid-template-columns:1fr; }
   .proof-phone { margin:0; max-width:100%; }
@@ -726,7 +730,7 @@ footer {
     <p class="sec-p">Configure contatos, mensagem e imagens no Venpro. Depois a extensão abre o WhatsApp Web, envia a campanha e acompanha o progresso do envio.</p>
     <button class="btn-pri" onclick="window.location.href='/register'">Testar a Carteira no WhatsApp</button>
   </div>
-  <div class="video-frame">
+  <div class="video-frame whatsapp-video-frame">
     <video src="/videos/venpro-whatsapp-disparador.mp4" autoplay muted loop playsinline controls preload="metadata"></video>
   </div>
 </div>
@@ -1007,25 +1011,25 @@ footer {
   border-radius: 14px; padding: 28px;
   display: flex; flex-direction:column; align-items:center; justify-content:center;
   text-align:center; gap:12px; min-height:170px;
-  opacity:.55;
+  opacity:.72;
 }
-.dep-vaga-ico { font-size:28px; color:var(--borda2); }
-.dep-vaga-txt { font-size:13px; color:var(--sub2); line-height:1.55; }
+.dep-vaga-ico { font-size:28px; color:#8a9099; }
+.dep-vaga-txt { font-size:13px; color:#b7bcc4; line-height:1.55; }
 .dep-vaga-badge {
-  font-size:11px; color:var(--sub2);
+  font-size:11px; color:#d6dae0;
   background:var(--bg3); border:1px solid var(--borda);
   padding:4px 12px; border-radius:20px; font-weight:600;
 }
 .avalie-banner {
   margin-top:40px;
-  background:var(--bg2); border:1px solid var(--borda);
+  background:var(--bg2); border:1px solid var(--borda-c);
   border-radius:16px; padding:32px 36px;
   display:flex; align-items:center; justify-content:space-between;
   gap:24px; flex-wrap:wrap;
 }
 .avalie-left { flex:1; min-width:220px; }
-.avalie-left h3 { font-size:18px; font-weight:800; margin-bottom:6px; }
-.avalie-left p { font-size:14px; color:var(--sub); line-height:1.6; }
+.avalie-left h3 { color:var(--texto-c); font-size:18px; font-weight:800; margin-bottom:6px; }
+.avalie-left p { font-size:14px; color:var(--sub-c); line-height:1.6; }
 </style>
 <div class="sec-wrap">
 <div class="sec-inner">
