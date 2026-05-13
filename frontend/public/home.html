@@ -324,6 +324,10 @@ table.mt tr:hover td { background:rgba(0,0,0,.02); }
   object-fit:cover;
   background:#101418;
 }
+.video-frame.demo-square video {
+  aspect-ratio:1/1;
+  object-fit:contain;
+}
 .proof-wrap { margin-top:46px; }
 .proof-panel {
   background:linear-gradient(145deg, rgba(18,24,27,.88), rgba(35,38,43,.78));
@@ -698,17 +702,17 @@ footer {
 </div>
 </div>
 
-<!-- ── VITRINE VIDEO ── -->
+<!-- ── DEMO VIDEO ── -->
 <div class="sec-wrap" id="vitrine-demo">
 <div class="sec-inner video-demo">
   <div class="video-copy">
-    <div class="sec-lbl">Vitrine Inteligente</div>
-    <h2 class="sec-h">Do produto ao pedido no WhatsApp.</h2>
-    <p class="sec-p">Cole a lista, revise fotos e preços, gere o link e receba o pedido pronto no seu WhatsApp. Menos digitação, mais venda.</p>
-    <button class="btn-pri" onclick="window.location.href='/register'">Criar minha vitrine</button>
+    <div class="sec-lbl">Veja o Venpro em ação</div>
+    <h2 class="sec-h">Cotação, vitrine e WhatsApp trabalhando juntos.</h2>
+    <p class="sec-p">Suba a tabela de preços, receba a cotação preenchida, monte ofertas com imagens e envie para o cliente pelo WhatsApp em poucos minutos.</p>
+    <button class="btn-pri" onclick="window.location.href='/register'">Testar o Venpro grátis</button>
   </div>
-  <div class="video-frame">
-    <video src="/videos/venpro-vitrine-inteligente-curto.mp4" autoplay muted loop playsinline controls preload="metadata"></video>
+  <div class="video-frame demo-square">
+    <video src="/videos/venpro-demo-ferramentas-whatsapp-instagram.mp4" playsinline controls preload="metadata"></video>
   </div>
 </div>
 </div>
