@@ -10,8 +10,8 @@ RATE = "+12%"
 VOLUME = "+0%"
 
 TEXTS = [
-    "RCA, você ainda perde tempo montando cotação na mão? Com o Venpro, você transforma lista, oferta e WhatsApp em pedido fechado, com muito mais agilidade.",
-    "Primeiro passo: receba a lista do cliente. Pode ser planilha, PDF ou mensagem. Suba no Venpro e deixe a Cotação Pronta organizar os produtos para você.",
+    "RCA, suba a sua tabela de preço. Depois pegue a tabela de cotação do seu cliente e veja a mágica acontecer em segundos. Um trabalho que levaria horas acontece em minutos.",
+    "A Cotação Pronta cruza os produtos, organiza as informações e ajuda você a responder o cliente com muito mais agilidade.",
     "Segundo passo: monte sua vitrine de ofertas. Escolha os produtos de maior giro, coloque fotos, preços e envie um link profissional para o cliente comprar pelo WhatsApp.",
     "Terceiro passo: divulgue no WhatsApp. Use mensagens curtas, ofertas claras e fale primeiro com clientes parados. O Venpro ajuda você a vender sem perder tempo.",
     "Quarto passo: acompanhe campanhas e positivação. Veja oportunidades, recupere clientes e aumente seus resultados. Venpro: mais vendas, mais resultados.",

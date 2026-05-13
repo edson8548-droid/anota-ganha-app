@@ -39,7 +39,6 @@ def run(command):
 
 
 def make_segment(slide):
-    duration = 20
     run([
         FFMPEG,
         "-y",
@@ -47,13 +46,13 @@ def make_segment(slide):
         "-framerate", "30",
         "-i", str(slide["image"]),
         "-i", str(slide["audio"]),
-        "-t", f"{duration:.2f}",
         "-vf", "scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
         "-c:v", "libx264",
         "-preset", "medium",
         "-crf", "20",
         "-c:a", "aac",
         "-b:a", "160k",
+        "-ar", "44100",
         "-shortest",
         str(slide["segment"]),
     ])
@@ -71,7 +70,12 @@ def concat_segments(output):
         "-f", "concat",
         "-safe", "0",
         "-i", str(list_file),
-        "-c", "copy",
+        "-c:v", "libx264",
+        "-preset", "medium",
+        "-crf", "20",
+        "-c:a", "aac",
+        "-b:a", "160k",
+        "-ar", "44100",
         str(output),
     ])
 
