@@ -1,0 +1,277 @@
+{
+  "version": 1,
+  "updated_at": "2026-05-13",
+  "sources": [
+    {
+      "id": "mondelez_tang_global",
+      "type": "official_brand",
+      "url": "https://www.mondelezinternational.com/our-brands/tang/index.html",
+      "note": "Tang is Mondelez's powdered beverage brand; page confirms powdered fruit-flavored drink positioning."
+    },
+    {
+      "id": "pao_tang_laranja_18g",
+      "type": "retailer",
+      "url": "https://www.paodeacucar.com/produto/1433063/refresco-em-po-tang-laranja-18g",
+      "note": "Pao de Acucar listing confirms Tang, sabor Laranja, peso liquido 18g."
+    },
+    {
+      "id": "pao_tang_uva_18g",
+      "type": "retailer",
+      "url": "https://www.paodeacucar.com/produto/1433068/refresco-em-po-uva-tang-pacote-18g",
+      "note": "Pao de Acucar listing confirms Tang, sabor Uva, 18g."
+    },
+    {
+      "id": "pao_tang_morango_18g",
+      "type": "retailer",
+      "url": "https://www.paodeacucar.com/produto/1433072/refresco-em-po-morango-tang-pacote-18g",
+      "note": "Pao de Acucar listing confirms Tang, sabor Morango, 18g."
+    },
+    {
+      "id": "pao_tang_maracuja_18g",
+      "type": "retailer",
+      "url": "https://www.paodeacucar.com/produto/1433061/refresco-em-po-maracuja-tang-pacote-18g",
+      "note": "Pao de Acucar listing confirms Tang, sabor Maracuja, 18g."
+    },
+    {
+      "id": "ype_desinfetante_pinho_lavanda",
+      "type": "official_brand",
+      "url": "https://www.ype.ind.br/produtos/desinfetante-ype-pinho-lavanda",
+      "note": "Ype official page confirms Desinfetante Ype Pinho Lavanda in 500ml, 1L and 2L."
+    },
+    {
+      "id": "ype_desinfetante_bak_lavanda",
+      "type": "official_brand",
+      "url": "https://www.ype.ind.br/produtos/desinfetante-bak-ype-lavanda",
+      "note": "Ype official page confirms BAK Lavanda and 500ml, 1L, 2L, 5L presentations."
+    },
+    {
+      "id": "ype_detergente_atol_neutro",
+      "type": "official_brand",
+      "url": "https://www.ype.ind.br/produtos/detergente-atol-neutro",
+      "note": "Ype official page confirms Detergente Atol Neutro in 500ml, 2L, 5L."
+    },
+    {
+      "id": "ype_amaciante_concentrado_delicado",
+      "type": "official_brand",
+      "url": "https://www.ype.ind.br/produtos/amaciante-concentrado-ype-delicado",
+      "note": "Ype official page confirms Amaciante Concentrado Delicado in 500ml, 900ml, 1L, 1.5L."
+    },
+    {
+      "id": "comfort_lavanda",
+      "type": "official_brand",
+      "url": "https://www.comfort.com.br/products/catalog/amaciante-lavanda.html",
+      "note": "Comfort official page confirms Amaciante Concentrado Comfort Lavanda and 500ml description."
+    },
+    {
+      "id": "casa_km_casa_perfume",
+      "type": "official_brand",
+      "url": "https://www.casakm.com.br/casa---perfume-limpador-perfumado-sensazione-1l/p",
+      "note": "Casa K&M official store confirms Casa & Perfume limpador perfumado, aroma Sensazione, 1L."
+    },
+    {
+      "id": "lepok_veja_lavanda_500ml",
+      "type": "retailer",
+      "url": "https://www.lepok.com.br/produto/Veja-Multiuso-Lavanda-E-Alcool-500ml/12868",
+      "note": "Retailer listing confirms Veja Multiuso Lavanda 500ml by Reckitt."
+    }
+  ],
+  "categories": [
+    {
+      "id": "refresco_po",
+      "categoria": "refresco em po",
+      "subcategoria": "bebida em po",
+      "aliases": ["ref po", "refresco po", "refresco em po", "suco po", "po refresco", "refr po"],
+      "negative_keywords": ["suco pronto", "nectar", "gelatina"],
+      "brands": [
+        {
+          "marca": "Tang",
+          "aliases": ["tang", "tangue"],
+          "erros_comuns": ["tanq", "tangg"],
+          "linhas": [],
+          "sabores": [
+            {"nome": "laranja", "aliases": ["lar"], "confidence": "high", "sources": ["pao_tang_laranja_18g"]},
+            {"nome": "uva", "aliases": [], "confidence": "high", "sources": ["pao_tang_uva_18g"]},
+            {"nome": "morango", "aliases": ["morang"], "confidence": "high", "sources": ["pao_tang_morango_18g"]},
+            {"nome": "maracuja", "aliases": ["marac"], "confidence": "high", "sources": ["pao_tang_maracuja_18g"]},
+            {"nome": "limao", "aliases": ["lim"], "confidence": "medium", "sources": ["pao_tang_uva_18g"]}
+          ],
+          "apresentacoes": ["18g"],
+          "positive_keywords": ["refresco", "po", "bebida em po"],
+          "negative_keywords": ["suco pronto"],
+          "confidence": "high",
+          "sources": ["mondelez_tang_global", "pao_tang_laranja_18g", "pao_tang_uva_18g", "pao_tang_morango_18g", "pao_tang_maracuja_18g"]
+        }
+      ]
+    },
+    {
+      "id": "limpador_perfumado",
+      "categoria": "limpador perfumado",
+      "subcategoria": "limpeza da casa",
+      "aliases": ["limp casa perfume", "limpador perfumado", "casa perfume", "casa e perfume", "casa & perfume"],
+      "negative_keywords": ["desinfetante", "amaciante"],
+      "brands": [
+        {
+          "marca": "Casa & Perfume",
+          "aliases": ["casa perfume", "casa e perfume", "casa&perfume", "casa & perfume"],
+          "erros_comuns": [],
+          "linhas": ["Sensazione", "Passione", "Agradable", "Bela Flore", "Sensualidad", "Cha Branco"],
+          "fragrancias": [
+            {"nome": "sensazione", "aliases": [], "confidence": "high", "sources": ["casa_km_casa_perfume"]},
+            {"nome": "passione", "aliases": [], "confidence": "high", "sources": ["casa_km_casa_perfume"]},
+            {"nome": "agradable", "aliases": [], "confidence": "high", "sources": ["casa_km_casa_perfume"]},
+            {"nome": "bela flore", "aliases": ["bela flor"], "confidence": "high", "sources": ["casa_km_casa_perfume"]},
+            {"nome": "cha branco", "aliases": ["cha bco"], "confidence": "high", "sources": ["casa_km_casa_perfume"]}
+          ],
+          "apresentacoes": ["1l"],
+          "positive_keywords": ["limpador", "perfumado", "perfume"],
+          "negative_keywords": ["amaciante"],
+          "confidence": "high",
+          "sources": ["casa_km_casa_perfume"]
+        }
+      ],
+      "generic_fragrancias": ["lavanda", "floral", "pinho", "eucalipto", "limao", "citronela", "talco", "erva doce", "jasmim", "bambu", "algodao", "baunilha"]
+    },
+    {
+      "id": "desinfetante",
+      "categoria": "desinfetante",
+      "subcategoria": "limpeza da casa",
+      "aliases": ["desinf", "desinfetante", "pinho"],
+      "negative_keywords": ["limpador perfumado", "amaciante"],
+      "brands": [
+        {
+          "marca": "Ype",
+          "aliases": ["ype", "ypê"],
+          "erros_comuns": [],
+          "linhas": ["Pinho", "BAK"],
+          "fragrancias": [
+            {"nome": "lavanda", "aliases": [], "confidence": "high", "sources": ["ype_desinfetante_pinho_lavanda", "ype_desinfetante_bak_lavanda"]},
+            {"nome": "pinho", "aliases": [], "confidence": "high", "sources": ["ype_desinfetante_pinho_lavanda"]},
+            {"nome": "eucalipto", "aliases": ["eucal"], "confidence": "medium", "sources": ["ype_desinfetante_bak_lavanda"]},
+            {"nome": "floral", "aliases": [], "confidence": "medium", "sources": ["ype_desinfetante_bak_lavanda"]}
+          ],
+          "apresentacoes": ["500ml", "1l", "2l", "5l"],
+          "positive_keywords": ["desinfetante", "desinf", "pinho"],
+          "negative_keywords": [],
+          "confidence": "high",
+          "sources": ["ype_desinfetante_pinho_lavanda", "ype_desinfetante_bak_lavanda"]
+        }
+      ],
+      "generic_fragrancias": ["pinho", "lavanda", "eucalipto", "floral", "citronela", "limao"]
+    },
+    {
+      "id": "detergente",
+      "categoria": "detergente",
+      "subcategoria": "limpeza da cozinha",
+      "aliases": ["detergente", "det", "lava loucas", "lava louca"],
+      "negative_keywords": ["lava roupa"],
+      "brands": [
+        {
+          "marca": "Ype",
+          "aliases": ["ype", "ypê"],
+          "erros_comuns": [],
+          "linhas": ["Atol"],
+          "fragrancias": [],
+          "sabores": [],
+          "versoes": ["neutro"],
+          "apresentacoes": ["500ml", "2l", "5l"],
+          "positive_keywords": ["detergente", "neutro"],
+          "negative_keywords": ["lava roupa"],
+          "confidence": "high",
+          "sources": ["ype_detergente_atol_neutro"]
+        }
+      ]
+    },
+    {
+      "id": "amaciante",
+      "categoria": "amaciante",
+      "subcategoria": "lavanderia",
+      "aliases": ["amaciante", "amac", "suavizante"],
+      "negative_keywords": ["detergente", "desinfetante"],
+      "brands": [
+        {
+          "marca": "Ype",
+          "aliases": ["ype", "ypê"],
+          "erros_comuns": [],
+          "linhas": ["Concentrado", "Delicado", "Brisa Lilas", "Encanto das Flores", "Alquimia"],
+          "fragrancias": [
+            {"nome": "delicado", "aliases": [], "confidence": "high", "sources": ["ype_amaciante_concentrado_delicado"]},
+            {"nome": "brisa lilas", "aliases": ["lilas"], "confidence": "high", "sources": ["ype_amaciante_concentrado_delicado"]},
+            {"nome": "encanto das flores", "aliases": ["flores"], "confidence": "high", "sources": ["ype_amaciante_concentrado_delicado"]}
+          ],
+          "apresentacoes": ["500ml", "900ml", "1l", "1.5l"],
+          "positive_keywords": ["amaciante", "concentrado"],
+          "negative_keywords": [],
+          "confidence": "high",
+          "sources": ["ype_amaciante_concentrado_delicado"]
+        },
+        {
+          "marca": "Comfort",
+          "aliases": ["comfort"],
+          "erros_comuns": [],
+          "linhas": ["Concentrado"],
+          "fragrancias": [
+            {"nome": "lavanda", "aliases": [], "confidence": "high", "sources": ["comfort_lavanda"]}
+          ],
+          "apresentacoes": ["500ml"],
+          "positive_keywords": ["amaciante", "concentrado"],
+          "negative_keywords": [],
+          "confidence": "high",
+          "sources": ["comfort_lavanda"]
+        }
+      ],
+      "generic_fragrancias": ["lavanda", "floral", "algodao", "talco", "bebe", "lilas", "flores"]
+    },
+    {
+      "id": "limpador_multiuso",
+      "categoria": "limpador multiuso",
+      "subcategoria": "limpeza da casa",
+      "aliases": ["multiuso", "limpador multiuso", "limp multiuso", "limpador"],
+      "negative_keywords": ["desinfetante", "amaciante"],
+      "brands": [
+        {
+          "marca": "Veja",
+          "aliases": ["veja"],
+          "erros_comuns": [],
+          "linhas": ["Multiuso"],
+          "fragrancias": [
+            {"nome": "lavanda", "aliases": [], "confidence": "medium", "sources": ["lepok_veja_lavanda_500ml"]}
+          ],
+          "apresentacoes": ["500ml"],
+          "positive_keywords": ["multiuso", "limpador"],
+          "negative_keywords": [],
+          "confidence": "medium",
+          "sources": ["lepok_veja_lavanda_500ml"]
+        }
+      ],
+      "generic_fragrancias": ["lavanda", "floral", "limao", "alcool"]
+    }
+  ],
+  "normalization": {
+    "unit_aliases": {
+      "litro": "l",
+      "litros": "l",
+      "lt": "l",
+      "lts": "l",
+      "ml": "ml",
+      "g": "g",
+      "gr": "g",
+      "grama": "g",
+      "gramas": "g",
+      "kg": "kg"
+    },
+    "package_aliases": {
+      "pct": "pacote",
+      "pc": "pacote",
+      "un": "unidade",
+      "und": "unidade",
+      "cx": "caixa"
+    },
+    "attribute_aliases": {
+      "frag": "fragrancia",
+      "fragr": "fragrancia",
+      "aroma": "fragrancia",
+      "perfume": "fragrancia",
+      "cheiro": "fragrancia"
+    }
+  }
+}
