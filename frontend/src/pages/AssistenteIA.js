@@ -136,6 +136,7 @@ export default function AssistenteIA() {
   const [gerandoTabela, setGerandoTabela] = useState(false);
   const [tabelaSucesso, setTabelaSucesso] = useState(false);
   const [gerandoSeg, setGerandoSeg] = useState(0);
+  const [tabelaProgress, setTabelaProgress] = useState(null);
   const tabelaInputRef = useRef(null);
   const timerRef = useRef(null);
   const abortTabelaRef = useRef(null);
@@ -158,6 +159,7 @@ export default function AssistenteIA() {
     setGerandoTabela(true);
     setTabelaSucesso(false);
     setGerandoSeg(0);
+    setTabelaProgress(null);
     tabelaJobIdRef.current = null;
     canceladoPeloUsuarioRef.current = false;
     abortTabelaRef.current = new AbortController();
@@ -170,6 +172,7 @@ export default function AssistenteIA() {
         {
           signal: abortTabelaRef.current.signal,
           onJobId: (jobId) => { tabelaJobIdRef.current = jobId; },
+          onServerProgress: setTabelaProgress,
         }
       );
       const url = window.URL.createObjectURL(blob);
@@ -203,6 +206,7 @@ export default function AssistenteIA() {
     clearInterval(timerRef.current);
     setGerandoTabela(false);
     setGerandoSeg(0);
+    setTabelaProgress(null);
     try {
       await cancelarTabelaPrazos(jobId);
     } catch (err) {
@@ -344,11 +348,21 @@ export default function AssistenteIA() {
               )}
 
               {(gerandoTabela || tabelaSucesso) && (() => {
-                const pct = tabelaSucesso ? 100 : Math.min(88, Math.round(gerandoSeg / (gerandoSeg + 15) * 100));
+                const pct = tabelaSucesso
+                  ? 100
+                  : tabelaProgress?.stage === 'extracting_pdf' && tabelaProgress.total_pages
+                    ? Math.min(88, Math.max(8, Math.round((tabelaProgress.current_page / tabelaProgress.total_pages) * 88)))
+                    : Math.min(88, Math.round(gerandoSeg / (gerandoSeg + 15) * 100));
                 const color = tabelaSucesso ? '#22c55e' : '#e8412a';
                 let label;
                 if (tabelaSucesso) {
                   label = 'Tabela gerada com sucesso!';
+                } else if (tabelaProgress?.stage === 'extracting_pdf') {
+                  label = `Lendo PDF: página ${tabelaProgress.current_page}/${tabelaProgress.total_pages} · ${tabelaProgress.rows} produtos encontrados`;
+                } else if (tabelaProgress?.stage === 'writing_excel') {
+                  label = `Montando Excel com ${tabelaProgress.rows} produtos...`;
+                } else if (tabelaProgress?.stage === 'pdf_opened') {
+                  label = `PDF aberto: ${tabelaProgress.total_pages} páginas`;
                 } else if (gerandoSeg >= 120) {
                   label = `Aguardando servidor... ${gerandoSeg}s (pode levar até 10 min para PDFs)`;
                 } else if (gerandoSeg >= 30) {
@@ -375,7 +389,7 @@ export default function AssistenteIA() {
 
               {gerandoTabela && gerandoSeg > 10 && (
                 <p style={{ color: '#94a3b8', fontSize: 12, marginTop: 8, textAlign: 'center' }}>
-                  Aguarde — o servidor está lendo {tabelaArquivo?.name?.toLowerCase().endsWith('.pdf') ? 'o PDF com IA' : 'a planilha'} e montando as colunas de prazo.
+                  Aguarde — o servidor está lendo {tabelaArquivo?.name?.toLowerCase().endsWith('.pdf') ? 'o PDF' : 'a planilha'} e montando as colunas de prazo.
                 </p>
               )}
 

@@ -138,7 +138,10 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress, option
       const contentType = pollRes.headers.get('content-type') || '';
       if (contentType.includes('json')) {
         const data = await pollRes.json();
-        if (data.status === 'processing') continue;
+        if (data.status === 'processing') {
+          if (data.progress) options.onServerProgress?.(data.progress);
+          continue;
+        }
         throw new Error(data.error || 'Erro desconhecido');
       }
 

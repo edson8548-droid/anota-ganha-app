@@ -754,8 +754,22 @@ async def _processar_tabela_prazos(job_id):
 
         logger.info(f"[Job {job_id}] Iniciando processamento ({ext}, {len(conteudo)} bytes)")
 
+        loop = asyncio.get_running_loop()
+
+        def _progress_threadsafe(update):
+            asyncio.run_coroutine_threadsafe(
+                db.cotacao_jobs.update_one(
+                    {"_id": job_id},
+                    {"$set": {
+                        "progress": update,
+                        "progress_updated_at": datetime.now(timezone.utc),
+                    }},
+                ),
+                loop,
+            )
+
         resultado_path = await asyncio.wait_for(
-            asyncio.to_thread(gerar_excel_multiprazos, tmp.name, prazos),
+            asyncio.to_thread(gerar_excel_multiprazos, tmp.name, prazos, _progress_threadsafe),
             timeout=540,  # 9 minutes max
         )
 
@@ -835,7 +849,7 @@ async def get_job_status(
                 {"$set": {"status": "error", "error": "Processamento demorou demais. Tente novamente — para PDF grande, converta para Excel antes."}},
             )
             raise HTTPException(500, "Processamento demorou demais. Tente novamente — para PDF grande, converta para Excel antes.")
-        return {"status": "processing"}
+        return {"status": "processing", "progress": job.get("progress")}
 
     if job["status"] == "error":
         input_grid_id = job.get("input_grid_id")
