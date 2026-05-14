@@ -138,6 +138,7 @@ export default function AssistenteIA() {
   const [gerandoSeg, setGerandoSeg] = useState(0);
   const [tabelaProgress, setTabelaProgress] = useState(null);
   const [tabelaErro, setTabelaErro] = useState('');
+  const [tabelaDownloadUrl, setTabelaDownloadUrl] = useState('');
   const tabelaInputRef = useRef(null);
   const timerRef = useRef(null);
   const abortTabelaRef = useRef(null);
@@ -162,6 +163,10 @@ export default function AssistenteIA() {
     setGerandoSeg(0);
     setTabelaProgress(null);
     setTabelaErro('');
+    if (tabelaDownloadUrl) {
+      window.URL.revokeObjectURL(tabelaDownloadUrl);
+      setTabelaDownloadUrl('');
+    }
     tabelaJobIdRef.current = null;
     canceladoPeloUsuarioRef.current = false;
     abortTabelaRef.current = new AbortController();
@@ -181,8 +186,10 @@ export default function AssistenteIA() {
       const a = document.createElement('a');
       a.href = url;
       a.download = 'tabela_com_prazos.xlsx';
+      document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setTabelaDownloadUrl(url);
       setTabelaSucesso(true);
       setTabelaArquivo(null);
     } catch (err) {
@@ -298,7 +305,15 @@ export default function AssistenteIA() {
                 <input
                   type="file" accept=".xlsx,.xls,.pdf" ref={tabelaInputRef}
                   style={{ display: 'none' }}
-                  onChange={e => { setTabelaArquivo(e.target.files[0]); setTabelaSucesso(false); setTabelaErro(''); }}
+                  onChange={e => {
+                    setTabelaArquivo(e.target.files[0]);
+                    setTabelaSucesso(false);
+                    setTabelaErro('');
+                    if (tabelaDownloadUrl) {
+                      window.URL.revokeObjectURL(tabelaDownloadUrl);
+                      setTabelaDownloadUrl('');
+                    }
+                  }}
                 />
               </div>
 
@@ -404,9 +419,19 @@ export default function AssistenteIA() {
               )}
 
               {tabelaSucesso && (
-                <p className="ia-modal-sucesso">
-                  ✓ Tabela gerada! Agora suba o arquivo no Robô de Cotação.
-                </p>
+                <div className="ia-modal-sucesso">
+                  <p>✓ Tabela gerada! Se o download não abriu, clique no botão abaixo.</p>
+                  {tabelaDownloadUrl && (
+                    <a
+                      className="ia-modal-btn"
+                      href={tabelaDownloadUrl}
+                      download="tabela_com_prazos.xlsx"
+                      style={{ display: 'block', marginTop: 10, textAlign: 'center', textDecoration: 'none' }}
+                    >
+                      Baixar tabela gerada
+                    </a>
+                  )}
+                </div>
               )}
 
               {tabelaErro && (
