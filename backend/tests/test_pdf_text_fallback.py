@@ -17,21 +17,14 @@ class FakePage:
         return self._text
 
 
+class FakePageTableError(FakePage):
+    def extract_tables(self):
+        raise RuntimeError("erro ao extrair tabela")
+
+
 class FakePdf:
-    def __init__(self):
-        self.pages = [
-            FakePage(
-                "\n".join(
-                    [
-                        "Código Produto EAN Emb. Qtde Qtd. R$ R$ R$",
-                        "3511-18 ABS ALWAYS BASICO 7500435127226 CX-18 1 18 3.121 56.180 56.180",
-                        "C/8 C/ABA PQ SC",
-                        "3531-16 ABS INTIMUS 7896007550906 CX-16 1 16 18.675 298.800 298.800",
-                        "NOTURNO C/30 SECO",
-                    ]
-                )
-            )
-        ]
+    def __init__(self, page_cls=FakePage):
+        self.pages = [page_cls(pdf_texto_tabela())]
 
     def __enter__(self):
         return self
@@ -59,3 +52,27 @@ def test_ler_pdf_base_fallback_por_texto(monkeypatch):
             "preco_base": 18.675,
         },
     ]
+
+
+def test_ler_pdf_base_fallback_por_texto_quando_tabela_falha(monkeypatch):
+    import pdfplumber
+
+    monkeypatch.setattr(pdfplumber, "open", lambda _path: FakePdf(FakePageTableError))
+
+    rows = _ler_pdf_base("arquivo-tabela-com-erro.pdf")
+
+    assert len(rows) == 2
+    assert rows[0]["nome"] == "ABS ALWAYS BASICO C/8 C/ABA PQ SC"
+    assert rows[0]["preco_base"] == 3.121
+
+
+def pdf_texto_tabela():
+    return "\n".join(
+        [
+            "Código Produto EAN Emb. Qtde Qtd. R$ R$ R$",
+            "3511-18 ABS ALWAYS BASICO 7500435127226 CX-18 1 18 3.121 56.180 56.180",
+            "C/8 C/ABA PQ SC",
+            "3531-16 ABS INTIMUS 7896007550906 CX-16 1 16 18.675 298.800 298.800",
+            "NOTURNO C/30 SECO",
+        ]
+    )
