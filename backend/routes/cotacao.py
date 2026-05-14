@@ -97,8 +97,11 @@ def _track_background_task(task, job_id=None):
 
 
 def _start_tabela_prazos_job(job_id):
+    if job_id in _running_job_ids:
+        return None
+    _running_job_ids.add(job_id)
     task = asyncio.create_task(_processar_tabela_prazos(job_id))
-    _track_background_task(task)
+    _track_background_task(task, job_id=job_id)
     return task
 
 
@@ -714,6 +717,7 @@ async def gerar_tabela_prazos(
         },
     })
 
+    _start_tabela_prazos_job(job_id)
     return {"job_id": job_id}
 
 
@@ -791,14 +795,19 @@ async def get_job_status(
         raise HTTPException(404, "Job não encontrado")
 
     if job["status"] == "queued":
-        await _processar_tabela_prazos(job_id)
-        job = await db.cotacao_jobs.find_one({"_id": job_id, "user_id": uid})
-        if not job:
-            raise HTTPException(404, "Job não encontrado")
+        _start_tabela_prazos_job(job_id)
+        return {"status": "processing"}
 
     if job["status"] == "processing":
         age_base = job.get("started_at") or job["created_at"]
         age = (datetime.now(timezone.utc) - age_base).total_seconds()
+        if job_id not in _running_job_ids and age > 15:
+            await db.cotacao_jobs.update_one(
+                {"_id": job_id},
+                {"$set": {"status": "queued"}, "$unset": {"started_at": ""}},
+            )
+            _start_tabela_prazos_job(job_id)
+            return {"status": "processing"}
         if age > 480:  # 8 min — fires before client's 10-min timeout; catches orphaned jobs
             await db.cotacao_jobs.update_one(
                 {"_id": job_id},

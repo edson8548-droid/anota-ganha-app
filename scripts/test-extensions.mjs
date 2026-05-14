@@ -15,6 +15,7 @@ function readText(path) {
 
 function assertFilesExist(baseDir, files) {
   for (const file of files) {
+    assert.equal(typeof file, 'string', `referencia invalida em ${baseDir}`);
     assert.ok(existsSync(join(root, baseDir, file)), `${baseDir}/${file} nao existe`);
   }
 }
@@ -26,7 +27,7 @@ describe('extensoes Chrome', () => {
     assert.equal(manifest.manifest_version, 3);
     assertFilesExist('chrome-extension', [
       manifest.background.service_worker,
-      manifest.action.default_popup,
+      manifest.action?.default_popup || manifest.side_panel?.default_path,
       ...manifest.content_scripts.flatMap(script => script.js || []),
     ]);
     assert.ok(manifest.host_permissions.includes('https://api.venpro.com.br/*'));
