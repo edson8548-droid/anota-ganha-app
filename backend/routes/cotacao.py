@@ -771,9 +771,10 @@ async def _processar_tabela_prazos(job_id):
             except RuntimeError as e:
                 logger.warning("[Job %s] Falha ao agendar progresso: %s", job_id, e)
 
+        timeout_seconds = 180 if ext == ".pdf" else 540
         resultado_path = await asyncio.wait_for(
             asyncio.to_thread(gerar_excel_multiprazos, tmp.name, prazos, _progress_threadsafe),
-            timeout=540,  # 9 minutes max
+            timeout=timeout_seconds,
         )
 
         latest_job = await db.cotacao_jobs.find_one({"_id": job_id})
@@ -804,10 +805,10 @@ async def _processar_tabela_prazos(job_id):
             {"$set": {"status": "done", "grid_id": grid_id}},
         )
     except asyncio.TimeoutError:
-        logger.error(f"[Job {job_id}] Timeout (9 min)")
+        logger.error(f"[Job {job_id}] Timeout ao gerar tabela de prazos")
         await db.cotacao_jobs.update_one(
             {"_id": job_id},
-            {"$set": {"status": "error", "error": "Processamento demorou demais. Para PDFs grandes, converta para Excel (.xlsx) antes de enviar."}},
+            {"$set": {"status": "error", "error": "Processamento demorou demais. Esse PDF travou a leitura no servidor; converta para Excel (.xlsx) ou use um PDF menor."}},
         )
     except Exception as e:
         logger.error(f"Erro ao gerar tabela (job {job_id}): {e}")
@@ -846,12 +847,13 @@ async def get_job_status(
             )
             _start_tabela_prazos_job(job_id)
             return {"status": "processing"}
-        if age > 480:  # 8 min — fires before client's 10-min timeout; catches orphaned jobs
+        max_age = 210 if job.get("ext") == ".pdf" else 480
+        if age > max_age:  # fires before client's 10-min timeout; catches orphaned jobs
             await db.cotacao_jobs.update_one(
                 {"_id": job_id},
-                {"$set": {"status": "error", "error": "Processamento demorou demais. Tente novamente — para PDF grande, converta para Excel antes."}},
+                {"$set": {"status": "error", "error": "Processamento demorou demais. Esse PDF travou a leitura no servidor; converta para Excel (.xlsx) ou use um PDF menor."}},
             )
-            raise HTTPException(500, "Processamento demorou demais. Tente novamente — para PDF grande, converta para Excel antes.")
+            raise HTTPException(500, "Processamento demorou demais. Esse PDF travou a leitura no servidor; converta para Excel (.xlsx) ou use um PDF menor.")
         return {"status": "processing", "progress": job.get("progress")}
 
     if job["status"] == "error":
