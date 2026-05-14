@@ -36,6 +36,8 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
+BUILD_VERSION = "pdf-fallback-v2-e6f0f65"
+BUILD_COMMIT = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_COMMIT") or "local"
 
 # ==================== App ====================
 app = FastAPI(
@@ -167,15 +169,33 @@ app.add_middleware(
 # ==================== Health ====================
 @app.get("/")
 async def root():
-    return { "message": "Venpro API", "status": "running", "version": "1.0.0", "payments": ["asaas", "mercadopago"] }
+    return {
+        "message": "Venpro API",
+        "status": "running",
+        "version": "1.0.0",
+        "build": BUILD_VERSION,
+        "commit": BUILD_COMMIT[:12],
+        "payments": ["asaas", "mercadopago"],
+    }
 
 @app.get("/health")
 async def health_check():
     try:
         await db.command("ping")
-        return {"status": "healthy", "database": "connected"}
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "build": BUILD_VERSION,
+            "commit": BUILD_COMMIT[:12],
+        }
     except Exception as e:
-        return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
+        return {
+            "status": "unhealthy",
+            "database": "disconnected",
+            "build": BUILD_VERSION,
+            "commit": BUILD_COMMIT[:12],
+            "error": str(e),
+        }
 
 # ==================== MongoDB ====================
 mongo_url = os.environ.get("MONGO_URL") or os.environ.get("DATABASE_URL")
