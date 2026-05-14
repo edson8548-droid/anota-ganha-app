@@ -38,7 +38,18 @@ export const processarCotacao = async (arquivo, tabelaId, modo = 'completo') => 
   return { blob: response.data, stats, semMatch };
 };
 
-export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress) => {
+export const cancelarTabelaPrazos = async (jobId) => {
+  if (!jobId) return;
+  const user = auth.currentUser;
+  if (!user) return;
+  const token = await user.getIdToken();
+  await fetch(apiUrl(`/cotacao/jobs/${jobId}`), {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+};
+
+export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress, options = {}) => {
   const buildFormData = () => {
     const formData = new FormData();
     formData.append('arquivo', arquivo);
@@ -71,8 +82,12 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress) => {
         method: 'POST',
         headers,
         body: buildFormData(),
+        signal: options.signal,
       });
     } catch (err) {
+      if (options.signal?.aborted) {
+        throw new DOMException('Processamento cancelado', 'AbortError');
+      }
       throw new Error('Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.');
     }
 
@@ -84,6 +99,7 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress) => {
     }
 
     const { job_id } = await submitRes.json();
+    options.onJobId?.(job_id);
     return job_id;
   };
 
@@ -93,12 +109,18 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress) => {
     let notFoundAttempts = 0;
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise(r => setTimeout(r, 3000));
+      if (options.signal?.aborted) {
+        throw new DOMException('Processamento cancelado', 'AbortError');
+      }
       onProgress?.(retryOffsetSeconds + ((i + 1) * 3));
 
       let pollRes;
       try {
-        pollRes = await fetch(apiUrl(`/cotacao/jobs/${jobId}`), { headers });
+        pollRes = await fetch(apiUrl(`/cotacao/jobs/${jobId}`), { headers, signal: options.signal });
       } catch {
+        if (options.signal?.aborted) {
+          throw new DOMException('Processamento cancelado', 'AbortError');
+        }
         continue; // network glitch, retry
       }
 

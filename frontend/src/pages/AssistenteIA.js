@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ArrowLeft, ClipboardList } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
-import { gerarTabelaPrazos } from '../services/cotacao.service';
+import { cancelarTabelaPrazos, gerarTabelaPrazos } from '../services/cotacao.service';
 import './AssistenteIA.css';
 
 function processInline(str, keyPrefix) {
@@ -138,6 +138,9 @@ export default function AssistenteIA() {
   const [gerandoSeg, setGerandoSeg] = useState(0);
   const tabelaInputRef = useRef(null);
   const timerRef = useRef(null);
+  const abortTabelaRef = useRef(null);
+  const tabelaJobIdRef = useRef(null);
+  const canceladoPeloUsuarioRef = useRef(false);
 
   const handleCopy = (content, id) => {
     navigator.clipboard.writeText(content);
@@ -155,9 +158,20 @@ export default function AssistenteIA() {
     setGerandoTabela(true);
     setTabelaSucesso(false);
     setGerandoSeg(0);
+    tabelaJobIdRef.current = null;
+    canceladoPeloUsuarioRef.current = false;
+    abortTabelaRef.current = new AbortController();
     timerRef.current = setInterval(() => setGerandoSeg(s => s + 1), 1000);
     try {
-      const blob = await gerarTabelaPrazos(tabelaArquivo, pctPrazos, (s) => setGerandoSeg(s));
+      const blob = await gerarTabelaPrazos(
+        tabelaArquivo,
+        pctPrazos,
+        (s) => setGerandoSeg(s),
+        {
+          signal: abortTabelaRef.current.signal,
+          onJobId: (jobId) => { tabelaJobIdRef.current = jobId; },
+        }
+      );
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -167,11 +181,44 @@ export default function AssistenteIA() {
       setTabelaSucesso(true);
       setTabelaArquivo(null);
     } catch (err) {
-      toast.error('Erro ao gerar tabela: ' + (err.message || 'Erro desconhecido'));
+      if (err.name === 'AbortError') {
+        if (!canceladoPeloUsuarioRef.current) {
+          toast.info('Processamento cancelado.');
+        }
+      } else {
+        toast.error('Erro ao gerar tabela: ' + (err.message || 'Erro desconhecido'));
+      }
     } finally {
       clearInterval(timerRef.current);
       setGerandoTabela(false);
+      abortTabelaRef.current = null;
+      tabelaJobIdRef.current = null;
     }
+  };
+
+  const handleCancelarTabela = async () => {
+    const jobId = tabelaJobIdRef.current;
+    canceladoPeloUsuarioRef.current = true;
+    abortTabelaRef.current?.abort();
+    clearInterval(timerRef.current);
+    setGerandoTabela(false);
+    setGerandoSeg(0);
+    try {
+      await cancelarTabelaPrazos(jobId);
+    } catch (err) {
+      console.warn('Erro ao cancelar job de tabela:', err);
+    }
+    tabelaJobIdRef.current = null;
+    abortTabelaRef.current = null;
+    toast.info('Processamento cancelado. Você pode tentar novamente.');
+  };
+
+  const handleFecharTabelaModal = () => {
+    if (gerandoTabela) {
+      handleCancelarTabela();
+      return;
+    }
+    setShowTabelaModal(false);
   };
 
   return (
@@ -219,11 +266,11 @@ export default function AssistenteIA() {
 
         {/* Modal: Gerar Tabela de Prazos */}
         {showTabelaModal && (
-          <div className="ia-modal-overlay" onClick={() => setShowTabelaModal(false)}>
+          <div className="ia-modal-overlay" onClick={handleFecharTabelaModal}>
             <div className="ia-modal" onClick={e => e.stopPropagation()}>
               <div className="ia-modal-header">
                 <span>📊 Gerar Tabela com Prazos</span>
-                <button className="ia-modal-close" onClick={() => setShowTabelaModal(false)}>✕</button>
+                <button className="ia-modal-close" onClick={handleFecharTabelaModal}>✕</button>
               </div>
 
               <p className="ia-modal-desc">
@@ -285,6 +332,16 @@ export default function AssistenteIA() {
                   ? `Processando... ${gerandoSeg}s${tabelaArquivo?.name?.toLowerCase().endsWith('.pdf') ? ' (PDF pode levar 1-2 min)' : ''}`
                   : 'Gerar e baixar tabela'}
               </button>
+
+              {gerandoTabela && (
+                <button
+                  className="ia-modal-btn"
+                  onClick={handleCancelarTabela}
+                  style={{ marginTop: 8, background: '#45484e' }}
+                >
+                  Cancelar processamento
+                </button>
+              )}
 
               {(gerandoTabela || tabelaSucesso) && (() => {
                 const pct = tabelaSucesso ? 100 : Math.min(88, Math.round(gerandoSeg / (gerandoSeg + 15) * 100));
