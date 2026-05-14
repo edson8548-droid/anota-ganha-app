@@ -541,7 +541,7 @@ def _ler_excel_base(caminho_arquivo):
         return []
 
 
-def _ler_pdf_base(caminho_pdf):
+def _ler_pdf_base(caminho_pdf, progress_callback=None):
     """Lê PDF de tabela do atacadista usando somente extração local."""
     import logging
     logger_local = logging.getLogger(__name__)
@@ -589,7 +589,10 @@ def _ler_pdf_base(caminho_pdf):
         import pdfplumber
 
         with pdfplumber.open(caminho_pdf) as pdf:
-            for page in pdf.pages:
+            total_pages = len(pdf.pages)
+            if progress_callback:
+                progress_callback({"stage": "pdf_opened", "total_pages": total_pages, "rows": 0})
+            for page_number, page in enumerate(pdf.pages, 1):
                 tables = page.extract_tables()
                 for table in tables:
                     if not table or len(table) < 2:
@@ -634,6 +637,13 @@ def _ler_pdf_base(caminho_pdf):
                             "ean": limpar_ean(ean_raw),
                             "preco_base": preco,
                         })
+                if progress_callback and (page_number == total_pages or page_number % 5 == 0):
+                    progress_callback({
+                        "stage": "extracting_pdf",
+                        "current_page": page_number,
+                        "total_pages": total_pages,
+                        "rows": len(rows_data),
+                    })
     except Exception as e:
         logger_local.warning(f"pdfplumber falhou: {e}")
 
@@ -687,17 +697,19 @@ def _gerar_excel_de_dados(rows_data, percentuais):
     return tmp.name
 
 
-def gerar_excel_multiprazos(caminho_base, percentuais):
+def gerar_excel_multiprazos(caminho_base, percentuais, progress_callback=None):
     """
     Orquestrador: aceita Excel (.xlsx/.xls) ou PDF e gera tabela com colunas por prazo.
     percentuais: {7: 0.0, 14: 2.5, 21: 4.0, 28: 5.5}
     """
     if caminho_base.lower().endswith('.pdf'):
-        rows_data = _ler_pdf_base(caminho_base)
+        rows_data = _ler_pdf_base(caminho_base, progress_callback=progress_callback)
     else:
         rows_data = _ler_excel_base(caminho_base)
 
     if not rows_data:
         raise ValueError("Nenhum produto encontrado no arquivo enviado")
 
+    if progress_callback:
+        progress_callback({"stage": "writing_excel", "rows": len(rows_data)})
     return _gerar_excel_de_dados(rows_data, percentuais)
