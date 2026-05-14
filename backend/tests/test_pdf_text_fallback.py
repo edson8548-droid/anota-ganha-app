@@ -66,6 +66,20 @@ def test_ler_pdf_base_fallback_por_texto_quando_tabela_falha(monkeypatch):
     assert rows[0]["preco_base"] == 3.121
 
 
+def test_ler_pdf_base_nao_falha_se_progresso_falhar(monkeypatch):
+    import pdfplumber
+
+    monkeypatch.setattr(pdfplumber, "open", lambda _path: FakePdf())
+
+    def progress_callback(_update):
+        raise TypeError("callback quebrado")
+
+    rows = _ler_pdf_base("arquivo-sem-tabela.pdf", progress_callback=progress_callback)
+
+    assert len(rows) == 2
+    assert rows[1]["nome"] == "ABS INTIMUS NOTURNO C/30 SECO"
+
+
 def pdf_texto_tabela():
     return "\n".join(
         [
