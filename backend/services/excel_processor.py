@@ -622,7 +622,7 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
         except (TypeError, ValueError):
             return None
 
-    def _ler_pdf_por_texto(pdf):
+    def _ler_texto_bruto(text):
         rows_text = []
         current = None
 
@@ -631,32 +631,44 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
         )
         price_pattern = _re.compile(r"(?<!\d)(\d+(?:[.,]\d{2,3})+)(?!\d)")
 
+        for raw_line in str(text or "").splitlines():
+            line = normalizar_celula(raw_line)
+            if linha_ignorada(line):
+                continue
+
+            match = row_pattern.match(line)
+            if match:
+                prices = price_pattern.findall(match.group("tail"))
+                preco = parse_preco_pdf(prices[0]) if prices else None
+                if preco is None:
+                    current = None
+                    continue
+                current = {
+                    "nome": match.group("name").strip(),
+                    "ean": limpar_ean(match.group("ean")),
+                    "preco_base": preco,
+                }
+                rows_text.append(current)
+                continue
+
+            if current and not _re.search(r"\d{8,14}", line):
+                # Produto quebrado em duas ou mais linhas no PDF.
+                if len(line) <= 80 and not price_pattern.search(line):
+                    current["nome"] = f"{current['nome']} {line}".strip()
+
+        return rows_text
+
+    def _ler_pdf_por_texto(pdf):
+        rows_text = []
+
         for page_number, page in enumerate(pdf.pages, 1):
-            text = page.extract_text() or ""
-            for raw_line in text.splitlines():
-                line = normalizar_celula(raw_line)
-                if linha_ignorada(line):
-                    continue
+            try:
+                text = page.extract_text() or ""
+            except Exception as e:
+                logger_local.warning(f"extract_text falhou na pagina {page_number}: {e}")
+                text = ""
 
-                match = row_pattern.match(line)
-                if match:
-                    prices = price_pattern.findall(match.group("tail"))
-                    preco = parse_preco_pdf(prices[0]) if prices else None
-                    if preco is None:
-                        current = None
-                        continue
-                    current = {
-                        "nome": match.group("name").strip(),
-                        "ean": limpar_ean(match.group("ean")),
-                        "preco_base": preco,
-                    }
-                    rows_text.append(current)
-                    continue
-
-                if current and not _re.search(r"\d{8,14}", line):
-                    # Produto quebrado em duas ou mais linhas no PDF.
-                    if len(line) <= 80 and not price_pattern.search(line):
-                        current["nome"] = f"{current['nome']} {line}".strip()
+            rows_text.extend(_ler_texto_bruto(text))
 
             if progress_callback and (page_number == len(pdf.pages) or page_number % 5 == 0):
                 progress_callback({
@@ -678,50 +690,57 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
             if progress_callback:
                 progress_callback({"stage": "pdf_opened", "total_pages": total_pages, "rows": 0})
             for page_number, page in enumerate(pdf.pages, 1):
-                tables = page.extract_tables()
+                try:
+                    tables = page.extract_tables()
+                except Exception as e:
+                    logger_local.warning(f"extract_tables falhou na pagina {page_number}: {e}")
+                    tables = []
                 for table in tables:
-                    if not table or len(table) < 2:
+                    try:
+                        if not table or len(table) < 2:
+                            continue
+
+                        header_idx = None
+                        best_score = 0
+                        for idx, candidate in enumerate(table[:5]):
+                            headers_test = [normalizar_celula(c).upper() for c in candidate]
+                            candidate_score = score_header(headers_test)
+                            if candidate_score > best_score:
+                                best_score = candidate_score
+                                header_idx = idx
+
+                        if header_idx is not None and best_score >= 4:
+                            headers = [normalizar_celula(c).upper() for c in table[header_idx]]
+                            headers_cache = headers
+                            data_rows = table[header_idx + 1:]
+                        elif headers_cache:
+                            headers = headers_cache
+                            primeira_linha = " ".join(normalizar_celula(c).upper() for c in table[0])
+                            data_rows = table[1:] if "ELEMENTOS QUE COMPÕEM" in primeira_linha else table
+                        else:
+                            continue
+
+                        col_nome, col_ean, col_preco = localizar_colunas(headers)
+
+                        for row in data_rows:
+                            if not row or len(row) <= col_preco:
+                                continue
+                            nome = normalizar_celula(row[col_nome]) if col_nome < len(row) else ""
+                            if not nome or nome.upper() in ("NONE", "", "PRODUTO", "CÓDIGO", "CODIGO"):
+                                continue
+                            ean_raw = normalizar_celula(row[col_ean]) if col_ean is not None and col_ean < len(row) else ""
+                            preco_raw = normalizar_celula(row[col_preco]) if row[col_preco] else ""
+                            preco = parse_preco_pdf(preco_raw)
+                            if preco is None:
+                                continue
+                            rows_data.append({
+                                "nome": nome,
+                                "ean": limpar_ean(ean_raw),
+                                "preco_base": preco,
+                            })
+                    except Exception as e:
+                        logger_local.warning(f"tabela do PDF ignorada na pagina {page_number}: {e}")
                         continue
-
-                    header_idx = None
-                    best_score = 0
-                    for idx, candidate in enumerate(table[:5]):
-                        headers_test = [normalizar_celula(c).upper() for c in candidate]
-                        candidate_score = score_header(headers_test)
-                        if candidate_score > best_score:
-                            best_score = candidate_score
-                            header_idx = idx
-
-                    if header_idx is not None and best_score >= 4:
-                        headers = [normalizar_celula(c).upper() for c in table[header_idx]]
-                        headers_cache = headers
-                        data_rows = table[header_idx + 1:]
-                    elif headers_cache:
-                        headers = headers_cache
-                        primeira_linha = " ".join(normalizar_celula(c).upper() for c in table[0])
-                        data_rows = table[1:] if "ELEMENTOS QUE COMPÕEM" in primeira_linha else table
-                    else:
-                        continue
-
-                    col_nome, col_ean, col_preco = localizar_colunas(headers)
-
-                    for row in data_rows:
-                        if not row or len(row) <= col_preco:
-                            continue
-                        nome = normalizar_celula(row[col_nome]) if col_nome < len(row) else ""
-                        if not nome or nome.upper() in ("NONE", "", "PRODUTO", "CÓDIGO", "CODIGO"):
-                            continue
-                        ean_raw = normalizar_celula(row[col_ean]) if col_ean is not None and col_ean < len(row) else ""
-                        preco_raw = normalizar_celula(row[col_preco]) if row[col_preco] else ""
-                        try:
-                            preco = float(preco_raw.replace(",", ".").replace("R$", "").replace(" ", "").strip())
-                        except (ValueError, TypeError):
-                            continue
-                        rows_data.append({
-                            "nome": nome,
-                            "ean": limpar_ean(ean_raw),
-                            "preco_base": preco,
-                        })
                 if progress_callback and (page_number == total_pages or page_number % 5 == 0):
                     progress_callback({
                         "stage": "extracting_pdf",
@@ -732,13 +751,28 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
             if not rows_data:
                 if progress_callback:
                     progress_callback({"stage": "extracting_pdf_text", "total_pages": total_pages, "rows": 0})
-                rows_data = _ler_pdf_por_texto(pdf)
+                try:
+                    rows_data = _ler_pdf_por_texto(pdf)
+                except Exception as e:
+                    logger_local.warning(f"fallback por texto com pdfplumber falhou: {e}")
     except Exception as e:
         logger_local.warning(f"pdfplumber falhou: {e}")
 
     if not rows_data:
+        try:
+            from pdfminer.high_level import extract_text
+
+            if progress_callback:
+                progress_callback({"stage": "extracting_pdf_text", "rows": 0})
+            rows_data = _ler_texto_bruto(extract_text(caminho_pdf) or "")
+            if progress_callback:
+                progress_callback({"stage": "extracting_pdf_text", "rows": len(rows_data)})
+        except Exception as e:
+            logger_local.warning(f"fallback por pdfminer falhou: {e}")
+
+    if not rows_data:
         raise ValueError(
-            "Não foi possível ler a tabela do PDF sem IA. Converta o PDF para Excel ou use o prompt de Cotação Pronta para organizar a tabela."
+            "Não encontrei produtos e preços nesse PDF. Tente gerar novamente ou converta o arquivo para Excel (.xlsx)."
         )
 
     return rows_data
