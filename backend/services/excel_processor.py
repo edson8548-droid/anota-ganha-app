@@ -702,93 +702,106 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
 
     rows_data = []
     headers_cache = None
+
+    try:
+        from pdfminer.high_level import extract_text
+
+        emit_progress({"stage": "extracting_pdf_text", "rows": 0})
+        rows_data = _ler_texto_bruto(extract_text(caminho_pdf) or "")
+        diagnostics.append(f"texto_pdfminer_primeiro={len(rows_data)}_produtos")
+        emit_progress({"stage": "extracting_pdf_text", "rows": len(rows_data)})
+    except Exception as e:
+        logger_local.warning(f"leitura inicial por pdfminer falhou: {e}")
+        diagnostics.append(f"pdfminer_primeiro_erro={type(e).__name__}")
+
     try:
         import pdfplumber
 
-        with pdfplumber.open(caminho_pdf) as pdf:
-            total_pages = len(pdf.pages)
-            diagnostics.append(f"pdfplumber_abriu={total_pages}_paginas")
-            emit_progress({"stage": "pdf_opened", "total_pages": total_pages, "rows": 0})
+        if not rows_data:
+            with pdfplumber.open(caminho_pdf) as pdf:
+                total_pages = len(pdf.pages)
+                diagnostics.append(f"pdfplumber_abriu={total_pages}_paginas")
+                emit_progress({"stage": "pdf_opened", "total_pages": total_pages, "rows": 0})
 
-            try:
-                rows_data = _ler_pdf_por_texto(pdf)
-                diagnostics.append(f"texto_pdfplumber_primeiro={len(rows_data)}_produtos")
-            except Exception as e:
-                logger_local.warning(f"leitura inicial por texto falhou: {e}")
-                diagnostics.append(f"texto_pdfplumber_primeiro_erro={type(e).__name__}")
-                rows_data = []
-
-            if not rows_data:
-                for page_number, page in enumerate(pdf.pages, 1):
-                    try:
-                        tables = page.extract_tables()
-                    except Exception as e:
-                        logger_local.warning(f"extract_tables falhou na pagina {page_number}: {e}")
-                        diagnostics.append(f"tables_p{page_number}_erro={type(e).__name__}")
-                        tables = []
-                    for table in tables:
-                        try:
-                            if not table or len(table) < 2:
-                                continue
-
-                            header_idx = None
-                            best_score = 0
-                            for idx, candidate in enumerate(table[:5]):
-                                headers_test = [normalizar_celula(c).upper() for c in candidate]
-                                candidate_score = score_header(headers_test)
-                                if candidate_score > best_score:
-                                    best_score = candidate_score
-                                    header_idx = idx
-
-                            if header_idx is not None and best_score >= 4:
-                                headers = [normalizar_celula(c).upper() for c in table[header_idx]]
-                                headers_cache = headers
-                                data_rows = table[header_idx + 1:]
-                            elif headers_cache:
-                                headers = headers_cache
-                                primeira_linha = " ".join(normalizar_celula(c).upper() for c in table[0])
-                                data_rows = table[1:] if "ELEMENTOS QUE COMPÕEM" in primeira_linha else table
-                            else:
-                                continue
-
-                            col_nome, col_ean, col_preco = localizar_colunas(headers)
-
-                            for row in data_rows:
-                                if not row or len(row) <= col_preco:
-                                    continue
-                                nome = normalizar_celula(row[col_nome]) if col_nome < len(row) else ""
-                                if not nome or nome.upper() in ("NONE", "", "PRODUTO", "CÓDIGO", "CODIGO"):
-                                    continue
-                                ean_raw = normalizar_celula(row[col_ean]) if col_ean is not None and col_ean < len(row) else ""
-                                preco_raw = normalizar_celula(row[col_preco]) if row[col_preco] else ""
-                                preco = parse_preco_pdf(preco_raw)
-                                if preco is None:
-                                    continue
-                                rows_data.append({
-                                    "nome": nome,
-                                    "ean": limpar_ean(ean_raw),
-                                    "preco_base": preco,
-                                })
-                        except Exception as e:
-                            logger_local.warning(f"tabela do PDF ignorada na pagina {page_number}: {e}")
-                            continue
-                    if page_number == total_pages or page_number % 5 == 0:
-                        emit_progress({
-                            "stage": "extracting_pdf",
-                            "current_page": page_number,
-                            "total_pages": total_pages,
-                            "rows": len(rows_data),
-                        })
-
-            if not rows_data:
-                diagnostics.append("tabelas=0_produtos")
-                emit_progress({"stage": "extracting_pdf_text", "total_pages": total_pages, "rows": 0})
                 try:
                     rows_data = _ler_pdf_por_texto(pdf)
-                    diagnostics.append(f"texto_pdfplumber={len(rows_data)}_produtos")
+                    diagnostics.append(f"texto_pdfplumber_primeiro={len(rows_data)}_produtos")
                 except Exception as e:
-                    logger_local.warning(f"fallback por texto com pdfplumber falhou: {e}")
-                    diagnostics.append(f"texto_pdfplumber_erro={type(e).__name__}")
+                    logger_local.warning(f"leitura inicial por texto falhou: {e}")
+                    diagnostics.append(f"texto_pdfplumber_primeiro_erro={type(e).__name__}")
+                    rows_data = []
+
+                if not rows_data:
+                    for page_number, page in enumerate(pdf.pages, 1):
+                        try:
+                            tables = page.extract_tables()
+                        except Exception as e:
+                            logger_local.warning(f"extract_tables falhou na pagina {page_number}: {e}")
+                            diagnostics.append(f"tables_p{page_number}_erro={type(e).__name__}")
+                            tables = []
+                        for table in tables:
+                            try:
+                                if not table or len(table) < 2:
+                                    continue
+
+                                header_idx = None
+                                best_score = 0
+                                for idx, candidate in enumerate(table[:5]):
+                                    headers_test = [normalizar_celula(c).upper() for c in candidate]
+                                    candidate_score = score_header(headers_test)
+                                    if candidate_score > best_score:
+                                        best_score = candidate_score
+                                        header_idx = idx
+
+                                if header_idx is not None and best_score >= 4:
+                                    headers = [normalizar_celula(c).upper() for c in table[header_idx]]
+                                    headers_cache = headers
+                                    data_rows = table[header_idx + 1:]
+                                elif headers_cache:
+                                    headers = headers_cache
+                                    primeira_linha = " ".join(normalizar_celula(c).upper() for c in table[0])
+                                    data_rows = table[1:] if "ELEMENTOS QUE COMPÕEM" in primeira_linha else table
+                                else:
+                                    continue
+
+                                col_nome, col_ean, col_preco = localizar_colunas(headers)
+
+                                for row in data_rows:
+                                    if not row or len(row) <= col_preco:
+                                        continue
+                                    nome = normalizar_celula(row[col_nome]) if col_nome < len(row) else ""
+                                    if not nome or nome.upper() in ("NONE", "", "PRODUTO", "CÓDIGO", "CODIGO"):
+                                        continue
+                                    ean_raw = normalizar_celula(row[col_ean]) if col_ean is not None and col_ean < len(row) else ""
+                                    preco_raw = normalizar_celula(row[col_preco]) if row[col_preco] else ""
+                                    preco = parse_preco_pdf(preco_raw)
+                                    if preco is None:
+                                        continue
+                                    rows_data.append({
+                                        "nome": nome,
+                                        "ean": limpar_ean(ean_raw),
+                                        "preco_base": preco,
+                                    })
+                            except Exception as e:
+                                logger_local.warning(f"tabela do PDF ignorada na pagina {page_number}: {e}")
+                                continue
+                        if page_number == total_pages or page_number % 5 == 0:
+                            emit_progress({
+                                "stage": "extracting_pdf",
+                                "current_page": page_number,
+                                "total_pages": total_pages,
+                                "rows": len(rows_data),
+                            })
+
+                if not rows_data:
+                    diagnostics.append("tabelas=0_produtos")
+                    emit_progress({"stage": "extracting_pdf_text", "total_pages": total_pages, "rows": 0})
+                    try:
+                        rows_data = _ler_pdf_por_texto(pdf)
+                        diagnostics.append(f"texto_pdfplumber={len(rows_data)}_produtos")
+                    except Exception as e:
+                        logger_local.warning(f"fallback por texto com pdfplumber falhou: {e}")
+                        diagnostics.append(f"texto_pdfplumber_erro={type(e).__name__}")
     except Exception as e:
         logger_local.warning(f"pdfplumber falhou: {e}")
         diagnostics.append(f"pdfplumber_erro={type(e).__name__}")
