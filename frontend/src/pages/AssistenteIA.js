@@ -137,6 +137,7 @@ export default function AssistenteIA() {
   const [tabelaSucesso, setTabelaSucesso] = useState(false);
   const [gerandoSeg, setGerandoSeg] = useState(0);
   const [tabelaProgress, setTabelaProgress] = useState(null);
+  const [tabelaErro, setTabelaErro] = useState('');
   const tabelaInputRef = useRef(null);
   const timerRef = useRef(null);
   const abortTabelaRef = useRef(null);
@@ -160,6 +161,7 @@ export default function AssistenteIA() {
     setTabelaSucesso(false);
     setGerandoSeg(0);
     setTabelaProgress(null);
+    setTabelaErro('');
     tabelaJobIdRef.current = null;
     canceladoPeloUsuarioRef.current = false;
     abortTabelaRef.current = new AbortController();
@@ -189,7 +191,9 @@ export default function AssistenteIA() {
           toast.info('Processamento cancelado.');
         }
       } else {
-        toast.error('Erro ao gerar tabela: ' + (err.message || 'Erro desconhecido'));
+        const message = err.message || 'Erro desconhecido';
+        setTabelaErro(message);
+        toast.error('Erro ao gerar tabela. Veja os detalhes na janela.');
       }
     } finally {
       clearInterval(timerRef.current);
@@ -249,7 +253,7 @@ export default function AssistenteIA() {
           <div className="ia-sidebar-title">Ferramentas</div>
           <button
             className="ia-prompt-btn ia-prompt-btn--ferramenta"
-            onClick={() => { setShowTabelaModal(true); setTabelaSucesso(false); }}
+            onClick={() => { setShowTabelaModal(true); setTabelaSucesso(false); setTabelaErro(''); }}
           >
             📊 Gerar tabela de prazos
             <span>Aplica % por prazo na sua tabela base</span>
@@ -294,7 +298,7 @@ export default function AssistenteIA() {
                 <input
                   type="file" accept=".xlsx,.xls,.pdf" ref={tabelaInputRef}
                   style={{ display: 'none' }}
-                  onChange={e => { setTabelaArquivo(e.target.files[0]); setTabelaSucesso(false); }}
+                  onChange={e => { setTabelaArquivo(e.target.files[0]); setTabelaSucesso(false); setTabelaErro(''); }}
                 />
               </div>
 
@@ -401,6 +405,23 @@ export default function AssistenteIA() {
                 <p className="ia-modal-sucesso">
                   ✓ Tabela gerada! Agora suba o arquivo no Robô de Cotação.
                 </p>
+              )}
+
+              {tabelaErro && (
+                <div style={{
+                  marginTop: 12,
+                  padding: 12,
+                  borderRadius: 8,
+                  background: '#2a1717',
+                  border: '1px solid #7f1d1d',
+                  color: '#fecaca',
+                  fontSize: 12,
+                  lineHeight: 1.45,
+                  whiteSpace: 'pre-wrap',
+                  overflowWrap: 'anywhere',
+                }}>
+                  <strong>Erro ao gerar tabela:</strong> {tabelaErro}
+                </div>
               )}
             </div>
           </div>
