@@ -31,3 +31,4 @@ pandas
 
 pdfplumber==0.11.9
 pdfminer.six==20251230
+urllib3>=2.7.0 # not directly required, pinned by Snyk to avoid a vulnerability
