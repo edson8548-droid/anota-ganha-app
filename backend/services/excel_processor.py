@@ -583,6 +583,91 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
         col_preco = max(preco_candidates, default=(0, len(headers) - 1))[1]
         return col_nome if col_nome is not None else 0, col_ean, col_preco
 
+    def linha_ignorada(line):
+        upper = line.upper()
+        return (
+            not line
+            or upper.startswith("DADOS DA EMPRESA")
+            or upper.startswith("EMPRESA:")
+            or upper.startswith("ENDEREÇO:")
+            or upper.startswith("ENDERECO:")
+            or upper.startswith("CNPJ:")
+            or upper.startswith("TELEFONE:")
+            or upper.startswith("CLIENTE:")
+            or upper.startswith("VENDEDOR:")
+            or upper.startswith("REPRES ")
+            or upper.startswith("ELEMENTOS QUE")
+            or upper.startswith("CÓDIGO ")
+            or upper.startswith("CODIGO ")
+            or upper.startswith("UN UNIT")
+            or upper.startswith("TOTAL ")
+            or "DATA EMISS" in upper
+            or "DATA CONCLUS" in upper
+        )
+
+    def parse_preco_pdf(valor):
+        texto = str(valor or "").replace("R$", "").replace(" ", "").strip()
+        if not texto:
+            return None
+        try:
+            if "," in texto:
+                return float(texto.replace(".", "").replace(",", "."))
+
+            parts = texto.split(".")
+            if len(parts) == 2 and len(parts[1]) == 3:
+                return float(texto)
+            if len(parts) > 2 and len(parts[-1]) == 3:
+                return float("".join(parts[:-1]) + "." + parts[-1])
+            return float(texto)
+        except (TypeError, ValueError):
+            return None
+
+    def _ler_pdf_por_texto(pdf):
+        rows_text = []
+        current = None
+
+        row_pattern = _re.compile(
+            r"^\s*(?P<code>\d[\w./-]*)\s+(?P<name>.+?)\s+(?P<ean>\d{8,14})\s+(?P<tail>.+)$"
+        )
+        price_pattern = _re.compile(r"(?<!\d)(\d+(?:[.,]\d{2,3})+)(?!\d)")
+
+        for page_number, page in enumerate(pdf.pages, 1):
+            text = page.extract_text() or ""
+            for raw_line in text.splitlines():
+                line = normalizar_celula(raw_line)
+                if linha_ignorada(line):
+                    continue
+
+                match = row_pattern.match(line)
+                if match:
+                    prices = price_pattern.findall(match.group("tail"))
+                    preco = parse_preco_pdf(prices[0]) if prices else None
+                    if preco is None:
+                        current = None
+                        continue
+                    current = {
+                        "nome": match.group("name").strip(),
+                        "ean": limpar_ean(match.group("ean")),
+                        "preco_base": preco,
+                    }
+                    rows_text.append(current)
+                    continue
+
+                if current and not _re.search(r"\d{8,14}", line):
+                    # Produto quebrado em duas ou mais linhas no PDF.
+                    if len(line) <= 80 and not price_pattern.search(line):
+                        current["nome"] = f"{current['nome']} {line}".strip()
+
+            if progress_callback and (page_number == len(pdf.pages) or page_number % 5 == 0):
+                progress_callback({
+                    "stage": "extracting_pdf_text",
+                    "current_page": page_number,
+                    "total_pages": len(pdf.pages),
+                    "rows": len(rows_text),
+                })
+
+        return rows_text
+
     rows_data = []
     headers_cache = None
     try:
@@ -644,6 +729,10 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
                         "total_pages": total_pages,
                         "rows": len(rows_data),
                     })
+            if not rows_data:
+                if progress_callback:
+                    progress_callback({"stage": "extracting_pdf_text", "total_pages": total_pages, "rows": 0})
+                rows_data = _ler_pdf_por_texto(pdf)
     except Exception as e:
         logger_local.warning(f"pdfplumber falhou: {e}")
 
