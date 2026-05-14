@@ -527,6 +527,15 @@ async def _cleanup_job_input(job):
             pass
 
 
+async def _cleanup_job_output(job):
+    grid_id = job.get("grid_id")
+    if grid_id:
+        try:
+            await _bucket().delete(grid_id)
+        except Exception:
+            pass
+
+
 async def _processar_preview_job(job_id):
     from bson import ObjectId
     from services.excel_processor import ler_cotacao
@@ -750,6 +759,18 @@ async def _processar_tabela_prazos(job_id):
             timeout=540,  # 9 minutes max
         )
 
+        latest_job = await db.cotacao_jobs.find_one({"_id": job_id})
+        if not latest_job or latest_job.get("status") == "canceled":
+            try:
+                os.unlink(resultado_path)
+            except OSError:
+                pass
+            if latest_job:
+                await _cleanup_job_input(latest_job)
+                await db.cotacao_jobs.delete_one({"_id": job_id})
+            logger.info("[Job %s] Cancelado antes de salvar resultado", job_id)
+            return
+
         with open(resultado_path, "rb") as f:
             resultado_bytes = f.read()
         os.unlink(resultado_path)
@@ -849,6 +870,31 @@ async def get_job_status(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=tabela_com_prazos.xlsx"},
     )
+
+
+@router.delete("/jobs/{job_id}")
+async def cancelar_job_tabela_prazos(
+    job_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    uid = await get_user_id(credentials)
+    job = await db.cotacao_jobs.find_one({"_id": job_id, "user_id": uid})
+    if not job:
+        return {"status": "canceled"}
+
+    await _cleanup_job_input(job)
+    await _cleanup_job_output(job)
+
+    if job.get("status") == "processing":
+        await db.cotacao_jobs.update_one(
+            {"_id": job_id, "user_id": uid},
+            {"$set": {"status": "canceled", "canceled_at": datetime.now(timezone.utc)}},
+        )
+    else:
+        await db.cotacao_jobs.delete_one({"_id": job_id, "user_id": uid})
+
+    _running_job_ids.discard(job_id)
+    return {"status": "canceled"}
 
 
 class ConfirmarPayload(BaseModel):
