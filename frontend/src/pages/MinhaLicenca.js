@@ -136,7 +136,7 @@ const MinhaLicenca = () => {
           </div>
           {!assinaturaAtiva && (
             <button onClick={() => navigate('/plans')} style={s.btnPrimary}>
-              Ver planos e assinar
+              Ver planos e assinar →
             </button>
           )}
           {subscription?.status === 'active' && (
@@ -174,7 +174,7 @@ const MinhaLicenca = () => {
               disabled={cupomLoading || !cupomCodigo.trim()}
               style={{ ...s.btnPrimary, opacity: cupomLoading || !cupomCodigo.trim() ? 0.5 : 1 }}
             >
-              {cupomLoading ? 'Aplicando...' : 'Aplicar'}
+              {cupomLoading ? 'Aplicando...' : 'Aplicar →'}
             </button>
           </div>
           {cupomMsg && (
@@ -203,7 +203,7 @@ const MinhaLicenca = () => {
                 <div style={s.extDesc}>Preenche cotações no Cotatudo automaticamente com os preços da sua tabela.</div>
               </div>
               <a href="/venpro-cotatudo-extension.zip" download style={s.btnDownload}>
-                Baixar
+                Baixar →
               </a>
             </div>
 
@@ -214,7 +214,7 @@ const MinhaLicenca = () => {
                 <div style={s.extDesc}>Envia sua oferta para toda a carteira pelo WhatsApp Web com mensagens personalizadas.</div>
               </div>
               <a href="/venpro-whatsapp-extension.zip" download style={s.btnDownload}>
-                Baixar
+                Baixar →
               </a>
             </div>
 
@@ -257,7 +257,7 @@ const s = {
   cardDesc: { fontSize: 13, color: '#A0A3A8', marginBottom: 16, lineHeight: 1.6, marginTop: -6 },
   statusBadge: { display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderRadius: 10, marginBottom: 14 },
   statusText: { fontSize: 14, fontWeight: 600 },
-  btnPrimary: { background: '#3A85A8', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
+  btnPrimary: { background: '#3A85A8', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 22px', minHeight: 42, fontSize: 14, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
   btnDanger: { background: '#2E3136', color: '#D5DBE3', border: '1px solid rgba(145,170,184,.22)', borderRadius: 8, padding: '10px 22px', fontSize: 14, fontWeight: 600, cursor: 'pointer', marginTop: 10, minHeight: 40, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
   cupomInput: { flex: 1, minWidth: 180, padding: '10px 16px', background: '#2B2D31', border: '1px solid #4A4D52', borderRadius: 8, color: '#E1E1E1', fontSize: 14, fontFamily: 'monospace', letterSpacing: 1 },
   extGrid: { display: 'flex', flexDirection: 'column', gap: 12 },
@@ -265,7 +265,7 @@ const s = {
   extIcon: { fontSize: 24, flexShrink: 0 },
   extName: { fontSize: 14, fontWeight: 600, color: '#E1E1E1', marginBottom: 3 },
   extDesc: { fontSize: 12, color: '#A0A3A8', lineHeight: 1.5 },
-  btnDownload: { background: '#3A85A8', color: '#fff', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 },
+  btnDownload: { background: '#3A85A8', color: '#fff', borderRadius: 8, padding: '10px 18px', minHeight: 38, fontSize: 13, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
   installHint: { marginTop: 16, padding: '12px 16px', background: '#2B2D31', borderRadius: 8, fontSize: 12, color: '#A0A3A8', lineHeight: 1.7, borderLeft: '3px solid #3A85A8' },
   code: { background: '#363940', borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace', fontSize: 11, color: '#3A85A8', border: '1px solid #4A4D52' },
 };
