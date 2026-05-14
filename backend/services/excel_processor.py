@@ -549,6 +549,8 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
     def normalizar_celula(valor):
         return " ".join(str(valor or "").replace("\n", " ").split()).strip()
 
+    diagnostics = []
+
     def score_header(headers):
         score = 0
         texto = " ".join(headers)
@@ -687,6 +689,7 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
 
         with pdfplumber.open(caminho_pdf) as pdf:
             total_pages = len(pdf.pages)
+            diagnostics.append(f"pdfplumber_abriu={total_pages}_paginas")
             if progress_callback:
                 progress_callback({"stage": "pdf_opened", "total_pages": total_pages, "rows": 0})
             for page_number, page in enumerate(pdf.pages, 1):
@@ -694,6 +697,7 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
                     tables = page.extract_tables()
                 except Exception as e:
                     logger_local.warning(f"extract_tables falhou na pagina {page_number}: {e}")
+                    diagnostics.append(f"tables_p{page_number}_erro={type(e).__name__}")
                     tables = []
                 for table in tables:
                     try:
@@ -749,14 +753,18 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
                         "rows": len(rows_data),
                     })
             if not rows_data:
+                diagnostics.append("tabelas=0_produtos")
                 if progress_callback:
                     progress_callback({"stage": "extracting_pdf_text", "total_pages": total_pages, "rows": 0})
                 try:
                     rows_data = _ler_pdf_por_texto(pdf)
+                    diagnostics.append(f"texto_pdfplumber={len(rows_data)}_produtos")
                 except Exception as e:
                     logger_local.warning(f"fallback por texto com pdfplumber falhou: {e}")
+                    diagnostics.append(f"texto_pdfplumber_erro={type(e).__name__}")
     except Exception as e:
         logger_local.warning(f"pdfplumber falhou: {e}")
+        diagnostics.append(f"pdfplumber_erro={type(e).__name__}")
 
     if not rows_data:
         try:
@@ -765,14 +773,17 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
             if progress_callback:
                 progress_callback({"stage": "extracting_pdf_text", "rows": 0})
             rows_data = _ler_texto_bruto(extract_text(caminho_pdf) or "")
+            diagnostics.append(f"texto_pdfminer={len(rows_data)}_produtos")
             if progress_callback:
                 progress_callback({"stage": "extracting_pdf_text", "rows": len(rows_data)})
         except Exception as e:
             logger_local.warning(f"fallback por pdfminer falhou: {e}")
+            diagnostics.append(f"pdfminer_erro={type(e).__name__}")
 
     if not rows_data:
+        detalhe = "; ".join(diagnostics[-8:]) if diagnostics else "sem_diagnostico"
         raise ValueError(
-            "Não encontrei produtos e preços nesse PDF. Tente gerar novamente ou converta o arquivo para Excel (.xlsx)."
+            f"Não encontrei produtos e preços nesse PDF. Tente gerar novamente ou converta o arquivo para Excel (.xlsx). Diagnóstico: {detalhe}."
         )
 
     return rows_data
