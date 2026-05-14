@@ -551,6 +551,14 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
 
     diagnostics = []
 
+    def emit_progress(update):
+        if not progress_callback:
+            return
+        try:
+            progress_callback(update)
+        except Exception as e:
+            logger_local.warning(f"callback de progresso falhou: {e}")
+
     def score_header(headers):
         score = 0
         texto = " ".join(headers)
@@ -682,8 +690,8 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
 
             rows_text.extend(_ler_texto_bruto(text))
 
-            if progress_callback and (page_number == len(pdf.pages) or page_number % 5 == 0):
-                progress_callback({
+            if page_number == len(pdf.pages) or page_number % 5 == 0:
+                emit_progress({
                     "stage": "extracting_pdf_text",
                     "current_page": page_number,
                     "total_pages": len(pdf.pages),
@@ -700,8 +708,7 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
         with pdfplumber.open(caminho_pdf) as pdf:
             total_pages = len(pdf.pages)
             diagnostics.append(f"pdfplumber_abriu={total_pages}_paginas")
-            if progress_callback:
-                progress_callback({"stage": "pdf_opened", "total_pages": total_pages, "rows": 0})
+            emit_progress({"stage": "pdf_opened", "total_pages": total_pages, "rows": 0})
             for page_number, page in enumerate(pdf.pages, 1):
                 try:
                     tables = page.extract_tables()
@@ -755,8 +762,8 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
                     except Exception as e:
                         logger_local.warning(f"tabela do PDF ignorada na pagina {page_number}: {e}")
                         continue
-                if progress_callback and (page_number == total_pages or page_number % 5 == 0):
-                    progress_callback({
+                if page_number == total_pages or page_number % 5 == 0:
+                    emit_progress({
                         "stage": "extracting_pdf",
                         "current_page": page_number,
                         "total_pages": total_pages,
@@ -764,8 +771,7 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
                     })
             if not rows_data:
                 diagnostics.append("tabelas=0_produtos")
-                if progress_callback:
-                    progress_callback({"stage": "extracting_pdf_text", "total_pages": total_pages, "rows": 0})
+                emit_progress({"stage": "extracting_pdf_text", "total_pages": total_pages, "rows": 0})
                 try:
                     rows_data = _ler_pdf_por_texto(pdf)
                     diagnostics.append(f"texto_pdfplumber={len(rows_data)}_produtos")
@@ -780,12 +786,10 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
         try:
             from pdfminer.high_level import extract_text
 
-            if progress_callback:
-                progress_callback({"stage": "extracting_pdf_text", "rows": 0})
+            emit_progress({"stage": "extracting_pdf_text", "rows": 0})
             rows_data = _ler_texto_bruto(extract_text(caminho_pdf) or "")
             diagnostics.append(f"texto_pdfminer={len(rows_data)}_produtos")
-            if progress_callback:
-                progress_callback({"stage": "extracting_pdf_text", "rows": len(rows_data)})
+            emit_progress({"stage": "extracting_pdf_text", "rows": len(rows_data)})
         except Exception as e:
             logger_local.warning(f"fallback por pdfminer falhou: {e}")
             diagnostics.append(f"pdfminer_erro={type(e).__name__}")
@@ -855,5 +859,8 @@ def gerar_excel_multiprazos(caminho_base, percentuais, progress_callback=None):
         raise ValueError("Nenhum produto encontrado no arquivo enviado")
 
     if progress_callback:
-        progress_callback({"stage": "writing_excel", "rows": len(rows_data)})
+        try:
+            progress_callback({"stage": "writing_excel", "rows": len(rows_data)})
+        except Exception:
+            pass
     return _gerar_excel_de_dados(rows_data, percentuais)

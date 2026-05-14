@@ -757,16 +757,19 @@ async def _processar_tabela_prazos(job_id):
         loop = asyncio.get_running_loop()
 
         def _progress_threadsafe(update):
-            asyncio.run_coroutine_threadsafe(
-                db.cotacao_jobs.update_one(
+            async def _write_progress():
+                await db.cotacao_jobs.update_one(
                     {"_id": job_id},
                     {"$set": {
                         "progress": update,
                         "progress_updated_at": datetime.now(timezone.utc),
                     }},
-                ),
-                loop,
-            )
+                )
+
+            try:
+                loop.call_soon_threadsafe(lambda: asyncio.create_task(_write_progress()))
+            except RuntimeError as e:
+                logger.warning("[Job %s] Falha ao agendar progresso: %s", job_id, e)
 
         resultado_path = await asyncio.wait_for(
             asyncio.to_thread(gerar_excel_multiprazos, tmp.name, prazos, _progress_threadsafe),
