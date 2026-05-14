@@ -1851,7 +1851,7 @@ const Dashboard = () => {
             <div className="rca-feedback-copy">
               <span className="rca-central-kicker">Feedback</span>
               <h2>Ajude a melhorar o Venpro</h2>
-              <p>Conte o que ficou confuso, o que precisa melhorar ou qual ferramenta faria diferença no seu dia.</p>
+              <p>Conte o que podemos melhorar ou qual ferramenta faria diferença no seu dia.</p>
             </div>
             <form className="rca-feedback-form" onSubmit={handleSendDashboardFeedback}>
               <label>
