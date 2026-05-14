@@ -356,6 +356,8 @@ export default function AssistenteIA() {
                   ? 100
                   : tabelaProgress?.stage === 'extracting_pdf' && tabelaProgress.total_pages
                     ? Math.min(88, Math.max(8, Math.round((tabelaProgress.current_page / tabelaProgress.total_pages) * 88)))
+                    : tabelaProgress?.stage === 'extracting_pdf_text' && tabelaProgress.total_pages && tabelaProgress.current_page
+                      ? Math.min(88, Math.max(8, Math.round((tabelaProgress.current_page / tabelaProgress.total_pages) * 88)))
                     : Math.min(88, Math.round(gerandoSeg / (gerandoSeg + 15) * 100));
                 const color = tabelaSucesso ? '#22c55e' : '#e8412a';
                 let label;
