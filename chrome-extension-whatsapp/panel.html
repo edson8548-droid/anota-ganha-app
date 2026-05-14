@@ -5,11 +5,17 @@
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body { width:100%; font-family:'Segoe UI',Tahoma,sans-serif; background:#2B2D31; color:#E1E1E1; padding:16px; }
-    .header { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
-    .header-logo { width:28px; height:28px; object-fit:contain; }
+    .header { display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+    .header-logo {
+      width:34px;
+      height:34px;
+      border-radius:8px;
+      object-fit:contain;
+      box-shadow:0 0 16px rgba(49,112,142,.22);
+    }
     .header-ven { font-size:19px; font-weight:800; color:#fff; }
     .header-pro { font-size:19px; font-weight:800; color:#3A85A8; }
-    .header-word { font-size:19px; font-weight:800; color:#fff; }
+    .header-word { font-size:22px; font-weight:800; color:#fff; letter-spacing:-0.2px; }
     .header-sub { font-size:11px; color:#A0A3A8; margin-bottom:14px; }
     .status { background:#363940; border:1px solid #4A4D52; border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:13px; line-height:1.4; }
     .status.ok { border-color:#2ECC8A; color:#2ECC8A; }
