@@ -631,6 +631,9 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
         row_pattern = _re.compile(
             r"^\s*(?P<code>\d[\w./-]*)\s+(?P<name>.+?)\s+(?P<ean>\d{8,14})\s+(?P<tail>.+)$"
         )
+        flexible_row_pattern = _re.compile(
+            r"^\s*(?P<name>.+?)\s+(?P<ean>\d{8,14})\s+(?P<tail>.+)$"
+        )
         price_pattern = _re.compile(r"(?<!\d)(\d+(?:[.,]\d{2,3})+)(?!\d)")
 
         for raw_line in str(text or "").splitlines():
@@ -639,14 +642,21 @@ def _ler_pdf_base(caminho_pdf, progress_callback=None):
                 continue
 
             match = row_pattern.match(line)
+            if not match:
+                match = flexible_row_pattern.match(line)
             if match:
                 prices = price_pattern.findall(match.group("tail"))
                 preco = parse_preco_pdf(prices[0]) if prices else None
                 if preco is None:
                     current = None
                     continue
+                nome = match.group("name").strip()
+                nome = _re.sub(r"^\d[\w./-]*\s+", "", nome).strip()
+                if len(nome) < 3 or nome.upper() in ("PRODUTO", "CODIGO", "CÓDIGO"):
+                    current = None
+                    continue
                 current = {
-                    "nome": match.group("name").strip(),
+                    "nome": nome,
                     "ean": limpar_ean(match.group("ean")),
                     "preco_base": preco,
                 }
