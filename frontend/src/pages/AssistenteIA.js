@@ -359,6 +359,10 @@ export default function AssistenteIA() {
                   label = 'Tabela gerada com sucesso!';
                 } else if (tabelaProgress?.stage === 'extracting_pdf') {
                   label = `Lendo PDF: página ${tabelaProgress.current_page}/${tabelaProgress.total_pages} · ${tabelaProgress.rows} produtos encontrados`;
+                } else if (tabelaProgress?.stage === 'extracting_pdf_text') {
+                  label = tabelaProgress.current_page
+                    ? `Lendo texto do PDF: página ${tabelaProgress.current_page}/${tabelaProgress.total_pages} · ${tabelaProgress.rows} produtos encontrados`
+                    : `Lendo texto do PDF: ${tabelaProgress.total_pages || '?'} páginas`;
                 } else if (tabelaProgress?.stage === 'writing_excel') {
                   label = `Montando Excel com ${tabelaProgress.rows} produtos...`;
                 } else if (tabelaProgress?.stage === 'pdf_opened') {
