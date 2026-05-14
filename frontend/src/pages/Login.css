@@ -41,14 +41,6 @@
   filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .3));
 }
 
-.login-logo-full {
-  width: 220px;
-  max-width: 86vw;
-  height: auto;
-  display: block;
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .3));
-}
-
 .login-logo-ven {
   font-size: 30px;
   font-weight: 800;

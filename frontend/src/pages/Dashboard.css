@@ -79,12 +79,6 @@
   flex-shrink: 0;
   filter: drop-shadow(0 4px 10px rgba(0,0,0,.24));
 }
-.logo-full-img {
-  width: 148px;
-  height: auto;
-  display: block;
-  filter: drop-shadow(0 4px 10px rgba(0,0,0,.24));
-}
 .logo-icon {
   width: 34px; height: 34px; border-radius: 8px;
   background: linear-gradient(135deg, var(--acento), #1A6E8A);
