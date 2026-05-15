@@ -58,7 +58,8 @@ def _gerar_excel_multiprazos_worker(caminho_base, prazos, queue):
 
 def _gerar_excel_multiprazos_pdf_isolado(caminho_base, prazos, timeout_seconds=150):
     """Gera tabela de PDF em processo separado para poder encerrar parser travado."""
-    ctx = multiprocessing.get_context("spawn")
+    metodo = "fork" if "fork" in multiprocessing.get_all_start_methods() else "spawn"
+    ctx = multiprocessing.get_context(metodo)
     queue = ctx.Queue()
     process = ctx.Process(
         target=_gerar_excel_multiprazos_worker,
