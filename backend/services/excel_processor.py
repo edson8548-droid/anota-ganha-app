@@ -23,6 +23,14 @@ def _score_coluna_ean(nome_coluna) -> int:
 
     if not c_norm:
         return 0
+    if (
+        "COD PROD" in c_norm
+        or "CODIGO PROD" in c_norm
+        or "COD INTERNO" in c_norm
+        or "CODIGO INTERNO" in c_norm
+        or c_norm in {"COD", "CODIGO", "CÓDIGO"}
+    ):
+        return 0
     if "EAN" in c_norm or "GTIN" in c_norm:
         return 100
     if "CODIGO DE BARRAS" in c_norm or "COD BARRAS" in c_norm or "COD BARRA" in c_norm:
@@ -31,10 +39,6 @@ def _score_coluna_ean(nome_coluna) -> int:
         return 92
     if "BARRAS" in c_norm or "BARRA" in c_norm or "BARCODE" in c_norm:
         return 90
-    if c_norm in {"COD", "CODIGO", "CÓDIGO"}:
-        return 35
-    if "COD PROD" in c_norm or "CODIGO PROD" in c_norm or "COD INTERNO" in c_norm:
-        return 0
     return 0
 
 
@@ -46,7 +50,7 @@ def _melhor_coluna_ean(colunas):
         if score > melhor_score:
             melhor_col = col
             melhor_score = score
-    return melhor_col if melhor_score >= 35 else None
+    return melhor_col if melhor_score >= 80 else None
 
 
 def _xlsx_safe_bytes(caminho_arquivo):
@@ -159,7 +163,7 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
             buf.seek(0)
             df_final = pd.read_excel(buf, header=2)
             col_nome_final = df_final.columns[0]
-            col_ean_final = df_final.columns[1] if len(df_final.columns) > 1 else None
+            col_ean_final = _melhor_coluna_ean(df_final.columns)
             col_preco_final = df_final.columns[-1]
         except Exception:
             return {}, []
@@ -212,7 +216,7 @@ def ler_cotacao(caminho_arquivo):
         return any(k in val for k in _NOME_KW)
 
     def _match_ean(val):
-        return _score_coluna_ean(val) >= 35
+        return _score_coluna_ean(val) >= 80
 
     def _match_preco(val):
         return any(k in val for k in _PRECO_KW)
@@ -250,14 +254,12 @@ def ler_cotacao(caminho_arquivo):
             header_row = found_header
         if col_nome is None:
             col_nome = 0
-        if col_ean is None:
-            col_ean = 1
         if col_preco is None:
             col_preco = ws.max_column - 1
 
         for row_idx in range(header_row + 1, ws.max_row + 1):
             row = ws[row_idx]
-            ean_val  = row[col_ean].value  if col_ean  < len(row) else None
+            ean_val  = row[col_ean].value  if col_ean is not None and col_ean < len(row) else None
             nome_val = row[col_nome].value if col_nome < len(row) else None
             if nome_val and str(nome_val).strip() and str(nome_val).strip().upper() not in ("NONE", "NAN"):
                 itens.append({
@@ -295,14 +297,12 @@ def ler_cotacao(caminho_arquivo):
                     continue
 
                 header_row = hdr + 1
-                if col_ean is None:
-                    col_ean = col_nome + 1
                 if col_preco is None:
                     col_preco = len(df.columns) - 1
 
                 for idx, row in df.iterrows():
                     nome_val = row.iloc[col_nome]
-                    ean_val  = row.iloc[col_ean] if col_ean < len(row) else ""
+                    ean_val  = row.iloc[col_ean] if col_ean is not None and col_ean < len(row) else ""
                     if nome_val and str(nome_val).strip() and str(nome_val).strip() != "nan":
                         itens.append({
                             "ean": str(ean_val) if ean_val and str(ean_val) != "nan" else "",
@@ -476,9 +476,6 @@ def _ler_excel_base(caminho_arquivo):
             if col_preco is None:
                 col_preco = len(df.columns) - 1
 
-            if col_ean is None:
-                col_ean = 1 if col_nome != 1 else 0
-
             rows = _rows_from_df(df, col_nome, col_ean, col_preco)
             if rows:
                 logger_local.info(f"_ler_excel_base: {len(rows)} produtos (pandas header={hdr})")
@@ -508,8 +505,6 @@ def _ler_excel_base(caminho_arquivo):
                 elif col_preco is None and any(k in val for k in PRECO_KEYWORDS):
                     col_preco = cell.column - 1
 
-        if col_ean is None:
-            col_ean = 1 if col_nome != 1 else 0
         if col_preco is None:
             col_preco = ws_in.max_column - 1
 
@@ -517,7 +512,7 @@ def _ler_excel_base(caminho_arquivo):
         for row_idx in range(header_row_idx + 1, ws_in.max_row + 1):
             row = ws_in[row_idx]
             nome = row[col_nome].value if col_nome < len(row) else None
-            ean_raw = row[col_ean].value if col_ean < len(row) else None
+            ean_raw = row[col_ean].value if col_ean is not None and col_ean < len(row) else None
             preco_raw = row[col_preco].value if col_preco < len(row) else None
 
             if not nome or not str(nome).strip() or str(nome).strip().upper() in ("NONE", "NAN"):
