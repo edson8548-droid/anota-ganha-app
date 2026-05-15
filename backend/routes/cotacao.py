@@ -346,6 +346,7 @@ async def processar_cotacao(
     from bson import ObjectId
 
     uid = await get_user_id(credentials)
+    modo = str(modo or "completo").strip().lower()
 
     doc = await db.tabelas_mestre.find_one({"_id": ObjectId(tabela_id), "user_id": uid})
     if not doc:
@@ -424,6 +425,7 @@ async def preview_cotacao(
     from services.matching_engine import processar_cotacao_com_ia
 
     uid = await get_user_id(credentials)
+    modo = str(modo or "completo").strip().lower()
 
     doc = await db.tabelas_mestre.find_one({"_id": ObjectId(tabela_id), "user_id": uid})
     if not doc:
@@ -516,6 +518,7 @@ async def preview_cotacao_async(
     from bson import ObjectId
 
     uid = await get_user_id(credentials)
+    modo = str(modo or "completo").strip().lower()
 
     doc = await db.tabelas_mestre.find_one({"_id": ObjectId(tabela_id), "user_id": uid})
     if not doc:
@@ -612,7 +615,7 @@ async def _processar_preview_job(job_id):
         tmp_cotacao.close()
 
         prazo_efetivo = job.get("prazo") if job.get("prazo", 0) > 0 else doc.get("prazo", 28)
-        modo = job.get("modo", "completo")
+        modo = str(job.get("modo", "completo") or "completo").strip().lower()
 
         def _processar_sync():
             pd, pl = ler_tabela_mestre(tmp_mestre.name, prazo=prazo_efetivo)
@@ -1099,6 +1102,7 @@ async def match_cotatudo(
     from services.matching_engine import processar_cotacao_com_ia
 
     uid = await get_user_id(credentials)
+    modo = str(payload.modo or "completo").strip().lower()
 
     doc = await db.tabelas_mestre.find_one({"_id": ObjectId(payload.tabela_id), "user_id": uid})
     if not doc:
@@ -1125,12 +1129,12 @@ async def match_cotatudo(
 
         def _match_sync():
             pd, pl = ler_tabela_mestre(tmp_mestre.name, prazo=prazo_efetivo)
-            return pd, pl, processar_cotacao_com_ia(itens_para_match, pd, pl, modo=payload.modo)
+            return pd, pl, processar_cotacao_com_ia(itens_para_match, pd, pl, modo=modo)
 
         precos_dict, precos_lista, resultados = await asyncio.to_thread(_match_sync)
 
         aprendizado_map = {}
-        if payload.modo != "ean":
+        if modo != "ean":
             nomes_norm = [normalizar_nome(it["nome"]) for it in itens_para_match]
             cursor = db.cotacao_aprendizado.find(
                 {"user_id": uid, "produto_cotacao_norm": {"$in": nomes_norm}, "confirmado": True}
@@ -1143,7 +1147,7 @@ async def match_cotatudo(
 
         for i, item in enumerate(itens_para_match):
             res = resultados[i]
-            if payload.modo != "ean":
+            if modo != "ean":
                 learned = aprendizado_map.get(normalizar_nome(item["nome"]))
                 if learned:
                     res["preco"] = learned["preco"]

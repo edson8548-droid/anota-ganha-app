@@ -1987,6 +1987,7 @@ def processar_cotacao(itens_cotacao, precos_dict, precos_nome_lista, modo="compl
         lista de {"linha": int, "preco": float|None, "tipo": str|None}
     """
     results = []
+    modo = str(modo or "completo").strip().lower()
     norms_cache = [item['norm'] for item in precos_nome_lista]
 
     for item in itens_cotacao:
