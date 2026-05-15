@@ -148,7 +148,7 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress, option
       return pollRes.blob();
     }
 
-    throw new Error('Tempo esgotado (20 min). PDFs grandes demoram mais — converta para Excel (.xlsx) antes de enviar para processar mais rápido.');
+    throw new Error('Tempo esgotado (20 min). Envie uma planilha Excel (.xlsx) menor ou tente novamente.');
   };
 
   const isServerRestartError = (err) =>

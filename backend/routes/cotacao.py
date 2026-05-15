@@ -734,12 +734,12 @@ async def gerar_tabela_prazos(
         arquivo,
         conteudo,
         label="Tabela para prazos",
-        allowed_extensions={".xlsx", ".pdf"},
-        allowed_kinds={"xlsx", "pdf"},
-        allowed_content_types=XLSX_CONTENT_TYPES | PDF_CONTENT_TYPES,
+        allowed_extensions={".xlsx"},
+        allowed_kinds={"xlsx"},
+        allowed_content_types=XLSX_CONTENT_TYPES,
         max_bytes=MAX_TABELA_PRAZOS_BYTES,
     )
-    ext = ".pdf" if (arquivo.filename or "").lower().endswith(".pdf") else ".xlsx"
+    ext = ".xlsx"
 
     job_id = str(uuid.uuid4())
     bucket = _bucket()

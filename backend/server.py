@@ -36,7 +36,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
-BUILD_VERSION = "pdf-worker-fork-1056134"
+BUILD_VERSION = "prazos-xlsx-only-d4365ec"
 BUILD_COMMIT = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_COMMIT") or "local"
 
 # ==================== App ====================
