@@ -8,6 +8,7 @@ import tempfile
 import logging
 import uuid
 import asyncio
+import multiprocessing
 from datetime import datetime, timezone
 from io import BytesIO
 
@@ -45,6 +46,41 @@ MAX_TABELAS = 5
 MAX_EXCEL_BYTES = 20 * 1024 * 1024
 MAX_COTACAO_PREVIEW_BYTES = 14 * 1024 * 1024
 MAX_TABELA_PRAZOS_BYTES = 25 * 1024 * 1024
+
+
+def _gerar_excel_multiprazos_worker(caminho_base, prazos, queue):
+    try:
+        resultado_path = gerar_excel_multiprazos(caminho_base, prazos)
+        queue.put({"ok": True, "path": resultado_path})
+    except Exception as e:
+        queue.put({"ok": False, "error": str(e), "type": type(e).__name__})
+
+
+def _gerar_excel_multiprazos_pdf_isolado(caminho_base, prazos, timeout_seconds=150):
+    """Gera tabela de PDF em processo separado para poder encerrar parser travado."""
+    ctx = multiprocessing.get_context("spawn")
+    queue = ctx.Queue()
+    process = ctx.Process(
+        target=_gerar_excel_multiprazos_worker,
+        args=(caminho_base, prazos, queue),
+    )
+    process.start()
+    process.join(timeout_seconds)
+
+    if process.is_alive():
+        process.terminate()
+        process.join(5)
+        raise TimeoutError(
+            "Processamento demorou demais. Esse PDF travou a leitura no servidor; converta para Excel (.xlsx) ou use um PDF menor."
+        )
+
+    if queue.empty():
+        raise RuntimeError("Processo de leitura do PDF terminou sem retornar resultado.")
+
+    result = queue.get()
+    if not result.get("ok"):
+        raise ValueError(result.get("error") or "Erro ao ler PDF")
+    return result["path"]
 
 
 def init_cotacao(database):
@@ -771,11 +807,19 @@ async def _processar_tabela_prazos(job_id):
             except RuntimeError as e:
                 logger.warning("[Job %s] Falha ao agendar progresso: %s", job_id, e)
 
-        timeout_seconds = 180 if ext == ".pdf" else 540
-        resultado_path = await asyncio.wait_for(
-            asyncio.to_thread(gerar_excel_multiprazos, tmp.name, prazos, _progress_threadsafe),
-            timeout=timeout_seconds,
-        )
+        if ext == ".pdf":
+            _progress_threadsafe({"stage": "extracting_pdf_text", "rows": 0})
+            resultado_path = await asyncio.to_thread(
+                _gerar_excel_multiprazos_pdf_isolado,
+                tmp.name,
+                prazos,
+                150,
+            )
+        else:
+            resultado_path = await asyncio.wait_for(
+                asyncio.to_thread(gerar_excel_multiprazos, tmp.name, prazos, _progress_threadsafe),
+                timeout=540,
+            )
 
         latest_job = await db.cotacao_jobs.find_one({"_id": job_id})
         if not latest_job or latest_job.get("status") == "canceled":
