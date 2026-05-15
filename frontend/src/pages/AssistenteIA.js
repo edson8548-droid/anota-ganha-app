@@ -289,7 +289,7 @@ export default function AssistenteIA() {
               </div>
 
               <p className="ia-modal-desc">
-                Suba a planilha base do atacadista e informe o % de aumento para cada prazo.
+                Suba a planilha base do atacadista em Excel (.xlsx) e informe o % de aumento para cada prazo.
                 O sistema gera um Excel pronto para subir no Robô de Cotação.
               </p>
 
@@ -300,10 +300,10 @@ export default function AssistenteIA() {
               >
                 {tabelaArquivo
                   ? <span style={{ color: '#1A7A4A', fontWeight: 600 }}>✓ {tabelaArquivo.name}</span>
-                  : <span>Clique para selecionar a tabela base (.xlsx ou .pdf)</span>
+                  : <span>Clique para selecionar a tabela base (.xlsx)</span>
                 }
                 <input
-                  type="file" accept=".xlsx,.xls,.pdf" ref={tabelaInputRef}
+                  type="file" accept=".xlsx" ref={tabelaInputRef}
                   style={{ display: 'none' }}
                   onChange={e => {
                     setTabelaArquivo(e.target.files[0]);
@@ -352,7 +352,7 @@ export default function AssistenteIA() {
                 onClick={handleGerarTabela}
               >
                 {gerandoTabela
-                  ? `Processando... ${gerandoSeg}s${tabelaArquivo?.name?.toLowerCase().endsWith('.pdf') ? ' (PDF pode levar 1-2 min)' : ''}`
+                  ? `Processando... ${gerandoSeg}s`
                   : 'Gerar e baixar tabela'}
               </button>
 
@@ -414,7 +414,7 @@ export default function AssistenteIA() {
 
               {gerandoTabela && gerandoSeg > 10 && (
                 <p style={{ color: '#94a3b8', fontSize: 12, marginTop: 8, textAlign: 'center' }}>
-                  Aguarde — o servidor está lendo {tabelaArquivo?.name?.toLowerCase().endsWith('.pdf') ? 'o PDF' : 'a planilha'} e montando as colunas de prazo.
+                  Aguarde — o servidor está lendo a planilha e montando as colunas de prazo.
                 </p>
               )}
 
