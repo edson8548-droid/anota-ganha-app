@@ -1084,6 +1084,22 @@ def _build_aprendizado_ops(uid, tabela_id, itens, resultados, aprovacoes, agora)
     return ops
 
 
+async def _salvar_aprendizado_confirmacao(uid, tabela_id, itens, resultados, aprovacoes):
+    try:
+        ops = _build_aprendizado_ops(
+            uid,
+            tabela_id,
+            itens,
+            resultados,
+            aprovacoes,
+            datetime.now(timezone.utc),
+        )
+        if ops:
+            await db.cotacao_aprendizado.bulk_write(ops, ordered=False)
+    except Exception as e:
+        logger.error(f"Erro ao salvar aprendizado em segundo plano: {e}")
+
+
 @router.post("/confirmar")
 async def confirmar_cotacao(
     payload: ConfirmarPayload,
@@ -1112,22 +1128,6 @@ async def confirmar_cotacao(
         payload.precos_editados,
     )
 
-    # Salvar aprendizado para itens por descrição em lote.
-    # EAN exato não precisa ser aprendido; gravar item a item em cotação grande
-    # pode segurar a resposta até o navegador acusar Network Error.
-    agora = datetime.now(timezone.utc)
-    aprendizado_ops = _build_aprendizado_ops(
-        uid,
-        sessao["tabela_id"],
-        itens,
-        resultados_confirmados,
-        payload.aprovacoes,
-        agora,
-    )
-
-    if aprendizado_ops:
-        await db.cotacao_aprendizado.bulk_write(aprendizado_ops, ordered=False)
-
     # Gerar Excel com apenas items aprovados preenchidos
     resultados_filtrados = []
     for i, res in enumerate(resultados_confirmados):
@@ -1153,8 +1153,6 @@ async def confirmar_cotacao(
             os.unlink(tmp_cotacao.name)
         except OSError:
             pass
-        # Limpar sessão após uso
-        await db.cotacao_sessoes.delete_one({"_id": payload.session_id})
 
     # Stats apenas dos aprovados
     stats = {"ean": 0, "descricao": 0, "ia": 0, "aprendido": 0, "sem_match": 0, "total": len(itens)}
@@ -1172,6 +1170,15 @@ async def confirmar_cotacao(
             stats["ia"] += 1
         else:
             stats["descricao"] += 1
+
+    task = asyncio.create_task(_salvar_aprendizado_confirmacao(
+        uid,
+        sessao["tabela_id"],
+        itens,
+        resultados_confirmados,
+        payload.aprovacoes,
+    ))
+    _track_background_task(task)
 
     return Response(
         content=resultado_bytes,
