@@ -592,6 +592,11 @@ async def _cleanup_job_output(job):
             pass
 
 
+async def _preview_job_foi_cancelado(job_id):
+    job = await db.cotacao_jobs.find_one({"_id": job_id, "type": "preview"})
+    return not job or job.get("status") == "canceled"
+
+
 async def _processar_preview_job(job_id):
     from bson import ObjectId
     from services.excel_processor import ler_cotacao
@@ -644,6 +649,11 @@ async def _processar_preview_job(job_id):
             timeout=540,
         )
 
+        if await _preview_job_foi_cancelado(job_id):
+            await _cleanup_job_input(job)
+            await db.cotacao_jobs.delete_one({"_id": job_id})
+            return
+
         if modo != "ean":
             nomes_norm = [normalizar_nome(item["nome"]) for item in itens]
             cursor = db.cotacao_aprendizado.find(_aprendizado_query(job["user_id"], job["tabela_id"], nomes_norm))
@@ -654,6 +664,11 @@ async def _processar_preview_job(job_id):
                 if learned:
                     resultados[i]["preco"] = learned["preco"]
                     resultados[i]["tipo"] = "APRENDIDO"
+
+        if await _preview_job_foi_cancelado(job_id):
+            await _cleanup_job_input(job)
+            await db.cotacao_jobs.delete_one({"_id": job_id})
+            return
 
         preview_items = _resultados_para_preview(itens, resultados)
         session_id = str(uuid.uuid4())
@@ -674,11 +689,15 @@ async def _processar_preview_job(job_id):
             {"$set": {"status": "done", "session_id": session_id, "itens": preview_items}},
         )
     except asyncio.TimeoutError:
+        if await _preview_job_foi_cancelado(job_id):
+            return
         await db.cotacao_jobs.update_one(
             {"_id": job_id},
             {"$set": {"status": "error", "error": "Processamento demorou demais. Tente novamente com uma cotação menor ou em modo rápido."}},
         )
     except Exception as e:
+        if await _preview_job_foi_cancelado(job_id):
+            return
         logger.error(f"Erro no preview async (job {job_id}): {e}")
         await db.cotacao_jobs.update_one(
             {"_id": job_id},
@@ -730,9 +749,39 @@ async def get_preview_job_status(
         await db.cotacao_jobs.delete_one({"_id": job_id})
         raise HTTPException(500, job.get("error", "Erro ao processar cotação"))
 
+    if job["status"] == "canceled":
+        await _cleanup_job_input(job)
+        await db.cotacao_jobs.delete_one({"_id": job_id})
+        raise HTTPException(499, "Processamento cancelado")
+
     result = {"session_id": job["session_id"], "itens": job["itens"]}
     await db.cotacao_jobs.delete_one({"_id": job_id})
     return result
+
+
+@router.delete("/preview-jobs/{job_id}")
+async def cancelar_preview_job(
+    job_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    uid = await get_user_id(credentials)
+    job = await db.cotacao_jobs.find_one({"_id": job_id, "user_id": uid, "type": "preview"})
+    if not job:
+        return {"status": "canceled"}
+
+    await _cleanup_job_input(job)
+    await _cleanup_job_output(job)
+
+    if job.get("status") == "processing":
+        await db.cotacao_jobs.update_one(
+            {"_id": job_id, "user_id": uid, "type": "preview"},
+            {"$set": {"status": "canceled", "canceled_at": datetime.now(timezone.utc)}},
+        )
+    else:
+        await db.cotacao_jobs.delete_one({"_id": job_id, "user_id": uid, "type": "preview"})
+
+    _running_job_ids.discard(job_id)
+    return {"status": "canceled"}
 
 
 @router.post("/gerar-tabela-prazos")

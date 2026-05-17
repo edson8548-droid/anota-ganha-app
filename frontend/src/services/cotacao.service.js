@@ -170,15 +170,92 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress, option
   }
 };
 
-export const previewCotacao = async (arquivo, tabelaId, modo = 'completo', prazo = 0) => {
+export const cancelarPreviewCotacao = async (jobId) => {
+  if (!jobId) return;
+  const user = auth.currentUser;
+  if (!user) return;
+  const token = await user.getIdToken();
+  await fetch(apiUrl(`/cotacao/preview-jobs/${jobId}`), {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+};
+
+export const previewCotacao = async (arquivo, tabelaId, modo = 'completo', prazo = 0, options = {}) => {
   const formData = new FormData();
   formData.append('arquivo', arquivo);
   formData.append('tabela_id', tabelaId);
   formData.append('modo', modo);
   formData.append('prazo', prazo);
 
-  const response = await api.post('/cotacao/preview', formData);
-  return response.data; // { session_id, itens }
+  const user = auth.currentUser;
+  if (!user) {
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  const userFinal = auth.currentUser;
+  if (!userFinal) throw new Error('Faça login novamente.');
+  const token = await userFinal.getIdToken();
+  const headers = { Authorization: `Bearer ${token}` };
+
+  let submitRes;
+  try {
+    submitRes = await fetch(apiUrl('/cotacao/preview-async'), {
+      method: 'POST',
+      headers,
+      body: formData,
+      signal: options.signal,
+    });
+  } catch (err) {
+    if (options.signal?.aborted) {
+      throw new DOMException('Processamento cancelado', 'AbortError');
+    }
+    throw new Error('Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.');
+  }
+
+  if (!submitRes.ok) {
+    const text = await submitRes.text();
+    let msg = `Erro ${submitRes.status}`;
+    try { msg = JSON.parse(text).detail || msg; } catch {}
+    throw new Error(msg);
+  }
+
+  const { job_id: jobId } = await submitRes.json();
+  options.onJobId?.(jobId);
+  const maxAttempts = 180; // 9 minutos, alinhado ao limite do backend
+  let notFoundAttempts = 0;
+
+  for (let i = 0; i < maxAttempts; i += 1) {
+    await new Promise(r => setTimeout(r, 3000));
+    if (options.signal?.aborted) {
+      throw new DOMException('Processamento cancelado', 'AbortError');
+    }
+    let pollRes;
+    try {
+      pollRes = await fetch(apiUrl(`/cotacao/preview-jobs/${jobId}`), { headers, signal: options.signal });
+    } catch (err) {
+      if (options.signal?.aborted) {
+        throw new DOMException('Processamento cancelado', 'AbortError');
+      }
+      continue;
+    }
+
+    if (!pollRes.ok) {
+      const text = await pollRes.text();
+      let msg = `Erro ${pollRes.status}`;
+      try { msg = JSON.parse(text).detail || msg; } catch {}
+      if (pollRes.status === 404 && notFoundAttempts < 3) {
+        notFoundAttempts += 1;
+        continue;
+      }
+      throw new Error(msg);
+    }
+
+    const data = await pollRes.json();
+    if (data.status === 'processing') continue;
+    return data; // { session_id, itens }
+  }
+
+  throw new Error('Tempo esgotado. Tente novamente em modo EAN ou com uma cotação menor.');
 };
 
 export const confirmarCotacao = async (sessionId, aprovacoes) => {
