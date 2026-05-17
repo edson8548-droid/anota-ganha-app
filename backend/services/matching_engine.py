@@ -55,8 +55,8 @@ MARCAS_POR_CATEGORIA = {
     'REFR': {'TANG', 'FRISCO', 'CLIGHT', 'MAGUARY', 'MID'},
     'REFRESCO': {'MAGUARY', 'SUCO KAPO', 'GUARA', 'GUARAVITON', 'MID'},
     'SUCO': {'MAGUARY', 'DAFRUTA', 'SERIGY', 'KAPO', 'AURORA', 'TAMPICO', 'DEL VALLE'},
-    'VIN':   {'MARCUSJAMES', 'SANGUEDEBOI', 'COUNTRYWINE', 'STA CAROLINA', 'LA HACIENDA', 'ST GERMAIN', 'CANTINHO', 'AURORA', 'PATA', 'SANTA LORETO'},
-    'VINHO': {'MARCUSJAMES', 'SANGUEDEBOI', 'COUNTRYWINE', 'STA CAROLINA', 'LA HACIENDA', 'ALMADEN', 'CHALISE', 'CHILANO', 'CONCHAYTORO', 'DOM BOSCO', 'SALTON', 'STA HELENA', 'SANTA LORETO'},
+    'VIN':   {'MARCUSJAMES', 'SANGUEDEBOI', 'COUNTRYWINE', 'STA CAROLINA', 'LA HACIENDA', 'ST GERMAIN', 'CANTINHO', 'AURORA', 'PATA', 'SANTA LORETO', 'COLLINA'},
+    'VINHO': {'MARCUSJAMES', 'SANGUEDEBOI', 'COUNTRYWINE', 'STA CAROLINA', 'LA HACIENDA', 'ALMADEN', 'CHALISE', 'CHILANO', 'CONCHAYTORO', 'DOM BOSCO', 'SALTON', 'STA HELENA', 'SANTA LORETO', 'COLLINA'},
     'VODKA':  {'ORLOFF', 'SMIRNOFF', 'ABSOLUT', 'LEONOFF', 'BALALAIKA', 'ASKOV'},
     'WHISKY': {'JACKDANIELS', 'BALLANTINES', 'CHIVAS', 'WHITEHORSE', 'PASSPORT', 'JOHNNIEWALKER', 'J WALKER'},
     'ATUM':   {'COQUEIRO', 'GCOSTA', 'G COSTA', 'G/COSTA', 'PESCADOR', '88', 'GOMES COSTA'},
@@ -77,7 +77,7 @@ MARCAS_POR_CATEGORIA = {
     'CONHAQUE': {'DOMECQ', 'DOMEC', 'DREHER', 'PRESIDENTE', 'POLINHO', 'SAO JOAO DA BARRA'},
     'LAVA ROUPA': {'OMO', 'SURF', 'TIXAN', 'BRILHANTE', 'ARIEL', 'ACE', 'YPE', 'YPÊ', 'URCA', 'ASSIM', 'MINUANO'},
     'AMAC': {'DOWNY', 'COMFORT', 'FOFO', 'AMACITEL', 'VIDA MACIA', 'BABYSOFT', 'BABY SOFT', 'ZERO A DOIS', 'ZEROADOIS', 'GIRANDO SOL', 'URCA', 'MONBIJU', 'SOBRILHO', 'SUPREMA', 'TUFF', 'ZULU', 'CANDURA', 'YPE', 'YPÊ'},
-    'SANITARIA': {'CANDURA', 'CANDIDA', 'QBOA', 'Q-BOA', 'YPE', 'YPÊ', 'BARBAREX', 'SUPERCANDIDA', 'BRILUX'},
+    'SANITARIA': {'CANDURA', 'CANDIDA', 'QBOA', 'Q-BOA', 'YPE', 'YPÊ', 'BARBAREX', 'SUPERCANDIDA', 'BRILUX', 'ALPES'},
     'PAPEL HIG': {'NEVE', 'PERSONAL', 'ELITE', 'MILI', 'COTTON', 'SUBLIME', 'DUETTO', 'DELUXE', 'MAX', 'SCOTT', 'MIMMO', 'NOBRE', 'ISAPEL', 'FANCY', 'PALOMA', 'FLORAL', 'QUALITE', 'PRIMACARE', 'FOLHALEV', 'TIFFY', 'FAMILIAR', 'FOFINHO', 'PRIMAVERA'},
     'PAPEL HIGIENICO': {'NEVE', 'PERSONAL', 'ELITE', 'MILI', 'COTTON', 'SUBLIME', 'DUETTO', 'DELUXE', 'MAX', 'SCOTT', 'MIRIMMO', 'NOBRE', 'ISAPEL', 'FANCY', 'PALOMA', 'FLORAL', 'QUALITE', 'FOLHALEV', 'TIFFY', 'FAMILIAR', 'FOFINHO', 'PRIMAVERA'},
     'FILTRO PAPEL': {'3CORACOES', 'BRIGITTA', 'BRITTA', 'MELITTA', 'SENSEO', 'HARIO', 'JAGUARI'},
@@ -94,7 +94,7 @@ MARCAS_POR_CATEGORIA = {
 
     # Categorias com travas de marca
     'ABS': {'ALWAYS', 'INTIMUS', 'SEMPRE LIVRE', 'S LIVRE'},
-    'DESINF': {'PINHOSOL', 'PINHOBRIL', 'PINHOTROP', 'LYSOFORM', 'BUFALO', 'URCA', 'SANOL', 'FUZZETO', 'FUZETTO', 'YPE', 'YPÊ', 'CANDURA', 'PATO', 'VEJA', 'UAU'},
+    'DESINF': {'PINHOSOL', 'PINHOBRIL', 'PINHOTROP', 'LYSOFORM', 'BUFALO', 'URCA', 'SANOL', 'FUZZETO', 'FUZETTO', 'YPE', 'YPÊ', 'CANDURA', 'PATO', 'VEJA', 'UAU', 'HARPIC'},
     'LV LOUCA': {'YPE', 'YPÊ', 'LIMPOL', 'MINUANO', 'ODD', 'CANDURA', 'CASACLEAN', 'PALMOLIVE', 'FAIRY'},
     'MARG': {'QUALY', 'DELICIA', 'CLAYBOM', 'CREMOSY', 'BECEL', 'VIGOR', 'DORIANA', 'AVIACAO'},
     'SABAO PASTA': {'DIPOL', 'UFE', 'YPE', 'YPÊ', 'URCA'},
@@ -445,6 +445,66 @@ SABORES_CALDO = {
     'CAMARAO', 'PEIXE', 'FEIJAO', 'COSTELINHA',
 }
 
+_CAT_EQUIV_SEGURA = {
+    'DET': 'LV LOUCA',
+    'DETERGENTE': 'LV LOUCA',
+    'LV LOUCA': 'LV LOUCA',
+    'DESINFETANTE': 'DESINF',
+    'SABAO': 'SAB',
+    'BISCOITO': 'BISC',
+    'AGUARDENTE': 'AGUARD',
+    'CACHACA': 'CACHAC',
+    'SHAMPOO': 'SH',
+    'CONDICIONADOR': 'COND',
+    'REPELENTE': 'REPEL',
+    'MACAR': 'MAC',
+    'MAIONESE': 'MAION',
+    'POLPA TOM': 'MOL TOM',
+    'POLPA': 'MOL TOM',
+    'FRALDA': 'FRAL',
+    'PAPEL HIGIENICO': 'PAPEL HIG',
+    'CATCHUP': 'KETCHUP',
+    'T MANCHA': 'ALV',
+    'SABAO BARRA': 'SABAO',
+    'SABAO PASTA': 'SABAO',
+}
+
+_CATEGORIAS_FORTES = (
+    ('AGUA SANITARIA', ('AGUA SANIT', 'AGUA SAN ', 'SANITARIA', 'QBOA', 'Q-BOA')),
+    ('ALVEJANTE', ('ALVEJ', 'ALV ', 'T MANCHA', 'VANISH')),
+    ('ALCOOL', ('ALCOOL',)),
+    ('AMAC', ('AMAC', 'AMACIANTE')),
+    ('APAR', ('APAR', 'BARB')),
+    ('CREME DENTAL', ('CR D ', 'CR DENT', 'CREME DENT')),
+    ('CREOLINA', ('CREOLINA',)),
+    ('DESINF', ('DESINF', 'PINHOSOL', 'PINHOBRIL', 'PINHOTROP', 'HARPIC')),
+    ('DETERGENTE LOUCA', ('DET ', 'DETERG', 'LV LOUCA', 'LAVA LOUCA')),
+    ('FRAL', ('FRAL', 'FRALDA')),
+    ('INSET', ('INSET', 'MATINSET', 'MATA INSET', 'REPEL')),
+    ('LAVA ROUPA', ('LAVA ROUPA', 'LV ROUPA', 'SABAO PO', 'SAB PO')),
+    ('LIMPADOR', ('LIMP ', 'LIMPADOR', 'MULTIUSO', 'VEJA M U')),
+    ('LIMPA VIDRO', ('LIMPA VID', 'LIMP VID')),
+    ('LUSTRA MOVEL', ('LUSTRA', 'LUST MOV')),
+    ('SAPONACEO', ('SAPON', 'SAPOLIO', 'SAPOLEO')),
+    ('VINHO', ('VIN ', 'VINHO')),
+)
+
+_FRAGRANCIAS_LIMPEZA = {
+    'LAVANDA': {'LAVANDA', 'LAV', 'LAVANDER'},
+    'EUCALIPTO': {'EUCALIPTO', 'EUCAL'},
+    'LIMAO': {'LIMAO', 'LEMON', 'CITRUS', 'CITRICO'},
+    'FLORAL': {'FLORAL', 'FLOR'},
+    'TALCO': {'TALCO'},
+    'NEUTRO': {'NEUTRO'},
+    'AZUL': {'AZUL', 'BLUE'},
+    'ROSA': {'ROSA', 'ROSAS'},
+    'PRIMAVERA': {'PRIMAVERA'},
+    'COCO_BAUNILHA': {'COCO BAUNILHA', 'COCO', 'BAUNILHA', 'VANILLA'},
+    'ALGODAO': {'ALGODAO'},
+    'AMENDOAS': {'AMENDOA', 'AMENDOAS'},
+    'ORIENTAL': {'ORIENTAL', 'ORIENT'},
+}
+
 # ─────────────────────────────────────────────
 # FUNÇÕES STANDALONE
 # ─────────────────────────────────────────────
@@ -748,6 +808,8 @@ def normalizar_nome(nome):
         nome = nome.replace("PINHO SOL", "PINHOSOL")
         nome = nome.replace("PINHO BRIL", "PINHOBRIL")
         nome = nome.replace("PINHO TROP", "PINHOTROP")
+        nome = nome.replace("GIRAN SOL", "GIRANDO SOL")
+        nome = nome.replace("GIRASSOL AMAC", "GIRANDO SOL AMAC")
         nome = nome.replace("BABY SOFT", "BABYSOFT")
         nome = nome.replace("MON BIJU", "MONBIJU")
         nome = nome.replace("SO BRILHO", "SOBRILHO")
@@ -1208,11 +1270,142 @@ def _sabores_caldo_incompativeis(nome1, nome2):
         sabores2 = tokens2 & SABORES_CALDO
         return bool(sabores1 and sabores2 and sabores1 != sabores2)
 
+def _tem_sinal_categoria(nome, sinal):
+        if sinal.endswith(' '):
+            return nome.startswith(sinal) or f' {sinal}' in f' {nome} '
+        if ' ' in sinal:
+            return sinal in nome
+        return bool(re.search(r'(?:^|(?<=[^A-Z0-9]))' + re.escape(sinal) + r'(?=[^A-Z0-9]|$)', nome))
+
+def _categorias_seguras(nome):
+        cats = set()
+        for categoria, sinais in _CATEGORIAS_FORTES:
+            if any(_tem_sinal_categoria(nome, sinal) for sinal in sinais):
+                cats.add(categoria)
+
+        for categoria in MARCAS_POR_CATEGORIA:
+            cat = _CAT_EQUIV_SEGURA.get(categoria, categoria)
+            if nome.startswith(categoria + ' ') or f' {categoria} ' in f' {nome} ' or nome == categoria:
+                cats.add(cat)
+
+        if 'AGUA SANITARIA' in cats:
+            cats.discard('AGUA')
+        if 'LIMPA VIDRO' in cats:
+            cats.discard('LIMPADOR')
+        if 'CREME DENTAL' in cats:
+            cats.discard('CREME')
+        return cats
+
+def _marcas_para_categorias(categorias):
+        mapa = {
+            'AGUA SANITARIA': ('SANITARIA',),
+            'DETERGENTE LOUCA': ('DET', 'LV LOUCA'),
+            'DESINF': ('DESINF',),
+            'LIMPADOR': ('LIMP',),
+            'LIMPA VIDRO': ('LIMP',),
+            'LUSTRA MOVEL': ('LUSTRA',),
+            'AMAC': ('AMAC',),
+            'LAVA ROUPA': ('LAVA ROUPA',),
+            'FRAL': ('FRAL', 'FRALDA'),
+            'INSET': ('INSET',),
+            'APAR': ('APAR',),
+            'ALCOOL': ('ALCOOL',),
+            'CREME DENTAL': ('CR D', 'CR DENTAL'),
+            'VINHO': ('VIN', 'VINHO'),
+        }
+        marcas = set()
+        for categoria in categorias:
+            for chave in mapa.get(categoria, (categoria,)):
+                marcas.update(MARCAS_POR_CATEGORIA.get(chave, set()))
+        marcas.update({'CANDURA', 'ALPES', 'BARBAREX', 'HARPIC', 'UFENOL'})
+        return marcas
+
+def _marcas_no_nome(nome, marcas):
+        encontradas = set()
+        for marca in sorted(marcas, key=len, reverse=True):
+            padrao = r'(?:^|(?<=\s))' + re.escape(marca) + r'(?=\s|$)'
+            if re.search(padrao, nome):
+                encontradas.add(marca)
+        return encontradas
+
+def _fragrancias_no_nome(nome):
+        achadas = set()
+        for canonica, aliases in _FRAGRANCIAS_LIMPEZA.items():
+            for alias in aliases:
+                if _tem_sinal_categoria(nome, alias):
+                    achadas.add(canonica)
+                    break
+        return achadas
+
+def _contagens_embalagem(nome):
+        contagens = set()
+        for valor in re.findall(r'\bC(\d+)\b', nome):
+            contagens.add(('C', valor))
+        for valor in re.findall(r'\b(\d+)\s*NOIT(?:E|ES)?\b', nome):
+            contagens.add(('NOITE', valor))
+        for valor in re.findall(r'\b(\d+)\s*PAST(?:ILHA|ILHAS)?\b', nome):
+            contagens.add(('PASTILHA', valor))
+        for valor in re.findall(r'\bLV\s*(\d+)\b', nome):
+            contagens.add(('LEVE', valor))
+        for valor in re.findall(r'\bPG\s*(\d+)\b', nome):
+            contagens.add(('PAGUE', valor))
+        return contagens
+
+def _travas_seguras_nome(nome1, nome2):
+        """
+        Travas conservadoras para impedir preco de produto parecido mas diferente.
+        Usada tambem no matching relaxado para nao deixar a camada 2 contornar
+        categoria, marca, fragrancia ou embalagem.
+        """
+        cats1 = _categorias_seguras(nome1)
+        cats2 = _categorias_seguras(nome2)
+
+        if cats1 and cats2 and not cats1.intersection(cats2):
+            return True
+
+        cats_comuns = cats1.intersection(cats2)
+        if cats_comuns:
+            marcas = _marcas_para_categorias(cats_comuns)
+            marcas1 = _marcas_no_nome(nome1, marcas)
+            marcas2 = _marcas_no_nome(nome2, marcas)
+            if marcas1 and marcas2 and not marcas1.intersection(marcas2):
+                return True
+            cats_marca_obrigatoria = {
+                'AGUA SANITARIA', 'AMAC', 'DESINF', 'DETERGENTE LOUCA',
+                'LAVA ROUPA', 'LIMPADOR', 'LIMPA VIDRO', 'LUSTRA MOVEL',
+                'FRAL', 'INSET', 'APAR', 'ALCOOL',
+            }
+            if cats_comuns & cats_marca_obrigatoria and bool(marcas1) != bool(marcas2):
+                return True
+
+        cats_variantes = {
+            'AGUA SANITARIA', 'ALCOOL', 'AMAC', 'DESINF', 'DETERGENTE LOUCA',
+            'LAVA ROUPA', 'LIMPADOR', 'LIMPA VIDRO', 'LUSTRA MOVEL', 'SAPONACEO',
+        }
+        if cats1 & cats2 & cats_variantes:
+            frag1 = _fragrancias_no_nome(nome1)
+            frag2 = _fragrancias_no_nome(nome2)
+            if bool(frag1) != bool(frag2):
+                return True
+            if frag1 and frag2 and frag1 != frag2:
+                return True
+
+        if cats1 & cats2 & {'FRAL', 'INSET', 'APAR'}:
+            embal1 = _contagens_embalagem(nome1)
+            embal2 = _contagens_embalagem(nome2)
+            if embal1 and embal2 and not embal1.intersection(embal2):
+                return True
+
+        return False
+
 def nomes_incompativeis_v4(nome1, nome2):
         """
         Lógica v4.8 — travas de categoria, marca, peso, subtipo e variante.
         Retorna True se deve BLOQUEAR a comparação.
         """
+        if _travas_seguras_nome(nome1, nome2):
+            return True
+
         # 0. TRAVA DE CATEGORIA CRUZADA (v4.8)
         # Se os nomes pertencem a categorias DIFERENTES → bloqueia
         # Ex: "MARG VIGOR" vs "MAIONESE VIGOR" → MARG ≠ MAIONESE → BLOQUEADO
@@ -1620,6 +1813,9 @@ def _travas_leves(nome1, nome2):
         Travas leves v5.1 — bloqueia categorias cruzadas, marcas
         diferentes, pack sizes, e cross-category same-brand.
         """
+        if _travas_seguras_nome(nome1, nome2):
+            return True
+
         # 1. TRAVA DE CATEGORIA CRUZADA
         _CAT_EQUIV = {
             'DET': 'LV LOUCA', 'DETERGENTE': 'LV LOUCA',
