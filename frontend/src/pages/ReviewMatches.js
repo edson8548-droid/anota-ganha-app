@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 
 const BADGE = {
-  EAN:       { bg: '#14532d', color: '#4ade80', label: 'EAN ✓' },
-  APRENDIDO: { bg: '#1e3a5f', color: '#60a5fa', label: 'Aprendido ✓' },
+  EAN:       { bg: '#14532d', color: '#4ade80', label: 'EAN 100% acerto' },
+  APRENDIDO: { bg: '#1e3a5f', color: '#60a5fa', label: 'Aprendido' },
   pendente:  { bg: '#431407', color: '#fb923c', label: 'Aguarda revisão' },
   sem_match: { bg: '#1e293b', color: '#64748b', label: 'Não encontrado' },
 };
@@ -62,7 +62,8 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
         {itens.map((item, idx) => {
           const badge = badgeInfo(item);
           const aprovado = aprovacoes[idx];
-          const podeToggle = item.status === 'pendente' || item.status === 'aprovado';
+          const automaticoConfiavel = item.status === 'aprovado' && item.tipo === 'EAN';
+          const podeToggle = item.status === 'pendente' || (item.status === 'aprovado' && item.tipo !== 'EAN');
 
           return (
             <div key={idx} style={{
@@ -78,9 +79,7 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
                 borderRadius: 4, padding: '2px 8px', fontSize: 11,
                 fontWeight: 700, whiteSpace: 'nowrap', minWidth: 80, textAlign: 'center',
               }}>
-                {item.tipo && item.status === 'pendente'
-                  ? item.tipo
-                  : badge.label}
+                {item.tipo && item.status === 'pendente' ? item.tipo : badge.label}
               </span>
 
               <span style={{
@@ -116,6 +115,17 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
                 >
                   {aprovado ? 'Rejeitar' : 'Aprovar'}
                 </button>
+              )}
+              {automaticoConfiavel && item.preco && (
+                <span style={{
+                  color: '#4ade80',
+                  fontSize: 12,
+                  fontWeight: 800,
+                  minWidth: 96,
+                  textAlign: 'center',
+                }}>
+                  Automático
+                </span>
               )}
             </div>
           );
