@@ -142,11 +142,11 @@ export default function Cotacao() {
     toast.info('Processamento cancelado.');
   };
 
-  const handleConfirmar = async (aprovacoes) => {
+  const handleConfirmar = async (aprovacoes, precosEditados) => {
     if (!reviewData) return;
     setConfirmando(true);
     try {
-      const { blob, stats, semMatch } = await confirmarCotacao(reviewData.session_id, aprovacoes);
+      const { blob, stats, semMatch } = await confirmarCotacao(reviewData.session_id, aprovacoes, precosEditados);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

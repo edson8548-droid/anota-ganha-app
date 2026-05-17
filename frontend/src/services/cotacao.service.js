@@ -258,10 +258,10 @@ export const previewCotacao = async (arquivo, tabelaId, modo = 'completo', prazo
   throw new Error('Tempo esgotado. Tente novamente em modo EAN ou com uma cotação menor.');
 };
 
-export const confirmarCotacao = async (sessionId, aprovacoes) => {
+export const confirmarCotacao = async (sessionId, aprovacoes, precosEditados) => {
   const response = await api.post(
     '/cotacao/confirmar',
-    { session_id: sessionId, aprovacoes },
+    { session_id: sessionId, aprovacoes, precos_editados: precosEditados },
     { responseType: 'blob' }
   );
 

@@ -84,3 +84,30 @@ def test_confirmar_nao_grava_aprendizado_para_matches_ean():
         "tabela_id": "tabela-a",
         "produto_cotacao_norm": "FEIJAO TESTE 1KG",
     }
+
+
+def test_confirmar_aplica_precos_editados_antes_do_aprendizado():
+    resultados = [
+        {"linha": 2, "preco": 10.0, "tipo": "EAN"},
+        {"linha": 3, "preco": 7.5, "tipo": "SIMILAR 92%"},
+        {"linha": 4, "preco": None, "tipo": None},
+    ]
+
+    atualizados = cotacao._resultados_com_precos_editados(resultados, [9.8, 7.25, 3.0])
+
+    assert atualizados[0]["preco"] == 9.8
+    assert atualizados[1]["preco"] == 7.25
+    assert atualizados[2]["preco"] is None
+    assert resultados[0]["preco"] == 10.0
+
+    ops = cotacao._build_aprendizado_ops(
+        "user-1",
+        "tabela-a",
+        [{"nome": "ARROZ TESTE 5KG"}, {"nome": "FEIJAO TESTE 1KG"}, {"nome": "MACARRAO"}],
+        atualizados,
+        [True, True, False],
+        datetime.now(timezone.utc),
+    )
+
+    assert len(ops) == 1
+    assert ops[0]._doc["$set"]["preco"] == 7.25

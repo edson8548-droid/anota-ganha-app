@@ -1030,6 +1030,20 @@ async def cancelar_job_tabela_prazos(
 class ConfirmarPayload(BaseModel):
     session_id: str
     aprovacoes: List[bool]  # um bool por item, na mesma ordem do preview
+    precos_editados: List[float | None] | None = None
+
+
+def _resultados_com_precos_editados(resultados, precos_editados):
+    if not precos_editados:
+        return [dict(res) for res in resultados]
+
+    atualizados = []
+    for res, preco_editado in zip(resultados, precos_editados):
+        novo = dict(res)
+        if novo.get("preco") is not None and preco_editado is not None and preco_editado > 0:
+            novo["preco"] = float(preco_editado)
+        atualizados.append(novo)
+    return atualizados
 
 
 def _build_aprendizado_ops(uid, tabela_id, itens, resultados, aprovacoes, agora):
@@ -1088,6 +1102,13 @@ async def confirmar_cotacao(
 
     if len(payload.aprovacoes) != len(itens):
         raise HTTPException(400, "Número de aprovações não corresponde ao número de itens.")
+    if payload.precos_editados is not None and len(payload.precos_editados) != len(itens):
+        raise HTTPException(400, "Número de preços editados não corresponde ao número de itens.")
+
+    resultados_confirmados = _resultados_com_precos_editados(
+        resultados,
+        payload.precos_editados,
+    )
 
     # Salvar aprendizado para itens por descrição em lote.
     # EAN exato não precisa ser aprendido; gravar item a item em cotação grande
@@ -1097,7 +1118,7 @@ async def confirmar_cotacao(
         uid,
         sessao["tabela_id"],
         itens,
-        resultados,
+        resultados_confirmados,
         payload.aprovacoes,
         agora,
     )
@@ -1107,7 +1128,7 @@ async def confirmar_cotacao(
 
     # Gerar Excel com apenas items aprovados preenchidos
     resultados_filtrados = []
-    for i, res in enumerate(resultados):
+    for i, res in enumerate(resultados_confirmados):
         if payload.aprovacoes[i] and res.get("preco") is not None:
             resultados_filtrados.append(res)
         else:
@@ -1136,7 +1157,7 @@ async def confirmar_cotacao(
     # Stats apenas dos aprovados
     stats = {"ean": 0, "descricao": 0, "ia": 0, "aprendido": 0, "sem_match": 0, "total": len(itens)}
     sem_match = []
-    for item, res, aprovado in zip(itens, resultados, payload.aprovacoes):
+    for item, res, aprovado in zip(itens, resultados_confirmados, payload.aprovacoes):
         tipo = res.get("tipo")
         if not aprovado or res.get("preco") is None:
             stats["sem_match"] += 1
