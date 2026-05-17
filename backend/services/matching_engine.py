@@ -1883,7 +1883,7 @@ def encontrar_preco(ean, nome_original, precos_dict, precos_nome_lista, norms_ca
 
         # Pré-filtro rápido: top-100 candidatos por score fuzz (O(N) com C-speed)
         # Travas são checadas só nos candidatos pré-filtrados → muito mais rápido
-        candidatos = _candidatos_rapidos(n_site, n_site_ord, precos_nome_lista, norms_cache, limit=100, score_cutoff=40)
+        candidatos = _candidatos_rapidos(n_site, n_site_ord, precos_nome_lista, norms_cache, limit=40, score_cutoff=55)
 
         # ═══════════════════════════════════════════════════════════
         # CAMADA 1: Matching padrão (75% + travas rigorosas)
