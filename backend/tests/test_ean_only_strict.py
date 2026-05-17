@@ -46,6 +46,20 @@ def test_coluna_codigo_na_cotacao_nao_e_tratada_como_ean():
     assert itens[0]["ean"] == ""
 
 
+def test_coluna_cod_produto_nao_e_tratada_como_descricao():
+    path = _xlsx([
+        ["Cód. Produto", "Ean", "Descrição", "Emb."],
+        [68009, "7896369615077", "ABACAXI CALDA MARIZA LT 400G", 12],
+    ])
+    try:
+        itens, _ = ler_cotacao(path)
+    finally:
+        os.unlink(path)
+
+    assert itens[0]["nome"] == "ABACAXI CALDA MARIZA LT 400G"
+    assert itens[0]["ean"] == "7896369615077"
+
+
 def test_coluna_codigo_na_tabela_mestre_nao_entra_no_dict_de_ean():
     path = _xlsx([
         ["PRODUTO", "CODIGO", "28"],

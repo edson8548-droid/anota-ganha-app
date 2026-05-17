@@ -213,6 +213,8 @@ def ler_cotacao(caminho_arquivo):
                  "PRECO UNIT", "PREÇO UNIT", "UNIT")
 
     def _match_nome(val):
+        if "PRODUTO" in val and any(k in val for k in ("COD", "CÓD", "CODIGO", "CÓDIGO")):
+            return False
         return any(k in val for k in _NOME_KW)
 
     def _match_ean(val):
