@@ -53,6 +53,47 @@ def _melhor_coluna_ean(colunas):
     return melhor_col if melhor_score >= 80 else None
 
 
+def _score_coluna_preco(nome_coluna, prazo=None) -> int:
+    """Pontua colunas de preco evitando total, embalagem e quantidade."""
+    c = str(nome_coluna or "").upper().strip()
+    c = _re.sub(r"\s+", " ", c)
+    c_norm = _re.sub(r"[^A-Z0-9]+", " ", c).strip()
+
+    if not c_norm:
+        return 0
+
+    if any(k in c_norm for k in ("TOTAL", "EMB", "CAIXA", "CX", "QTD", "QTDE", "QUANT")):
+        return 0
+
+    if prazo:
+        nums = _re.findall(r"\b(\d+)\b", c_norm)
+        if str(prazo) in nums:
+            return 100
+
+    if "UNIT" in c_norm or "UNITARIO" in c_norm or "UNITARIA" in c_norm:
+        return 95
+    if "PRECO UNIT" in c_norm or "VALOR UNIT" in c_norm:
+        return 95
+    if c_norm in {"R UNIT", "RS UNIT", "R UNITARIO", "RS UNITARIO"}:
+        return 95
+    if c_norm in {"PRECO", "PRE O", "VALOR", "R", "RS"}:
+        return 60
+    if "PRECO" in c_norm or "VALOR" in c_norm:
+        return 55
+    return 0
+
+
+def _melhor_coluna_preco(colunas, prazo=None):
+    melhor_col = None
+    melhor_score = 0
+    for col in colunas:
+        score = _score_coluna_preco(col, prazo=prazo)
+        if score > melhor_score:
+            melhor_col = col
+            melhor_score = score
+    return melhor_col if melhor_score >= 55 else None
+
+
 def _xlsx_safe_bytes(caminho_arquivo):
     """
     Retorna BytesIO do xlsx com styles.xml corrigido.
@@ -130,13 +171,8 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
             cols_str = [str(c) for c in cols]
             cols_up = [c.upper() for c in cols_str]
 
-            # Coluna de preço pelo prazo: número exato como palavra
-            c_preco = None
-            for i, c in enumerate(cols_str):
-                nums = _re.findall(r'\b(\d+)\b', c)
-                if str(prazo) in nums:
-                    c_preco = cols[i]
-                    break
+            # Coluna de preço: prazo quando existir; senão preço unitário.
+            c_preco = _melhor_coluna_preco(cols, prazo=prazo)
 
             # Coluna de nome
             c_nome = None
@@ -180,8 +216,8 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
         ean = limpar_ean(ean_raw)
 
         try:
-            preco = float(str(row[col_preco_final]).replace(",", ".").replace("R$", "").strip())
-            if preco <= 0:
+            preco = float(str(row[col_preco_final]).replace(",", ".").replace("R$", "").replace(" ", "").strip())
+            if pd.isna(preco) or preco <= 0:
                 continue
         except (ValueError, TypeError):
             continue

@@ -74,6 +74,29 @@ def test_coluna_codigo_na_tabela_mestre_nao_entra_no_dict_de_ean():
     assert precos_nome[0]["preco"] == 25.9
 
 
+def test_tabela_mestre_sem_prazo_usa_preco_unitario_e_nao_total():
+    path = _xlsx([
+        ["Dados da Empresa e do Cliente", None, None, None, None, None, None, None, None, None],
+        ["Empresa: TESTE", None, None, None, None, None, None, None, None, None],
+        ["Elementos que compõem o Pedido", None, None, None, None, None, None, None, None, None],
+        ["Código", "Produto", "EAN", "Emb.", "Qtde", None, "Qtd.\nUN", "R$\nUnit.", "R$\nEmb.", "R$\nTotal"],
+        ["3511-18", "ABS ALWAYS BASICO C/8 C/ABA PQ SC", "7500435127226", "CX-18", 1, None, 18, "3.1 21", "56.1 80", "56.1 80"],
+        ["Total Venda:", None, None, None, None, None, None, None, None, None],
+        ["3531-16", "ABS INTIMUS NOTURNO C/30 SECO", "7896007550906", "CX-16", 1, None, 16, "1 6.1 60", "258.56", "258.56"],
+    ])
+    try:
+        precos, precos_nome = ler_tabela_mestre(path, prazo=28)
+    finally:
+        os.unlink(path)
+
+    assert precos["7500435127226"] == 3.121
+    assert precos["7896007550906"] == 16.160
+    assert [item["orig"] for item in precos_nome] == [
+        "ABS ALWAYS BASICO C/8 C/ABA PQ SC",
+        "ABS INTIMUS NOTURNO C/30 SECO",
+    ]
+
+
 def test_resultado_nao_sobrescreve_coluna_embalagem_quando_nao_ha_preco():
     path = _xlsx([
         ["Cód. Produto", "Ean", "Descrição", "Emb."],
