@@ -2087,12 +2087,14 @@ def encontrar_preco(ean, nome_original, precos_dict, precos_nome_lista, norms_ca
         melhor_nota, preco_candidato, melhor_orig = 0, None, None
 
         for item in candidatos:
-            if nomes_incompativeis_v4(n_site, item['norm']):
-                continue
-
             nota_sort = fuzz.token_sort_ratio(n_site_ord, item['ord'])  / 100.0
             nota_set  = fuzz.token_set_ratio(n_site, item['norm'])      / 100.0
             nota = max(nota_sort, nota_set)
+
+            if nota < TAXA_SIMILARIDADE or nota <= melhor_nota:
+                continue
+            if nomes_incompativeis_v4(n_site, item['norm']):
+                continue
 
             if nota > melhor_nota:
                 melhor_nota = nota
@@ -2111,13 +2113,15 @@ def encontrar_preco(ean, nome_original, precos_dict, precos_nome_lista, norms_ca
         melhor_nota2, preco_candidato2 = 0, None
 
         for item in candidatos:
-            # Travas reduzidas: só categoria e marca
-            if _travas_leves(n_site, item['norm']):
-                continue
-
             nota_sort = fuzz.token_sort_ratio(n_site_ord, item['ord'])  / 100.0
             nota_set  = fuzz.token_set_ratio(n_site, item['norm'])      / 100.0
             nota = max(nota_sort, nota_set)
+
+            if nota < TAXA_CAMADA2 or nota <= melhor_nota2:
+                continue
+            # Travas reduzidas: só categoria e marca
+            if _travas_leves(n_site, item['norm']):
+                continue
 
             if nota > melhor_nota2:
                 melhor_nota2 = nota
@@ -2151,13 +2155,15 @@ def encontrar_preco(ean, nome_original, precos_dict, precos_nome_lista, norms_ca
                     if not re.search(padrao_marca, item['norm']):
                         continue
 
-                # 3. Travas de embalagem (LT vs SC) também se aplicam na camada 3
-                if nomes_incompativeis_v4(n_site, item['norm']):
-                    continue
-
                 nota_sort = fuzz.token_sort_ratio(n_site_ord, item['ord'])  / 100.0
                 nota_set  = fuzz.token_set_ratio(n_site, item['norm'])      / 100.0
                 nota = max(nota_sort, nota_set)
+
+                if nota < TAXA_CAMADA3 or nota <= melhor_nota3:
+                    continue
+                # 3. Travas de embalagem (LT vs SC) também se aplicam na camada 3
+                if nomes_incompativeis_v4(n_site, item['norm']):
+                    continue
 
                 if nota > melhor_nota3:
                     melhor_nota3 = nota
