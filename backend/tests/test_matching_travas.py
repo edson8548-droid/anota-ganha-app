@@ -210,6 +210,91 @@ def test_matching_nao_usa_preco_galinha_ou_carne_para_caldo_bacon_costela():
     assert preco is None
     assert tipo is None
 
+def test_travas_muffato_bloqueiam_marca_categoria_fragrancia_e_embalagem():
+    casos = [
+        (
+            "AGUA SANIT CANDURA 2L",
+            "AGUA SAN ALPES 2L",
+            "agua sanitaria com marcas diferentes nao deve casar",
+        ),
+        (
+            "AGUA SANIT CANDURA 5L",
+            "AGUA SAN DA ILHA FC 5L",
+            "agua sanitaria com marca conhecida nao deve casar com item sem essa marca",
+        ),
+        (
+            "ALCOOL COPERALCOOL 46 1L LAVANDA ORIENT",
+            "ALCOOL COPERALCOOL EUCALIPTO 46 1L",
+            "alcool com fragrancias diferentes nao deve casar",
+        ),
+        (
+            "CREOLINA UFENOL 750ML",
+            "VINHO COLLINA 750ML",
+            "creolina nao deve casar com vinho pelo volume",
+        ),
+        (
+            "DETERG LIQ YPE 500ML LIMAO",
+            "LIMPA VID LIMPOL REF 500ML",
+            "detergente de louca nao deve casar com limpa vidro",
+        ),
+        (
+            "DESINF PINHO SOL 500ML LAVANDA",
+            "DESINF PINHO SOL 500ML, LEMON, .",
+            "desinfetante lavanda nao deve casar com lemon",
+        ),
+        (
+            "DESINF PINHO SOL 500ML LAVANDA",
+            "DESINF PINHO SOL 500ML, ORIG, .",
+            "desinfetante com fragrancia nao deve casar com original",
+        ),
+        (
+            "DESINF PINHO SOL 500ML LAVANDA",
+            "DESINF PINHO SOL 500ML, CITRUS LAV, .",
+            "desinfetante lavanda nao deve casar com combinacao citrus lavanda",
+        ),
+        (
+            "FRALDA PAMPERS CONFORT SEC M C/26",
+            "FRAL PAMPERS CONFORT SEC M C/24",
+            "fralda com quantidade diferente nao deve casar",
+        ),
+        (
+            "INSET RAID ELETRICO APARELHO + 4 PAST C/12",
+            "INSET RAID 45 NOITES",
+            "inseticida aparelho/pastilha nao deve casar com refil por noites",
+        ),
+    ]
+
+    for cotacao, tabela, motivo in casos:
+        assert _incompat(cotacao, tabela), motivo
+
+def test_matching_muffato_nao_usa_preco_errado_em_casos_riscados():
+    itens = [
+        _price_item("AGUA SAN ALPES 2L", 4.99),
+        _price_item("AGUA SAN DA ILHA FC 5L", 12.03),
+        _price_item("ALCOOL COPERALCOOL EUCALIPTO 46 1L", 8.99),
+        _price_item("VINHO COLLINA 750ML", 18.99),
+        _price_item("LIMPA VID LIMPOL REF 500ML", 5.49),
+        _price_item("DESINF PINHO SOL 500ML, LEMON, .", 6.67),
+        _price_item("DESINF PINHO SOL 500ML, ORIG, .", 6.49),
+        _price_item("DESINF PINHO SOL 500ML, CITRUS LAV, .", 6.89),
+        _price_item("FRAL PAMPERS CONFORT SEC M C/24", 33.99),
+        _price_item("INSET RAID 45 NOITES", 29.99),
+    ]
+
+    for nome in [
+        "AGUA SANIT CANDURA 2L",
+        "AGUA SANIT CANDURA 5L",
+        "ALCOOL COPERALCOOL 46 1L LAVANDA ORIENT",
+        "CREOLINA UFENOL 750ML",
+        "DETERG LIQ YPE 500ML LIMAO",
+        "DESINF PINHO SOL 500ML LAVANDA",
+        "FRALDA PAMPERS CONFORT SEC M C/26",
+        "INSET RAID ELETRICO APARELHO + 4 PAST C/12",
+    ]:
+        preco, tipo = encontrar_preco("", nome, {}, itens, [item["norm"] for item in itens])
+        assert preco is None
+        assert tipo is None
+
 def test_caldo_knorr_114g_nao_cruza_sabores():
     sabores = ["CARNE", "COSTELA", "GALINHA", "LEGUMES"]
     for sabor_a in sabores:
