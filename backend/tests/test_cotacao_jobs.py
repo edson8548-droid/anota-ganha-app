@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sys
+from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -53,4 +54,33 @@ def test_aprendizado_key_isola_por_tabela():
         "user_id": "user-1",
         "tabela_id": "tabela-b",
         "produto_cotacao_norm": "ARROZ",
+    }
+
+
+def test_confirmar_nao_grava_aprendizado_para_matches_ean():
+    itens = [
+        {"nome": "ARROZ TESTE 5KG"},
+        {"nome": "FEIJAO TESTE 1KG"},
+        {"nome": "MACARRAO TESTE 500G"},
+    ]
+    resultados = [
+        {"preco": 10.0, "tipo": "EAN"},
+        {"preco": 7.5, "tipo": "SIMILAR 92%"},
+        {"preco": None, "tipo": None},
+    ]
+
+    ops = cotacao._build_aprendizado_ops(
+        "user-1",
+        "tabela-a",
+        itens,
+        resultados,
+        [True, True, False],
+        datetime.now(timezone.utc),
+    )
+
+    assert len(ops) == 1
+    assert ops[0]._filter == {
+        "user_id": "user-1",
+        "tabela_id": "tabela-a",
+        "produto_cotacao_norm": "FEIJAO TESTE 1KG",
     }
