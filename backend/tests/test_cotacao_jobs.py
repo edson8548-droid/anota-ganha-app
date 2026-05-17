@@ -97,7 +97,8 @@ def test_confirmar_aplica_precos_editados_antes_do_aprendizado():
 
     assert atualizados[0]["preco"] == 9.8
     assert atualizados[1]["preco"] == 7.25
-    assert atualizados[2]["preco"] is None
+    assert atualizados[2]["preco"] == 3.0
+    assert atualizados[2]["tipo"] == "MANUAL"
     assert resultados[0]["preco"] == 10.0
 
     ops = cotacao._build_aprendizado_ops(
@@ -105,9 +106,10 @@ def test_confirmar_aplica_precos_editados_antes_do_aprendizado():
         "tabela-a",
         [{"nome": "ARROZ TESTE 5KG"}, {"nome": "FEIJAO TESTE 1KG"}, {"nome": "MACARRAO"}],
         atualizados,
-        [True, True, False],
+        [True, True, True],
         datetime.now(timezone.utc),
     )
 
-    assert len(ops) == 1
+    assert len(ops) == 2
     assert ops[0]._doc["$set"]["preco"] == 7.25
+    assert ops[1]._doc["$set"]["preco"] == 3.0

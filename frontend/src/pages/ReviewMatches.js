@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 const BADGE = {
   EAN:       { bg: '#14532d', color: '#4ade80', label: 'EAN 100% acerto' },
   APRENDIDO: { bg: '#1e3a5f', color: '#60a5fa', label: 'Aprendido' },
+  manual:    { bg: '#3f2f05', color: '#facc15', label: 'Preço manual' },
   pendente:  { bg: '#431407', color: '#fb923c', label: 'Aguarda revisão' },
   sem_match: { bg: '#1e293b', color: '#64748b', label: 'Não encontrado' },
 };
@@ -49,11 +50,10 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
   const aprovados = aprovacoes.filter(Boolean).length;
   const total = itens.length;
   const precosEditados = precos.map((value, idx) => {
-    if (itens[idx].preco == null) return null;
     return parsePrice(value);
   });
   const temPrecoInvalido = itens.some((item, idx) =>
-    aprovacoes[idx] && item.preco != null && precosEditados[idx] == null
+    aprovacoes[idx] && precosEditados[idx] == null
   );
 
   return (
@@ -94,12 +94,19 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
           const badge = badgeInfo(item);
           const aprovado = aprovacoes[idx];
           const automaticoConfiavel = item.status === 'aprovado' && item.tipo === 'EAN';
-          const podeToggle = item.status === 'pendente' || (item.status === 'aprovado' && item.tipo !== 'EAN');
-          const precoEditavel = item.preco != null;
           const precoAtual = precosEditados[idx];
+          const semMatchComPrecoManual = item.status === 'sem_match' && precoAtual != null;
+          const podeToggle = item.status === 'pendente'
+            || (item.status === 'aprovado' && item.tipo !== 'EAN')
+            || semMatchComPrecoManual
+            || (item.status === 'sem_match' && aprovado);
+          const precoEditavel = true;
           const precoOriginal = Number(item.preco);
-          const precoAlterado = precoEditavel && precoAtual != null && Math.abs(precoAtual - precoOriginal) >= 0.005;
+          const precoAlterado = precoEditavel && precoAtual != null && (
+            item.preco == null || Math.abs(precoAtual - precoOriginal) >= 0.005
+          );
           const precoInvalido = aprovado && precoEditavel && precoAtual == null;
+          const badgeAtual = semMatchComPrecoManual ? BADGE.manual : badge;
 
           return (
             <div key={idx} style={{
@@ -108,14 +115,14 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
               borderRadius: 8,
               padding: '10px 14px',
               border: `1px solid ${aprovado ? '#166534' : '#334155'}`,
-              opacity: item.status === 'sem_match' ? 0.55 : 1,
+              opacity: item.status === 'sem_match' && !semMatchComPrecoManual ? 0.72 : 1,
             }}>
               <span style={{
-                background: badge.bg, color: badge.color,
+                background: badgeAtual.bg, color: badgeAtual.color,
                 borderRadius: 4, padding: '2px 8px', fontSize: 11,
                 fontWeight: 700, whiteSpace: 'nowrap', minWidth: 80, textAlign: 'center',
               }}>
-                {item.tipo && item.status === 'pendente' ? item.tipo : badge.label}
+                {item.tipo && item.status === 'pendente' ? item.tipo : badgeAtual.label}
               </span>
 
               <span style={{
@@ -138,6 +145,7 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
                     value={precos[idx]}
                     onChange={(e) => updatePreco(idx, e.target.value)}
                     inputMode="decimal"
+                    placeholder="0,00"
                     aria-label={`Preço de ${item.nome_cotacao}`}
                     style={{
                       width: 72,
@@ -164,18 +172,19 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
                 </span>
               )}
 
-              {podeToggle && item.preco && (
+              {podeToggle && (
                 <button
                   onClick={() => toggle(idx)}
+                  disabled={!aprovado && precoAtual == null}
                   style={{
-                    background: aprovado ? '#ef4444' : '#16a34a',
+                    background: (!aprovado && precoAtual == null) ? '#475569' : aprovado ? '#ef4444' : '#16a34a',
                     color: '#fff',
                     border: 'none',
                     borderRadius: 6,
                     padding: '4px 12px',
                     fontSize: 12,
                     fontWeight: 700,
-                    cursor: 'pointer',
+                    cursor: (!aprovado && precoAtual == null) ? 'not-allowed' : 'pointer',
                     minWidth: 70,
                   }}
                 >
