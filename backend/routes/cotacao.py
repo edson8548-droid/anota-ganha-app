@@ -1040,8 +1040,10 @@ def _resultados_com_precos_editados(resultados, precos_editados):
     atualizados = []
     for res, preco_editado in zip(resultados, precos_editados):
         novo = dict(res)
-        if novo.get("preco") is not None and preco_editado is not None and preco_editado > 0:
+        if preco_editado is not None and preco_editado > 0:
             novo["preco"] = float(preco_editado)
+            if novo.get("tipo") is None:
+                novo["tipo"] = "MANUAL"
         atualizados.append(novo)
     return atualizados
 
