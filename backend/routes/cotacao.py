@@ -89,6 +89,23 @@ def init_cotacao(database):
     db = database
 
 
+def _aprendizado_query(user_id: str, tabela_id: str, nomes_norm):
+    return {
+        "user_id": user_id,
+        "tabela_id": str(tabela_id),
+        "produto_cotacao_norm": {"$in": nomes_norm},
+        "confirmado": True,
+    }
+
+
+def _aprendizado_key(user_id: str, tabela_id: str, nome_norm: str):
+    return {
+        "user_id": user_id,
+        "tabela_id": str(tabela_id),
+        "produto_cotacao_norm": nome_norm,
+    }
+
+
 def _resultados_para_preview(itens, resultados):
     """Converte itens + resultados do matching para formato de preview da UI."""
     preview = []
@@ -467,9 +484,7 @@ async def preview_cotacao(
         if modo != "ean":
             # Sobrescrever matches com dados aprendidos do usuário (uma query batched)
             nomes_norm = [normalizar_nome(item["nome"]) for item in itens]
-            cursor = db.cotacao_aprendizado.find(
-                {"user_id": uid, "produto_cotacao_norm": {"$in": nomes_norm}, "confirmado": True}
-            )
+            cursor = db.cotacao_aprendizado.find(_aprendizado_query(uid, tabela_id, nomes_norm))
             aprendizado_map = {doc["produto_cotacao_norm"]: doc async for doc in cursor}
 
             for i, item in enumerate(itens):
@@ -630,9 +645,7 @@ async def _processar_preview_job(job_id):
 
         if modo != "ean":
             nomes_norm = [normalizar_nome(item["nome"]) for item in itens]
-            cursor = db.cotacao_aprendizado.find(
-                {"user_id": job["user_id"], "produto_cotacao_norm": {"$in": nomes_norm}, "confirmado": True}
-            )
+            cursor = db.cotacao_aprendizado.find(_aprendizado_query(job["user_id"], job["tabela_id"], nomes_norm))
             aprendizado_map = {doc["produto_cotacao_norm"]: doc async for doc in cursor}
 
             for i, item in enumerate(itens):
@@ -1002,8 +1015,9 @@ async def confirmar_cotacao(
 
         if aprovado:
             await db.cotacao_aprendizado.update_one(
-                {"user_id": uid, "produto_cotacao_norm": nome_norm},
+                _aprendizado_key(uid, sessao["tabela_id"], nome_norm),
                 {"$set": {
+                    "tabela_id": str(sessao["tabela_id"]),
                     "preco": res["preco"],
                     "confirmado": True,
                     "updated_at": agora,
@@ -1012,8 +1026,12 @@ async def confirmar_cotacao(
             )
         else:
             await db.cotacao_aprendizado.update_one(
-                {"user_id": uid, "produto_cotacao_norm": nome_norm},
-                {"$set": {"confirmado": False, "updated_at": agora}},
+                _aprendizado_key(uid, sessao["tabela_id"], nome_norm),
+                {"$set": {
+                    "tabela_id": str(sessao["tabela_id"]),
+                    "confirmado": False,
+                    "updated_at": agora,
+                }},
                 upsert=True,
             )
 
@@ -1136,9 +1154,7 @@ async def match_cotatudo(
         aprendizado_map = {}
         if modo != "ean":
             nomes_norm = [normalizar_nome(it["nome"]) for it in itens_para_match]
-            cursor = db.cotacao_aprendizado.find(
-                {"user_id": uid, "produto_cotacao_norm": {"$in": nomes_norm}, "confirmado": True}
-            )
+            cursor = db.cotacao_aprendizado.find(_aprendizado_query(uid, payload.tabela_id, nomes_norm))
             aprendizado_map = {d["produto_cotacao_norm"]: d async for d in cursor}
 
         precos = []

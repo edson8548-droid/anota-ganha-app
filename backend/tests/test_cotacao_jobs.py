@@ -33,3 +33,24 @@ def test_tabela_prazos_job_start_is_background_and_deduplicated(monkeypatch):
         assert job_id not in cotacao._running_job_ids
 
     asyncio.run(run())
+
+
+def test_aprendizado_query_isola_por_tabela():
+    query = cotacao._aprendizado_query("user-1", "tabela-a", ["ARROZ", "FEIJAO"])
+
+    assert query == {
+        "user_id": "user-1",
+        "tabela_id": "tabela-a",
+        "produto_cotacao_norm": {"$in": ["ARROZ", "FEIJAO"]},
+        "confirmado": True,
+    }
+
+
+def test_aprendizado_key_isola_por_tabela():
+    key = cotacao._aprendizado_key("user-1", "tabela-b", "ARROZ")
+
+    assert key == {
+        "user_id": "user-1",
+        "tabela_id": "tabela-b",
+        "produto_cotacao_norm": "ARROZ",
+    }
