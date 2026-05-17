@@ -6,7 +6,7 @@ from openpyxl import Workbook
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.excel_processor import ler_cotacao, ler_tabela_mestre
+from services.excel_processor import gerar_excel_resultado, ler_cotacao, ler_tabela_mestre
 from services.matching_engine import processar_cotacao
 
 
@@ -59,3 +59,33 @@ def test_coluna_codigo_na_tabela_mestre_nao_entra_no_dict_de_ean():
     assert "12345678" not in precos
     assert precos_nome[0]["preco"] == 25.9
 
+
+def test_resultado_nao_sobrescreve_coluna_embalagem_quando_nao_ha_preco():
+    path = _xlsx([
+        ["Cód. Produto", "Ean", "Descrição", "Emb."],
+        [68009, "7896369615077", "ABACAXI CALDA MARIZA LT 400G", 12],
+    ])
+    output = None
+    try:
+        itens, _ = ler_cotacao(path)
+        output = gerar_excel_resultado(
+            path,
+            itens,
+            [{"linha": 2, "preco": 14.87, "tipo": "EAN"}],
+        )
+
+        from openpyxl import load_workbook
+
+        wb = load_workbook(output, data_only=True)
+        ws = wb.active
+        try:
+            assert ws.cell(1, 4).value == "Emb."
+            assert ws.cell(2, 4).value == 12
+            assert ws.cell(1, 5).value == "PRECO"
+            assert ws.cell(2, 5).value == 14.87
+        finally:
+            wb.close()
+    finally:
+        os.unlink(path)
+        if output:
+            os.unlink(output)

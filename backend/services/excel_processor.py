@@ -254,9 +254,6 @@ def ler_cotacao(caminho_arquivo):
             header_row = found_header
         if col_nome is None:
             col_nome = 0
-        if col_preco is None:
-            col_preco = ws.max_column - 1
-
         for row_idx in range(header_row + 1, ws.max_row + 1):
             row = ws[row_idx]
             ean_val  = row[col_ean].value  if col_ean is not None and col_ean < len(row) else None
@@ -297,8 +294,6 @@ def ler_cotacao(caminho_arquivo):
                     continue
 
                 header_row = hdr + 1
-                if col_preco is None:
-                    col_preco = len(df.columns) - 1
 
                 for idx, row in df.iterrows():
                     nome_val = row.iloc[col_nome]
@@ -321,6 +316,36 @@ def ler_cotacao(caminho_arquivo):
     return itens, header_row
 
 
+def _cell_is_empty(cell) -> bool:
+    value = cell.value
+    if value is None:
+        return True
+    return str(value).strip() == ""
+
+
+def _first_empty_price_cell(ws, row_idx: int, preferred_zero_based, fallback_start_col: int):
+    """
+    Retorna uma célula segura para gravar preço sem sobrescrever dados existentes.
+
+    Se a cotação tiver uma coluna de preço detectada e a célula da linha estiver vazia,
+    usa essa coluna. Caso contrário, grava na primeira coluna vazia à direita das
+    colunas originais da planilha.
+    """
+    if preferred_zero_based is not None:
+        preferred_col = preferred_zero_based + 1
+        preferred_cell = ws.cell(row=row_idx, column=preferred_col)
+        if _cell_is_empty(preferred_cell):
+            return preferred_cell
+        start_col = preferred_col + 1
+    else:
+        start_col = fallback_start_col
+
+    col = max(start_col, 1)
+    while not _cell_is_empty(ws.cell(row=row_idx, column=col)):
+        col += 1
+    return ws.cell(row=row_idx, column=col)
+
+
 def gerar_excel_resultado(caminho_original, itens, resultados):
     """
     Gera Excel preenchido com os precos encontrados.
@@ -332,11 +357,20 @@ def gerar_excel_resultado(caminho_original, itens, resultados):
         buf = _xlsx_safe_bytes(caminho_original)
         wb = openpyxl.load_workbook(buf)
         ws = wb.active
+        fallback_start_col = ws.max_column + 1
+        header_row_idx = max(1, min((item.get("linha", 2) for item in itens), default=2) - 1)
 
         for item, res in zip(itens, resultados):
             if res["preco"] is not None:
-                col = item["col_preco"]
-                cell = ws.cell(row=item["linha"], column=col + 1)
+                cell = _first_empty_price_cell(
+                    ws,
+                    row_idx=item["linha"],
+                    preferred_zero_based=item.get("col_preco"),
+                    fallback_start_col=fallback_start_col,
+                )
+                header_cell = ws.cell(row=header_row_idx, column=cell.column)
+                if _cell_is_empty(header_cell):
+                    header_cell.value = "PRECO"
                 cell.value = res["preco"]
 
                 if res["tipo"] and "IA" in res["tipo"]:
@@ -364,7 +398,18 @@ def gerar_excel_resultado(caminho_original, itens, resultados):
             if res["preco"] is not None:
                 row_idx = item["linha"] - 2  # ajuste header
                 if 0 <= row_idx < len(df):
-                    df.at[df.index[row_idx], preco_col] = res["preco"]
+                    target_col = preco_col
+                    existing = df.at[df.index[row_idx], target_col] if target_col in df.columns else None
+                    if existing is not None and str(existing).strip() not in ("", "nan", "None"):
+                        base_name = "PRECO"
+                        target_col = base_name
+                        suffix = 2
+                        while target_col in df.columns and str(df.at[df.index[row_idx], target_col]).strip() not in ("", "nan", "None"):
+                            target_col = f"{base_name}_{suffix}"
+                            suffix += 1
+                    if target_col not in df.columns:
+                        df[target_col] = None
+                    df.at[df.index[row_idx], target_col] = res["preco"]
 
         output = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
         df.to_excel(output.name, index=False)
