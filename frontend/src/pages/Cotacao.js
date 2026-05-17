@@ -1,9 +1,9 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ArrowLeft } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
-import { listarTabelas, uploadTabela, excluirTabela, processarCotacao, previewCotacao, confirmarCotacao } from '../services/cotacao.service';
+import { listarTabelas, uploadTabela, excluirTabela, processarCotacao, previewCotacao, confirmarCotacao, cancelarPreviewCotacao } from '../services/cotacao.service';
 import ReviewMatches from './ReviewMatches';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -37,6 +37,9 @@ export default function Cotacao() {
   const [confirmando, setConfirmando] = useState(false);
   const [processingSeg, setProcessingSeg] = useState(0);
   const processingTimerRef = useRef(null);
+  const processingAbortRef = useRef(null);
+  const previewJobIdRef = useRef(null);
+  const processingCancelRequestedRef = useRef(false);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null });
 
   const showConfirm = (title, description, onConfirm) =>
@@ -55,6 +58,11 @@ export default function Cotacao() {
   }, []);
 
   useState(() => { carregarTabelas(); }, [carregarTabelas]);
+
+  useEffect(() => () => {
+    processingAbortRef.current?.abort();
+    clearInterval(processingTimerRef.current);
+  }, []);
 
   const handleUpload = async () => {
     if (!novoNome || !novoArquivo) return;
@@ -88,16 +96,50 @@ export default function Cotacao() {
     setResultado(null);
     setReviewData(null);
     setProcessingSeg(0);
+    previewJobIdRef.current = null;
+    processingCancelRequestedRef.current = false;
+    processingAbortRef.current = new AbortController();
     processingTimerRef.current = setInterval(() => setProcessingSeg(s => s + 1), 1000);
     try {
-      const data = await previewCotacao(arquivoCotacao, tabelaSelecionada, modoMatch, prazoSelecionado);
+      const data = await previewCotacao(
+        arquivoCotacao,
+        tabelaSelecionada,
+        modoMatch,
+        prazoSelecionado,
+        {
+          signal: processingAbortRef.current.signal,
+          onJobId: (jobId) => { previewJobIdRef.current = jobId; },
+        }
+      );
       clearInterval(processingTimerRef.current);
       setReviewData(data);
     } catch (err) {
       clearInterval(processingTimerRef.current);
-      toast.error('Erro ao processar: ' + (err.response?.data?.detail || err.message));
+      if (err.name === 'AbortError' && !processingCancelRequestedRef.current) {
+        toast.info('Processamento cancelado.');
+      } else if (err.name !== 'AbortError') {
+        toast.error('Erro ao processar: ' + (err.response?.data?.detail || err.message));
+      }
     }
+    processingAbortRef.current = null;
+    previewJobIdRef.current = null;
     setProcessing(false);
+  };
+
+  const handleCancelarProcessamento = async () => {
+    processingCancelRequestedRef.current = true;
+    processingAbortRef.current?.abort();
+    const jobId = previewJobIdRef.current;
+    setProcessing(false);
+    clearInterval(processingTimerRef.current);
+    previewJobIdRef.current = null;
+    processingAbortRef.current = null;
+    try {
+      if (jobId) await cancelarPreviewCotacao(jobId);
+    } catch (err) {
+      console.warn('Erro ao cancelar processamento:', err);
+    }
+    toast.info('Processamento cancelado.');
   };
 
   const handleConfirmar = async (aprovacoes) => {
@@ -202,6 +244,7 @@ export default function Cotacao() {
             setArquivoCotacao={setArquivoCotacao}
             processing={processing}
             handleProcessar={handleProcessar}
+            handleCancelarProcessamento={handleCancelarProcessamento}
             resultado={resultado}
             setResultado={setResultado}
             cotacaoInputRef={cotacaoInputRef}
@@ -334,7 +377,7 @@ function CotacaoTab({
   tabelas, tabelaSelecionada, setTabelaSelecionada,
   modoMatch, setModoMatch, canalPreenchimento, setCanalPreenchimento,
   arquivoCotacao, setArquivoCotacao,
-  processing, handleProcessar, resultado, setResultado, cotacaoInputRef,
+  processing, handleProcessar, handleCancelarProcessamento, resultado, setResultado, cotacaoInputRef,
   reviewData, setReviewData, confirmando, handleConfirmar, processingSeg,
   prazoSelecionado, setPrazoSelecionado,
 }) {
@@ -496,6 +539,14 @@ function CotacaoTab({
                     ? `Processar Cotação — ${prazoEfetivo} dias`
                     : 'Processar Cotação'}
               </button>
+              {processing && (
+                <button
+                  onClick={handleCancelarProcessamento}
+                  style={{ ...secondaryBtnStyle, width: '100%', padding: 12, marginTop: 10, fontWeight: 700 }}
+                >
+                  Cancelar processamento
+                </button>
+              )}
             </>
           )}
 
@@ -504,7 +555,9 @@ function CotacaoTab({
             let pct, label, color;
             if (processing) {
               pct = Math.min(88, Math.round(processingSeg / (processingSeg + 15) * 100));
-              label = `Buscando preços... ${processingSeg}s`;
+              label = pct >= 88
+                ? `Servidor ainda buscando preços... ${processingSeg}s`
+                : `Buscando preços... ${processingSeg}s`;
               color = '#3A85A8';
             } else if (reviewData) {
               pct = 100;
