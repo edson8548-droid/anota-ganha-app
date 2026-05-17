@@ -17,6 +17,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import Response
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel
+from pymongo import UpdateOne
 from typing import List
 import firebase_admin
 from firebase_admin import auth as firebase_auth
@@ -982,6 +983,42 @@ class ConfirmarPayload(BaseModel):
     aprovacoes: List[bool]  # um bool por item, na mesma ordem do preview
 
 
+def _build_aprendizado_ops(uid, tabela_id, itens, resultados, aprovacoes, agora):
+    ops = []
+    for i, aprovado in enumerate(aprovacoes):
+        item = itens[i]
+        res = resultados[i]
+        if res.get("preco") is None:
+            continue
+        if res.get("tipo") == "EAN":
+            continue
+
+        nome_norm = normalizar_nome(item["nome"])
+
+        if aprovado:
+            ops.append(UpdateOne(
+                _aprendizado_key(uid, tabela_id, nome_norm),
+                {"$set": {
+                    "tabela_id": str(tabela_id),
+                    "preco": res["preco"],
+                    "confirmado": True,
+                    "updated_at": agora,
+                }},
+                upsert=True,
+            ))
+        else:
+            ops.append(UpdateOne(
+                _aprendizado_key(uid, tabela_id, nome_norm),
+                {"$set": {
+                    "tabela_id": str(tabela_id),
+                    "confirmado": False,
+                    "updated_at": agora,
+                }},
+                upsert=True,
+            ))
+    return ops
+
+
 @router.post("/confirmar")
 async def confirmar_cotacao(
     payload: ConfirmarPayload,
@@ -1003,37 +1040,21 @@ async def confirmar_cotacao(
     if len(payload.aprovacoes) != len(itens):
         raise HTTPException(400, "Número de aprovações não corresponde ao número de itens.")
 
-    # Salvar aprendizado para itens com preço (aprovados ou rejeitados)
+    # Salvar aprendizado para itens por descrição em lote.
+    # EAN exato não precisa ser aprendido; gravar item a item em cotação grande
+    # pode segurar a resposta até o navegador acusar Network Error.
     agora = datetime.now(timezone.utc)
-    for i, aprovado in enumerate(payload.aprovacoes):
-        item = itens[i]
-        res = resultados[i]
-        if res.get("preco") is None:
-            continue
+    aprendizado_ops = _build_aprendizado_ops(
+        uid,
+        sessao["tabela_id"],
+        itens,
+        resultados,
+        payload.aprovacoes,
+        agora,
+    )
 
-        nome_norm = normalizar_nome(item["nome"])
-
-        if aprovado:
-            await db.cotacao_aprendizado.update_one(
-                _aprendizado_key(uid, sessao["tabela_id"], nome_norm),
-                {"$set": {
-                    "tabela_id": str(sessao["tabela_id"]),
-                    "preco": res["preco"],
-                    "confirmado": True,
-                    "updated_at": agora,
-                }},
-                upsert=True,
-            )
-        else:
-            await db.cotacao_aprendizado.update_one(
-                _aprendizado_key(uid, sessao["tabela_id"], nome_norm),
-                {"$set": {
-                    "tabela_id": str(sessao["tabela_id"]),
-                    "confirmado": False,
-                    "updated_at": agora,
-                }},
-                upsert=True,
-            )
+    if aprendizado_ops:
+        await db.cotacao_aprendizado.bulk_write(aprendizado_ops, ordered=False)
 
     # Gerar Excel com apenas items aprovados preenchidos
     resultados_filtrados = []
