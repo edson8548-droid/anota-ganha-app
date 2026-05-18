@@ -246,7 +246,7 @@ def ler_cotacao(caminho_arquivo):
     _EAN_KW   = ("EAN", "COD.BARRAS", "COD BARRAS", "CODIGO DE BARRAS",
                  "CÓDIGO DE BARRAS", "CÓDIGO BARRAS", "COD BARRA", "GTIN", "BARRAS")
     _PRECO_KW = ("PREÇO", "PRECO", "VALOR UNIT", "VALOR UNI", "VALOR", "R$",
-                 "PRECO UNIT", "PREÇO UNIT", "UNIT")
+                 "PRECO UNIT", "PREÇO UNIT", "UNIT", "CUSTO", "VLR", "VLR. CUSTO", "VLR CUSTO")
 
     def _match_nome(val):
         if "PRODUTO" in val and any(k in val for k in ("COD", "CÓD", "CODIGO", "CÓDIGO")):
@@ -257,7 +257,9 @@ def ler_cotacao(caminho_arquivo):
         return _score_coluna_ean(val) >= 80
 
     def _match_preco(val):
-        return any(k in val for k in _PRECO_KW)
+        if any(k in val for k in _PRECO_KW):
+            return True
+        return bool(_re.search(r"\bVLR\b.*\bCUSTO\b", val))
 
     itens = []
     header_row = 1
@@ -371,12 +373,11 @@ def _first_empty_price_cell(ws, row_idx: int, preferred_zero_based, fallback_sta
     """
     if preferred_zero_based is not None:
         preferred_col = preferred_zero_based + 1
-        preferred_cell = ws.cell(row=row_idx, column=preferred_col)
-        if _cell_is_empty(preferred_cell):
-            return preferred_cell
-        start_col = preferred_col + 1
-    else:
-        start_col = fallback_start_col
+        # Sempre prefere a coluna detectada de preço/custo para evitar criar
+        # coluna nova "PRECO" quando a planilha já possui a coluna alvo.
+        return ws.cell(row=row_idx, column=preferred_col)
+
+    start_col = fallback_start_col
 
     col = max(start_col, 1)
     while not _cell_is_empty(ws.cell(row=row_idx, column=col)):

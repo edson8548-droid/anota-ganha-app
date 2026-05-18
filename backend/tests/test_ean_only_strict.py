@@ -126,3 +126,36 @@ def test_resultado_nao_sobrescreve_coluna_embalagem_quando_nao_ha_preco():
         os.unlink(path)
         if output:
             os.unlink(output)
+
+
+def test_resultado_preenche_coluna_custo_sem_criar_preco_extra():
+    path = _xlsx([
+        ["Cód. Produto", "Ean", "Descrição", "Emb.", "Vlr. Custo"],
+        [68009, "7896369615077", "ABACAXI CALDA MARIZA LT 400G", 12, 99.99],
+    ])
+    output = None
+    try:
+        itens, _ = ler_cotacao(path)
+        output = gerar_excel_resultado(
+            path,
+            itens,
+            [{"linha": 2, "preco": 14.87, "tipo": "EAN"}],
+        )
+
+        from openpyxl import load_workbook
+
+        wb = load_workbook(output, data_only=True)
+        ws = wb.active
+        try:
+            # Mantém a escrita na coluna de custo/preço existente (coluna 5)
+            assert ws.cell(1, 5).value == "Vlr. Custo"
+            assert ws.cell(2, 5).value == 14.87
+            # Não deve criar coluna PRECO na frente
+            assert ws.cell(1, 6).value in (None, "")
+            assert ws.cell(2, 6).value in (None, "")
+        finally:
+            wb.close()
+    finally:
+        os.unlink(path)
+        if output:
+            os.unlink(output)
