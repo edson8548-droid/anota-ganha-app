@@ -18,6 +18,7 @@ from fastapi.responses import Response
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel
 from pymongo import UpdateOne
+from pymongo.errors import DuplicateKeyError
 from typing import List
 import firebase_admin
 from firebase_admin import auth as firebase_auth
@@ -47,6 +48,8 @@ MAX_TABELAS = 5
 MAX_EXCEL_BYTES = 20 * 1024 * 1024
 MAX_COTACAO_PREVIEW_BYTES = 14 * 1024 * 1024
 MAX_TABELA_PRAZOS_BYTES = 25 * 1024 * 1024
+MAX_ACTIVE_PREVIEW_JOBS_PER_USER = int(os.environ.get("MAX_ACTIVE_PREVIEW_JOBS_PER_USER", "1"))
+MAX_RUNNING_COTACAO_JOBS = int(os.environ.get("MAX_RUNNING_COTACAO_JOBS", "3"))
 
 
 def _gerar_excel_multiprazos_worker(caminho_base, prazos, queue):
@@ -151,8 +154,19 @@ def _track_background_task(task, job_id=None):
     task.add_done_callback(_cleanup)
 
 
+def _can_start_cotacao_job():
+    return len(_running_job_ids) < MAX_RUNNING_COTACAO_JOBS
+
+
 def _start_tabela_prazos_job(job_id):
     if job_id in _running_job_ids:
+        return None
+    if not _can_start_cotacao_job():
+        logger.info(
+            "[Job %s] Aguardando fila: limite global de %s processamentos ativos atingido",
+            job_id,
+            MAX_RUNNING_COTACAO_JOBS,
+        )
         return None
     _running_job_ids.add(job_id)
     task = asyncio.create_task(_processar_tabela_prazos(job_id))
@@ -163,10 +177,31 @@ def _start_tabela_prazos_job(job_id):
 def _start_preview_job(job_id):
     if job_id in _running_job_ids:
         return None
+    if not _can_start_cotacao_job():
+        logger.info(
+            "[Job %s] Aguardando fila: limite global de %s processamentos ativos atingido",
+            job_id,
+            MAX_RUNNING_COTACAO_JOBS,
+        )
+        return None
     _running_job_ids.add(job_id)
     task = asyncio.create_task(_processar_preview_job(job_id))
     _track_background_task(task, job_id=job_id)
     return task
+
+
+async def _preview_ativo_do_usuario(uid: str):
+    if MAX_ACTIVE_PREVIEW_JOBS_PER_USER <= 0:
+        return None
+    return await db.cotacao_jobs.find_one(
+        {
+            "user_id": uid,
+            "type": "preview",
+            "active": True,
+            "status": {"$in": ["queued", "processing"]},
+        },
+        sort=[("created_at", -1)],
+    )
 
 
 async def resume_cotacao_jobs():
@@ -178,13 +213,13 @@ async def resume_cotacao_jobs():
         if age > 15 * 60:
             await db.cotacao_jobs.update_one(
                 {"_id": job_id},
-                {"$set": {"status": "error", "error": "Processamento demorou demais. Tente novamente — para PDF grande, converta para Excel antes."}},
+                {"$set": {"status": "error", "active": False, "error": "Processamento demorou demais. Tente novamente — para PDF grande, converta para Excel antes."}},
             )
             continue
         if not job.get("input_grid_id"):
             await db.cotacao_jobs.update_one(
                 {"_id": job_id},
-                {"$set": {"status": "error", "error": "Servidor reiniciou durante o processamento. Tente novamente."}},
+                {"$set": {"status": "error", "active": False, "error": "Servidor reiniciou durante o processamento. Tente novamente."}},
             )
             continue
         await db.cotacao_jobs.update_one(
@@ -366,6 +401,13 @@ async def processar_cotacao(
     uid = await get_user_id(credentials)
     modo = str(modo or "completo").strip().lower()
 
+    job_ativo = await _preview_ativo_do_usuario(uid)
+    if job_ativo:
+        raise HTTPException(
+            409,
+            "Você já tem uma cotação em processamento. Aguarde finalizar ou cancele antes de enviar outra.",
+        )
+
     doc = await db.tabelas_mestre.find_one({"_id": ObjectId(tabela_id), "user_id": uid})
     if not doc:
         raise HTTPException(404, "Tabela mestre não encontrada")
@@ -444,6 +486,13 @@ async def preview_cotacao(
 
     uid = await get_user_id(credentials)
     modo = str(modo or "completo").strip().lower()
+
+    job_ativo = await _preview_ativo_do_usuario(uid)
+    if job_ativo:
+        raise HTTPException(
+            409,
+            "Você já tem uma cotação em processamento. Aguarde finalizar ou cancele antes de enviar outra.",
+        )
 
     doc = await db.tabelas_mestre.find_one({"_id": ObjectId(tabela_id), "user_id": uid})
     if not doc:
@@ -558,17 +607,29 @@ async def preview_cotacao_async(
     )
 
     job_id = str(uuid.uuid4())
-    await db.cotacao_jobs.insert_one({
+    job_doc = {
         "_id": job_id,
         "type": "preview",
         "user_id": uid,
         "status": "queued",
+        "active": True,
         "created_at": datetime.now(timezone.utc),
         "tabela_id": tabela_id,
         "input_grid_id": cotacao_grid_id,
         "modo": modo,
         "prazo": prazo,
-    })
+    }
+    try:
+        await db.cotacao_jobs.insert_one(job_doc)
+    except DuplicateKeyError:
+        try:
+            await _bucket().delete(cotacao_grid_id)
+        except Exception:
+            pass
+        raise HTTPException(
+            409,
+            "Você já tem uma cotação em processamento. Aguarde finalizar ou cancele antes de enviar outra.",
+        )
 
     _start_preview_job(job_id)
     return {"job_id": job_id}
@@ -686,14 +747,14 @@ async def _processar_preview_job(job_id):
         await _cleanup_job_input(job)
         await db.cotacao_jobs.update_one(
             {"_id": job_id},
-            {"$set": {"status": "done", "session_id": session_id, "itens": preview_items}},
+            {"$set": {"status": "done", "active": False, "session_id": session_id, "itens": preview_items}},
         )
     except asyncio.TimeoutError:
         if await _preview_job_foi_cancelado(job_id):
             return
         await db.cotacao_jobs.update_one(
             {"_id": job_id},
-            {"$set": {"status": "error", "error": "Processamento demorou demais. Tente novamente com uma cotação menor ou em modo rápido."}},
+            {"$set": {"status": "error", "active": False, "error": "Processamento demorou demais. Tente novamente com uma cotação menor ou em modo rápido."}},
         )
     except Exception as e:
         if await _preview_job_foi_cancelado(job_id):
@@ -701,7 +762,7 @@ async def _processar_preview_job(job_id):
         logger.error(f"Erro no preview async (job {job_id}): {e}")
         await db.cotacao_jobs.update_one(
             {"_id": job_id},
-            {"$set": {"status": "error", "error": f"Erro ao processar: {str(e)}"}},
+            {"$set": {"status": "error", "active": False, "error": f"Erro ao processar: {str(e)}"}},
         )
     finally:
         for tmp in [tmp_mestre, tmp_cotacao]:
@@ -739,7 +800,7 @@ async def get_preview_job_status(
         elif age > 540:
             await db.cotacao_jobs.update_one(
                 {"_id": job_id},
-                {"$set": {"status": "error", "error": "Processamento demorou demais. Tente novamente com uma cotação menor ou em modo rápido."}},
+                {"$set": {"status": "error", "active": False, "error": "Processamento demorou demais. Tente novamente com uma cotação menor ou em modo rápido."}},
             )
             raise HTTPException(500, "Processamento demorou demais. Tente novamente com uma cotação menor ou em modo rápido.")
         return {"status": "processing"}
@@ -775,12 +836,12 @@ async def cancelar_preview_job(
     if job.get("status") == "processing":
         await db.cotacao_jobs.update_one(
             {"_id": job_id, "user_id": uid, "type": "preview"},
-            {"$set": {"status": "canceled", "canceled_at": datetime.now(timezone.utc)}},
+            {"$set": {"status": "canceled", "active": False, "canceled_at": datetime.now(timezone.utc)}},
         )
     else:
         await db.cotacao_jobs.delete_one({"_id": job_id, "user_id": uid, "type": "preview"})
+        _running_job_ids.discard(job_id)
 
-    _running_job_ids.discard(job_id)
     return {"status": "canceled"}
 
 
@@ -1022,8 +1083,8 @@ async def cancelar_job_tabela_prazos(
         )
     else:
         await db.cotacao_jobs.delete_one({"_id": job_id, "user_id": uid})
+        _running_job_ids.discard(job_id)
 
-    _running_job_ids.discard(job_id)
     return {"status": "canceled"}
 
 

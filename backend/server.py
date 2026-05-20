@@ -248,6 +248,17 @@ async def startup_event():
             "created_at",
             expireAfterSeconds=86400
         )
+        await db.cotacao_jobs.create_index(
+            [("user_id", 1), ("type", 1), ("active", 1)],
+            unique=True,
+            partialFilterExpression={"type": "preview", "active": True},
+        )
+        await db.cotacao_jobs.create_index(
+            [("status", 1), ("created_at", 1)]
+        )
+        await db.cotacao_jobs.create_index(
+            [("user_id", 1), ("type", 1), ("status", 1)]
+        )
         logger.info("✅ Índices MongoDB criados")
     except Exception as e:
         logger.warning(f"⚠️  Índices MongoDB: {e}")
