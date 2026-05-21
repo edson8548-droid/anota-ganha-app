@@ -39,8 +39,7 @@ const ForgotPassword = () => {
       <div className="login-card">
         <div className="login-header">
           <div className="login-logo">
-            <img className="login-logo-icon" src="/assets/logo/venpro-logo-icon.svg" alt="Venpro" />
-            <span className="login-logo-word">Venpro</span>
+            <img className="login-logo-icon" src="/assets/logo/venpro-logo-minimal.svg" alt="Venpro" />
           </div>
           <p className="login-subtitle">Recuperar senha</p>
         </div>

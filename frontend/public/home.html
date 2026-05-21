@@ -78,6 +78,9 @@ a { text-decoration: none; color: inherit; }
   flex-shrink:0;
 }
 .logo-mark.small { width:32px; height:32px; }
+.brand-logo-full {
+  object-fit: contain;
+}
 .logo-text { font-size:24px; font-weight:800; letter-spacing:-0.5px; }
 .logo-ven { color: var(--texto); }
 .logo-pro { color: var(--acento); }
@@ -138,8 +141,8 @@ nav {
   margin-bottom:22px;
 }
 .hero-brand img {
-  width:74px;
-  height:74px;
+  width:112px;
+  height:112px;
   object-fit:contain;
   filter: drop-shadow(0 12px 26px rgba(0,0,0,.28));
 }
@@ -552,7 +555,7 @@ footer {
 @media(max-width:700px){
   .nav-links { display:none; }
   .hero { padding:60px 5% 48px; }
-  .hero-brand img { width:58px; height:58px; }
+  .hero-brand img { width:92px; height:92px; }
   .hero-brand-name { font-size:30px; }
   .hero-brand-line { font-size:10px; letter-spacing:1.8px; }
   .pain-grid { grid-template-columns:1fr; }
@@ -570,7 +573,7 @@ footer {
 <!-- ── NAV ── -->
 <nav>
   <div class="logo-wrap">
-    <img class="logo-mark" src="/assets/logo/venpro-logo-icon.svg" alt="Venpro">
+    <img class="logo-mark" src="/assets/logo/venpro-logo-minimal.svg" alt="Venpro">
     <div class="logo-text">Venpro</div>
   </div>
   <div class="nav-links">
@@ -588,9 +591,8 @@ footer {
 <section class="hero">
   <div class="hero-left">
     <div class="hero-brand">
-      <img src="/assets/logo/venpro-logo-icon.svg" alt="Venpro">
+      <img class="brand-logo-full" src="/assets/logo/venpro-logo-minimal.svg" alt="Venpro">
       <div>
-        <div class="hero-brand-name">Venpro</div>
         <div class="hero-brand-line">Mais vendas. Mais resultados.</div>
       </div>
     </div>
@@ -1132,7 +1134,7 @@ footer {
 <!-- ── FOOTER ── -->
 <footer>
   <div class="logo-wrap">
-    <img class="logo-mark small" src="/assets/logo/venpro-logo-icon.svg" alt="Venpro">
+    <img class="logo-mark small" src="/assets/logo/venpro-logo-minimal.svg" alt="Venpro">
     <div class="logo-text" style="font-size:17px">Venpro</div>
   </div>
   <div class="ft-links">
