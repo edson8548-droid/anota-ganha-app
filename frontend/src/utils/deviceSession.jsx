@@ -32,7 +32,7 @@ export const registerDeviceSession = async () => {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
     screenWidth: window.screen?.width || 0,
     screenHeight: window.screen?.height || 0,
-    appVersion: process.env.REACT_APP_VERSION || '',
+    appVersion: import.meta.env.REACT_APP_VERSION || '',
   };
 
   return api.post('/users/device-session', payload);

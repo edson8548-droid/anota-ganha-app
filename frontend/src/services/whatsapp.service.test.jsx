@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import api from './api';
 import {
   deletarFotos,
@@ -8,15 +9,21 @@ import {
   uploadFotos,
 } from './whatsapp.service';
 
-jest.mock('./api', () => ({
-  get: jest.fn(),
-  post: jest.fn(),
-  put: jest.fn(),
-  delete: jest.fn(),
+vi.mock('./api', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  },
+  get: vi.fn(),
+  post: vi.fn(),
+  put: vi.fn(),
+  delete: vi.fn(),
 }));
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 });
 
 test('getCampanha chama o endpoint da campanha WhatsApp', () => {

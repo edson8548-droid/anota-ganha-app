@@ -131,7 +131,7 @@ const Landing = () => {
           </button>
           <a
             className="landing-btn-cta-ghost"
-            href="https://wa.me/5513997501798?text=Olá,%20quero%20saber%20mais%20sobre%20o%20Venpro"
+            href="https://wa.me/5513996382430?text=Olá,%20quero%20saber%20mais%20sobre%20o%20Venpro"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -291,7 +291,7 @@ const Landing = () => {
       {/* Footer */}
       <footer className="landing-footer">
         &copy; {new Date().getFullYear()} Venpro — Ferramentas para Representantes Comerciais ·{' '}
-        <a href="https://wa.me/5513997501798?text=Olá,%20preciso%20de%20suporte" target="_blank" rel="noopener noreferrer">Suporte WhatsApp</a>
+        <a href="https://wa.me/5513996382430?text=Olá,%20preciso%20de%20suporte" target="_blank" rel="noopener noreferrer">Suporte WhatsApp</a>
       </footer>
     </div>
   );

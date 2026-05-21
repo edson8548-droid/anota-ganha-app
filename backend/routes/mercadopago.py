@@ -42,7 +42,7 @@ def send_payment_success_email(recipient_email: str, user_name: str, plan_name: 
     """ Envia um recibo de confirmação de pagamento (status: approved). """
     
     sendgrid_api_key = os.environ.get("SENDGRID_API_KEY")
-    from_email = os.environ.get("FROM_EMAIL", "suporte@anotaganha.com")
+    from_email = os.environ.get("FROM_EMAIL", "suportevenpro@gmail.com")
     
     if not sendgrid_api_key or not from_email: return
 
@@ -82,7 +82,7 @@ def send_payment_rejection_email(recipient_email: str, user_name: str):
     """ Envia uma notificação de recusa de pagamento (status: rejected). """
     
     sendgrid_api_key = os.environ.get("SENDGRID_API_KEY")
-    from_email = os.environ.get("FROM_EMAIL", "suporte@anotaganha.com")
+    from_email = os.environ.get("FROM_EMAIL", "suportevenpro@gmail.com")
     
     if not sendgrid_api_key or not from_email: return
 

@@ -1,10 +1,11 @@
-const api = require('../services/api').default;
-const { getOrCreateDeviceId, registerDeviceSession } = require('./deviceSession');
+import { vi } from 'vitest';
+import api from '../services/api';
+import { getOrCreateDeviceId, registerDeviceSession } from './deviceSession';
 
-jest.mock('../services/api', () => ({
+vi.mock('../services/api', () => ({
   __esModule: true,
   default: {
-    post: jest.fn(() => Promise.resolve({ data: { ok: true } })),
+    post: vi.fn(() => Promise.resolve({ data: { ok: true } })),
   },
 }));
 

@@ -6,6 +6,7 @@ test('site renderiza a primeira tela sem ficar em branco', async ({ page }) => {
 
   await page.goto('/');
   await expect(page.locator('body')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Venda mais, trabalhe menos/i })).toBeVisible();
 
   const bodyText = (await page.locator('body').innerText()).trim();
   expect(bodyText.length).toBeGreaterThan(20);

@@ -7,6 +7,7 @@ const statusEl     = document.getElementById('status');
 const tabelasEl    = document.getElementById('tabelas');
 const prazoEl      = document.getElementById('prazo');
 const modoEl       = document.getElementById('modo');
+const empresaColunaEl = document.getElementById('empresaColuna');
 const btnEl        = document.getElementById('btnPreencher');
 const resultsEl    = document.getElementById('results');
 const progressWrap = document.getElementById('progressWrap');
@@ -311,7 +312,11 @@ async function runJob(job, startBatch = 0, initial = {}) {
 
     let filled = 0;
     if (precos.length > 0) {
-      const fillResult = await sendToCotatudo({ action: 'fillPrices', prices: precos });
+      const fillResult = await sendToCotatudo({
+        action: 'fillPrices',
+        prices: precos,
+        empresaColuna: job.empresaColuna || 0,
+      });
       filled = fillResult?.filled || 0;
       if (filled === 0) {
         throw new Error('Encontrei preços, mas não consegui preencher os campos do Cotatudo. Atualize a cotação e tente novamente.');
@@ -334,6 +339,7 @@ async function startProcessing() {
   const tabelaId = tabelasEl.value;
   const prazo = parseInt(prazoEl.value, 10);
   const modo = modoEl.value;
+  const empresaColuna = parseInt(empresaColunaEl.value, 10) || 0;
 
   if (!tabelaId) {
     setStatus('Selecione uma tabela.', 'err');
@@ -346,7 +352,7 @@ async function startProcessing() {
   setStatus('Lendo itens da cotação...', 'info');
 
   try {
-    const extractResult = await sendToCotatudo({ action: 'extractItems' });
+    const extractResult = await sendToCotatudo({ action: 'extractItems', empresaColuna });
     const items = (extractResult.items || []).filter(item => !item.filled && (item.nome || item.ean));
 
     if (items.length === 0) {
@@ -357,7 +363,7 @@ async function startProcessing() {
     }
 
     await storageRemove(['processingState', 'processingJob']);
-    const job = { items, tabelaId, prazo, modo };
+    const job = { items, tabelaId, prazo, modo, empresaColuna };
     setProgress(0, `0 / ${items.length} itens`);
     showRunning();
     setStatus(`Processando ${items.length} itens...`, 'info');
@@ -407,12 +413,21 @@ tabelasEl.addEventListener('change', () => {
 });
 prazoEl.addEventListener('change', updateFillButtonState);
 modoEl.addEventListener('change', updateFillButtonState);
+empresaColunaEl.addEventListener('change', () => {
+  storageSet({ cotatudoEmpresaColuna: empresaColunaEl.value });
+  updateFillButtonState();
+});
 btnEl.addEventListener('click', startProcessing);
 btnRetomar.addEventListener('click', resumeProcessing);
 btnCancelar.addEventListener('click', cancelAndReset);
 btnParar.addEventListener('click', cancelAndReset);
 
 async function init() {
+  const data = await storageGet(['processingState', 'cotatudoEmpresaColuna']);
+  if (data.cotatudoEmpresaColuna != null) {
+    empresaColunaEl.value = String(data.cotatudoEmpresaColuna);
+  }
+
   const tab = await getCotatudoTab();
   if (!tab) {
     setStatus('Abra uma cotação no cotatudo.com.br primeiro.', 'err');
@@ -421,7 +436,6 @@ async function init() {
     return;
   }
 
-  const data = await storageGet('processingState');
   if (data.processingState) applyState(data.processingState);
   setStatus('Carregando tabelas...', 'info');
   await loadTabelas();

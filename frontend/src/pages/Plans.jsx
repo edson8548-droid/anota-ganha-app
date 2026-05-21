@@ -157,7 +157,7 @@ const Plans = () => {
       {/* Footer */}
       <div className="plans-footer">
         <p>🔒 Pagamento seguro via Asaas</p>
-        <p>✉️ Dúvidas? Entre em contato: suporte@venpro.com.br</p>
+        <p>✉️ Dúvidas? Entre em contato: suportevenpro@gmail.com</p>
       </div>
 
       </div>{/* /plans-content */}

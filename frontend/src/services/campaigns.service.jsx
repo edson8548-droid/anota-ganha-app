@@ -6,7 +6,7 @@ import {
   where, onSnapshot, serverTimestamp, arrayUnion 
 } from 'firebase/firestore';
 // ⭐️ CORREÇÃO: O caminho foi atualizado para apontar para o teu ficheiro
-import { db } from '../firebase/config.js'; 
+import { db } from '../firebase/config';
 
 class CampaignsService {
   constructor() {

@@ -36,7 +36,7 @@ E adicione estas variáveis:
 | `ASAAS_API_KEY` | `sua_chave_asaas` | Chave da API Asaas |
 | `ASAAS_WEBHOOK_TOKEN` | `seu_token_webhook` | Token de autenticação do webhook Asaas |
 | `SENDGRID_API_KEY` | `SG.suas-chave-sendgrid` | Chave do SendGrid |
-| `SENDER_EMAIL` | `suporte@anotaganha.com` | Email remetente |
+| `SENDER_EMAIL` | `suportevenpro@gmail.com` | Email remetente |
 | `RATE_LIMIT_ENABLED` | `true` | Rate limiting habilitado |
 
 ---
@@ -148,7 +148,7 @@ curl https://seu-backend-api-url-no-render.onrender.com/health
 ### Logs a verificar no Render Dashboard:
 
 ```
-[SERVER] Anota Ganha API started
+[SERVER] Venpro API started
 [CORS] Preflight received from https://anota-ganha-app.web.app
 [CORS] Preflight received from https://venpro.com.br
 [SECURITY] auth_valid route=users

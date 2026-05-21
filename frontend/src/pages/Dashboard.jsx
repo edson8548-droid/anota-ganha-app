@@ -371,7 +371,7 @@ const Dashboard = () => {
     setSelectedClient(null);
   };
   const handleWhatsAppSupport = () => {
-    const phoneNumber = '5513997501798';
+    const phoneNumber = '5513996382430';
     const message = 'Olá, preciso de suporte no Venpro';
     const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -393,7 +393,7 @@ const Dashboard = () => {
     const label = typeLabels[feedbackDraft.type] || 'comentário';
     const userInfo = user?.email ? `\n\nConta: ${user.email}` : '';
     const message = `Olá, tenho uma ${label} sobre o Venpro:\n\n${text}${userInfo}`;
-    const url = `https://wa.me/5513997501798?text=${encodeURIComponent(message)}`;
+    const url = `https://wa.me/5513996382430?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
     setFeedbackDraft(current => ({ ...current, message: '' }));
     toast.success('Mensagem preparada no WhatsApp.');

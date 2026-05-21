@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, ClipboardList } from 'lucide-react';
+import { ArrowLeft, ClipboardList, ExternalLink } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { cancelarTabelaPrazos, gerarTabelaPrazos } from '../services/cotacao.service';
 import './AssistenteIA.css';
@@ -101,9 +101,9 @@ const PROMPTS_RAPIDOS = [
     texto: 'Analise a lista, PDF ou Excel fornecido abaixo e transforme em uma lista organizada para eu colar na Vitrine Inteligente.\n\nFormato obrigatório da resposta:\n- Gere a resposta em CSV separado por ponto e vírgula (;).\n- Coloque tudo dentro de um bloco de código para aparecer o botão de copiar.\n- Use exatamente este cabeçalho:\nNome do Produto;Quantidade da Embalagem;Preço Unitário\n- Cada produto deve ficar em uma linha separada.\n- Não coloque nenhum texto antes ou depois do bloco de código.\n\nRegras importantes:\n- Ignore códigos, descrições duplicadas, observações ou qualquer informação irrelevante.\n- Se encontrar preço em formato brasileiro, mantenha com vírgula. Exemplo: 8,54.\n- Se o preço vier como 2.150, interprete como 2,150 apenas se isso estiver claramente no padrão da lista; se for preço com 3 casas, mantenha 2,150.\n- Se a embalagem aparecer como CX 8UN, CX-24, CX 24, FD-20, FARDO 12UN ou similar, coloque essa informação em Quantidade da Embalagem.\n- Se não encontrar a quantidade da embalagem, deixe a coluna vazia.\n- Não invente produtos, preços ou quantidades.\n- Não junte vários produtos na mesma linha.\n\nExemplo do formato final:\n```csv\nNome do Produto;Quantidade da Embalagem;Preço Unitário\nAGUA SANITARIA YPE 2L;CX 8UN;8,54\nLAVA ROUPA PO ASSIM 800G;CX 20UN;119,00\nCOCO RAL MENINA 100G TRAD;CX 24UN;2,05\n```\n\n[COLE SUA LISTA AQUI OU ANEXE O PDF/EXCEL]',
   },
   {
-    label: 'Cotação: PDF em Excel',
-    sub: 'Organiza PDF de preço para subir na Cotação Pronta',
-    texto: 'Analise o PDF, pedido ou tabela de preços anexado e transforme em uma tabela compatível com a ferramenta Cotação Pronta.\n\nFormato obrigatório da resposta:\n- Gere a resposta em CSV separado por ponto e vírgula (;).\n- Coloque tudo dentro de um bloco de código para aparecer o botão de copiar.\n- Use exatamente este cabeçalho:\nPRODUTO;EAN;7 dias;14 dias;21 dias;28 dias\n- Cada produto deve ficar em uma linha separada.\n- Não coloque nenhum texto antes ou depois do bloco de código.\n\nRegras para extrair os dados:\n- Use a coluna de descrição/nome do produto como PRODUTO.\n- Use EAN, GTIN ou código de barras na coluna EAN. Se não existir, deixe em branco.\n- Use o preço unitário como base. Não use preço total do pedido nem preço da embalagem, a menos que o arquivo só tenha esse preço e isso esteja claro.\n- Se o preço aparecer como 3.222, trate como 3,222 quando o fornecedor usar três casas decimais.\n- Converta os preços para duas casas decimais.\n- Não invente produtos, EAN ou preços.\n- Ignore cabeçalhos, totais, observações, dados da empresa, dados do cliente e linhas sem produto.\n\nPercentuais por prazo:\n- 7 dias: [DIGITE O PERCENTUAL. Ex: 0]\n- 14 dias: [DIGITE O PERCENTUAL. Ex: 0,69]\n- 21 dias: [DIGITE O PERCENTUAL. Ex: 1,38]\n- 28 dias: [DIGITE O PERCENTUAL. Ex: 2,07]\n\nRegra de arredondamento:\n- Depois de aplicar o percentual, arredonde sempre para cima no centavo.\n- Exemplo: se o resultado for 3,222, escreva 3,23.\n- Exemplo: se o resultado for 10,001, escreva 10,01.\n\nExemplo do formato final:\n```csv\nPRODUTO;EAN;7 dias;14 dias;21 dias;28 dias\nABS ALWAYS BASICO C/8 C/ABA PQ SC;7500435127226;3,13;3,15;3,17;3,19\nAGUA SANITARIA YPE 2L;7896098900123;8,54;8,60;8,66;8,72\n```\n\n[ANEXE O PDF/EXCEL OU COLE A LISTA AQUI]',
+    label: 'PDF caixa → Excel',
+    sub: 'Divide preço da caixa e gera tabela para cotação',
+    texto: 'Transforme o PDF de preços anexado em um arquivo Excel (.xlsx) pronto para usar na Cotação Pronta.\n\nO PDF tem preço de caixa, fardo, display ou embalagem. Preciso do preço unitário.\n\nRegras:\n- Gere um .xlsx com as colunas: PRODUTO | EAN | 7 dias.\n- Em 7 dias, coloque o preço unitário.\n- Se o PDF já tiver preço unitário, use ele.\n- Se tiver só preço da caixa/fardo/display, divida pela quantidade da embalagem.\n- Use quantidades como CX/12, FD/10, DPL/6, FRC/12, PAC/24.\n- Se aparecer CX/1, mas a descrição tiver quantidade, use a descrição: CX C/100, C/100 UN, CX 24UN, FD 10UN, L12P11.\n- Não use PAL/960, PAL/1152 ou qualquer divisor de pallet.\n- Não crie 14, 21 e 28 dias. O Venpro vai gerar esses prazos depois.\n- Arredonde sempre para cima no centavo. Ex: 178,44 ÷ CX/12 = 14,87.\n- Não invente EAN, produto ou preço.\n- Ignore totais, cabeçalhos, dados do cliente, observações e linhas sem produto.\n\nSe não conseguir gerar .xlsx, entregue em bloco de código separado por TABULAÇÃO assim:\n```text\nPRODUTO\tEAN\t7 dias\nABACAXI MAESTRIA RODELA CALDA LT 400G\t7898935234149\t14,87\nPACOCA PACOQUITA ROLHA CX C/100 UN 15G\t7890000000000\t0,28\n```\n\n[ANEXE O PDF AQUI]',
   },
   {
     label: 'Mensagem para link da vitrine',
@@ -121,6 +121,20 @@ const PROMPTS_RAPIDOS = [
     texto: 'Vou visitar amanhã um cliente que é [tipo de estabelecimento] e que compra comigo há [tempo]. Última compra foi de [produtos]. Me ajuda com um roteiro de abordagem para a visita.',
   },
 ];
+
+const IA_SHORTCUTS = [
+  { name: 'ChatGPT', url: 'https://chatgpt.com/' },
+  { name: 'Gemini', url: 'https://gemini.google.com/app' },
+  { name: 'DeepSeek', url: 'https://chat.deepseek.com/' },
+  { name: 'Claude', url: 'https://claude.ai/new' },
+];
+
+const PDF_HELPER = {
+  name: 'iLovePDF',
+  url: 'https://www.ilovepdf.com/pt',
+  title: 'Organizar PDF antes da IA',
+  description: 'Use para juntar varios PDFs em um arquivo so, separar paginas, comprimir e converter PDF para Excel antes de trabalhar a tabela na IA.',
+};
 
 export default function AssistenteIA() {
   const navigate = useNavigate();
@@ -145,6 +159,15 @@ export default function AssistenteIA() {
   const tabelaJobIdRef = useRef(null);
   const canceladoPeloUsuarioRef = useRef(false);
 
+  const ajustarPercentualPrazo = (prazo, delta) => {
+    setPctPrazos(prev => {
+      const atual = parseFloat(String(prev[prazo]).replace(',', '.'));
+      const base = Number.isFinite(atual) ? atual : 0;
+      const novo = Math.max(-99, Math.min(99, Math.round((base + delta) * 100) / 100));
+      return { ...prev, [prazo]: String(novo) };
+    });
+  };
+
   const handleCopy = (content, id) => {
     navigator.clipboard.writeText(content);
     setCopiedId(id);
@@ -155,6 +178,37 @@ export default function AssistenteIA() {
     setSelectedPrompt(prompt);
     setInput(prompt.texto);
   };
+
+  const handleOpenIa = async (shortcut) => {
+    if (input.trim()) {
+      try {
+        await navigator.clipboard.writeText(input);
+        setCopiedId(`ia-${shortcut.name}`);
+        setTimeout(() => setCopiedId(null), 2000);
+        toast.success(`Prompt copiado. Cole no ${shortcut.name}.`);
+      } catch (err) {
+        toast.info(`Abra o ${shortcut.name} e copie o prompt manualmente.`);
+      }
+    }
+    window.open(shortcut.url, '_blank', 'noopener,noreferrer');
+  };
+
+  const renderPdfHelper = () => (
+    <div className="ia-pdf-helper">
+      <div>
+        <div className="ia-pdf-helper-kicker">Ferramenta PDF</div>
+        <div className="ia-pdf-helper-title">{PDF_HELPER.title}</div>
+        <div className="ia-pdf-helper-desc">{PDF_HELPER.description}</div>
+      </div>
+      <button
+        className="ia-pdf-helper-btn"
+        onClick={() => window.open(PDF_HELPER.url, '_blank', 'noopener,noreferrer')}
+      >
+        <span>Abrir {PDF_HELPER.name}</span>
+        <ExternalLink size={14} />
+      </button>
+    </div>
+  );
 
   const handleGerarTabela = async () => {
     if (!tabelaArquivo) return;
@@ -267,16 +321,18 @@ export default function AssistenteIA() {
           </button>
 
           <div className="ia-sidebar-title" style={{ marginTop: 16 }}>Atalhos rápidos</div>
-          {PROMPTS_RAPIDOS.map((p, i) => (
-            <button
-              key={i}
-              className={`ia-prompt-btn ${selectedPrompt?.label === p.label ? 'active' : ''}`}
-              onClick={() => handlePrompt(p)}
-            >
-              {p.label}
-              <span>{p.sub}</span>
-            </button>
-          ))}
+          <div className="ia-prompt-grid">
+            {PROMPTS_RAPIDOS.map((p, i) => (
+              <button
+                key={i}
+                className={`ia-prompt-btn ${selectedPrompt?.label === p.label ? 'active' : ''}`}
+                onClick={() => handlePrompt(p)}
+              >
+                {p.label}
+                <span>{p.sub}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Modal: Gerar Tabela de Prazos */}
@@ -289,7 +345,7 @@ export default function AssistenteIA() {
               </div>
 
               <p className="ia-modal-desc">
-                Suba a planilha base do atacadista em Excel (.xlsx) e informe o % de aumento para cada prazo.
+                Suba a planilha base do atacadista em Excel (.xlsx) e informe o % por prazo (aumento ou desconto).
                 O sistema gera um Excel pronto para subir no Robô de Cotação.
               </p>
 
@@ -323,24 +379,59 @@ export default function AssistenteIA() {
                   <div key={p} className="ia-modal-prazo-item">
                     <label>{p} dias</label>
                     <div className="ia-modal-prazo-input">
+                      <button
+                        type="button"
+                        onClick={() => ajustarPercentualPrazo(p, -0.01)}
+                        style={{
+                          background: '#1f2937',
+                          color: '#e5e7eb',
+                          border: '1px solid #374151',
+                          borderRadius: 6,
+                          width: 28,
+                          height: 28,
+                          cursor: 'pointer',
+                          fontWeight: 700,
+                        }}
+                        title="Diminuir 0,01%"
+                      >
+                        −
+                      </button>
                       <input
                         type="number"
-                        min="0"
+                        min="-99"
                         max="99"
                         step="0.01"
                         value={pctPrazos[p]}
                         placeholder="0,00"
                         onChange={e => {
                           const val = e.target.value;
-                          setPctPrazos(prev => ({ ...prev, [p]: val === '' ? '' : parseFloat(val) || 0 }));
+                          // Mantém texto bruto para permitir digitar negativos (ex.: "-", "-3", "-3.5")
+                          setPctPrazos(prev => ({ ...prev, [p]: val }));
                         }}
                       />
+                      <button
+                        type="button"
+                        onClick={() => ajustarPercentualPrazo(p, 0.01)}
+                        style={{
+                          background: '#1f2937',
+                          color: '#e5e7eb',
+                          border: '1px solid #374151',
+                          borderRadius: 6,
+                          width: 28,
+                          height: 28,
+                          cursor: 'pointer',
+                          fontWeight: 700,
+                        }}
+                        title="Aumentar 0,01%"
+                      >
+                        +
+                      </button>
                       <span>%</span>
                     </div>
                     <div className="ia-modal-prazo-exemplo">
-                      {pctPrazos[p] && parseFloat(pctPrazos[p]) > 0
+                      {pctPrazos[p] !== '' && Number.isFinite(parseFloat(pctPrazos[p]))
                         ? `R$ 10,00 → R$ ${(10 * (1 + parseFloat(pctPrazos[p]) / 100)).toFixed(2).replace('.', ',')}`
-                        : 'sem aumento'}
+                        : 'sem ajuste'}
                     </div>
                   </div>
                 ))}
@@ -462,6 +553,22 @@ export default function AssistenteIA() {
                 <div className="ia-empty-ico"><ClipboardList size={42} color="var(--ia-acento)" /></div>
                 <div className="ia-empty-title">Olá{user?.name ? `, ${user.name.split(' ')[0]}` : ''}!</div>
                 <div className="ia-empty-sub">Escolha um prompt ao lado para copiar e usar na IA da sua preferência.</div>
+                <div className="ia-empty-shortcuts">
+                  <div className="ia-provider-title">Abrir IA</div>
+                  <div className="ia-shortcuts">
+                    {IA_SHORTCUTS.map((shortcut) => (
+                      <button
+                        key={shortcut.name}
+                        className="ia-shortcut-btn"
+                        onClick={() => handleOpenIa(shortcut)}
+                      >
+                        <span>{shortcut.name}</span>
+                        <ExternalLink size={14} />
+                      </button>
+                    ))}
+                  </div>
+                  {renderPdfHelper()}
+                </div>
               </div>
             ) : (
               <div className="ia-prompt-card">
@@ -486,6 +593,20 @@ export default function AssistenteIA() {
                 <div className="ia-prompt-help">
                   Edite os campos entre colchetes, copie o prompt e cole no ChatGPT, Gemini ou outra IA que preferir.
                 </div>
+                <div className="ia-provider-title">Copiar e abrir em</div>
+                <div className="ia-shortcuts">
+                  {IA_SHORTCUTS.map((shortcut) => (
+                    <button
+                      key={shortcut.name}
+                      className="ia-shortcut-btn"
+                      onClick={() => handleOpenIa(shortcut)}
+                    >
+                      <span>{copiedId === `ia-${shortcut.name}` ? 'Copiado' : shortcut.name}</span>
+                      <ExternalLink size={14} />
+                    </button>
+                  ))}
+                </div>
+                {renderPdfHelper()}
               </div>
             )}
           </div>

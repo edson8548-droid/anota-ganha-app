@@ -1,45 +1,55 @@
-jest.mock('axios', () => ({
-  get: jest.fn(),
-  post: jest.fn(),
-  put: jest.fn(),
-  delete: jest.fn(),
+import { vi } from 'vitest';
+import axios from 'axios';
+import { vitrineService } from './vitrine.service';
+
+vi.mock('axios', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  },
+  get: vi.fn(),
+  post: vi.fn(),
+  put: vi.fn(),
+  delete: vi.fn(),
 }));
 
-jest.mock('firebase/app', () => ({
-  initializeApp: jest.fn(() => ({})),
+vi.mock('firebase/app', () => ({
+  initializeApp: vi.fn(() => ({})),
 }));
 
-jest.mock('firebase/auth', () => ({
-  getAuth: jest.fn(() => ({
+vi.mock('firebase/auth', () => ({
+  getAuth: vi.fn(() => ({
     currentUser: {
-      getIdToken: jest.fn(() => Promise.resolve('token-123')),
+      getIdToken: vi.fn(() => Promise.resolve('token-123')),
     },
   })),
 }));
 
-jest.mock('firebase/firestore', () => ({
-  getFirestore: jest.fn(() => ({})),
+vi.mock('firebase/firestore', () => ({
+  getFirestore: vi.fn(() => ({})),
 }));
 
-jest.mock('../config/api', () => ({
+vi.mock('../config/api', () => ({
   BACKEND_URL: 'https://api.venpro.com.br',
   API_BASE_URL: 'https://api.venpro.com.br/api',
   backendUrl: path => `https://api.venpro.com.br${path.startsWith('/') ? path : `/${path}`}`,
   apiUrl: path => `https://api.venpro.com.br/api${path.startsWith('/') ? path : `/${path}`}`,
 }));
 
-const axios = require('axios');
-const { vitrineService } = require('./vitrine.service');
-
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 });
 
 test('listar busca ofertas autenticadas', async () => {
   await vitrineService.listar();
 
   expect(axios.get).toHaveBeenCalledWith('https://api.venpro.com.br/api/vitrine/ofertas', {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: 'Bearer token-123',
+      'Content-Type': 'application/json',
+    },
   });
 });
 
@@ -49,7 +59,10 @@ test('criar envia dados da oferta', async () => {
   await vitrineService.criar(data);
 
   expect(axios.post).toHaveBeenCalledWith('https://api.venpro.com.br/api/vitrine/ofertas', data, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: 'Bearer token-123',
+      'Content-Type': 'application/json',
+    },
   });
 });
 
@@ -62,7 +75,7 @@ test('uploadImagem envia arquivo em FormData sem content-type manual', async () 
   expect(axios.post).toHaveBeenCalledWith(
     'https://api.venpro.com.br/api/vitrine/ofertas/oferta-1/items/item-1/imagem',
     expect.any(FormData),
-    { headers: {} },
+    { headers: { Authorization: 'Bearer token-123' } },
   );
   expect(form.get('arquivo')).toBe(file);
 });
@@ -74,12 +87,12 @@ test('obterPublica busca oferta publica sem auth', async () => {
 });
 
 test('gerarLinkPublico usa origem atual', () => {
-  expect(vitrineService.gerarLinkPublico('oferta-teste')).toBe('http://localhost/oferta/oferta-teste');
+  expect(vitrineService.gerarLinkPublico('oferta-teste')).toBe(`${window.location.origin}/oferta/oferta-teste`);
 });
 
 test('gerarLinkPublico inclui nome da empresa quando informado', () => {
   expect(vitrineService.gerarLinkPublico('oferta-teste', 'Spani Atacadista')).toBe(
-    'http://localhost/spani-atacadista/ofertas/oferta-teste',
+    `${window.location.origin}/spani-atacadista/ofertas/oferta-teste`,
   );
 });
 

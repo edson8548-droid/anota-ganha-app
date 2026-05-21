@@ -10,7 +10,7 @@ module.exports = defineConfig({
     screenshot: 'only-on-failure',
   },
   webServer: {
-    command: 'npx cross-env BROWSER=none PORT=3100 npm start',
+    command: 'npx cross-env PORT=3100 npm start -- --host 127.0.0.1',
     url: 'http://127.0.0.1:3100',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

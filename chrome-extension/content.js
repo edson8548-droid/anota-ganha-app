@@ -3,18 +3,51 @@
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'extractItems') {
-    const items = extractCotatudoItems();
+    const items = extractCotatudoItems({ empresaColuna: msg.empresaColuna });
     sendResponse({ items });
   } else if (msg.action === 'fillPrices') {
-    const count = fillCotatudoPrices(msg.prices);
-    sendResponse({ filled: count });
+    const result = fillCotatudoPrices(msg.prices, { empresaColuna: msg.empresaColuna });
+    sendResponse(result);
   }
   return true; // keep channel open for async
 });
 
-function extractCotatudoItems() {
+function normalizeEmpresaColuna(value) {
+  const index = Number.parseInt(value, 10);
+  return Number.isInteger(index) && index >= 0 && index <= 4 ? index : 0;
+}
+
+function isVisible(el) {
+  const rect = el.getBoundingClientRect();
+  const style = window.getComputedStyle(el);
+  return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+}
+
+function getEditableInputs(row) {
+  return Array.from(row.querySelectorAll('input[type="text"], input[type="number"], input[type="tel"]'))
+    .filter(input => !input.disabled && !input.readOnly && isVisible(input));
+}
+
+function isPriceLikeInput(input) {
+  const meta = `${input.name || ''} ${input.id || ''} ${input.className || ''} ${input.placeholder || ''}`.toLowerCase();
+  return /(preco|preço|valor|vlr|cotacao|cotação|unit)/.test(meta);
+}
+
+function getPriceCandidates(row) {
+  const inputs = getEditableInputs(row);
+  const priceLike = inputs.filter(isPriceLikeInput);
+  return priceLike.length ? priceLike : inputs;
+}
+
+function getSelectedPriceInput(row, empresaColuna) {
+  const candidates = getPriceCandidates(row);
+  return candidates[normalizeEmpresaColuna(empresaColuna)] || null;
+}
+
+function extractCotatudoItems(options = {}) {
   const rows = document.querySelectorAll('table#conteudo_gvItem tbody tr');
   const items = [];
+  const empresaColuna = normalizeEmpresaColuna(options.empresaColuna);
 
   function limparEAN(s) {
     s = String(s || '').trim().replace(/\u00a0/g, ' ').replace(/^\s*['"]|['"]\s*$/g, '');
@@ -70,10 +103,9 @@ function extractCotatudoItems() {
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const inputs = row.querySelectorAll('input[type="text"], input[type="number"], input[type="tel"]');
-    if (inputs.length === 0) continue;
-    const lastInput = inputs[inputs.length - 1];
-    const currentVal = (lastInput.value || '').trim();
+    const priceInput = getSelectedPriceInput(row, empresaColuna);
+    if (!priceInput) continue;
+    const currentVal = (priceInput.value || '').trim();
 
     const cells = row.querySelectorAll('td');
     const cellTexts = [];
@@ -106,28 +138,11 @@ function extractCotatudoItems() {
   return items;
 }
 
-function fillCotatudoPrices(prices) {
+function fillCotatudoPrices(prices, options = {}) {
   const rows = document.querySelectorAll('table#conteudo_gvItem tbody tr');
   let count = 0;
   const failed = [];
-
-  function isVisible(el) {
-    const rect = el.getBoundingClientRect();
-    const style = window.getComputedStyle(el);
-    return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
-  }
-
-  function getPriceInput(row) {
-    const inputs = Array.from(row.querySelectorAll('input[type="text"], input[type="number"], input[type="tel"]'))
-      .filter(input => !input.disabled && !input.readOnly && isVisible(input));
-    if (inputs.length === 0) return null;
-
-    const byName = inputs.find(input => {
-      const meta = `${input.name || ''} ${input.id || ''} ${input.className || ''} ${input.placeholder || ''}`.toLowerCase();
-      return /(preco|preço|valor|vlr|cotacao|cotação|unit)/.test(meta);
-    });
-    return byName || inputs[inputs.length - 1];
-  }
+  const empresaColuna = normalizeEmpresaColuna(options.empresaColuna);
 
   function setInputValue(input, value) {
     input.scrollIntoView({ block: 'center', inline: 'nearest' });
@@ -157,7 +172,7 @@ function fillCotatudoPrices(prices) {
       failed.push(item.idx);
       continue;
     }
-    const input = getPriceInput(row);
+    const input = getSelectedPriceInput(row, empresaColuna);
     if (!input) {
       failed.push(item.idx);
       continue;

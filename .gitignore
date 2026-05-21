@@ -22,3 +22,4 @@ frontend/.firebase/
 *.zip
 !frontend/public/venpro-cotatudo-extension.zip
 !frontend/public/venpro-whatsapp-extension.zip
+docs/private/

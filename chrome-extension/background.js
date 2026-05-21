@@ -59,7 +59,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 async function runBatches(job, startBatch, preenchidos, naoEncontrados, processados) {
-  const { items, tabelaId, prazo, modo, tabId } = job;
+  const { items, tabelaId, prazo, modo, tabId, empresaColuna = 0 } = job;
   const token = await getToken();
   if (!token) {
     await saveState({ status: 'paused', msg: 'Token expirado. Faça login no Venpro.', batchIndex: startBatch, total: items.length, processados, preenchidos, naoEncontrados, pct: Math.round(startBatch / Math.ceil(items.length / BATCH) * 100) });
@@ -86,7 +86,7 @@ async function runBatches(job, startBatch, preenchidos, naoEncontrados, processa
         processados    += data.stats.total;
 
         if (data.precos.length > 0) {
-          try { await chrome.tabs.sendMessage(tabId, { action: 'fillPrices', prices: data.precos }); } catch {}
+          try { await chrome.tabs.sendMessage(tabId, { action: 'fillPrices', prices: data.precos, empresaColuna }); } catch {}
         }
       } else {
         let msg = `Erro ${resp.status} ao buscar preços`;

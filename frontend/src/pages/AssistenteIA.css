@@ -90,7 +90,7 @@
 .ia-body {
   flex: 1;
   display: flex;
-  max-width: 1100px;
+  max-width: 1240px;
   width: 100%;
   margin: 0 auto;
   padding: 24px 5%;
@@ -100,7 +100,7 @@
 
 /* ── Sidebar de atalhos ── */
 .ia-sidebar {
-  width: 220px;
+  width: 410px;
   flex-shrink: 0;
 }
 .ia-sidebar-title {
@@ -125,6 +125,15 @@
   margin-bottom: 8px;
   transition: border-color .2s, background .2s;
   line-height: 1.45;
+}
+.ia-prompt-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.ia-prompt-grid .ia-prompt-btn {
+  margin-bottom: 0;
+  min-height: 82px;
 }
 .ia-prompt-btn:hover {
   border-color: var(--ia-acento);
@@ -225,6 +234,89 @@
   font-size: 12px;
   line-height: 1.5;
 }
+.ia-provider-title {
+  color: var(--ia-sub);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+}
+.ia-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.ia-shortcut-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  border: 1px solid var(--ia-borda);
+  border-radius: 10px;
+  background: var(--ia-bg3);
+  color: var(--ia-texto);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color .2s, background .2s, transform .15s;
+}
+.ia-shortcut-btn:hover {
+  border-color: var(--ia-acento);
+  background: rgba(58,133,168,.12);
+  transform: translateY(-1px);
+}
+.ia-pdf-helper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 4px;
+  padding: 14px;
+  border: 1px solid rgba(58,133,168,.32);
+  border-radius: 12px;
+  background: rgba(58,133,168,.08);
+}
+.ia-pdf-helper-kicker {
+  color: var(--ia-acento2);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .7px;
+  text-transform: uppercase;
+}
+.ia-pdf-helper-title {
+  margin-top: 3px;
+  color: var(--ia-texto);
+  font-size: 13px;
+  font-weight: 900;
+}
+.ia-pdf-helper-desc {
+  margin-top: 5px;
+  color: var(--ia-sub);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.ia-pdf-helper-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid rgba(58,133,168,.55);
+  border-radius: 9px;
+  background: var(--ia-acento);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .2s, transform .15s;
+}
+.ia-pdf-helper-btn:hover {
+  background: var(--ia-acento2);
+  transform: translateY(-1px);
+}
 .ia-messages {
   background: var(--ia-card);
   border: 1px solid var(--ia-borda);
@@ -253,6 +345,16 @@
 .ia-empty-ico { display: flex; align-items: center; justify-content: center; }
 .ia-empty-title { font-size: 15px; font-weight: 700; color: var(--ia-sub); }
 .ia-empty-sub { font-size: 13px; line-height: 1.55; max-width: 300px; }
+.ia-empty-shortcuts {
+  width: min(100%, 520px);
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ia-empty-shortcuts .ia-provider-title {
+  text-align: center;
+}
 
 /* mensagens */
 .ia-msg {
@@ -505,6 +607,16 @@
   outline: none;
 }
 .ia-modal-prazo-input input:focus { border-color: var(--ia-acento); }
+/* Remove setas nativas do input number para não poluir o campo */
+.ia-modal-prazo-input input[type="number"]::-webkit-outer-spin-button,
+.ia-modal-prazo-input input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.ia-modal-prazo-input input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
 .ia-modal-prazo-input span {
   font-size: 14px;
   font-weight: 600;
@@ -602,6 +714,9 @@
     display: grid;
     grid-template-columns: 1fr;
   }
+  .ia-prompt-grid {
+    grid-template-columns: 1fr;
+  }
   .ia-prompt-view {
     width: 100%;
     min-height: 460px;
@@ -610,6 +725,16 @@
     flex-direction: column;
   }
   .ia-copy-main {
+    width: 100%;
+  }
+  .ia-shortcuts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ia-pdf-helper {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .ia-pdf-helper-btn {
     width: 100%;
   }
   .ia-messages { max-height: 400px; }
