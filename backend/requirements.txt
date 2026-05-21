@@ -19,8 +19,6 @@ sendgrid
 requests
 python-dateutil
 
-mercadopago
-
 firebase-admin
 
 google-genai

@@ -92,8 +92,6 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
     def _rate_config_for_path(self, path):
         if path in {"/", "/health"}:
             return None
-        if path == "/api/mercadopago/webhook":
-            return (300, 60, "/api/mercadopago/webhook")
         if path == "/api/asaas/webhook":
             return (300, 60, "/api/asaas/webhook")
         if path == "/api/license/validate":
@@ -175,7 +173,7 @@ async def root():
         "version": "1.0.0",
         "build": BUILD_VERSION,
         "commit": BUILD_COMMIT[:12],
-        "payments": ["asaas", "mercadopago"],
+        "payments": ["asaas"],
     }
 
 @app.get("/health")
@@ -213,7 +211,6 @@ api_router = APIRouter(prefix="/api")
 
 # ... (Todas as rotas de Auth, License, Admin, etc. são mantidas) ...
 
-# ⭐⭐⭐ ADICIONAR ROTAS DO MERCADO PAGO ⭐⭐⭐
 app.include_router(mercadopago_router, prefix="/api/mercadopago", tags=["Mercado Pago"])
 app.include_router(asaas_router, prefix="/api/asaas", tags=["Asaas"])
 app.include_router(license_router, prefix="/api/license", tags=["Licença"])
@@ -267,7 +264,7 @@ async def startup_event():
         await resume_cotacao_jobs()
     except Exception as e:
         logger.warning(f"⚠️  Retomada de jobs de cotação: {e}")
-    logger.info("✅ Mercado Pago integrado em /api/mercadopago")
+    logger.info("ℹ️ Mercado Pago desativado em /api/mercadopago")
     logger.info("✅ Asaas integrado em /api/asaas")
     logger.info("✅ Cotação integrado em /api/cotacao")
 
