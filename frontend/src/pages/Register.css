@@ -46,8 +46,8 @@
 }
 
 .register-logo-icon {
-  width: 112px;
-  height: 112px;
+  width: 170px;
+  height: 86px;
   object-fit: contain;
   filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .3));
 }
@@ -297,8 +297,8 @@
   }
 
   .register-logo-icon {
-    width: 96px;
-    height: 96px;
+    width: 150px;
+    height: 76px;
   }
 
   .form-group input {

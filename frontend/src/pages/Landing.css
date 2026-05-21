@@ -115,8 +115,8 @@
 }
 
 .landing-hero-brand img {
-  width: 112px;
-  height: 112px;
+  width: 190px;
+  height: 96px;
   object-fit: contain;
   filter: drop-shadow(0 12px 26px rgba(0,0,0,.28));
 }
@@ -640,8 +640,8 @@
     padding: 50px 20px 40px;
   }
   .landing-hero-brand img {
-    width: 92px;
-    height: 92px;
+    width: 160px;
+    height: 82px;
   }
   .landing-hero-brand-name {
     font-size: 30px;
