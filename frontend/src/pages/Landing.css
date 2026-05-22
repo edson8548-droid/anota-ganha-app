@@ -770,10 +770,31 @@
   text-align: center;
 }
 
+.landing-proof-slot.real {
+  border-style: solid;
+  border-color: rgba(46, 204, 138, .42);
+  background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.035));
+  text-align: left;
+  justify-content: flex-start;
+}
+
+.landing-proof-slot.real small {
+  color: #E8A830;
+  font-size: 15px;
+  letter-spacing: 1px;
+}
+
 .landing-proof-slot strong {
   color: #E1E1E1;
   font-size: 16px;
   line-height: 1.35;
+}
+
+.landing-proof-slot p {
+  color: #A0A3A8;
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0;
 }
 
 .landing-proof-slot span {
@@ -784,6 +805,12 @@
   font-size: 12px;
   font-weight: 800;
   padding: 5px 12px;
+}
+
+.landing-proof-slot.real span {
+  align-self: flex-start;
+  border-color: rgba(46, 204, 138, .4);
+  color: #9BE7C3;
 }
 
 .landing-proof-banner {

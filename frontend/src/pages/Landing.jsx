@@ -334,14 +334,16 @@ const Landing = () => {
       <section className="landing-proof" id="avaliacoes">
         <div className="landing-proof-heading">
           <span className="landing-video-badge"><Check size={16} /> Transparência</span>
-          <h2>Somos novos, e queremos mostrar avaliações reais.</h2>
-          <p>O Venpro está em lançamento. Em vez de inventar depoimentos, vamos publicar aqui comentários de representantes que testarem a ferramenta.</p>
+          <h2>Avaliações reais de quem usa na rotina.</h2>
+          <p>O Venpro está em lançamento. Em vez de inventar depoimentos, vamos publicar aqui comentários reais de representantes que testarem a ferramenta.</p>
         </div>
 
         <div className="landing-proof-grid">
-          <div className="landing-proof-slot">
-            <strong>Aguardando o primeiro depoimento real.</strong>
-            <span>Vaga aberta</span>
+          <div className="landing-proof-slot real">
+            <small>★★★★★</small>
+            <strong>“Aquelas cotações que antes demoravam mais de 1 hora para preencher, hoje levo apenas 5 minutos.”</strong>
+            <p>Com isso ganho mais tempo para gerar novos negócios. Super indico o Venpro a todos vendedores.</p>
+            <span>Renato · Representante comercial há quase 20 anos</span>
           </div>
           <div className="landing-proof-slot">
             <strong>Aguardando o segundo depoimento real.</strong>
