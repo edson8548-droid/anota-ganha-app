@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="Venpro">
+  <defs>
+    <linearGradient id="venproBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#45A3FF"/>
+      <stop offset="100%" stop-color="#17325A"/>
+    </linearGradient>
+    <linearGradient id="venproGreen" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2E8B3A"/>
+      <stop offset="100%" stop-color="#2ECC8A"/>
+    </linearGradient>
+  </defs>
+  <path d="M20 24h24l20 54 25-54h24L72 98H51L20 24Z" fill="url(#venproBlue)"/>
+  <path d="M67 72 96 34" fill="none" stroke="url(#venproGreen)" stroke-width="10" stroke-linecap="round"/>
+  <path d="M96 34 91 56 78 43Z" fill="#2ECC8A"/>
+</svg>
