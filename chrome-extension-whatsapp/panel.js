@@ -22,6 +22,19 @@ const pausaMaxEl    = document.getElementById('pausaMax');
 
 let campaign = null;
 
+function getSentCount(currentCampaign = campaign) {
+  return Array.isArray(currentCampaign?.sentNumbers) ? currentCampaign.sentNumbers.length : 0;
+}
+
+function getContactsCount(currentCampaign = campaign) {
+  return Number(currentCampaign?.contacts_count || currentCampaign?.contacts?.length || 0);
+}
+
+function isCampaignFullySent(currentCampaign = campaign) {
+  const total = getContactsCount(currentCampaign);
+  return total > 0 && getSentCount(currentCampaign) >= total;
+}
+
 function setStatus(text, type = 'info') {
   statusEl.textContent = text;
   statusEl.className = `status ${type}`;
@@ -103,10 +116,40 @@ async function loadCampaign() {
 
     const ready = campaign.contacts_count > 0 && campaign.message;
     btnDisparar.disabled = !ready;
+    btnDisparar.textContent = isCampaignFullySent(campaign) ? 'Campanha já concluída' : 'Iniciar Disparo';
+
+    if (ready && isCampaignFullySent(campaign)) {
+      showCompletedControls(getSentCount(campaign), getContactsCount(campaign));
+      setStatus('Esta campanha já foi concluída. Para enviar novamente, comece do zero.', 'ok');
+      return;
+    }
+
     setStatus(ready ? 'Campanha pronta para disparar.' : 'Configure contatos e mensagem no Venpro', ready ? 'ok' : 'info');
   } catch (err) {
     setStatus(err.message || 'Erro ao carregar campanha.', 'err');
   }
+}
+
+function showRunningCancelButtons() {
+  btnPararContinuar.style.display = 'block';
+  btnPararContinuar.textContent = 'Cancelar e continuar depois';
+  btnPararZerar.textContent = 'Cancelar e começar do zero';
+  cancelWrap.style.display = 'block';
+}
+
+function showCompletedControls(sent, total) {
+  const safeTotal = total || sent || 1;
+  progressWrap.style.display = 'block';
+  progressBar.style.width = '100%';
+  progressPct.textContent = '100%';
+  progressText.textContent = `${sent || safeTotal} / ${safeTotal} enviados`;
+  invalidosWrap.textContent = '';
+  stuckWrap.style.display = 'none';
+  btnPararContinuar.style.display = 'none';
+  btnPararZerar.textContent = 'Começar disparo do zero';
+  cancelWrap.style.display = 'block';
+  btnDisparar.disabled = false;
+  btnDisparar.textContent = 'Campanha já concluída';
 }
 
 function applyDispatchState(state) {
@@ -128,7 +171,7 @@ function applyDispatchState(state) {
   if (state.status === 'running') {
     const stuck = !state.ts || (Date.now() - state.ts) > STUCK_MS;
     stuckWrap.style.display  = stuck ? 'block' : 'none';
-    cancelWrap.style.display = 'block';
+    showRunningCancelButtons();
     btnDisparar.disabled = true;
     btnDisparar.textContent = stuck ? 'Pausado' : 'Disparando...';
     if (!state.errorMsg) {
@@ -136,10 +179,7 @@ function applyDispatchState(state) {
     }
   }
   if (state.status === 'done') {
-    stuckWrap.style.display  = 'none';
-    cancelWrap.style.display = 'none';
-    btnDisparar.disabled = false;
-    btnDisparar.textContent = 'Iniciar Disparo';
+    showCompletedControls(state.sent || processed, total);
     setStatus(`Concluído! ${state.sent} mensagens enviadas.`, 'ok');
   }
 }
@@ -148,6 +188,9 @@ function resetUI() {
   progressWrap.style.display = 'none';
   stuckWrap.style.display    = 'none';
   cancelWrap.style.display   = 'none';
+  btnPararContinuar.style.display = 'block';
+  btnPararContinuar.textContent = 'Cancelar e continuar depois';
+  btnPararZerar.textContent = 'Cancelar e começar do zero';
   btnDisparar.disabled = !campaign || !campaign.contacts_count || !campaign.message;
   btnDisparar.textContent = 'Iniciar Disparo';
   invalidosWrap.textContent = '';
@@ -190,13 +233,19 @@ btnDisparar.addEventListener('click', async () => {
     return;
   }
 
+  if (isCampaignFullySent(campaign)) {
+    showCompletedControls(getSentCount(campaign), getContactsCount(campaign));
+    setStatus('Esta campanha já consta como enviada. Clique em "Começar disparo do zero" para reenviar.', 'info');
+    return;
+  }
+
   const pausaMin = parseInt(pausaMinEl.value) || 60;
   const pausaMax = Math.max(pausaMin, parseInt(pausaMaxEl.value) || 90);
 
   btnDisparar.disabled = true;
   btnDisparar.textContent = 'Disparando...';
   progressWrap.style.display = 'block';
-  cancelWrap.style.display = 'block';
+  showRunningCancelButtons();
   setStatus('Iniciando disparo...', 'info');
 
   const response = await sendWhatsAppMessage(tab.id, {
@@ -218,6 +267,7 @@ btnRetomar.addEventListener('click', async () => {
   const token = await getToken();
   stuckWrap.style.display = 'none';
   cancelWrap.style.display = 'block';
+  showRunningCancelButtons();
   btnDisparar.disabled = true;
   btnDisparar.textContent = 'Disparando...';
   setStatus('Retomando disparo...', 'info');
@@ -256,7 +306,7 @@ async function cancelAndStartFromZero() {
     await clearSentNumbers(token);
     await loadCampaign();
     resetUI();
-    setStatus('Disparo cancelado. Ao iniciar de novo, começa do primeiro contato.', 'ok');
+    setStatus('Enviados zerados. Agora pode iniciar o disparo do primeiro contato.', 'ok');
   } catch {
     setStatus('Não consegui zerar os enviados. Tente novamente.', 'err');
   }
