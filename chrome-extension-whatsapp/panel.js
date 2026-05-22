@@ -15,7 +15,6 @@ const invalidosWrap = document.getElementById('invalidosWrap');
 const stuckWrap     = document.getElementById('stuckWrap');
 const cancelWrap    = document.getElementById('cancelWrap');
 const btnRetomar    = document.getElementById('btnRetomar');
-const btnCancelar   = document.getElementById('btnCancelar');
 const btnPararContinuar = document.getElementById('btnPararContinuar');
 const btnPararZerar = document.getElementById('btnPararZerar');
 const pausaMinEl    = document.getElementById('pausaMin');
@@ -129,7 +128,7 @@ function applyDispatchState(state) {
   if (state.status === 'running') {
     const stuck = !state.ts || (Date.now() - state.ts) > STUCK_MS;
     stuckWrap.style.display  = stuck ? 'block' : 'none';
-    cancelWrap.style.display = stuck ? 'none' : 'block';
+    cancelWrap.style.display = 'block';
     btnDisparar.disabled = true;
     btnDisparar.textContent = stuck ? 'Pausado' : 'Disparando...';
     if (!state.errorMsg) {
@@ -263,7 +262,6 @@ async function cancelAndStartFromZero() {
   }
 }
 
-btnCancelar.addEventListener('click', cancelAndContinueLater);
 btnPararContinuar.addEventListener('click', cancelAndContinueLater);
 btnPararZerar.addEventListener('click', cancelAndStartFromZero);
 
