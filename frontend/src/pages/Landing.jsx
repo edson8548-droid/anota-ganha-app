@@ -130,7 +130,8 @@ const Landing = () => {
       {/* Navbar */}
       <nav className="landing-nav">
         <div className="landing-nav-logo">
-          <img src="/assets/logo/venpro-logo-exato-colorido.svg" alt="Venpro" />
+          <img src="/assets/logo/venpro-logo-exato-colorido.svg" alt="" />
+          <span>Venpro</span>
         </div>
         <div className="landing-nav-links">
           <a href="#recursos">Recursos</a>

@@ -25,15 +25,23 @@
 .landing-nav-logo {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 10px;
   text-decoration: none;
 }
 
 .landing-nav-logo img {
-  width: 78px;
-  height: 46px;
+  width: 42px;
+  height: 42px;
   object-fit: contain;
   filter: drop-shadow(0 5px 12px rgba(0,0,0,.28));
+}
+
+.landing-nav-logo span {
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .landing-nav-links {
@@ -1207,8 +1215,11 @@
     gap: 10px;
   }
   .landing-nav-logo img {
-    width: 68px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
+  }
+  .landing-nav-logo span {
+    font-size: 21px;
   }
   .landing-nav-links {
     display: none;
