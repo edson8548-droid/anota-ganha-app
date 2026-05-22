@@ -34,8 +34,8 @@
 }
 
 .login-logo-icon {
-  width: 170px;
-  height: 86px;
+  width: 190px;
+  height: 172px;
   object-fit: contain;
   filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .3));
 }
@@ -292,8 +292,8 @@
     font-size: 26px;
   }
   .login-logo-icon {
-    width: 150px;
-    height: 76px;
+    width: 164px;
+    height: 148px;
   }
   .whatsapp-float {
     bottom: 20px;

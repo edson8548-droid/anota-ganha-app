@@ -30,8 +30,8 @@
 }
 
 .landing-nav-logo img {
-  width: 48px;
-  height: 48px;
+  width: 92px;
+  height: 54px;
   object-fit: contain;
   filter: drop-shadow(0 5px 12px rgba(0,0,0,.28));
 }
@@ -115,8 +115,8 @@
 }
 
 .landing-hero-brand img {
-  width: 190px;
-  height: 96px;
+  width: 210px;
+  height: 190px;
   object-fit: contain;
   filter: drop-shadow(0 12px 26px rgba(0,0,0,.28));
 }
@@ -622,11 +622,8 @@
     gap: 10px;
   }
   .landing-nav-logo img {
-    width: 40px;
-    height: 40px;
-  }
-  .landing-nav-word {
-    font-size: 23px;
+    width: 76px;
+    height: 46px;
   }
   .landing-nav-actions {
     gap: 8px;
@@ -640,8 +637,8 @@
     padding: 50px 20px 40px;
   }
   .landing-hero-brand img {
-    width: 160px;
-    height: 82px;
+    width: 170px;
+    height: 154px;
   }
   .landing-hero-brand-name {
     font-size: 30px;
