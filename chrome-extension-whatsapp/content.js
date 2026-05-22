@@ -57,6 +57,12 @@ let resumedFromNavigation = false;
 // ── Helpers ───────────────────────────────────────────────────────────────
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+function runtimeMessage(message) {
+  return new Promise(resolve => {
+    chrome.runtime.sendMessage(message, response => resolve(response || null));
+  });
+}
+
 async function sleepCancelable(ms) {
   const end = Date.now() + ms;
   while (!cancelFlag && Date.now() < end) {
@@ -229,6 +235,11 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
   dispatching = true;
   cancelFlag  = false;
 
+  const freshCampaign = await runtimeMessage({ action: 'fetchCampaign', token });
+  if (freshCampaign?.ok && freshCampaign.campaign) {
+    campaign = freshCampaign.campaign;
+  }
+
   const contacts = campaign.contacts || [];
   const sentSet  = new Set(campaign.sentNumbers || []);
   const photos   = campaign.photoUrls || [];
@@ -239,9 +250,14 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
   const total = contacts.length;
   let nextIdx = Math.max(0, startIdx || 0);
 
+  function getLocalSentCount() {
+    return contacts.filter(contact => sentSet.has(contact.telefone)).length;
+  }
+
   async function saveJob(nextIdx) {
+    const campaignSnapshot = { ...campaign, sentNumbers: Array.from(sentSet) };
     await chrome.storage.local.set({
-      whatsappDispatchJob: { campaign, token, pausaMin, pausaMax, startIdx: nextIdx, ts: Date.now() },
+      whatsappDispatchJob: { campaign: campaignSnapshot, token, pausaMin, pausaMax, startIdx: nextIdx, ts: Date.now() },
     });
   }
 
@@ -250,23 +266,35 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
   }
 
   async function saveState(status, errorMsg = '') {
+    sent = getLocalSentCount();
     const processed = Math.min(total, Math.max(sent + invalidos, nextIdx));
     const state = { status, sent, total, invalidos, processed, errorMsg, ts: Date.now(), startIdx: nextIdx };
     await new Promise(r => chrome.runtime.sendMessage({ action: 'saveDispatchState', state }, r));
     chrome.runtime.sendMessage({ action: 'dispatchUpdate' });
   }
 
+  async function sleepWithHeartbeat(ms) {
+    const end = Date.now() + ms;
+    while (!cancelFlag && Date.now() < end) {
+      await sleep(Math.min(10000, end - Date.now()));
+      await saveJob(nextIdx);
+      await saveState('running');
+    }
+  }
+
   async function registerSent(telefone) {
     if (sentSet.has(telefone)) return;
-    const response = await new Promise(resolve => {
-      chrome.runtime.sendMessage({ action: 'registerSentNumber', token, telefone }, r => resolve(r));
-    });
+    const response = await runtimeMessage({ action: 'registerSentNumber', token, telefone });
     if (!response?.ok) {
-      await saveState('running', 'Mensagem enviada, mas não consegui registrar no Venpro. Verifique sua conexão antes de continuar.');
+      const errorMsg = response?.status === 401
+        ? 'Mensagem enviada, mas o login expirou e não consegui registrar no Venpro. Abra o painel do Venpro e continue.'
+        : 'Mensagem enviada, mas não consegui registrar no Venpro. Verifique sua conexão antes de continuar.';
+      await saveState('running', errorMsg);
       return;
     }
     sentSet.add(telefone);
-    sent++;
+    sent = getLocalSentCount();
+    await saveJob(nextIdx);
     await saveState('running');
   }
 
@@ -315,7 +343,7 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
     nextIdx = i + 1;
     await saveJob(nextIdx);
     await saveState('running');
-    await sleepCancelable(15000); // wait 15s before sending photos (same as meu_robo.py)
+    await sleepWithHeartbeat(15000); // wait 15s before sending photos (same as meu_robo.py)
 
     // 2. Send photos
     if (cancelFlag) break;
@@ -331,7 +359,7 @@ async function dispatch(campaign, token, pausaMin, pausaMax, startIdx = 0) {
     // 3. Random pause before next contact
     if (cancelFlag) break;
     const pausa = pausaMin + Math.random() * (pausaMax - pausaMin);
-    await sleepCancelable(pausa * 1000);
+    await sleepWithHeartbeat(pausa * 1000);
   }
 
   await clearJob();
@@ -347,7 +375,7 @@ async function resumePendingJob() {
   const data = await chrome.storage.local.get('whatsappDispatchJob');
   const job = data.whatsappDispatchJob;
   if (!job?.campaign || !job?.token) return;
-  if (Date.now() - (job.ts || 0) > 10 * 60 * 1000) {
+  if (Date.now() - (job.ts || 0) > 4 * 60 * 60 * 1000) {
     await chrome.storage.local.remove('whatsappDispatchJob');
     return;
   }
@@ -359,6 +387,10 @@ resumePendingJob();
 // ── Message listener ──────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'startDispatch') {
+    if (dispatching) {
+      sendResponse({ ok: true, alreadyRunning: true });
+      return true;
+    }
     const { campaign, token, pausaMin, pausaMax } = msg.data;
     dispatch(campaign, token, pausaMin, pausaMax, 0).catch(console.error);
     sendResponse({ ok: true });
@@ -366,6 +398,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.action === 'resumeDispatch') {
+    if (dispatching) {
+      sendResponse({ ok: true, alreadyRunning: true });
+      return true;
+    }
     chrome.runtime.sendMessage({ action: 'getDispatchState' }, r => {
       const state = r?.state;
       const startIdx = state?.startIdx ?? 0;
@@ -383,7 +419,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.action === 'cancelDispatch') {
     cancelFlag = true;
-    dispatching = false;
     sendResponse({ ok: true });
     return true;
   }

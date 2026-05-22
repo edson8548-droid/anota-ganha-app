@@ -35,12 +35,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.action === 'registerSentNumber') {
-    fetch(`${API_URL}/whatsapp/campanha/enviados`, {
+    authenticatedFetch('/whatsapp/campanha/enviados', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${msg.token}`, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ telefone: msg.telefone }),
-    })
+    }, msg.token)
       .then(r => sendResponse({ ok: r.ok, status: r.status }))
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+
+  if (msg.action === 'fetchCampaign') {
+    authenticatedFetch('/whatsapp/campanha', {}, msg.token)
+      .then(async r => {
+        if (!r.ok) {
+          sendResponse({ ok: false, status: r.status });
+          return;
+        }
+        sendResponse({ ok: true, campaign: await r.json() });
+      })
       .catch(() => sendResponse({ ok: false }));
     return true;
   }
@@ -71,6 +84,31 @@ async function getValidToken() {
   }
 
   return requestTokenFromOpenVenproTab();
+}
+
+async function authenticatedFetch(path, options = {}, preferredToken = null) {
+  const token = preferredToken || await getValidToken();
+  let response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (response.status !== 401) return response;
+
+  await chrome.storage.local.remove(['venpro_token', 'venpro_token_ts']);
+  const freshToken = await requestTokenFromOpenVenproTab();
+  if (!freshToken || freshToken === token) return response;
+
+  return fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${freshToken}`,
+    },
+  });
 }
 
 async function requestTokenFromOpenVenproTab() {

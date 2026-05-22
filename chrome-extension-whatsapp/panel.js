@@ -21,9 +21,16 @@ const pausaMinEl    = document.getElementById('pausaMin');
 const pausaMaxEl    = document.getElementById('pausaMax');
 
 let campaign = null;
+let lastDisplayedSent = 0;
+let lastDisplayedProcessed = 0;
 
 function getSentCount(currentCampaign = campaign) {
-  return Array.isArray(currentCampaign?.sentNumbers) ? currentCampaign.sentNumbers.length : 0;
+  const sentNumbers = new Set(currentCampaign?.sentNumbers || []);
+  const contacts = currentCampaign?.contacts || [];
+  if (contacts.length > 0) {
+    return contacts.filter(contact => sentNumbers.has(contact.telefone)).length;
+  }
+  return sentNumbers.size;
 }
 
 function getContactsCount(currentCampaign = campaign) {
@@ -92,6 +99,14 @@ async function fetchCampaign(token) {
   return r.json();
 }
 
+async function refreshCampaignSilently() {
+  const token = await getToken();
+  if (!token) return;
+  try {
+    campaign = await fetchCampaign(token);
+  } catch {}
+}
+
 async function clearSentNumbers(token) {
   const r = await fetch(`${API_URL}/whatsapp/campanha/enviados`, {
     method: 'DELETE',
@@ -139,6 +154,8 @@ function showRunningCancelButtons() {
 
 function showCompletedControls(sent, total) {
   const safeTotal = total || sent || 1;
+  lastDisplayedSent = Math.max(lastDisplayedSent, sent || safeTotal);
+  lastDisplayedProcessed = Math.max(lastDisplayedProcessed, safeTotal);
   progressWrap.style.display = 'block';
   progressBar.style.width = '100%';
   progressPct.textContent = '100%';
@@ -155,7 +172,14 @@ function showCompletedControls(sent, total) {
 function applyDispatchState(state) {
   if (!state) return;
   const total = state.total || 1;
-  const processed = Math.min(total, Math.max(state.processed || 0, (state.sent || 0) + (state.invalidos || 0)));
+  const backendSent = getSentCount(campaign);
+  const sent = Math.min(total, Math.max(state.sent || 0, backendSent, lastDisplayedSent));
+  const processed = Math.min(
+    total,
+    Math.max(state.processed || 0, sent + (state.invalidos || 0), lastDisplayedProcessed)
+  );
+  lastDisplayedSent = sent;
+  lastDisplayedProcessed = processed;
   const rawPct = total ? (processed / total) * 100 : 0;
   const pctValue = rawPct > 0 && rawPct < 10 ? Math.max(0.1, Math.round(rawPct * 10) / 10) : Math.round(rawPct);
   const pctLabel = Number.isInteger(pctValue)
@@ -164,7 +188,7 @@ function applyDispatchState(state) {
   progressWrap.style.display = 'block';
   progressBar.style.width = Math.min(100, Math.max(rawPct, processed > 0 ? 1 : 0)) + '%';
   progressPct.textContent  = pctLabel;
-  progressText.textContent = `${state.sent || 0} / ${total} enviados`;
+  progressText.textContent = `${sent} / ${total} enviados`;
   if (state.invalidos > 0) invalidosWrap.textContent = `${state.invalidos} número(s) inválido(s)`;
   if (state.errorMsg) setStatus(state.errorMsg, 'err');
 
@@ -179,8 +203,8 @@ function applyDispatchState(state) {
     }
   }
   if (state.status === 'done') {
-    showCompletedControls(state.sent || processed, total);
-    setStatus(`Concluído! ${state.sent} mensagens enviadas.`, 'ok');
+    showCompletedControls(sent || processed, total);
+    setStatus(`Concluído! ${sent} mensagens enviadas.`, 'ok');
   }
 }
 
@@ -194,14 +218,16 @@ function resetUI() {
   btnDisparar.disabled = !campaign || !campaign.contacts_count || !campaign.message;
   btnDisparar.textContent = 'Iniciar Disparo';
   invalidosWrap.textContent = '';
+  lastDisplayedSent = getSentCount(campaign);
+  lastDisplayedProcessed = lastDisplayedSent;
   setStatus('Pronto.', 'ok');
 }
 
 // Polling every 30s
 setInterval(() => {
-  chrome.runtime.sendMessage({ action: 'getDispatchState' }, r => {
+  refreshCampaignSilently().finally(() => chrome.runtime.sendMessage({ action: 'getDispatchState' }, r => {
     if (r?.state?.status === 'running') applyDispatchState(r.state);
-  });
+  }));
 }, 30_000);
 
 chrome.runtime.onMessage.addListener((msg) => {
@@ -322,8 +348,9 @@ getWhatsAppTab().then(tab => {
     campaignInfo.style.display = 'none';
     return;
   }
-  chrome.runtime.sendMessage({ action: 'getDispatchState' }, r => {
-    if (r?.state) applyDispatchState(r.state);
-    loadCampaign();
+  loadCampaign().then(() => {
+    chrome.runtime.sendMessage({ action: 'getDispatchState' }, r => {
+      if (r?.state) applyDispatchState(r.state);
+    });
   });
 });
