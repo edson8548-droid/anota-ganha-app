@@ -74,7 +74,8 @@ const productShowcases = [
     image: '/assets/screenshots/pedido-whatsapp-vitrine-2.jpg',
     alt: 'Tela da Vitrine Inteligente no Venpro',
     text: 'Você monta uma vitrine com produtos, fotos, nomes e preços. O Venpro gera o link pronto para enviar ao cliente pelo WhatsApp.',
-    points: ['Itens com foto e preço', 'Link profissional da oferta', 'Pedido volta no WhatsApp']
+    points: ['Cliente recebe o link da vitrine', 'Escolhe itens e quantidades', 'Pedido volta no WhatsApp'],
+    kind: 'vitrineFlow'
   },
   {
     title: 'Raio-X dos Incentivos',
@@ -255,9 +256,50 @@ const Landing = () => {
                   ))}
                 </ul>
               </div>
-              <div className={`landing-showcase-media media-${index + 1}`}>
-                <img src={item.image} alt={item.alt} />
-              </div>
+              {item.kind === 'vitrineFlow' ? (
+                <div className="landing-vitrine-flow" aria-label="Fluxo da Vitrine Inteligente: cliente abre o link e pedido volta no WhatsApp">
+                  <div className="landing-client-link-print">
+                    <div className="client-link-url">venpro.com.br/oferta/ofertas-da-semana</div>
+                    <div className="client-link-header">
+                      <div className="client-link-logo">V</div>
+                      <div>
+                        <strong>Ofertas de quinta feira</strong>
+                        <span>Spani Atacadista · 12 produtos</span>
+                      </div>
+                    </div>
+                    <div className="client-link-search">Buscar produto...</div>
+                    <div className="client-link-products">
+                      <div className="client-link-product">
+                        <div className="client-link-photo">CAFÉ</div>
+                        <div>
+                          <strong>Café Fort 500g Almofada</strong>
+                          <span>Caixa: R$ 219,54</span>
+                        </div>
+                        <div className="client-link-qty">- 2 +</div>
+                      </div>
+                      <div className="client-link-product">
+                        <div className="client-link-photo green">SARD</div>
+                        <div>
+                          <strong>Sardinha Pescador 125g</strong>
+                          <span>Caixa: R$ 237,06</span>
+                        </div>
+                        <div className="client-link-qty">- 1 +</div>
+                      </div>
+                    </div>
+                    <div className="client-link-footer">
+                      <span>Total: R$ 952,40</span>
+                      <button type="button">Enviar pedido pelo WhatsApp</button>
+                    </div>
+                  </div>
+                  <div className="landing-vitrine-order-print">
+                    <img src={item.image} alt={item.alt} />
+                  </div>
+                </div>
+              ) : (
+                <div className={`landing-showcase-media media-${index + 1}`}>
+                  <img src={item.image} alt={item.alt} />
+                </div>
+              )}
             </article>
           ))}
 
