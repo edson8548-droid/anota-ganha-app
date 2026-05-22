@@ -97,7 +97,7 @@ const Plans = () => {
               Preço de lançamento por tempo limitado
             </div>
             <div style={{ fontSize: 15, color: '#A0A3A8', marginBottom: 6 }}>
-              De <span style={{ textDecoration: 'line-through', color: '#8C9098' }}>R$ 99,90</span> por
+              Plano normal <span style={{ textDecoration: 'line-through', color: '#8C9098' }}>R$ 139,90</span> por
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 4 }}>
               <span style={{ fontSize: 18, fontWeight: 700, color: '#A0A3A8', alignSelf: 'flex-start', marginTop: 8 }}>R$</span>

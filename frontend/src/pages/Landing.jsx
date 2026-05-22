@@ -372,7 +372,7 @@ const Landing = () => {
         <div className="landing-price-card">
           <div className="landing-price-tag">Preço de lançamento</div>
           <h3>Plano Mensal</h3>
-          <div className="landing-price-before">De <span>R$ 99,90</span> por</div>
+          <div className="landing-price-before">Plano normal <span>R$ 139,90</span> por</div>
           <div className="landing-price-value">
             <small>R$</small>
             <strong>69</strong>

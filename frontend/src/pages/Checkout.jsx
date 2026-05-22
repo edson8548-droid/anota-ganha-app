@@ -221,7 +221,7 @@ const Checkout = () => {
             <p className="plan-summary-name">{selectedPlan.name}</p>
             <div className="plan-summary-price-block">
               <div className="price-total-checkout" style={{ textDecoration: 'line-through', opacity: .7 }}>
-                De R$ 99,90/mês
+                Plano normal R$ 139,90/mês
               </div>
               <div className="price-main-checkout">
                 R$ {formatMoney(selectedPlan.price)}
