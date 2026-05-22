@@ -106,6 +106,16 @@ export const vitrineService = {
     });
   },
 
+  async aprenderImagem(productName, imageUrl, ean = null) {
+    const headers = await getHeaders();
+    return axios.post(apiUrl('/vitrine/aprender-imagem'), {
+      product_name: productName,
+      image_url: imageUrl,
+      ean,
+      source: 'manual_select',
+    }, { headers });
+  },
+
   // ── Página pública (sem auth) ─────────────────────
   async obterPublica(slug) {
     return axios.get(apiUrl(`/vitrine/publica/${slug}`));

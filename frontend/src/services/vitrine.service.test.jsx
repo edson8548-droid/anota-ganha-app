@@ -80,6 +80,26 @@ test('uploadImagem envia arquivo em FormData sem content-type manual', async () 
   expect(form.get('arquivo')).toBe(file);
 });
 
+test('aprenderImagem salva preferencia de foto do produto', async () => {
+  await vitrineService.aprenderImagem('Produto Teste', 'https://cdn.exemplo.com/produto.jpg', '789');
+
+  expect(axios.post).toHaveBeenCalledWith(
+    'https://api.venpro.com.br/api/vitrine/aprender-imagem',
+    {
+      product_name: 'Produto Teste',
+      image_url: 'https://cdn.exemplo.com/produto.jpg',
+      ean: '789',
+      source: 'manual_select',
+    },
+    {
+      headers: {
+        Authorization: 'Bearer token-123',
+        'Content-Type': 'application/json',
+      },
+    },
+  );
+});
+
 test('obterPublica busca oferta publica sem auth', async () => {
   await vitrineService.obterPublica('oferta-teste');
 

@@ -203,6 +203,13 @@ class ParseListRequest(BaseModel):
     lista: str
 
 
+class LearnImageRequest(BaseModel):
+    product_name: str
+    image_url: str
+    ean: Optional[str] = None
+    source: Optional[str] = "manual_select"
+
+
 class UpdateItemRequest(BaseModel):
     product_name: Optional[str] = None
     product_code: Optional[str] = None
@@ -1128,6 +1135,24 @@ def _serper_search(product_name: str) -> dict:
     return {"found": result["found"], "image_url": result["image_url"], "match": result["match"]}
 
 
+async def _find_learned_image(nome_norm: str, uid: str) -> Optional[dict]:
+    if not nome_norm:
+        return None
+
+    # Preferência do próprio RCA primeiro. Se não houver, usa a base compartilhada.
+    doc = await _db.vitrine_product_images.find_one(
+        {"normalized_name": nome_norm, "created_by": uid},
+        sort=[("selected_count", -1), ("updated_at", -1)],
+    )
+    if doc:
+        return doc
+
+    return await _db.vitrine_product_images.find_one(
+        {"normalized_name": nome_norm, "created_by": {"$ne": uid}},
+        sort=[("selected_count", -1), ("updated_at", -1)],
+    )
+
+
 @router.get("/sugerir-imagem")
 async def sugerir_imagem(product_name: str, uid: str = Depends(get_user_id)):
     """Busca imagem: 1) banco interno, 2) Serper.dev (Google Images)."""
@@ -1135,7 +1160,7 @@ async def sugerir_imagem(product_name: str, uid: str = Depends(get_user_id)):
     logger.info(f"[sugerir-imagem] query={product_name!r} norm={nome_norm!r}")
 
     # 1. Banco interno — busca exata
-    doc = await _db.vitrine_product_images.find_one({"normalized_name": nome_norm})
+    doc = await _find_learned_image(nome_norm, uid)
     if doc:
         url = doc.get("image_url")
         if url:
@@ -1146,9 +1171,14 @@ async def sugerir_imagem(product_name: str, uid: str = Depends(get_user_id)):
     if palavras:
         regex = ".*".join(re.escape(p) for p in palavras)
         doc = await _db.vitrine_product_images.find_one(
-            {"normalized_name": {"$regex": regex, "$options": "i"}},
-            sort=[("selected_count", -1)],
+            {"normalized_name": {"$regex": regex, "$options": "i"}, "created_by": uid},
+            sort=[("selected_count", -1), ("updated_at", -1)],
         )
+        if not doc:
+            doc = await _db.vitrine_product_images.find_one(
+                {"normalized_name": {"$regex": regex, "$options": "i"}, "created_by": {"$ne": uid}},
+                sort=[("selected_count", -1), ("updated_at", -1)],
+            )
         if doc:
             url = doc.get("image_url")
             if url:
@@ -1173,6 +1203,50 @@ async def sugerir_imagem(product_name: str, uid: str = Depends(get_user_id)):
             upsert=True,
         )
     return result
+
+
+@router.post("/aprender-imagem")
+async def aprender_imagem(req: LearnImageRequest, uid: str = Depends(get_user_id)):
+    product_name = (req.product_name or "").strip()
+    image_url = (req.image_url or "").strip()
+    if not product_name:
+        raise HTTPException(400, "Nome do produto obrigatório")
+    if not image_url:
+        raise HTTPException(400, "URL da imagem obrigatória")
+    if not (
+        image_url.startswith("https://")
+        or image_url.startswith("http://")
+        or image_url.startswith("/api/vitrine/imagens/")
+    ):
+        raise HTTPException(400, "URL da imagem inválida")
+
+    nome_norm = normalizar(product_name)
+    now = datetime.now(timezone.utc)
+    await _db.vitrine_product_images.update_one(
+        {"normalized_name": nome_norm, "created_by": uid},
+        {
+            "$set": {
+                "product_name": product_name,
+                "normalized_name": nome_norm,
+                "ean": req.ean,
+                "image_url": image_url,
+                "source": req.source or "manual_select",
+                "created_by": uid,
+                "updated_at": now,
+                "preferred": True,
+            },
+            "$inc": {"selected_count": 1},
+            "$setOnInsert": {"created_at": now},
+        },
+        upsert=True,
+    )
+    await audit_event(
+        "vitrine_item_image_learned",
+        uid=uid,
+        status="success",
+        metadata={"productName": product_name[:120], "source": req.source or "manual_select"},
+    )
+    return {"ok": True, "image_url": image_url, "match": "learned"}
 
 
 @router.get("/sugerir-imagens")

@@ -130,15 +130,25 @@ export default function VitrineEditar() {
     }
   };
 
-  const selecionarImagem = (imageUrl) => {
+  const selecionarImagem = async (imageUrl) => {
     if (!imagePicker?.key || !imageUrl) return;
+    const selectedItem = itens.find(it => it._key === imagePicker.key);
     setItens(prev => prev.map(it =>
       it._key === imagePicker.key
         ? { ...it, _imagePreview: imageUrl, _imageUrl: imageUrl, _imageFile: null }
         : it
     ));
     setImagePicker(null);
-    toast.success('Foto trocada');
+    try {
+      await vitrineService.aprenderImagem(
+        selectedItem?.product_name || imagePicker.productName,
+        imageUrl,
+        selectedItem?.ean || null,
+      );
+      toast.success('Foto trocada e salva para as próximas vitrines');
+    } catch {
+      toast.success('Foto trocada');
+    }
   };
 
   const parsearLista = async () => {
