@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Clipboard,
   ClipboardList,
+  Check,
   FileSpreadsheet,
   MessageCircle,
   Send,
@@ -51,9 +52,9 @@ const rcaSlides = [
   {
     step: '05',
     icon: Sparkles,
-    title: 'Use IA para vender melhor',
-    text: 'Transforme uma lista simples em oferta, argumento de venda, mensagem de recuperação ou roteiro para abordagem de cliente.',
-    action: 'Usar IA',
+    title: 'Use prompts para vender melhor',
+    text: 'Copie comandos prontos para transformar lista simples em oferta, argumento de venda, mensagem de recuperação ou roteiro de abordagem.',
+    action: 'Copiar prompt',
     message: 'Tenho uma sugestão de mix para melhorar seu giro essa semana. Posso te mandar uma opção por categoria?'
   }
 ];
@@ -95,6 +96,11 @@ const Landing = () => {
         <div className="landing-nav-logo">
           <img src="/assets/logo/venpro-logo-exato-colorido.svg" alt="Venpro" />
         </div>
+        <div className="landing-nav-links">
+          <a href="#recursos">Recursos</a>
+          <a href="#plano">Plano</a>
+          <a href="#avaliacoes">Avaliações</a>
+        </div>
         <div className="landing-nav-actions">
           {user ? (
             <button className="landing-btn-primary" onClick={() => navigate('/dashboard')}>Meu Painel</button>
@@ -120,8 +126,8 @@ const Landing = () => {
           Venda mais, <span>trabalhe menos</span>
         </h1>
         <p>
-          Cotações automáticas, assistente IA especializado em vendas, campanhas de positivação
-          e muito mais — tudo em um só lugar, feito para o dia a dia do RCA.
+          Cotações automáticas, prompts prontos para vender melhor, campanhas de positivação
+          e vitrine de ofertas — tudo em um só lugar, feito para o dia a dia do RCA.
         </p>
         <div className="landing-hero-cta">
           <button className="landing-btn-cta" onClick={handleCTA}>
@@ -161,7 +167,7 @@ const Landing = () => {
       </section>
 
       {/* Features */}
-      <section className="landing-features">
+      <section className="landing-features" id="recursos">
         <h2 className="landing-features-title">Ferramentas que trabalham por você</h2>
         <p className="landing-features-sub">Tudo o que um representante comercial precisa, em uma única plataforma.</p>
         <div className="landing-features-grid">
@@ -178,7 +184,7 @@ const Landing = () => {
           <div className="landing-feature-card">
             <div className="landing-feature-icon"><ClipboardList size={32} /></div>
             <h3>Prompts Prontos para RCA</h3>
-            <p>Copie modelos de comando para organizar tabelas, montar ofertas, revisar mensagens e usar no ChatGPT, Gemini ou outra IA da sua preferência.</p>
+            <p>Copie modelos de comando para organizar tabelas, montar ofertas, revisar mensagens e usar no ChatGPT ou outra IA da sua preferência.</p>
           </div>
           <div className="landing-feature-card">
             <div className="landing-feature-icon"><BarChart3 size={32} /></div>
@@ -190,6 +196,71 @@ const Landing = () => {
             <h3>Carteira no WhatsApp</h3>
             <p>Monte sua oferta uma vez e envie para todos os seus clientes pelo WhatsApp Web com mensagens personalizadas e fotos dos produtos.</p>
           </div>
+        </div>
+      </section>
+
+      <section className="landing-proof" id="avaliacoes">
+        <div className="landing-proof-heading">
+          <span className="landing-video-badge"><Check size={16} /> Transparência</span>
+          <h2>Somos novos, e queremos mostrar avaliações reais.</h2>
+          <p>O Venpro está em lançamento. Em vez de inventar depoimentos, vamos publicar aqui comentários de representantes que testarem a ferramenta.</p>
+        </div>
+
+        <div className="landing-proof-grid">
+          <div className="landing-proof-slot">
+            <strong>Aguardando o primeiro depoimento real.</strong>
+            <span>Vaga aberta</span>
+          </div>
+          <div className="landing-proof-slot">
+            <strong>Aguardando o segundo depoimento real.</strong>
+            <span>Vaga aberta</span>
+          </div>
+          <div className="landing-proof-slot">
+            <strong>Aguardando o terceiro depoimento real.</strong>
+            <span>Vaga aberta</span>
+          </div>
+        </div>
+
+        <div className="landing-proof-banner">
+          <div>
+            <h3>Testou o Venpro?</h3>
+            <p>Use os 15 dias grátis. Se ajudar na rotina, envie sua avaliação e ela poderá aparecer aqui com seu nome e cidade.</p>
+          </div>
+          <button className="landing-btn-cta" onClick={() => navigate('/register')}>
+            Experimentar grátis
+          </button>
+        </div>
+      </section>
+
+      <section className="landing-pricing" id="plano">
+        <div className="landing-pricing-heading">
+          <span className="landing-video-badge"><Check size={16} /> Plano Venpro</span>
+          <h2>Comece grátis. Assine quando fizer sentido.</h2>
+          <p>Uma assinatura para acessar as ferramentas principais da rotina do representante comercial.</p>
+        </div>
+
+        <div className="landing-price-card">
+          <div className="landing-price-tag">Preço de lançamento</div>
+          <h3>Plano Mensal</h3>
+          <div className="landing-price-before">De <span>R$ 99,90</span> por</div>
+          <div className="landing-price-value">
+            <small>R$</small>
+            <strong>69</strong>
+            <span>,90</span>
+          </div>
+          <p className="landing-price-period">por mês, recorrente até cancelar</p>
+          <ul className="landing-price-list">
+            <li><Check size={17} /> Cotação Pronta ilimitada</li>
+            <li><Check size={17} /> Carteira no WhatsApp</li>
+            <li><Check size={17} /> Vitrine Inteligente com link da empresa</li>
+            <li><Check size={17} /> Prompts Prontos para RCA</li>
+            <li><Check size={17} /> Gestão de clientes ilimitada</li>
+            <li><Check size={17} /> Suporte via WhatsApp</li>
+          </ul>
+          <button className="landing-btn-cta" onClick={() => navigate('/register')}>
+            Começar 15 dias grátis
+          </button>
+          <p className="landing-price-note">Sem cartão de crédito no teste. Cancele quando quiser.</p>
         </div>
       </section>
 

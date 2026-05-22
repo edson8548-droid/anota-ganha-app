@@ -196,7 +196,7 @@ export default function Cotacao() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button onClick={() => navigate('/assistente')} style={navBtnStyle}>IA</button>
+          <button onClick={() => navigate('/assistente')} style={navBtnStyle}>Prompts</button>
           <button onClick={() => navigate('/minha-licenca')} style={navBtnStyle}>Licença</button>
           <button onClick={handleLogout} style={navBtnStyle}>Sair</button>
         </div>

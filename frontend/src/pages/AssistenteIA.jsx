@@ -93,7 +93,7 @@ const PROMPTS_RAPIDOS = [
   {
     label: 'Crédito e limite',
     sub: 'Pedido travado ou aumento de limite',
-    texto: 'Aja como um assistente de um representante comercial. Escreva uma mensagem persuasiva, profissional e direta para o setor de análise de crédito da empresa, solicitando a liberação de um pedido e o aumento do limite de crédito de um cliente. A mensagem será enviada por e-mail para o analista.\n\nUse os seguintes dados para montar a mensagem:\n\nNome do Cliente / Razão Social: [DIGITE O NOME AQUI]\nCNPJ: [DIGITE O CNPJ AQUI]\nLimite Atual: [DIGITE O VALOR DO LIMITE ATUAL AQUI]\nLimite Desejado / Solicitado: [DIGITE O NOVO LIMITE AQUI]\nValor do Pedido Atual (que está travado): [DIGITE O VALOR DO PEDIDO AQUI]\nJustificativa principal: [ESCOLHA UMA OU MAIS: Excelente pagador / Cliente novo com grande potencial de compra / Aumentou muito o volume de vendas na loja / Concorrente está oferecendo mais limite / Mix de produtos está girando rápido]\n\nA mensagem deve ser amigável, focada em não perder a venda e em construir uma boa parceria com o setor de crédito. Gere apenas o texto da mensagem pronto para eu copiar e enviar.',
+    texto: 'Aja como um especialista em apoio comercial para representantes. Escreva uma mensagem persuasiva, profissional e direta para o setor de análise de crédito da empresa, solicitando a liberação de um pedido e o aumento do limite de crédito de um cliente. A mensagem será enviada por e-mail para o analista.\n\nUse os seguintes dados para montar a mensagem:\n\nNome do Cliente / Razão Social: [DIGITE O NOME AQUI]\nCNPJ: [DIGITE O CNPJ AQUI]\nLimite Atual: [DIGITE O VALOR DO LIMITE ATUAL AQUI]\nLimite Desejado / Solicitado: [DIGITE O NOVO LIMITE AQUI]\nValor do Pedido Atual (que está travado): [DIGITE O VALOR DO PEDIDO AQUI]\nJustificativa principal: [ESCOLHA UMA OU MAIS: Excelente pagador / Cliente novo com grande potencial de compra / Aumentou muito o volume de vendas na loja / Concorrente está oferecendo mais limite / Mix de produtos está girando rápido]\n\nA mensagem deve ser amigável, focada em não perder a venda e em construir uma boa parceria com o setor de crédito. Gere apenas o texto da mensagem pronto para eu copiar e enviar.',
   },
   {
     label: 'Vitrine: lista organizada',
@@ -124,7 +124,6 @@ const PROMPTS_RAPIDOS = [
 
 const IA_SHORTCUTS = [
   { name: 'ChatGPT', url: 'https://chatgpt.com/' },
-  { name: 'Gemini', url: 'https://gemini.google.com/app' },
   { name: 'DeepSeek', url: 'https://chat.deepseek.com/' },
   { name: 'Claude', url: 'https://claude.ai/new' },
 ];
@@ -591,7 +590,7 @@ export default function AssistenteIA() {
                   spellCheck={false}
                 />
                 <div className="ia-prompt-help">
-                  Edite os campos entre colchetes, copie o prompt e cole no ChatGPT, Gemini ou outra IA que preferir.
+                  Edite os campos entre colchetes, copie o prompt e cole no ChatGPT ou outra IA que preferir.
                 </div>
                 <div className="ia-provider-title">Copiar e abrir em</div>
                 <div className="ia-shortcuts">

@@ -2028,7 +2028,7 @@ const Dashboard = () => {
               <div className="tool-card" onClick={() => navigate('/assistente')}>
                 <div className="tool-card-icon"><ClipboardList size={32} /></div>
                 <div className="tool-card-title">Prompts Prontos para RCA</div>
-                <div className="tool-card-desc">Copie comandos prontos para organizar tabelas, montar ofertas, revisar mensagens e usar no ChatGPT, Gemini ou outra IA da sua preferência.</div>
+                <div className="tool-card-desc">Copie comandos prontos para organizar tabelas, montar ofertas, revisar mensagens e usar no ChatGPT ou outra IA da sua preferência.</div>
               </div>
               <div className="tool-card" onClick={() => navigate('/disparador-whatsapp')}>
                 <div className="tool-card-icon"><MessageCircle size={32} /></div>
