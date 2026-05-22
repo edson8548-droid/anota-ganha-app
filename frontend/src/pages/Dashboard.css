@@ -61,20 +61,23 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 21px;
-  font-weight: 800;
   text-decoration: none;
   color: var(--texto);
-  letter-spacing: -0.5px;
   transition: opacity .2s;
 }
 .logo:hover { opacity: .85; }
 .logo-ven { color: var(--texto); }
 .logo-pro { color: var(--acento); }
-.logo-word { color: var(--texto); }
+.logo-word {
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+}
 .logo-icon-img {
-  width: 92px;
-  height: 54px;
+  width: 42px;
+  height: 42px;
   object-fit: contain;
   flex-shrink: 0;
   filter: drop-shadow(0 4px 10px rgba(0,0,0,.24));

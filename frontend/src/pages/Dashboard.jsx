@@ -1556,7 +1556,8 @@ const Dashboard = () => {
           <div className="header-content">
             <div className="header-left">
               <a className="logo" href="/dashboard">
-                <img className="logo-icon-img" src="/assets/logo/venpro-logo-exato-colorido.svg" alt="Venpro" />
+                <img className="logo-icon-img" src="/assets/logo/venpro-logo-mark-exato-colorido.svg" alt="" />
+                <span className="logo-word">Venpro</span>
               </a>
             </div>
             <div className="header-actions">

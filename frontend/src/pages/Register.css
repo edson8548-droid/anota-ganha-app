@@ -42,12 +42,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 12px;
   margin-bottom: 12px;
 }
 
 .register-logo-icon {
-  width: 190px;
-  height: 172px;
+  width: 56px;
+  height: 56px;
   object-fit: contain;
   filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .3));
 }
@@ -67,10 +68,11 @@
 }
 
 .register-logo-word {
-  font-size: 28px;
-  font-weight: 800;
+  font-size: 34px;
+  font-weight: 900;
   color: #ffffff;
-  letter-spacing: -0.5px;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .register-header h1 {
@@ -293,12 +295,12 @@
   .register-logo-ven,
   .register-logo-pro,
   .register-logo-word {
-    font-size: 24px;
+    font-size: 26px;
   }
 
   .register-logo-icon {
-    width: 164px;
-    height: 148px;
+    width: 48px;
+    height: 48px;
   }
 
   .form-group input {

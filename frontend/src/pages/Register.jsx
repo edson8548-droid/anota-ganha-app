@@ -163,7 +163,8 @@ const Register = () => {
       <div className="register-container">
         <div className="register-header">
           <div className="register-logo">
-            <img className="register-logo-icon" src="/assets/logo/venpro-logo-exato-colorido.svg" alt="Venpro" />
+            <img className="register-logo-icon" src="/assets/logo/venpro-logo-mark-exato-colorido.svg" alt="" />
+            <span className="register-logo-word">Venpro</span>
           </div>
           <h1>Crie sua conta grátis</h1>
           <p>15 dias grátis, sem cartão de crédito</p>
