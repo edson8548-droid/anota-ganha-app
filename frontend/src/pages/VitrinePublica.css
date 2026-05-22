@@ -11,13 +11,36 @@
 
 /* ── Topo ── */
 .vp-header {
-  background: #ffffff;
+  background: linear-gradient(180deg, #17325a 0%, #22405f 74px, #ffffff 74px);
   border-bottom: 1px solid #e5e7eb;
   padding: 16px 16px 12px;
   position: sticky;
   top: 0;
   z-index: 20;
   box-shadow: 0 1px 8px rgba(0,0,0,.06);
+}
+.vp-venpro-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 42px;
+  margin-bottom: 14px;
+}
+.vp-venpro-brand img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  padding: 4px;
+  background: rgba(255,255,255,.96);
+  border-radius: 8px;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,.2));
+}
+.vp-venpro-brand span {
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
 }
 .vp-header-top {
   display: flex;

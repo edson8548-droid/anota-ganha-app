@@ -221,6 +221,10 @@ export default function VitrinePublica() {
 
       {/* ── Header ── */}
       <div className="vp-header" ref={headerRef}>
+        <div className="vp-venpro-brand">
+          <img src="/assets/logo/venpro-logo-mark-exato-colorido.svg" alt="" />
+          <span>Venpro</span>
+        </div>
         <div className="vp-header-top">
           {oferta.company_logo_url
             ? <img className="vp-logo" src={imgUrl(oferta.company_logo_url)} alt={oferta.company_name} />
