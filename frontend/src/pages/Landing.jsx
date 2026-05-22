@@ -59,6 +59,41 @@ const rcaSlides = [
   }
 ];
 
+const productShowcases = [
+  {
+    title: 'Cotação Pronta',
+    eyebrow: 'Tabela + lista do cliente',
+    image: '/assets/marketing/venpro-slide2-cotacao-pronta.png',
+    alt: 'Tela da Cotação Pronta no Venpro',
+    text: 'O representante sobe a tabela de preço, carrega a lista do cliente e recebe os itens encontrados para conferir antes de baixar a cotação.',
+    points: ['Busca por EAN e descrição', 'Preço ajustável por item', 'Arquivo pronto para revisar']
+  },
+  {
+    title: 'Vitrine Inteligente',
+    eyebrow: 'Oferta com foto, preço e link',
+    image: '/assets/screenshots/pedido-whatsapp-vitrine-2.jpg',
+    alt: 'Tela da Vitrine Inteligente no Venpro',
+    text: 'Você monta uma vitrine com produtos, fotos, nomes e preços. O Venpro gera o link pronto para enviar ao cliente pelo WhatsApp.',
+    points: ['Itens com foto e preço', 'Link profissional da oferta', 'Pedido volta no WhatsApp']
+  },
+  {
+    title: 'Raio-X dos Incentivos',
+    eyebrow: 'Quem chamar primeiro',
+    image: '/assets/marketing/venpro-print-raiox.png',
+    alt: 'Painel Raio-X dos Clientes no Venpro',
+    text: 'O painel ajuda a enxergar clientes parados, positivação e oportunidades de campanha para priorizar a carteira com mais clareza.',
+    points: ['Clientes parados', 'Taxa de positivação', 'Lista de ataque']
+  },
+  {
+    title: 'Carteira no WhatsApp',
+    eyebrow: 'Disparo organizado',
+    image: '/assets/screenshots/venpro-whatsapp-disparo-progresso.jpg',
+    alt: 'Disparo de oferta pelo WhatsApp com Venpro',
+    text: 'Monte a mensagem uma vez, selecione contatos e envie ofertas pelo WhatsApp Web com acompanhamento do progresso.',
+    points: ['Mensagem personalizada', 'Fotos da oferta', 'Controle de envio']
+  }
+];
+
 const Landing = () => {
   const navigate = useNavigate();
   const { user } = useAuthContext();
@@ -98,6 +133,7 @@ const Landing = () => {
         </div>
         <div className="landing-nav-links">
           <a href="#recursos">Recursos</a>
+          <a href="#prints">Prints</a>
           <a href="#plano">Plano</a>
           <a href="#avaliacoes">Avaliações</a>
         </div>
@@ -196,6 +232,58 @@ const Landing = () => {
             <h3>Carteira no WhatsApp</h3>
             <p>Monte sua oferta uma vez e envie para todos os seus clientes pelo WhatsApp Web com mensagens personalizadas e fotos dos produtos.</p>
           </div>
+        </div>
+      </section>
+
+      <section className="landing-showcase" id="prints">
+        <div className="landing-showcase-heading">
+          <span className="landing-video-badge"><ClipboardList size={16} /> Prints das ferramentas</span>
+          <h2>Veja como cada função entra na rotina do RCA</h2>
+          <p>Não é só promessa: a página mostra o que o representante usa no dia a dia para cotar, ofertar, acompanhar clientes e chamar a carteira.</p>
+        </div>
+
+        <div className="landing-showcase-list">
+          {productShowcases.map((item, index) => (
+            <article className="landing-showcase-item" key={item.title}>
+              <div className="landing-showcase-copy">
+                <span>{item.eyebrow}</span>
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+                <ul>
+                  {item.points.map(point => (
+                    <li key={point}><Check size={16} /> {point}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className={`landing-showcase-media media-${index + 1}`}>
+                <img src={item.image} alt={item.alt} />
+              </div>
+            </article>
+          ))}
+
+          <article className="landing-showcase-item landing-showcase-prompt">
+            <div className="landing-showcase-copy">
+              <span>Comandos prontos</span>
+              <h3>Prompts para vender melhor</h3>
+              <p>Modelos prontos para transformar tabela, oferta e mensagem em abordagem mais clara para o cliente.</p>
+              <ul>
+                <li><Check size={16} /> Mensagem de recuperação</li>
+                <li><Check size={16} /> Argumento por categoria</li>
+                <li><Check size={16} /> Roteiro para campanha</li>
+              </ul>
+            </div>
+            <div className="landing-prompt-preview" aria-label="Exemplo de prompt pronto para RCA">
+              <div className="landing-prompt-header">
+                <span>Prompt pronto</span>
+                <strong>RCA</strong>
+              </div>
+              <p>
+                Monte uma mensagem curta para cliente parado há 21 dias, usando oferta de alto giro,
+                tom profissional e chamada para responder no WhatsApp.
+              </p>
+              <button type="button" onClick={handleCTA}>Copiar prompt</button>
+            </div>
+          </article>
         </div>
       </section>
 

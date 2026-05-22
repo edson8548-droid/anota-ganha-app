@@ -361,6 +361,192 @@
   margin: 0;
 }
 
+/* Product Showcase */
+.landing-showcase {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px 78px;
+}
+
+.landing-showcase-heading {
+  max-width: 760px;
+  margin: 0 auto 30px;
+  text-align: center;
+}
+
+.landing-showcase-heading h2 {
+  color: #ffffff;
+  font-size: 30px;
+  line-height: 1.2;
+  margin: 0 0 12px;
+}
+
+.landing-showcase-heading p {
+  color: #A0A3A8;
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.landing-showcase-list {
+  display: grid;
+  gap: 18px;
+}
+
+.landing-showcase-item {
+  display: grid;
+  grid-template-columns: minmax(260px, .82fr) minmax(0, 1.18fr);
+  gap: 22px;
+  align-items: center;
+  border: 1px solid #4A4D52;
+  border-radius: 14px;
+  background: #363940;
+  padding: 22px;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, .18);
+}
+
+.landing-showcase-item:nth-child(even) .landing-showcase-copy {
+  order: 2;
+}
+
+.landing-showcase-item:nth-child(even) .landing-showcase-media {
+  order: 1;
+}
+
+.landing-showcase-copy {
+  min-width: 0;
+}
+
+.landing-showcase-copy > span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid rgba(232, 168, 48, .34);
+  border-radius: 999px;
+  color: #E8A830;
+  background: rgba(232, 168, 48, .1);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 11px;
+  margin-bottom: 14px;
+}
+
+.landing-showcase-copy h3 {
+  color: #ffffff;
+  font-size: 25px;
+  line-height: 1.2;
+  margin: 0 0 10px;
+}
+
+.landing-showcase-copy p {
+  color: #B8BBC1;
+  font-size: 15px;
+  line-height: 1.62;
+  margin: 0 0 18px;
+}
+
+.landing-showcase-copy ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.landing-showcase-copy li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #E1E1E1;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.landing-showcase-copy li svg {
+  color: #2ECC8A;
+  flex-shrink: 0;
+}
+
+.landing-showcase-media {
+  min-height: 330px;
+  overflow: hidden;
+  border: 1px solid #4A4D52;
+  border-radius: 12px;
+  background: #1F2228;
+}
+
+.landing-showcase-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 330px;
+  object-fit: contain;
+  background: #202328;
+  padding: 12px;
+}
+
+.landing-showcase-prompt {
+  grid-template-columns: minmax(260px, .82fr) minmax(0, 1.18fr);
+  background: linear-gradient(160deg, rgba(58, 133, 168, .08), #363940 62%);
+}
+
+.landing-prompt-preview {
+  border: 1px solid #4A4D52;
+  border-radius: 12px;
+  background: #24272E;
+  padding: 22px;
+  min-height: 250px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.landing-prompt-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  border-bottom: 1px solid #3D4149;
+  padding-bottom: 14px;
+}
+
+.landing-prompt-header span {
+  color: #75B9D6;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.landing-prompt-header strong {
+  color: #2ECC8A;
+  font-size: 13px;
+}
+
+.landing-prompt-preview p {
+  color: #E1E1E1;
+  font-size: 18px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.landing-prompt-preview button {
+  align-self: flex-start;
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  background: #3A85A8;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.landing-prompt-preview button:hover {
+  background: #31708E;
+}
+
 /* Proof */
 .landing-proof {
   max-width: 1120px;
@@ -897,6 +1083,39 @@
   }
   .landing-features-title {
     font-size: 22px;
+  }
+  .landing-showcase {
+    padding: 0 20px 56px;
+  }
+  .landing-showcase-heading h2 {
+    font-size: 24px;
+  }
+  .landing-showcase-heading p {
+    font-size: 15px;
+  }
+  .landing-showcase-item,
+  .landing-showcase-prompt {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+  .landing-showcase-item:nth-child(even) .landing-showcase-copy,
+  .landing-showcase-item:nth-child(even) .landing-showcase-media {
+    order: initial;
+  }
+  .landing-showcase-copy h3 {
+    font-size: 22px;
+  }
+  .landing-showcase-media {
+    min-height: 250px;
+  }
+  .landing-showcase-media img {
+    min-height: 250px;
+  }
+  .landing-prompt-preview {
+    min-height: 220px;
+  }
+  .landing-prompt-preview p {
+    font-size: 16px;
   }
   .landing-proof {
     padding: 0 20px 56px;
