@@ -23,3 +23,32 @@ frontend/.firebase/
 !frontend/public/venpro-cotatudo-extension.zip
 !frontend/public/venpro-whatsapp-extension.zip
 docs/private/
+
+# Local Codex/plugin state
+.agents/
+skills-lock.json
+
+# Marketing drafts and generated media kept locally, not deployed with the site
+marketing/
+logo/
+prompt/
+frontend/marketing/
+
+# Local screenshots / visual QA captures
+home-*.png
+landing-*.png
+frontend/direct-*.png
+
+# Generated social/media assets that should only be copied to public when approved
+frontend/public/assets/social/
+frontend/public/assets/logo/kit-venpro/
+frontend/public/assets/logo/venpro-instagram-profile-*.png
+
+# Generated marketing public drafts
+frontend/public/assets/marketing/venpro-callout-*.png
+
+# Local one-off helper scripts
+scripts/create_slide2_callouts.py
+scripts/create_slide2_mockup.py
+scripts/generate_logo_variants.py
+scripts/model_router.py
