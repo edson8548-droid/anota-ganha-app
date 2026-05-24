@@ -13,6 +13,7 @@ Status:
 - [ ] Verificar no GitHub Actions se o workflow `Uptime Monitor` nao falhou.
 - [ ] Verificar no Render se o backend esta `Live/Deployed`.
 - [ ] Anotar qualquer erro de usuario/assinante antes de fazer alteracao nova.
+- [ ] 19h00: perguntar se houve conversas no suporte WhatsApp. Se houver, pedir para enviar aqui e registrar em `docs/atendimento-whatsapp/conversas/AAAA-MM-DD.md`, mascarando dados sensiveis.
 
 ## Todo Dia Depois de Mexer no Projeto
 
@@ -87,19 +88,25 @@ Antes de rodar, a variavel `$uri` precisa estar definida no PowerShell com a `MO
 
 ### 5. Suporte
 
-- [ ] Configurar WhatsApp Business com nome Venpro.
-- [ ] Colocar logo/foto oficial no WhatsApp Business.
-- [ ] Criar mensagem automatica de saudacao.
+- [x] Configurar WhatsApp Business com nome Venpro.
+- [x] Colocar logo/foto oficial no WhatsApp Business.
+- [x] Criar mensagem automatica de saudacao.
 - [ ] Criar mensagem de ausencia.
-- [ ] Criar resposta rapida para instalacao do Cotatudo.
+- [x] Criar respostas rapidas iniciais: site, teste, suporte, preco e instalacao.
+- [x] Criar etiquetas iniciais no WhatsApp Business.
 - [ ] Criar resposta rapida para problema de pagamento/assinatura.
 - [ ] Criar resposta rapida para duvida de cotacao.
 
 ### 6. Campanha
 
+- [ ] 2026-05-26, terca-feira, entre 11h30 e 13h30: publicar no Instagram o carrossel `carrossel-5-tarefas-rca-v2-01.png` ate `carrossel-5-tarefas-rca-v2-07.png`.
+- [ ] 2026-05-26: fixar o primeiro post no perfil `@venprobr` apos publicar.
+- [ ] 2026-05-26: depois do post publicado, seguir manualmente 10 a 20 perfis reais e relevantes de RCA/representante comercial, sem automacao e sem follow em massa.
+- [ ] 2026-05-26: acompanhar as primeiras metricas do post: alcance, visitas ao perfil, cliques no site, salvamentos e compartilhamentos.
 - [ ] Criar Instagram oficial Venpro.
 - [ ] Criar Facebook oficial Venpro.
 - [ ] Configurar bio/perfil com link `https://venpro.com.br`.
+- [x] Conectar WhatsApp Business ao Instagram e a pagina do Facebook.
 - [ ] Publicar primeiro post fixado: o que e o Venpro e para quem serve.
 - [ ] Conferir se o Reel 1 final esta pronto para trafego/anuncio.
 - [ ] Finalizar ou refazer Reel 2 com voz natural e texto correto.

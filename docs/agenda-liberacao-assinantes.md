@@ -8,19 +8,20 @@ Status:
 
 - [x] Comprar chip exclusivo para suporte.
 - [x] Numero oficial definido: `+55 13 99638-2430` (`5513996382430` para links WhatsApp).
-- [ ] Definir se o numero sera usado em WhatsApp Business.
-- [ ] Criar perfil no WhatsApp Business com nome Venpro.
-- [ ] Colocar foto/logo novo do Venpro.
+- [x] Definir se o numero sera usado em WhatsApp Business.
+- [x] Criar perfil no WhatsApp Business com nome Venpro.
+- [x] Colocar foto/logo novo do Venpro.
 - [ ] Escrever descricao curta do atendimento.
-- [ ] Criar mensagem automatica de saudacao.
+- [x] Criar mensagem automatica de saudacao.
 - [ ] Criar mensagem de ausencia.
 - [x] Atualizar o numero no site e nos botoes de suporte.
 - [ ] Atualizar o numero nas mensagens de divulgacao.
 - [ ] Testar clique no botao de WhatsApp pelo celular.
 - [x] Substituir numero antigo de suporte nos arquivos do frontend.
 - [x] Substituir contatos antigos nas paginas legais.
-- [x] Definir email oficial de suporte: `suportevenpro@gmail.com`.
-- [ ] Configurar resposta rapida para instalacao da extensao Cotatudo.
+- [x] Definir email oficial de suporte: `suporte@venpro.com.br`.
+- [x] Configurar respostas rapidas iniciais no WhatsApp Business: site, teste, suporte, preco e instalacao.
+- [x] Criar etiquetas iniciais no WhatsApp Business para organizar leads e suporte.
 - [ ] Configurar resposta rapida para problema de pagamento/assinatura.
 
 Sugestao de descricao:
@@ -123,10 +124,15 @@ Ola! Voce esta falando com o suporte Venpro. Me diga seu nome, empresa e qual fe
 
 - [x] Criar carrossel de 5 slides para WhatsApp.
 - [x] Criar video promocional com slides, voz e musica.
-- [ ] Criar perfil oficial Venpro no Instagram.
+- [x] Criar perfil oficial Venpro no Instagram: `@venprobr`.
 - [ ] Criar pagina oficial Venpro no Facebook.
 - [ ] Usar o mesmo logo, nome e descricao curta nas duas redes.
-- [ ] Colocar link `https://venpro.com.br` na bio/perfil.
+- [x] Colocar link `https://venpro.com.br` na bio/perfil do Instagram.
+- [x] Conectar WhatsApp Business ao Instagram `@venprobr`.
+- [x] Conectar WhatsApp Business a pagina do Facebook Venpro.
+- [ ] 2026-05-26, terca-feira, entre 11h30 e 13h30: publicar primeiro carrossel no Instagram com os arquivos `carrossel-5-tarefas-rca-v2-01.png` ate `carrossel-5-tarefas-rca-v2-07.png`.
+- [ ] 2026-05-26: fixar o primeiro post no perfil `@venprobr`.
+- [ ] 2026-05-26: apos publicar, seguir manualmente 10 a 20 perfis reais e relevantes de RCA/representante comercial.
 - [ ] Criar destaques no Instagram: `Como funciona`, `Cotacao`, `Vitrine`, `WhatsApp`, `Planos`.
 - [ ] Publicar primeiro post fixado explicando o que e o Venpro.
 - [ ] Publicar Reel 1 como primeiro conteudo de alcance.
@@ -219,6 +225,7 @@ Manter MongoDB Atlas Free por enquanto e fazer backup manual. Ao atingir 30 assi
 
 - [x] Numero antigo de suporte trocado para `5513996382430` em `Dashboard.js`, `Landing.js`, `Login.js` e `WhatsAppButton.js`.
 - [x] Fallback antigo `suporte@anotaganha.com` trocado para `suportevenpro@gmail.com` no backend Mercado Pago.
+- [x] E-mail profissional `suporte@venpro.com.br` criado no Zoho Mail.
 - [x] Documento `DEPLOY_RENDER.md` atualizado para email Venpro.
 - [ ] `android-app/twa-manifest.json` ainda usa nome antigo `Anota & Ganhe Incentivos`; decidir se esse app sera mantido.
 - [ ] `backend/DEPLOY.md` ainda usa titulo antigo `Anota Ganha App`; ajustar quando revisar docs de deploy.
