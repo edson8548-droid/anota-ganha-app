@@ -215,7 +215,8 @@ async def resume_cotacao_jobs():
     now = datetime.now(timezone.utc)
     async for job in db.cotacao_jobs.find({"status": {"$in": ["queued", "processing"]}}):
         job_id = job["_id"]
-        age = (now - job.get("created_at", now)).total_seconds()
+        created_at = _utc_datetime(job.get("created_at", now))
+        age = (now - created_at).total_seconds()
         if age > 15 * 60:
             await db.cotacao_jobs.update_one(
                 {"_id": job_id},
