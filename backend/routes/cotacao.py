@@ -44,6 +44,12 @@ db = None
 _background_tasks: set = set()
 _running_job_ids: set = set()
 
+
+def _utc_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
 MAX_TABELAS = 5
 MAX_EXCEL_BYTES = 20 * 1024 * 1024
 MAX_COTACAO_PREVIEW_BYTES = 14 * 1024 * 1024
@@ -789,7 +795,7 @@ async def get_preview_job_status(
         return {"status": "processing"}
 
     if job["status"] == "processing":
-        started_at = job.get("started_at") or job.get("created_at")
+        started_at = _utc_datetime(job.get("started_at") or job.get("created_at"))
         age = (datetime.now(timezone.utc) - started_at).total_seconds()
         if job_id not in _running_job_ids and age > 15:
             await db.cotacao_jobs.update_one(
@@ -1010,7 +1016,7 @@ async def get_job_status(
         return {"status": "processing"}
 
     if job["status"] == "processing":
-        age_base = job.get("started_at") or job["created_at"]
+        age_base = _utc_datetime(job.get("started_at") or job["created_at"])
         age = (datetime.now(timezone.utc) - age_base).total_seconds()
         if job_id not in _running_job_ids and age > 15:
             await db.cotacao_jobs.update_one(
