@@ -10,7 +10,8 @@ Quando a conta é criada, o front-end chama `POST /api/users/welcome-email`.
 
 O envio é não bloqueante:
 
-- se `SENDGRID_API_KEY` e `SENDER_EMAIL` estiverem configurados, envia o email;
+- se `EMAIL_PROVIDER=zeptomail`, `ZEPTOMAIL_SEND_MAIL_TOKEN` e `SENDER_EMAIL` estiverem configurados, envia o email pelo ZeptoMail;
+- se `EMAIL_PROVIDER=sendgrid`, `SENDGRID_API_KEY` e `SENDER_EMAIL` estiverem configurados, envia o email pelo SendGrid;
 - se o email ainda não estiver configurado, o cadastro continua normal;
 - se o envio falhar, o erro é registrado e o usuário continua no dashboard;
 - se já enviou antes, não reenvia.

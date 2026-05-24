@@ -22,6 +22,10 @@ services:
         sync: false
       - key: ASAAS_WEBHOOK_TOKEN
         sync: false
+      - key: EMAIL_PROVIDER
+        value: zeptomail
+      - key: ZEPTOMAIL_SEND_MAIL_TOKEN
+        sync: false
       - key: SENDGRID_API_KEY
         sync: false
       - key: SENDER_EMAIL
@@ -62,6 +66,8 @@ Antes do deploy, configure estas variáveis de ambiente:
 | `JWT_SECRET_KEY` | Chave secreta para JWT |
 | `ASAAS_API_KEY` | Chave da API Asaas |
 | `ASAAS_WEBHOOK_TOKEN` | Token de autenticação do webhook Asaas |
+| `EMAIL_PROVIDER` | Provedor de email transacional (`zeptomail` ou `sendgrid`) |
+| `ZEPTOMAIL_SEND_MAIL_TOKEN` | Token de envio do Agent no ZeptoMail |
 | `SENDGRID_API_KEY` | Chave do SendGrid |
 | `SENDER_EMAIL` | Email remetente dos emails transacionais |
 | `FRONTEND_URL` | URL do frontend |

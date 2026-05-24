@@ -35,6 +35,8 @@ E adicione estas variáveis:
 | `JWT_SECRET_KEY` | `gerar-um-segredo-muito-longo-aqui` | Chave secreta para JWT |
 | `ASAAS_API_KEY` | `sua_chave_asaas` | Chave da API Asaas |
 | `ASAAS_WEBHOOK_TOKEN` | `seu_token_webhook` | Token de autenticação do webhook Asaas |
+| `EMAIL_PROVIDER` | `zeptomail` | Provedor de email transacional |
+| `ZEPTOMAIL_SEND_MAIL_TOKEN` | `Zoho-enczapikey ...` ou somente o token | Token do Agent no ZeptoMail |
 | `SENDGRID_API_KEY` | `SG.suas-chave-sendgrid` | Chave do SendGrid |
 | `SENDER_EMAIL` | `suporte@venpro.com.br` | Email remetente |
 | `RATE_LIMIT_ENABLED` | `true` | Rate limiting habilitado |
