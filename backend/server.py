@@ -24,8 +24,6 @@ from routes.cotacao import router as cotacao_router, init_cotacao, resume_cotaca
 from routes.whatsapp import router as whatsapp_router, init_whatsapp
 from routes.users import router as users_router, init_users
 from routes.vitrine import router as vitrine_router, init_vitrine
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
 import uuid
 from datetime import datetime, timezone
 import asyncio

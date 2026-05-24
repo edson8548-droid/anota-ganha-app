@@ -43,6 +43,8 @@ export const getCampaignStats = (campaignId) => api.get(`/stats/${campaignId}`);
 export const getCampaignStatsByCity = (campaignId) => api.get(`/stats/${campaignId}/cities`);
 
 // Users
+export const sendWelcomeEmail = () => api.post('/users/welcome-email');
+
 export const uploadAvatar = (file) => {
   const formData = new FormData();
   formData.append('arquivo', file);

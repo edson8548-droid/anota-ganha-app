@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
+import { sendWelcomeEmail } from '../services/api';
 import { isValidCPF, onlyDigits } from '../utils/documentValidators';
 import './Register.css';
 
@@ -129,6 +130,9 @@ const Register = () => {
       
       // ⭐️ A chamada 'register' agora envia os dados adicionais
       await register(email, password, additionalData);
+      sendWelcomeEmail().catch((welcomeErr) => {
+        console.warn('[Register] Não foi possível enviar email de boas-vindas:', welcomeErr?.message || welcomeErr);
+      });
       
       navigate('/dashboard');
     } catch (err) {

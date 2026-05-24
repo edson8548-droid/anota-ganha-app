@@ -12,6 +12,7 @@ from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from firebase_admin import auth as firebase_auth, firestore
 from services.public_files import stream_public_gridfs_file
 from services.security_audit import audit_event, hash_identifier
+from services.email_service import build_welcome_email, send_transactional_email
 from services.upload_validation import IMAGE_CONTENT_TYPES, safe_filename, validate_upload
 from pydantic import BaseModel, EmailStr, Field
 
@@ -198,6 +199,57 @@ class DeviceSessionPayload(BaseModel):
     screenWidth: int | None = Field(default=None, ge=0, le=20000)
     screenHeight: int | None = Field(default=None, ge=0, le=20000)
     appVersion: str | None = Field(default=None, max_length=40)
+
+
+@router.post("/welcome-email")
+async def send_welcome_email(
+    request: Request,
+    uid: str = Depends(get_user_id),
+):
+    """Envia email de boas-vindas sem bloquear o cadastro."""
+    user_ref = _fs().collection("users").document(uid)
+    user_doc = await asyncio.to_thread(user_ref.get)
+    if not user_doc.exists:
+        raise HTTPException(404, "Usuário não encontrado")
+
+    user_data = user_doc.to_dict() or {}
+    if user_data.get("welcomeEmailSentAt"):
+        return {"sent": False, "reason": "already_sent"}
+
+    email = (user_data.get("email") or "").strip()
+    name = (user_data.get("name") or user_data.get("nome") or "").strip()
+    if not email:
+        return {"sent": False, "reason": "missing_email"}
+
+    subject, text_content, html_content = build_welcome_email(name)
+    result = await asyncio.to_thread(
+        send_transactional_email,
+        to_email=email,
+        subject=subject,
+        text_content=text_content,
+        html_content=html_content,
+    )
+
+    if result.get("sent"):
+        await asyncio.to_thread(
+            user_ref.set,
+            {
+                "welcomeEmailSentAt": firestore.SERVER_TIMESTAMP,
+                "updated_at": firestore.SERVER_TIMESTAMP,
+            },
+            merge=True,
+        )
+        await audit_event("welcome_email_sent", uid=uid, status="success", request=request)
+    else:
+        await audit_event(
+            "welcome_email_skipped",
+            uid=uid,
+            status="ignored",
+            metadata={"reason": result.get("reason")},
+            request=request,
+        )
+
+    return result
 
 
 @router.post("/device-session")
