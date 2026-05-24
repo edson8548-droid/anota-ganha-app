@@ -345,14 +345,6 @@ const Landing = () => {
             <p>Com isso ganho mais tempo para gerar novos negócios. Super indico o Venpro a todos vendedores.</p>
             <span>Renato · Representante comercial há quase 20 anos</span>
           </div>
-          <div className="landing-proof-slot">
-            <strong>Aguardando o segundo depoimento real.</strong>
-            <span>Vaga aberta</span>
-          </div>
-          <div className="landing-proof-slot">
-            <strong>Aguardando o terceiro depoimento real.</strong>
-            <span>Vaga aberta</span>
-          </div>
         </div>
 
         <div className="landing-proof-banner">
