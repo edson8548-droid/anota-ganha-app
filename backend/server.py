@@ -28,8 +28,6 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import uuid
 from datetime import datetime, timezone
-import bcrypt
-import jwt
 import asyncio
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
