@@ -12,7 +12,9 @@ SENDER_NAME = "Venpro"
 
 
 def _email_config() -> tuple[str | None, str | None]:
-    return os.environ.get("SENDGRID_API_KEY"), os.environ.get("SENDER_EMAIL")
+    api_key = (os.environ.get("SENDGRID_API_KEY") or "").strip().strip("\"'")
+    sender = (os.environ.get("SENDER_EMAIL") or "").strip().strip("\"'")
+    return api_key or None, sender or None
 
 
 def transactional_email_enabled() -> bool:
