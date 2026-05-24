@@ -49,7 +49,7 @@ const Login = () => {
       <div className="login-card">
         <div className="login-header">
           <div className="login-logo">
-            <img className="login-logo-icon" src="/assets/logo/venpro-logo-mark-exato-colorido.svg" alt="" />
+            <img className="login-logo-icon" src="/assets/logo/venpro-logo-mark-exato-colorido.svg?v=20260523-2" alt="" />
             <span className="login-logo-word">Venpro</span>
           </div>
           <p className="login-subtitle">Entre na sua conta</p>
