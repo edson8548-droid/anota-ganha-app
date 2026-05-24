@@ -262,6 +262,17 @@ async def startup_event():
         await db.cotacao_jobs.create_index(
             [("user_id", 1), ("type", 1), ("status", 1)]
         )
+        await db.vitrine_offers.create_index(
+            [("created_by", 1), ("status", 1)]
+        )
+        await db.vitrine_offers.create_index(
+            [("slug", 1)],
+            unique=True,
+            sparse=True,
+        )
+        await db.tabelas_mestre.create_index(
+            [("user_id", 1)]
+        )
         logger.info("✅ Índices MongoDB criados")
     except Exception as e:
         logger.warning(f"⚠️  Índices MongoDB: {e}")

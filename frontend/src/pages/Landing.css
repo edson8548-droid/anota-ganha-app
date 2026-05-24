@@ -753,8 +753,9 @@
 
 .landing-proof-grid {
   display: grid;
-  grid-template-columns: minmax(0, 720px);
-  justify-content: center;
+  grid-template-columns: 1fr;
+  max-width: 600px;
+  margin: 0 auto;
   gap: 18px;
 }
 
