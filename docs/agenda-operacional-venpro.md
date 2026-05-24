@@ -145,14 +145,14 @@ Antes de rodar, a variavel `$uri` precisa estar definida no PowerShell com a `MO
 - [ ] Testar cotacao com tabela real.
 - [ ] Testar vitrine no celular.
 - [ ] Testar suporte pelo WhatsApp oficial.
-- [ ] Consultar `docs/escala-30-assinantes.md` e avaliar se ja precisa tirar o backend do Render Free.
+- [ ] Consultar `docs/escala-30-assinantes.md` e confirmar se o backend continua no Render Starter ou superior.
 
 ### Ao Chegar em 20 Assinantes
 
 - [ ] Revisar uso de CPU/memoria no Render.
 - [ ] Conferir se o limite de cotacoes simultaneas esta segurando bem.
 - [ ] Revisar erros frequentes nos logs.
-- [ ] Decidir se precisa melhorar plano do Render antes de campanhas maiores.
+- [ ] Decidir se precisa melhorar o plano do Render acima do Starter antes de campanhas maiores.
 - [ ] Avaliar indices de `vitrine_offers`, `vitrine_product_images` e `tabelas_mestre` conforme `docs/escala-30-assinantes.md`.
 
 ### Ao Chegar em 30 Assinantes
@@ -161,7 +161,7 @@ Antes de rodar, a variavel `$uri` precisa estar definida no PowerShell com a `MO
 - [ ] Ativar snapshot diario com retencao minima de 7 dias.
 - [ ] Testar restore em ambiente separado.
 - [ ] Manter backup manual por mais 2 semanas ate confiar nos snapshots.
-- [ ] Confirmar que backend nao esta mais em plano com hibernacao.
+- [ ] Confirmar que backend continua em plano sem hibernacao.
 - [ ] Revisar chamadas sincronas do Asaas e decidir se troca para `asyncio.to_thread` ou `httpx.AsyncClient`.
 
 ### Ao Chegar em 50 Assinantes

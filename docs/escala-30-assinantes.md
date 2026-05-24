@@ -9,10 +9,10 @@ Contexto considerado:
 
 ## Resumo
 
-Para 30 assinantes, o projeto aguenta se o backend ficar acordado e os fluxos principais continuarem com uso normal. O maior risco operacional nao e MongoDB nem cotacao; e o plano free do Render hibernar e causar demora no primeiro acesso.
+Para 30 assinantes, o projeto aguenta se o backend ficar acordado e os fluxos principais continuarem com uso normal. O projeto esta no Render Starter, entao o risco de hibernacao do plano Free nao se aplica ao estado atual.
 
 Prioridade pratica:
-1. Ao ter usuarios pagantes reais: tirar backend do plano free/hibernacao.
+1. Confirmar periodicamente se o backend continua no Render Starter ou superior.
 2. Antes de divulgar mais forte: criar indices de Mongo para vitrine e tabelas.
 3. Quando checkout tiver mais uso: tirar chamadas sincronas do Asaas do event loop.
 4. Quando passar de 100 usuarios: cachear verificacao de assinatura e avaliar Redis/fila.
@@ -53,29 +53,29 @@ Imagens de avatar e vitrine vao para GridFS, nao dependem do disco efemero do Re
 
 ## Pontos em que a analise do Claude estava certa
 
-### 1. Render Free hiberna
+### 1. Render Starter
 
-Status: correto e importante.
+Status: resolvido no estado atual.
 
-O `render.yaml` ainda esta com:
+O projeto deve ficar em plano sem hibernacao. O `render.yaml` foi alinhado para:
 
 ```yaml
-plan: free
+plan: starter
 ```
 
-Risco:
+Risco se voltar para Free:
 - primeiro acesso depois de inatividade pode demorar;
 - para assinante pagante, isso passa sensacao de site fora do ar;
 - pior horario: inicio da manha, quando o RCA abre para trabalhar.
 
 Acao recomendada:
-- quando houver assinantes pagantes ou divulgacao mais forte, subir o backend para um plano sem hibernacao;
-- confirmar valor atual no painel do Render antes de decidir;
-- alternativa temporaria: monitor externo pingando `/health`, mas isso nao substitui plano pago para cliente pagante.
+- manter backend em Starter ou superior;
+- confirmar no painel do Render quando houver mudanca de billing/plano;
+- nao tratar ping externo como substituto de plano pago para cliente pagante.
 
 Marco recomendado:
-- com 10 pagantes: avaliar upgrade;
-- com 20-30 pagantes: upgrade recomendado.
+- com 10 pagantes: confirmar plano ativo;
+- com 20-30 pagantes: revisar CPU/memoria e logs.
 
 ### 2. Chamadas do Asaas sao sincronas
 
@@ -243,4 +243,4 @@ Para amanha, o lancamento organico pode acontecer sem grande mudanca de arquitet
 Atencao principal:
 - nao vender muito antes de testar fluxo real;
 - observar suporte e logs;
-- se aparecer demora no primeiro acesso, priorizar upgrade do Render.
+- se aparecer demora no primeiro acesso mesmo no Starter, revisar logs, cold start, regiao e recursos do Render.

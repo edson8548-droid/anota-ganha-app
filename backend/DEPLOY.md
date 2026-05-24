@@ -1,4 +1,4 @@
-# Deploy do Backend - Anota Ganha App
+# Deploy do Backend - Venpro
 
 ## Opções de Deploy
 
@@ -9,7 +9,7 @@ Crie arquivo `render.yaml` na raiz do backend:
 ```yaml
 services:
   - type: web
-    name: anota-ganha-api
+    name: venpro-api
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
@@ -45,8 +45,8 @@ CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
 
 Build e run:
 ```bash
-docker build -t anota-ganha-api .
-docker run -p 8000:8000 --env-file .env anota-ganha-api
+docker build -t venpro-api .
+docker run -p 8000:8000 --env-file .env venpro-api
 ```
 
 ## Variáveis de Ambiente Obrigatórias
