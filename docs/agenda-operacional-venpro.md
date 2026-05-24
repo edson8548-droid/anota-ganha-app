@@ -13,6 +13,7 @@ Status:
 - [ ] Verificar no GitHub Actions se o workflow `Uptime Monitor` nao falhou.
 - [ ] Verificar no Render se o backend esta `Live/Deployed`.
 - [ ] Anotar qualquer erro de usuario/assinante antes de fazer alteracao nova.
+- [ ] Antes de enviar texto externo da Venpro, revisar portugues, clareza, tom profissional e promessas com base real.
 - [ ] 19h00: perguntar se houve conversas no suporte WhatsApp. Se houver, pedir para enviar aqui e registrar em `docs/atendimento-whatsapp/conversas/AAAA-MM-DD.md`, mascarando dados sensiveis.
 
 ## Todo Dia Depois de Mexer no Projeto
@@ -99,6 +100,12 @@ Antes de rodar, a variavel `$uri` precisa estar definida no PowerShell com a `MO
 
 ### 6. Campanha
 
+- [ ] 2026-05-25: Lancamento oficial do site Venpro com divulgacao organica no WhatsApp.
+- [ ] 2026-05-25: Divulgar em grupos de RCA/representantes comerciais onde houver permissao e contexto.
+- [ ] 2026-05-25: Enviar mensagem individual para RCAs proximos/conhecidos.
+- [ ] 2026-05-25: Usar link principal `https://venpro.com.br` e CTA de teste gratis.
+- [ ] 2026-05-25: Registrar todas as respostas, duvidas e objeções em `docs/atendimento-whatsapp/conversas/2026-05-25.md`.
+- [ ] 2026-05-25: Separar interessados com etiqueta no WhatsApp Business.
 - [ ] 2026-05-26, terca-feira, entre 11h30 e 13h30: publicar no Instagram o carrossel `carrossel-5-tarefas-rca-v2-01.png` ate `carrossel-5-tarefas-rca-v2-07.png`.
 - [ ] 2026-05-26: fixar o primeiro post no perfil `@venprobr` apos publicar.
 - [ ] 2026-05-26: depois do post publicado, seguir manualmente 10 a 20 perfis reais e relevantes de RCA/representante comercial, sem automacao e sem follow em massa.

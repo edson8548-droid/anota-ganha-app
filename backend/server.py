@@ -15,7 +15,6 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from services.security_audit import audit_event
 from services.security_config import PRODUCTION_CORS_ORIGINS, parse_cors_origins
 from services.security_headers import SecurityHeadersMiddleware
-# ... (restante dos imports) ...
 from routes.mercadopago import router as mercadopago_router
 from routes.mercadopago import setup_mercadopago, initialize_firebase
 from routes.asaas import router as asaas_router
@@ -80,6 +79,7 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.enabled = enabled
         self.requests = defaultdict(deque)
+        self.last_cleanup = 0
 
     def _client_ip(self, request):
         forwarded_for = request.headers.get("x-forwarded-for", "")
@@ -114,6 +114,18 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
 
         max_requests, window_seconds, bucket = limit_config
         now = time.monotonic()
+
+        if now - self.last_cleanup > 60:
+            self.last_cleanup = now
+            empty_keys = []
+            for stored_key, stored_timestamps in self.requests.items():
+                while stored_timestamps and now - stored_timestamps[0] > window_seconds:
+                    stored_timestamps.popleft()
+                if not stored_timestamps:
+                    empty_keys.append(stored_key)
+            for stored_key in empty_keys:
+                self.requests.pop(stored_key, None)
+
         key = f"{self._client_ip(request)}:{bucket}"
         timestamps = self.requests[key]
 
@@ -162,8 +174,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ... (Todo o código do servidor continua inalterado) ...
-
 # ==================== Health ====================
 @app.get("/")
 async def root():
@@ -203,8 +213,6 @@ if not mongo_url:
 
 client = AsyncIOMotorClient(mongo_url, maxPoolSize=10, serverSelectionTimeoutMS=3000, connectTimeoutMS=5000, socketTimeoutMS=10000)
 db = client[os.environ.get("DB_NAME", "anota_ganha_db")]
-
-# (Restante do código omitido por brevidade, mas deve ser mantido)
 
 # ==================== Routes Setup ====================
 api_router = APIRouter(prefix="/api")
@@ -272,5 +280,3 @@ async def startup_event():
 async def shutdown_db_client():
     client.close()
     logger.info("Mongo client closed")
-
-# (Uvicorn Runner omitido)

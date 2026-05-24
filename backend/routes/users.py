@@ -13,7 +13,7 @@ from firebase_admin import auth as firebase_auth, firestore
 from services.public_files import stream_public_gridfs_file
 from services.security_audit import audit_event, hash_identifier
 from services.upload_validation import IMAGE_CONTENT_TYPES, safe_filename, validate_upload
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -55,25 +55,20 @@ def _validar_formato_cpf(cpf: str) -> tuple[bool, str]:
 
 def _calcular_digitos_verificadores(cpf: str) -> tuple[int, int]:
     """
-    Calcula os dígitos verificadores do CPF.
-
-    Posição:            1 2 3 4 5 6 7 8 9 10 11
-    Dígito:             X X X X X X X X X V
-    Multiplicador:    10 11 10 10  2  1  2  1  2  1
+    Calcula os dois dígitos verificadores do CPF pelo algoritmo oficial.
     """
+    cpf = _remover_caracteres_cpf(cpf)
     if len(cpf) != 11:
-        return 0, 0  # CPF inválido
+        return 0, 0
 
-    # Cálculo dos 9 primeiros dígitos
-    soma = sum(int(d) for d in cpf[:9])
-    resto = soma % 11
+    def calcular(base: str, pesos: range) -> int:
+        soma = sum(int(digito) * peso for digito, peso in zip(base, pesos))
+        resto = soma % 11
+        return 0 if resto < 2 else 11 - resto
 
-    # Determina o dígito verificador esperado
-    dv_esperado = 11 - resto if resto < 10 else 0
-
-    dv_real = int(cpf[9])
-
-    return dv_esperado, dv_real
+    primeiro_digito = calcular(cpf[:9], range(10, 1, -1))
+    segundo_digito = calcular(cpf[:10], range(11, 1, -1))
+    return primeiro_digito, segundo_digito
 
 
 def _verificar_duplicidade_cpf(cpf: str, db) -> tuple[bool, str]:
@@ -96,12 +91,14 @@ def _verificar_duplicidade_cpf(cpf: str, db) -> tuple[bool, str]:
         if usuarios:
             usuario_existente = usuarios[0]
             email_existente = usuario_existente.to_dict().get("email", "")
-            nome_existente = usuario_existente.to_dict().get("name", "")
+            nome_existente = usuario_existente.to_dict().get("name") or usuario_existente.to_dict().get("nome", "")
 
-            return False, f"CPF já cadastrado para o usuário: {email_existente} ({nome_existente}). Use outro CPF ou entre em contato."
+            return True, f"CPF já cadastrado para o usuário: {email_existente} ({nome_existente}). Use outro CPF ou entre em contato."
     except Exception:
-        logger.warning(f"[SECURITY] Erro ao verificar duplicidade de CPF: {cpf_limpo}")
-        return False, "Erro ao verificar duplicidade. Por favor, tente novamente."
+        logger.warning("[SECURITY] Erro ao verificar duplicidade de CPF")
+        return True, "Erro ao verificar duplicidade. Por favor, tente novamente."
+
+    return False, "CPF disponível"
 
 def init_users(database):
     global _db
@@ -187,7 +184,8 @@ async def upload_avatar(
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
-    nome: str
+    nome: str | None = None
+    name: str | None = None
     cpf: str
     telefone: str
 
@@ -248,12 +246,7 @@ async def register_device_session(
 
 @router.post("/register")
 async def register(
-    email: str,
-    password: str,
-    nome: str,
-    cpf: str,
-    telefone: str,
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    payload: RegisterRequest,
 ):
     """
     Registra novo usuário no sistema.
@@ -265,7 +258,13 @@ async def register(
     - Telefone (básica)
     - Token Firebase obrigatório
     """
-    logger.info(f"[REGISTER] Novo registro: email={email}, cpf={cpf}")
+    email = str(payload.email).strip().lower()
+    password = payload.password
+    nome = (payload.nome or payload.name or "").strip()
+    cpf = _remover_caracteres_cpf(payload.cpf)
+    telefone = payload.telefone
+
+    logger.info("[REGISTER] Novo registro solicitado: email=%s", email)
 
     # 1. Validação básica de campos
     if not email or not password or not nome or not cpf or not telefone:
@@ -282,13 +281,17 @@ async def register(
     if not cpf_valido:
         raise HTTPException(400, f"CPF inválido: {msg_cpf}")
 
-    dv_esperado, dv_real = _calcular_digitos_verificadores(cpf)
-    if dv_esperado != dv_real:
-        raise HTTPException(400, f"Dígitos verificadores incorretos. Esperado: {dv_esperado}, Recebido: {dv_real}")
+    if cpf == cpf[0] * 11:
+        raise HTTPException(400, "CPF inválido")
+
+    dv1_esperado, dv2_esperado = _calcular_digitos_verificadores(cpf)
+    dv1_real, dv2_real = int(cpf[9]), int(cpf[10])
+    if (dv1_esperado, dv2_esperado) != (dv1_real, dv2_real):
+        raise HTTPException(400, "Dígitos verificadores do CPF incorretos")
 
     # 3. Verificação de duplicidade de CPF
-    cpf_duplicado, msg_duplicidade = await _verificar_duplicidade_cpf(cpf, _fs())
-    if not cpf_duplicado:
+    cpf_duplicado, msg_duplicidade = await asyncio.to_thread(_verificar_duplicidade_cpf, cpf, _fs())
+    if cpf_duplicado:
         raise HTTPException(400, msg_duplicidade)
 
     # 4. Validação de telefone
@@ -298,22 +301,29 @@ async def register(
 
     # 5. Cria usuário no Firebase Auth
     try:
-        user_credential = await firebase_auth.create_user_with_email_and_password(email, password)
-        uid = user_credential.uid
-        logger.info(f"[REGISTER] Firebase user criado: uid={uid}")
+        user = await asyncio.to_thread(
+            firebase_auth.create_user,
+            email=email,
+            password=password,
+            display_name=nome,
+        )
+        uid = user.uid
+        logger.info("[REGISTER] Firebase user criado: uid=%s", uid)
     except Exception as e:
-        logger.error(f"[REGISTER] Erro ao criar Firebase user: {e}")
-        if "EMAIL_EXISTS" in str(e):
+        logger.error("[REGISTER] Erro ao criar Firebase user: %s", e)
+        error_text = str(e)
+        if "EMAIL_EXISTS" in error_text or "already exists" in error_text.lower():
             raise HTTPException(400, "Este email já está cadastrado")
-        elif "WEAK_PASSWORD" in str(e):
+        elif "WEAK_PASSWORD" in error_text:
             raise HTTPException(400, "A senha é muito fraca. Use no mínimo 6 caracteres")
-        raise HTTPException(400, f"Erro ao criar usuário: {str(e)}")
+        raise HTTPException(400, "Erro ao criar usuário")
 
     # 6. Salva dados adicionais no Firestore (incluindo CPF validado)
     user_data = {
         "email": email,
+        "name": nome,
         "nome": nome,
-        "cpf": cpf,  # ✅ CPF validado (11 dígitos, sem formatação)
+        "cpf": cpf,
         "telefone": telefone_clean,
         "role": "user",
         "license_type": "trial",
@@ -323,11 +333,16 @@ async def register(
     }
 
     try:
-        await _fs().collection("users").document(uid).set(user_data)
-        logger.info(f"[REGISTER] Dados salvos no Firestore: uid={uid}, cpf={cpf}")
-    except Exception as e:
-        logger.error(f"[REGISTER] Erro ao salvar dados: {e}")
-        raise HTTPException(500, f"Erro ao salvar dados: {str(e)}")
+        await asyncio.to_thread(_fs().collection("users").document(uid).set, user_data)
+        logger.info("[REGISTER] Dados salvos no Firestore: uid=%s", uid)
+    except Exception:
+        logger.exception("[REGISTER] Erro ao salvar dados no Firestore: uid=%s", uid)
+        # Desfaz o usuário Firebase para evitar estado inconsistente
+        try:
+            await asyncio.to_thread(firebase_auth.delete_user, uid)
+        except Exception:
+            logger.warning("[REGISTER] Não foi possível desfazer Firebase user: uid=%s", uid)
+        raise HTTPException(500, "Erro ao salvar dados do usuário. Tente novamente.")
 
     return {
         "uid": uid,

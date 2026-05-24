@@ -83,9 +83,9 @@ def carregar_config() -> configparser.ConfigParser:
         print("=" * 60)
         print("\nAcesse o painel web e copie sua Chave de Licença.")
         chave = input("Chave de Licença (XXXX-XXXX-XXXX-XXXX): ").strip().upper()
-        servidor = input("URL do servidor [https://api.representantes.app]: ").strip()
+        servidor = input("URL do servidor [https://api.venpro.com.br]: ").strip()
         if not servidor:
-            servidor = "https://api.representantes.app"
+            servidor = "https://api.venpro.com.br"
 
         config["licenca"] = {"chave": chave, "servidor": servidor.rstrip("/")}
         with open(CONFIG_FILE, "w") as f:
@@ -130,7 +130,7 @@ def verificar_licenca_ou_sair(chave: str, servidor: str):
     print("═" * 60)
     print(f"\n  {r.get('message', 'Licença inativa.')}")
     print("\n  Acesse o painel para renovar:")
-    print("  → https://representantes.app/planos")
+    print("  → https://venpro.com.br/planos")
     print("═" * 60 + "\n")
     sys.exit(1)
 
@@ -150,7 +150,7 @@ async def loop_revalidacao(chave: str, servidor: str):
             print("  ❌ LICENÇA EXPIROU — ENCERRANDO AGENTE")
             print("═" * 60)
             print(f"  {r.get('message', 'Assinatura inativa.')}")
-            print("  Renove em: https://representantes.app/planos\n")
+            print("  Renove em: https://venpro.com.br/planos\n")
             os._exit(1)   # força saída mesmo dentro de coroutine
         log(f"✅ Licença revalidada: {r.get('message', 'OK')}")
 
