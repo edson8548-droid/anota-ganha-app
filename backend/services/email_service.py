@@ -42,9 +42,20 @@ def send_transactional_email(
 
     try:
         response = SendGridAPIClient(api_key).send(message)
-    except Exception:
-        logger.exception("[EMAIL] Falha ao enviar email transacional")
-        return {"sent": False, "reason": "send_failed"}
+    except Exception as exc:
+        status_code = getattr(exc, "status_code", None)
+        body = getattr(exc, "body", None)
+        if isinstance(body, bytes):
+            body = body.decode("utf-8", errors="replace")
+        logger.exception(
+            "[EMAIL] Falha ao enviar email transacional status_code=%s body=%s",
+            status_code,
+            str(body or "")[:1000],
+        )
+        result = {"sent": False, "reason": "send_failed"}
+        if status_code:
+            result["status_code"] = status_code
+        return result
 
     return {"sent": True, "status_code": response.status_code}
 
