@@ -36,7 +36,7 @@ E adicione estas variáveis:
 | `ASAAS_API_KEY` | `sua_chave_asaas` | Chave da API Asaas |
 | `ASAAS_WEBHOOK_TOKEN` | `seu_token_webhook` | Token de autenticação do webhook Asaas |
 | `SENDGRID_API_KEY` | `SG.suas-chave-sendgrid` | Chave do SendGrid |
-| `SENDER_EMAIL` | `suportevenpro@gmail.com` | Email remetente |
+| `SENDER_EMAIL` | `suporte@venpro.com.br` | Email remetente |
 | `RATE_LIMIT_ENABLED` | `true` | Rate limiting habilitado |
 
 ---

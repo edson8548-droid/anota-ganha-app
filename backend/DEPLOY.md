@@ -24,6 +24,8 @@ services:
         sync: false
       - key: SENDGRID_API_KEY
         sync: false
+      - key: SENDER_EMAIL
+        sync: false
 ```
 
 ### 2. Manual com Docker
@@ -61,6 +63,7 @@ Antes do deploy, configure estas variáveis de ambiente:
 | `ASAAS_API_KEY` | Chave da API Asaas |
 | `ASAAS_WEBHOOK_TOKEN` | Token de autenticação do webhook Asaas |
 | `SENDGRID_API_KEY` | Chave do SendGrid |
+| `SENDER_EMAIL` | Email remetente dos emails transacionais |
 | `FRONTEND_URL` | URL do frontend |
 | `BACKEND_URL` | URL do backend |
 

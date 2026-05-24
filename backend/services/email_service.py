@@ -5,9 +5,10 @@ import logging
 import os
 
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+from sendgrid.helpers.mail import Email, Mail, ReplyTo
 
 logger = logging.getLogger(__name__)
+SENDER_NAME = "Venpro"
 
 
 def _email_config() -> tuple[str | None, str | None]:
@@ -31,12 +32,13 @@ def send_transactional_email(
         return {"sent": False, "reason": "email_not_configured"}
 
     message = Mail(
-        from_email=sender,
+        from_email=Email(sender, SENDER_NAME),
         to_emails=to_email,
         subject=subject,
         plain_text_content=text_content,
         html_content=html_content,
     )
+    message.reply_to = ReplyTo(sender, SENDER_NAME)
 
     try:
         response = SendGridAPIClient(api_key).send(message)

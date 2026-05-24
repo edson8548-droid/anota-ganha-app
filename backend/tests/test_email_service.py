@@ -23,3 +23,39 @@ def test_build_welcome_email_mentions_trial_and_core_cta():
     assert "Cotação Pronta" in text_content
     assert "https://venpro.com.br" in text_content
     assert "Acessar o Venpro" in html_content
+
+
+def test_send_transactional_email_uses_named_sender_and_reply_to(monkeypatch):
+    sent_messages = []
+
+    class FakeResponse:
+        status_code = 202
+
+    class FakeSendGridClient:
+        def __init__(self, api_key):
+            assert api_key == "SG.fake"
+
+        def send(self, message):
+            sent_messages.append(message.get())
+            return FakeResponse()
+
+    monkeypatch.setenv("SENDGRID_API_KEY", "SG.fake")
+    monkeypatch.setenv("SENDER_EMAIL", "suporte@venpro.com.br")
+    monkeypatch.setattr("services.email_service.SendGridAPIClient", FakeSendGridClient)
+
+    result = send_transactional_email(
+        to_email="cliente@example.com",
+        subject="Teste",
+        text_content="Texto",
+        html_content="<p>Texto</p>",
+    )
+
+    assert result == {"sent": True, "status_code": 202}
+    assert sent_messages[0]["from"] == {
+        "email": "suporte@venpro.com.br",
+        "name": "Venpro",
+    }
+    assert sent_messages[0]["reply_to"] == {
+        "email": "suporte@venpro.com.br",
+        "name": "Venpro",
+    }
