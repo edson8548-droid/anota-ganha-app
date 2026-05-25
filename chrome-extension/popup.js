@@ -4,6 +4,7 @@ const STUCK_MS = 3 * 60 * 1000;
 const BTN_LABEL = 'Preencher Cotação';
 
 const statusEl     = document.getElementById('status');
+const siteDetectadoEl = document.getElementById('siteDetectado');
 const tabelasEl    = document.getElementById('tabelas');
 const prazoEl      = document.getElementById('prazo');
 const modoEl       = document.getElementById('modo');
@@ -27,6 +28,23 @@ let cancelRequested = false;
 function setStatus(text, type = 'info') {
   statusEl.textContent = text;
   statusEl.className = `status ${type}`;
+}
+
+function setDetectedSite(tab) {
+  const url = tab?.url || '';
+  let label = 'Site detectado: nenhum site de cotação aberto';
+  let type = 'err';
+
+  if (url.includes('cotatudo.com.br')) {
+    label = 'Site detectado: Cotatudo';
+    type = 'ok';
+  } else if (/\/php\/vrcotacao\/cotacao\.php/i.test(url)) {
+    label = 'Site detectado: VR Cotação';
+    type = 'ok';
+  }
+
+  siteDetectadoEl.textContent = label;
+  siteDetectadoEl.className = `status ${type}`;
 }
 
 function setProgress(pct, label) {
@@ -433,6 +451,7 @@ async function init() {
   }
 
   const tab = await getQuotationTab();
+  setDetectedSite(tab);
   if (!tab) {
     setStatus('Abra uma cotação no Cotatudo ou no VR Cotação primeiro.', 'err');
     tabelasEl.innerHTML = '<option value="">Necessário estar na cotação</option>';

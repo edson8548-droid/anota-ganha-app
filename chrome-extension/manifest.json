@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Venpro — Preencher Cotação",
   "version": "1.0.19",
-  "description": "Preenche cotações no Cotatudo e VR Cotação automaticamente com preços da sua tabela Venpro.",
+  "description": "Preenchedor de cotações do Venpro para Cotatudo, VR Cotação e novos portais compatíveis.",
   "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel"],
   "host_permissions": [
     "https://cotatudo.com.br/*",
