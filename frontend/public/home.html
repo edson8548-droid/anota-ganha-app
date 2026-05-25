@@ -555,6 +555,10 @@ footer {
 .ft-copy { font-size:12px; color:var(--sub2); }
 
 @media(max-width:700px){
+  nav { padding:0 5%; gap:10px; }
+  .logo-text { font-size:21px; }
+  nav > a { font-size:12px !important; margin-right:4px !important; }
+  .nav-cta { padding:10px 14px; font-size:13px; white-space:nowrap; }
   .nav-links { display:none; }
   .logo-mark { width:68px; height:40px; }
   .hero { padding:34px 5% 48px; }
@@ -600,8 +604,8 @@ footer {
         <div class="hero-brand-line">Mais vendas. Mais resultados.</div>
       </div>
     </div>
-    <div class="hero-tag">Resultado real</div>
-    <h1>Veja o sistema<br>em <em>operação.</em></h1>
+    <div class="hero-tag">Feito para RCA</div>
+    <h1>Cotação, vitrine e<br><em>WhatsApp no mesmo painel.</em></h1>
     <p class="hero-sub">Preencha cotações, envie ofertas e acompanhe campanhas em um painel feito para a rotina do representante comercial.</p>
     <div class="hero-btns">
       <button class="btn-pri" onclick="window.location.href='/register'">Testar 15 dias grátis →</button>
@@ -1007,7 +1011,7 @@ footer {
 <div class="sec-inner">
   <div class="sec-lbl center">Investimento</div>
   <h2 class="sec-h center">Simples assim.</h2>
-  <p class="sec-p center">Começa grátis. Assina quando quiser. Cancela quando quiser.</p>
+  <p class="sec-p center">Comece grátis. Assine quando fizer sentido. Cancele quando quiser.</p>
   <div class="planos-grid">
 
     <div class="plano">
@@ -1109,6 +1113,10 @@ footer {
   <h2 class="sec-h center" style="margin-bottom:48px">Perguntas frequentes.</h2>
   <div class="faq">
     <div>
+      <div class="faq-q" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block';this.querySelector('span').textContent=this.nextElementSibling.style.display==='block'?'−':'+'">Preciso de cartão de crédito para testar? <span>+</span></div>
+      <div class="faq-a">Não. O teste gratuito dura 15 dias e não pede cartão. Você só informa dados de pagamento se decidir assinar pelo Asaas.</div>
+    </div>
+    <div>
       <div class="faq-q" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block';this.querySelector('span').textContent=this.nextElementSibling.style.display==='block'?'−':'+'">A Carteira no WhatsApp usa meu número pessoal? <span>+</span></div>
       <div class="faq-a">Sim. A extensão roda no seu PC e usa o WhatsApp Web com o seu próprio número — sem custo adicional por mensagem e sem precisar de API paga.</div>
     </div>
@@ -1118,7 +1126,7 @@ footer {
     </div>
     <div>
       <div class="faq-q" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block';this.querySelector('span').textContent=this.nextElementSibling.style.display==='block'?'−':'+'">O que acontece se eu cancelar? <span>+</span></div>
-      <div class="faq-a">As ferramentas param de funcionar na próxima verificação de licença (a cada 1 hora). Seus dados ficam salvos por 30 dias. Ao renovar, tudo volta automaticamente.</div>
+      <div class="faq-a">Ao cancelar, novas cobranças são interrompidas. Se você já pagou um período, o acesso continua até o fim desse período. Seus dados ficam preservados por pelo menos 30 dias.</div>
     </div>
     <div>
       <div class="faq-q" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block';this.querySelector('span').textContent=this.nextElementSibling.style.display==='block'?'−':'+'">Meus dados de clientes são seguros? <span>+</span></div>
@@ -1126,7 +1134,7 @@ footer {
     </div>
     <div>
       <div class="faq-q" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block';this.querySelector('span').textContent=this.nextElementSibling.style.display==='block'?'−':'+'">Preciso de conhecimento técnico para instalar? <span>+</span></div>
-      <div class="faq-a">Não. O painel tem um guia passo a passo com comandos prontos para copiar e colar. A maioria dos usuários configura em menos de 10 minutos.</div>
+      <div class="faq-a">Não. O painel mostra o passo a passo para instalar as extensões no Chrome. Se tiver dúvida, o suporte ajuda pelo WhatsApp.</div>
     </div>
   </div>
 </div>
