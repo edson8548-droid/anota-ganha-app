@@ -335,7 +335,7 @@ const Landing = () => {
         <div className="landing-proof-heading">
           <span className="landing-video-badge"><Check size={16} /> Transparência</span>
           <h2>Avaliações reais de quem usa na rotina.</h2>
-          <p>O Venpro está em lançamento. Em vez de inventar depoimentos, vamos publicar aqui comentários reais de representantes que testarem a ferramenta.</p>
+          <p>Comentários reais de representantes que testaram o Venpro na rotina de cotação e atendimento.</p>
         </div>
 
         <div className="landing-proof-grid">
@@ -344,6 +344,12 @@ const Landing = () => {
             <strong>“Aquelas cotações que antes demoravam mais de 1 hora para preencher, hoje levo apenas 5 minutos.”</strong>
             <p>Com isso ganho mais tempo para gerar novos negócios. Super indico o Venpro a todos vendedores.</p>
             <span>Renato · Representante comercial há quase 20 anos</span>
+          </div>
+          <div className="landing-proof-slot real">
+            <small>★★★★★</small>
+            <strong>“Conheci o Venpro por indicação do Renato, fiz meu cadastro e achei o sistema muito bom.”</strong>
+            <p>Vai ajudar muito os representantes comerciais no dia a dia.</p>
+            <span>Rodney N. · Representante comercial</span>
           </div>
         </div>
 
