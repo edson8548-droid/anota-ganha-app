@@ -43,6 +43,15 @@ Comando base do backup manual:
 Observacao:
 Antes de rodar, a variavel `$uri` precisa estar definida no PowerShell com a `MONGO_URL` atual. Nao salvar nem enviar a `MONGO_URL` no chat ou no Git.
 
+## Melhorias Futuras de Producao
+
+- [ ] Backend: trocar o fallback local de `DB_NAME` em `backend/server.py` por validacao obrigatoria quando `APP_ENV=production`, para evitar subir producao apontando para banco antigo se a variavel faltar no Render.
+- [ ] Android/TWA: quando for gerar/publicar APK/AAB, confirmar que o SHA-256 do keystore final e o `packageId` `br.com.venpro.app` batem com `frontend/public/.well-known/assetlinks.json`.
+- [ ] Android/TWA: remover dependencia de caminho local do keystore no manifesto quando houver CI ou outra maquina de build.
+- [ ] CSP: remover futuramente `style-src-attr 'unsafe-inline'` depois de migrar estilos inline do React para classes CSS e testar visualmente tela por tela.
+- [ ] Monitoramento: criar alerta automatico para falha de `https://api.venpro.com.br/health`, erro 5xx no Render e falha de checkout/webhook Asaas.
+- [ ] Deploy: criar checklist automatizado pos-deploy para validar `manifest.json`, `service-worker.js`, `assetlinks.json`, ZIPs das extensoes, CORS e headers principais.
+
 ## Marcos de Crescimento
 
 ## Validacao Comercial Antes de Vender Para Mais Gente
@@ -180,6 +189,7 @@ Antes de rodar, a variavel `$uri` precisa estar definida no PowerShell com a `MO
 
 ## Historico
 
+- [x] 2026-05-25: Auditoria tecnica de deploy/producao concluiu que Firebase Hosting, service worker, manifesto, assetlinks, ZIPs, CORS e health check estao coerentes para divulgacao. Pendencias futuras registradas em "Melhorias Futuras de Producao".
 - [x] 2026-05-21: Primeiro backup manual do Mongo criado em `C:\Users\edson\backups-venpro\venpro-backup.gz` com cerca de 3.6 MB.
 - [x] 2026-05-21: Mercado Pago desativado; API passou a anunciar somente Asaas.
 - [x] 2026-05-21: Senha do Mongo trocada e usuario deixou de usar permissao `atlasAdmin`.
