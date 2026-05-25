@@ -486,6 +486,9 @@ const Landing = () => {
       {/* Footer */}
       <footer className="landing-footer">
         &copy; {new Date().getFullYear()} Venpro — Ferramentas para Representantes Comerciais ·{' '}
+        <a href="/privacy-policy.html">Privacidade</a>{' · '}
+        <a href="/terms.html">Termos</a>{' · '}
+        <a href="/delete-account.html">Exclusão de conta</a>{' · '}
         <a href="https://wa.me/5513996382430?text=Olá,%20preciso%20de%20suporte" target="_blank" rel="noopener noreferrer">Suporte WhatsApp</a>
       </footer>
     </div>

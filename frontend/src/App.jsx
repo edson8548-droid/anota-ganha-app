@@ -4,11 +4,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { SubscriptionProvider } from './contexts/SubscriptionContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
-import { startExtensionTokenBridge } from './utils/extensionTokenBridge';
-
 import './App.css';
-
-startExtensionTokenBridge();
 
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));

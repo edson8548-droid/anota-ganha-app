@@ -19,6 +19,7 @@ from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel
 from pymongo import UpdateOne
 from pymongo.errors import DuplicateKeyError
+from bson import ObjectId
 from typing import List
 import firebase_admin
 from firebase_admin import auth as firebase_auth
@@ -97,6 +98,12 @@ def _gerar_excel_multiprazos_pdf_isolado(caminho_base, prazos, timeout_seconds=1
 def init_cotacao(database):
     global db
     db = database
+
+
+def _object_id_or_400(value: str, label: str = "ID inválido") -> ObjectId:
+    if not ObjectId.is_valid(value):
+        raise HTTPException(400, label)
+    return ObjectId(value)
 
 
 def _aprendizado_query(user_id: str, tabela_id: str, nomes_norm):
@@ -367,10 +374,10 @@ async def renomear_tabela(
     nome: str = Form(...),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    from bson import ObjectId
     uid = await get_user_id(credentials)
+    oid = _object_id_or_400(tabela_id)
     result = await db.tabelas_mestre.update_one(
-        {"_id": ObjectId(tabela_id), "user_id": uid},
+        {"_id": oid, "user_id": uid},
         {"$set": {"nome": nome}}
     )
     if result.matched_count == 0:
@@ -383,16 +390,16 @@ async def excluir_tabela(
     tabela_id: str,
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    from bson import ObjectId
     uid = await get_user_id(credentials)
-    doc = await db.tabelas_mestre.find_one({"_id": ObjectId(tabela_id), "user_id": uid})
+    oid = _object_id_or_400(tabela_id)
+    doc = await db.tabelas_mestre.find_one({"_id": oid, "user_id": uid})
     if not doc:
         raise HTTPException(404, "Tabela não encontrada")
     try:
         await _bucket().delete(doc["grid_id"])
     except Exception:
         pass
-    await db.tabelas_mestre.delete_one({"_id": ObjectId(tabela_id)})
+    await db.tabelas_mestre.delete_one({"_id": oid})
     return {"ok": True}
 
 
@@ -403,9 +410,8 @@ async def processar_cotacao(
     modo: str = Form("completo"),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    from bson import ObjectId
-
     uid = await get_user_id(credentials)
+    oid = _object_id_or_400(tabela_id)
     modo = str(modo or "completo").strip().lower()
 
     job_ativo = await _preview_ativo_do_usuario(uid)
@@ -415,7 +421,7 @@ async def processar_cotacao(
             "Você já tem uma cotação em processamento. Aguarde finalizar ou cancele antes de enviar outra.",
         )
 
-    doc = await db.tabelas_mestre.find_one({"_id": ObjectId(tabela_id), "user_id": uid})
+    doc = await db.tabelas_mestre.find_one({"_id": oid, "user_id": uid})
     if not doc:
         raise HTTPException(404, "Tabela mestre não encontrada")
 
@@ -487,11 +493,11 @@ async def preview_cotacao(
     Executa matching e retorna JSON com resultados para revisão.
     Não gera Excel — salva sessão no MongoDB para uso posterior pelo /confirmar.
     """
-    from bson import ObjectId
     from services.excel_processor import ler_cotacao
     from services.matching_engine import processar_cotacao_com_ia
 
     uid = await get_user_id(credentials)
+    oid = _object_id_or_400(tabela_id)
     modo = str(modo or "completo").strip().lower()
 
     job_ativo = await _preview_ativo_do_usuario(uid)
@@ -501,7 +507,7 @@ async def preview_cotacao(
             "Você já tem uma cotação em processamento. Aguarde finalizar ou cancele antes de enviar outra.",
         )
 
-    doc = await db.tabelas_mestre.find_one({"_id": ObjectId(tabela_id), "user_id": uid})
+    doc = await db.tabelas_mestre.find_one({"_id": oid, "user_id": uid})
     if not doc:
         raise HTTPException(404, "Tabela mestre não encontrada")
 
@@ -587,12 +593,11 @@ async def preview_cotacao_async(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     """Cria um job para o preview da Cotação Pronta sem segurar a requisição aberta."""
-    from bson import ObjectId
-
     uid = await get_user_id(credentials)
+    oid = _object_id_or_400(tabela_id)
     modo = str(modo or "completo").strip().lower()
 
-    doc = await db.tabelas_mestre.find_one({"_id": ObjectId(tabela_id), "user_id": uid})
+    doc = await db.tabelas_mestre.find_one({"_id": oid, "user_id": uid})
     if not doc:
         raise HTTPException(404, "Tabela mestre não encontrada")
 
@@ -666,7 +671,6 @@ async def _preview_job_foi_cancelado(job_id):
 
 
 async def _processar_preview_job(job_id):
-    from bson import ObjectId
     from services.excel_processor import ler_cotacao
     from services.matching_engine import processar_cotacao_com_ia
 
@@ -1284,13 +1288,13 @@ async def match_cotatudo(
     Recebe itens extraídos do Cotatudo pela extensão Chrome,
     faz matching com a tabela mestre e retorna preços para preencher.
     """
-    from bson import ObjectId
     from services.matching_engine import processar_cotacao_com_ia
 
     uid = await get_user_id(credentials)
+    oid = _object_id_or_400(payload.tabela_id)
     modo = str(payload.modo or "completo").strip().lower()
 
-    doc = await db.tabelas_mestre.find_one({"_id": ObjectId(payload.tabela_id), "user_id": uid})
+    doc = await db.tabelas_mestre.find_one({"_id": oid, "user_id": uid})
     if not doc:
         raise HTTPException(404, "Tabela mestre não encontrada")
 

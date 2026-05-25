@@ -81,16 +81,12 @@ service cloud.firestore {
           'trialEndsAt',
           'createdAt',
           'updatedAt',
-          'paymentMethod',
-          'mercadoPagoSubscriptionId',
-          'mercadoPagoCustomerId'
+          'paymentMethod'
         ])
         && request.resource.data.userId == userId
         && request.resource.data.planId == 'trial'
         && request.resource.data.status == 'trialing'
-        && request.resource.data.paymentMethod == null
-        && request.resource.data.mercadoPagoSubscriptionId == null
-        && request.resource.data.mercadoPagoCustomerId == null;
+        && request.resource.data.paymentMethod == null;
     }
 
     function validTrialSubscriptionExpire(userId) {

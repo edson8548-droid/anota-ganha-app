@@ -43,3 +43,35 @@ def test_cpf_duplicate_check_returns_available_when_not_found():
 
     assert duplicado is False
     assert mensagem == "CPF disponível"
+
+
+class _ExistingDoc:
+    def to_dict(self):
+        return {"email": "cliente@example.com", "name": "Cliente Teste"}
+
+
+class _ExistingStream:
+    def stream(self):
+        return [_ExistingDoc()]
+
+
+class _ExistingCollection:
+    def where(self, *_args, **_kwargs):
+        return self
+
+    def limit(self, *_args, **_kwargs):
+        return _ExistingStream()
+
+
+class _ExistingDb:
+    def collection(self, *_args, **_kwargs):
+        return _ExistingCollection()
+
+
+def test_cpf_duplicate_check_does_not_expose_existing_user_data():
+    duplicado, mensagem = users._verificar_duplicidade_cpf("52998224725", _ExistingDb())
+
+    assert duplicado is True
+    assert "cliente@example.com" not in mensagem
+    assert "Cliente Teste" not in mensagem
+    assert mensagem == "CPF já cadastrado. Faça login ou entre em contato com o suporte."

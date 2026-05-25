@@ -135,8 +135,6 @@ async function requestTokenFromOpenVenproTab() {
     url: [
       'https://venpro.com.br/*',
       'https://www.venpro.com.br/*',
-      'https://anota-ganha-app.web.app/*',
-      'https://anota-ganha-app.firebaseapp.com/*',
     ],
   });
 

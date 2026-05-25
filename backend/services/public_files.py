@@ -10,6 +10,10 @@ PUBLIC_IMAGE_TYPES = {
     "image/gif",
 }
 
+PUBLIC_PDF_TYPES = {
+    "application/pdf",
+}
+
 PUBLIC_FILE_HEADERS = {
     "Cache-Control": "public, max-age=86400, immutable",
     "X-Content-Type-Options": "nosniff",
@@ -22,7 +26,13 @@ def parse_grid_id(grid_id: str, label: str = "Arquivo") -> ObjectId:
     return ObjectId(grid_id)
 
 
-async def stream_public_gridfs_file(bucket, grid_id: str, *, label: str = "Arquivo") -> StreamingResponse:
+async def stream_public_gridfs_file(
+    bucket,
+    grid_id: str,
+    *,
+    label: str = "Arquivo",
+    allowed_content_types: set[str] | None = None,
+) -> StreamingResponse:
     oid = parse_grid_id(grid_id, label)
 
     try:
@@ -31,7 +41,7 @@ async def stream_public_gridfs_file(bucket, grid_id: str, *, label: str = "Arqui
         raise HTTPException(404, f"{label} não encontrado")
 
     content_type = (grid_out.metadata or {}).get("content_type") or "application/octet-stream"
-    if content_type not in PUBLIC_IMAGE_TYPES:
+    if content_type not in (allowed_content_types or PUBLIC_IMAGE_TYPES):
         raise HTTPException(404, f"{label} não encontrado")
 
     return StreamingResponse(

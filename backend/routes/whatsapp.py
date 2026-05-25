@@ -17,7 +17,7 @@ from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel
 import firebase_admin
 from firebase_admin import auth as firebase_auth, firestore
-from services.public_files import stream_public_gridfs_file
+from services.public_files import PUBLIC_IMAGE_TYPES, PUBLIC_PDF_TYPES, stream_public_gridfs_file
 from services.security_audit import audit_event, hash_identifier
 from services.subscription_access import ensure_subscription_access
 from services.upload_validation import CSV_CONTENT_TYPES, IMAGE_CONTENT_TYPES, PDF_CONTENT_TYPES, validate_upload
@@ -199,7 +199,12 @@ async def _delete_photo(url: str):
 @router.get("/fotos/{grid_id}")
 async def servir_foto(grid_id: str):
     """Serve photo from GridFS — public endpoint used by Chrome extension."""
-    return await stream_public_gridfs_file(_gridfs(), grid_id, label="Foto")
+    return await stream_public_gridfs_file(
+        _gridfs(),
+        grid_id,
+        label="Foto",
+        allowed_content_types=PUBLIC_IMAGE_TYPES | PUBLIC_PDF_TYPES,
+    )
 
 
 @router.get("/campanha")

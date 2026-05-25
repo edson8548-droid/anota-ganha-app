@@ -8,18 +8,12 @@ from fastapi import HTTPException
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from routes.asaas import ASAAS_PLANS, _find_subscription_user_id, asaas_webhook
-from routes.mercadopago import PreferencePayload, create_preference, webhook as mercadopago_webhook
 from services.security_config import LOCAL_CORS_ORIGINS, PRODUCTION_CORS_ORIGINS, parse_cors_origins
 
 
 class FakeRequest:
     async def json(self):
         return {"event": "IGNORED"}
-
-
-class FakeMercadoPagoRequest:
-    async def json(self):
-        return {"type": "payment", "data": {"id": "123"}}
 
 
 def test_cors_fallback_in_production_does_not_include_localhost(monkeypatch):
@@ -83,21 +77,3 @@ def test_asaas_finds_user_from_monthly_external_reference():
     payment = {"externalReference": "usuario-com-hifen-monthly-69.90"}
 
     assert _find_subscription_user_id(payment=payment) == "usuario-com-hifen"
-
-
-def test_mercado_pago_create_preference_is_disabled():
-    payload = PreferencePayload(
-        planId="monthly",
-        user={"id": "user-1", "email": "user@example.com", "name": "User"},
-    )
-
-    with pytest.raises(HTTPException) as exc:
-        asyncio.run(create_preference(payload, authenticated_uid="user-1"))
-
-    assert exc.value.status_code == 410
-
-
-def test_mercado_pago_webhook_does_not_process_events():
-    response = asyncio.run(mercadopago_webhook(FakeMercadoPagoRequest()))
-
-    assert response == {"status": "disabled", "provider": "mercadopago"}

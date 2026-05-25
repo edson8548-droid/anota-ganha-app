@@ -22,7 +22,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // (content scripts can't bypass CORS — background can)
   if (msg.action === 'downloadPhoto') {
     fetch(msg.url)
-      .then(r => r.blob())
+      .then(r => {
+        if (!r.ok) throw new Error(`download_failed_${r.status}`);
+        return r.blob();
+      })
       .then(blob => new Promise((res, rej) => {
         const reader = new FileReader();
         reader.onload = () => res({ base64: reader.result, type: blob.type });
@@ -116,8 +119,6 @@ async function requestTokenFromOpenVenproTab() {
     url: [
       'https://venpro.com.br/*',
       'https://www.venpro.com.br/*',
-      'https://anota-ganha-app.web.app/*',
-      'https://anota-ganha-app.firebaseapp.com/*',
     ],
   });
 

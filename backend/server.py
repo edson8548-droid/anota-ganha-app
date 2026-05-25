@@ -12,11 +12,11 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+import firebase_admin
+from firebase_admin import credentials, firestore
 from services.security_audit import audit_event
 from services.security_config import PRODUCTION_CORS_ORIGINS, parse_cors_origins
 from services.security_headers import SecurityHeadersMiddleware
-from routes.mercadopago import router as mercadopago_router
-from routes.mercadopago import setup_mercadopago, initialize_firebase
 from routes.asaas import router as asaas_router
 from routes.license import router as license_router
 from routes.ia import router as ia_router
@@ -31,6 +31,26 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
+
+def initialize_firebase():
+    if firebase_admin._apps:
+        return firestore.client()
+    firebase_config = {
+        "type": "service_account",
+        "project_id": os.environ.get("FIREBASE_PROJECT_ID"),
+        "private_key_id": os.environ.get("FIREBASE_PRIVATE_KEY_ID"),
+        "private_key": (os.environ.get("FIREBASE_PRIVATE_KEY") or "").replace("\\n", "\n"),
+        "client_email": os.environ.get("FIREBASE_CLIENT_EMAIL"),
+        "client_id": os.environ.get("FIREBASE_CLIENT_ID"),
+        "token_uri": "https://oauth2.googleapis.com/token",
+    }
+    if not firebase_config["project_id"] or not firebase_config["private_key"]:
+        raise ValueError("Variáveis FIREBASE_... não configuradas.")
+    cred = credentials.Certificate(firebase_config)
+    storage_bucket = os.environ.get("FIREBASE_STORAGE_BUCKET", "").strip()
+    app_options = {"storageBucket": storage_bucket} if storage_bucket else None
+    firebase_admin.initialize_app(cred, app_options)
+    return firestore.client()
 BUILD_VERSION = "ean-strict-codes"
 BUILD_COMMIT = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_COMMIT") or "local"
 
@@ -213,9 +233,6 @@ db = client[os.environ.get("DB_NAME", "anota_ganha_db")]
 # ==================== Routes Setup ====================
 api_router = APIRouter(prefix="/api")
 
-# ... (Todas as rotas de Auth, License, Admin, etc. são mantidas) ...
-
-app.include_router(mercadopago_router, prefix="/api/mercadopago", tags=["Mercado Pago"])
 app.include_router(asaas_router, prefix="/api/asaas", tags=["Asaas"])
 app.include_router(license_router, prefix="/api/license", tags=["Licença"])
 app.include_router(ia_router, prefix="/api/ia", tags=["Assistente IA"])
@@ -235,7 +252,6 @@ async def startup_event():
         logger.info("✅ Firebase inicializado")
     except Exception as e:
         logger.error(f"⚠️  Firebase falhou ao inicializar: {e}")
-    setup_mercadopago()
     init_cotacao(db)
     init_whatsapp(db)
     init_users(db)
@@ -279,7 +295,6 @@ async def startup_event():
         await resume_cotacao_jobs()
     except Exception as e:
         logger.warning(f"⚠️  Retomada de jobs de cotação: {e}")
-    logger.info("ℹ️ Mercado Pago desativado em /api/mercadopago")
     logger.info("✅ Asaas integrado em /api/asaas")
     logger.info("✅ Cotação integrado em /api/cotacao")
 

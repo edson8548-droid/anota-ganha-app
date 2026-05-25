@@ -1,4 +1,4 @@
-const CACHE_NAME = 'venpro-app-v4';
+const CACHE_NAME = 'venpro-app-v5';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -93,5 +93,4 @@ self.addEventListener('sync', (event) => {
 self.addEventListener('push', (event) => {
   console.log('Service Worker: Push notification received', event);
 });
-
 

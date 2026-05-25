@@ -1,18 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Venpro — Carteira no WhatsApp",
-  "version": "1.1.19",
+  "version": "1.1.20",
   "description": "Envia ofertas para clientes via WhatsApp Web com sua campanha Venpro.",
   "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel"],
   "host_permissions": [
     "https://web.whatsapp.com/*",
     "https://venpro.com.br/*",
     "https://www.venpro.com.br/*",
-    "https://anota-ganha-app.web.app/*",
-    "https://anota-ganha-app.firebaseapp.com/*",
-    "https://api.venpro.com.br/*",
-    "https://storage.googleapis.com/*",
-    "https://firebasestorage.googleapis.com/*"
+    "https://api.venpro.com.br/*"
   ],
   "action": {
     "default_icon": {
@@ -41,9 +37,7 @@
     {
       "matches": [
         "https://venpro.com.br/*",
-        "https://www.venpro.com.br/*",
-        "https://anota-ganha-app.web.app/*",
-        "https://anota-ganha-app.firebaseapp.com/*"
+        "https://www.venpro.com.br/*"
       ],
       "js": ["venpro-content.js"],
       "run_at": "document_idle"

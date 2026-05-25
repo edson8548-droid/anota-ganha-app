@@ -1,31 +1,5 @@
-// Content script injected into venpro.com.br — requests token from the page
-// without relying on page localStorage.
-
-function requestTokenFromPage() {
-  return new Promise((resolve) => {
-    const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const timeout = setTimeout(() => {
-      window.removeEventListener('message', onMessage);
-      resolve(null);
-    }, 6000);
-
-    function onMessage(event) {
-      if (
-        event.source !== window ||
-        event.data?.type !== 'VENPRO_EXTENSION_TOKEN_RESPONSE' ||
-        event.data?.requestId !== requestId
-      ) {
-        return;
-      }
-      clearTimeout(timeout);
-      window.removeEventListener('message', onMessage);
-      resolve(event.data.token || null);
-    }
-
-    window.addEventListener('message', onMessage);
-    window.postMessage({ type: 'VENPRO_EXTENSION_TOKEN_REQUEST', requestId }, window.location.origin);
-  });
-}
+// Content script injected into venpro.com.br. It reads the Firebase session
+// from same-origin IndexedDB and avoids exposing tokens through page messages.
 
 function readTokenFromFirebaseIndexedDb() {
   return new Promise((resolve) => {
@@ -58,7 +32,7 @@ function readTokenFromFirebaseIndexedDb() {
 }
 
 async function syncToken() {
-  const token = await requestTokenFromPage() || await readTokenFromFirebaseIndexedDb();
+  const token = await readTokenFromFirebaseIndexedDb();
   if (token) {
     chrome.runtime.sendMessage({ action: 'saveToken', token });
   }

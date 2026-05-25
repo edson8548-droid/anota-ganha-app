@@ -90,11 +90,11 @@ def _verificar_duplicidade_cpf(cpf: str, db) -> tuple[bool, str]:
         usuarios = list(usuarios_query.stream())
 
         if usuarios:
-            usuario_existente = usuarios[0]
-            email_existente = usuario_existente.to_dict().get("email", "")
-            nome_existente = usuario_existente.to_dict().get("name") or usuario_existente.to_dict().get("nome", "")
-
-            return True, f"CPF já cadastrado para o usuário: {email_existente} ({nome_existente}). Use outro CPF ou entre em contato."
+            logger.warning(
+                "[SECURITY] cpf_duplicate_registration_attempt cpf_hash=%s",
+                hash_identifier(cpf_limpo),
+            )
+            return True, "CPF já cadastrado. Faça login ou entre em contato com o suporte."
     except Exception:
         logger.warning("[SECURITY] Erro ao verificar duplicidade de CPF")
         return True, "Erro ao verificar duplicidade. Por favor, tente novamente."
@@ -316,7 +316,7 @@ async def register(
     cpf = _remover_caracteres_cpf(payload.cpf)
     telefone = payload.telefone
 
-    logger.info("[REGISTER] Novo registro solicitado: email=%s", email)
+    logger.info("[REGISTER] Novo registro solicitado: email_hash=%s", hash_identifier(email))
 
     # 1. Validação básica de campos
     if not email or not password or not nome or not cpf or not telefone:

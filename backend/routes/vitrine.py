@@ -676,7 +676,11 @@ async def criar_oferta(req: CreateOfferRequest, uid: str = Depends(get_user_id))
     for i, item in enumerate(req.items or []):
         item_dict = item.model_dump()
 
-        logger.info(f"[CRIAR_OFERTA] Item {i}: {item_dict}")
+        logger.info(
+            "[CRIAR_OFERTA] Item recebido index=%s has_image=%s",
+            i,
+            bool(item_dict.get("image_url")),
+        )
         _normalizar_precos_vitrine_item(item_dict)
 
         items.append({
@@ -1156,8 +1160,12 @@ async def _find_learned_image(nome_norm: str, uid: str) -> Optional[dict]:
 @router.get("/sugerir-imagem")
 async def sugerir_imagem(product_name: str, uid: str = Depends(get_user_id)):
     """Busca imagem: 1) banco interno, 2) Serper.dev (Google Images)."""
+    product_name = (product_name or "").strip()
+    if len(product_name) < 2 or len(product_name) > 120:
+        raise HTTPException(400, "Nome do produto inválido")
+
     nome_norm = normalizar(product_name)
-    logger.info(f"[sugerir-imagem] query={product_name!r} norm={nome_norm!r}")
+    logger.info("[sugerir-imagem] query_len=%s norm=%r", len(product_name), nome_norm)
 
     # 1. Banco interno — busca exata
     doc = await _find_learned_image(nome_norm, uid)
@@ -1215,7 +1223,6 @@ async def aprender_imagem(req: LearnImageRequest, uid: str = Depends(get_user_id
         raise HTTPException(400, "URL da imagem obrigatória")
     if not (
         image_url.startswith("https://")
-        or image_url.startswith("http://")
         or image_url.startswith("/api/vitrine/imagens/")
     ):
         raise HTTPException(400, "URL da imagem inválida")
@@ -1252,8 +1259,9 @@ async def aprender_imagem(req: LearnImageRequest, uid: str = Depends(get_user_id
 @router.get("/sugerir-imagens")
 async def sugerir_imagens(product_name: str, uid: str = Depends(get_user_id)):
     """Retorna até 6 opções da internet para o RCA escolher outra foto."""
-    if not product_name.strip():
-        raise HTTPException(400, "Nome do produto obrigatório")
+    product_name = (product_name or "").strip()
+    if len(product_name) < 2 or len(product_name) > 120:
+        raise HTTPException(400, "Nome do produto inválido")
     result = await asyncio.to_thread(_serper_images, product_name, 6)
     return result
 

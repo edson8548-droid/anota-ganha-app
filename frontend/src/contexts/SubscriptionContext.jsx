@@ -56,7 +56,6 @@ export const PLANS = {
     period: 'monthly',
     duration: 'por mês',
     billingCycle: 'Recorrente até cancelar. Cancele quando quiser.',
-    mercadoPagoPreapprovalPlanId: null,
     limits: {
       campaigns: 999999,
       clients: 999999,
@@ -169,8 +168,6 @@ export const SubscriptionProvider = ({ children }) => {
         createdAt: now,
         updatedAt: now,
         paymentMethod: null,
-        mercadoPagoSubscriptionId: null,
-        mercadoPagoCustomerId: null
       };
 
       const subscriptionRef = doc(db, 'subscriptions', userId);
@@ -217,52 +214,6 @@ export const SubscriptionProvider = ({ children }) => {
   };
 
   // ============================================
-  // CRIAR ASSINATURA PAGA
-  // ============================================
-  const createPaidSubscription = async (planId, mercadoPagoData) => {
-    if (!userId) {
-      throw new Error('Usuário não autenticado');
-    }
-
-    try {
-      console.log('🔄 Criando assinatura paga:', planId);
-
-      const now = new Date();
-      const subscriptionRef = doc(db, 'subscriptions', userId);
-
-      const subscriptionData = {
-        userId: userId,
-        planId: planId,
-        status: 'active',
-        trialEndsAt: null, // Remover trial
-        createdAt: now,
-        updatedAt: now,
-        mercadoPagoSubscriptionId: mercadoPagoData.subscriptionId,
-        mercadoPagoCustomerId: mercadoPagoData.customerId,
-        mercadoPagoPaymentId: mercadoPagoData.paymentId,
-        paymentMethod: mercadoPagoData.paymentMethod,
-        lastPaymentDate: now,
-        nextBillingDate: mercadoPagoData.nextBillingDate
-      };
-
-      await setDoc(subscriptionRef, subscriptionData);
-
-      console.log('✅ Assinatura paga criada!');
-      
-      setSubscription(subscriptionData);
-      setCurrentPlan(PLANS[planId]);
-      setIsTrialActive(false);
-      setTrialEndsAt(null);
-
-      return subscriptionData;
-
-    } catch (error) {
-      console.error('❌ Erro ao criar assinatura:', error);
-      throw error;
-    }
-  };
-
-  // ============================================
   // CANCELAR ASSINATURA
   // ============================================
   const cancelSubscription = async () => {
@@ -297,7 +248,6 @@ export const SubscriptionProvider = ({ children }) => {
     canCreateCampaign,
     canAddClient,
     canAddIndustry,
-    createPaidSubscription,
     cancelSubscription,
     PLANS
   };
