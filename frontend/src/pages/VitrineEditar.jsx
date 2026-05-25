@@ -31,6 +31,14 @@ const buildItemPayload = (it, sortOrder) => {
   };
 };
 
+const buildExistingItemPayload = (it, sortOrder) => {
+  const payload = buildItemPayload(it, sortOrder);
+  if (!it._imageUrl) {
+    delete payload.image_url;
+  }
+  return payload;
+};
+
 function imgUrl(path) {
   if (!path) return null;
   const value = String(path);
@@ -248,7 +256,7 @@ export default function VitrineEditar() {
       const existentes = itens.filter(it => !it._deleted && it.id);
       for (const it of existentes) {
         try {
-          await vitrineService.atualizarItem(id, it.id, buildItemPayload(it, it.sort_order || 0));
+          await vitrineService.atualizarItem(id, it.id, buildExistingItemPayload(it, it.sort_order || 0));
           if (it._imageFile) {
             await vitrineService.uploadImagem(id, it.id, it._imageFile);
           }

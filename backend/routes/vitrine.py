@@ -1038,7 +1038,9 @@ async def atualizar_item(offer_id: str, item_id: str, req: UpdateItemRequest, ui
         updates["unit_price"] = merged["unit_price"]
         updates["units_per_package"] = merged.get("units_per_package")
 
-    if updates.get("image_url"):
+    if "image_url" in updates and updates.get("image_url") == item_atual.get("image_url"):
+        updates.pop("image_url", None)
+    elif updates.get("image_url"):
         updates["image_url"] = await _store_remote_image_url(
             updates["image_url"],
             uid=uid,
