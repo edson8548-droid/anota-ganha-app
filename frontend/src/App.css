@@ -47,3 +47,67 @@
 .animate-slide-up {
     animation: slide-up 0.3s ease-out;
 }
+
+.route-error-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #2B2D31;
+    color: #E1E1E1;
+    font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    padding: 24px;
+}
+
+.route-error-card {
+    width: min(100%, 440px);
+    background: #1F2227;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 24px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+}
+
+.route-error-kicker {
+    color: #2ed39a;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.route-error-card h1 {
+    margin: 10px 0 8px;
+    color: #FFFFFF;
+    font-size: 24px;
+    line-height: 1.2;
+}
+
+.route-error-card p {
+    margin: 0;
+    color: #C9CDD3;
+    font-size: 15px;
+    line-height: 1.55;
+}
+
+.route-error-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.route-error-actions button {
+    border: 0;
+    border-radius: 8px;
+    padding: 11px 16px;
+    background: #2ed39a;
+    color: #101214;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.route-error-actions button.secondary {
+    background: #333842;
+    color: #E1E1E1;
+}

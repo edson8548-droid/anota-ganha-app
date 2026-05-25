@@ -21,6 +21,15 @@ export const useSubscription = () => {
   return context;
 };
 
+const normalizeDate = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value.toDate === 'function') return value.toDate();
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 // ============================================
 // PLANOS DISPONÍVEIS
 // ============================================
@@ -107,7 +116,7 @@ export const SubscriptionProvider = ({ children }) => {
           
           // Verificar trial
           const now = new Date();
-          const trialEnd = subData.trialEndsAt?.toDate();
+          const trialEnd = normalizeDate(subData.trialEndsAt);
           const isTrial = trialEnd && now < trialEnd && subData.status === 'trialing';
           
           // Pegar plano atual
@@ -157,7 +166,7 @@ export const SubscriptionProvider = ({ children }) => {
       console.log('🎁 Solicitando trial no backend...');
       const response = await ensureTrialSubscription();
       const trialData = response.data?.subscription || {};
-      const trialEnd = trialData.trialEndsAt ? new Date(trialData.trialEndsAt) : null;
+      const trialEnd = normalizeDate(trialData.trialEndsAt);
 
       console.log('✅ Trial criado:', trialData);
       setSubscription(trialData);
