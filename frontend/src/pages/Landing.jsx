@@ -54,7 +54,7 @@ const rcaSlides = [
     icon: Sparkles,
     title: 'Use prompts para vender melhor',
     text: 'Copie comandos prontos para transformar lista simples em oferta, argumento de venda, mensagem de recuperação ou roteiro de abordagem.',
-    action: 'Copiar prompt',
+    action: 'Abrir Prompts Prontos',
     message: 'Tenho uma sugestão de mix para melhorar seu giro essa semana. Posso te mandar uma opção por categoria?'
   }
 ];
@@ -107,7 +107,7 @@ const Landing = () => {
     if (user) {
       navigate('/dashboard');
     } else {
-      navigate('/login');
+      navigate('/register');
     }
   };
 
@@ -145,7 +145,7 @@ const Landing = () => {
           ) : (
             <>
               <button className="landing-btn-outline" onClick={() => navigate('/login')}>Entrar</button>
-              <button className="landing-btn-primary" onClick={() => navigate('/register')}>Cadastrar</button>
+              <button className="landing-btn-primary" onClick={() => navigate('/register')}>Testar grátis</button>
             </>
           )}
         </div>
@@ -191,8 +191,8 @@ const Landing = () => {
             <span className="landing-stat-label">Produtos mapeados</span>
           </div>
           <div className="landing-stat">
-            <span className="landing-stat-num">95%</span>
-            <span className="landing-stat-label">Taxa de acerto médio</span>
+            <span className="landing-stat-num">EAN + nome</span>
+            <span className="landing-stat-label">Busca combinada</span>
           </div>
           <div className="landing-stat">
             <span className="landing-stat-num">3 min</span>
@@ -325,7 +325,7 @@ const Landing = () => {
                 Monte uma mensagem curta para cliente parado há 21 dias, usando oferta de alto giro,
                 tom profissional e chamada para responder no WhatsApp.
               </p>
-              <button type="button" onClick={handleCTA}>Copiar prompt</button>
+              <button type="button" onClick={handleCTA}>Ver Prompts Prontos</button>
             </div>
           </article>
         </div>

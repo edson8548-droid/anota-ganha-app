@@ -1,19 +1,15 @@
-// NOVO FICHEIRO: src/pages/PaymentSuccess.js
-
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './PaymentSuccess.css'; // Importa o CSS que acabámos de criar
+import './PaymentSuccess.css';
 
 const PaymentSuccess = () => {
   const navigate = useNavigate();
 
-  // Redireciona para o dashboard após 5 segundos
   useEffect(() => {
     const timer = setTimeout(() => {
       navigate('/dashboard');
     }, 5000); // 5000ms = 5 segundos
 
-    // Limpa o timer se o componente for desmontado (ex: o utilizador clicou no botão)
     return () => clearTimeout(timer);
   }, [navigate]);
 
@@ -25,7 +21,7 @@ const PaymentSuccess = () => {
         </div>
         <h1 className="status-title">Pagamento Aprovado!</h1>
         <p className="status-message">
-          Obrigado! A sua assinatura está ativa. O seu acesso ilimitado
+          Obrigado! Sua assinatura está ativa. Seu acesso ilimitado
           foi liberado.
         </p>
         <p className="status-message" style={{ fontSize: '14px', fontStyle: 'italic' }}>

@@ -67,6 +67,7 @@ try {
   const browser = await chromium.launch();
   const page = await browser.newPage();
   const violations = [];
+  const brokenAssets = [];
   const styleDiagnostics = [];
   let currentRoute = 'startup';
 
@@ -81,10 +82,24 @@ try {
       violations.push(`pageerror: ${error.message}`);
     }
   });
+  page.on('response', (response) => {
+    const url = response.url();
+    if (url.startsWith(`http://127.0.0.1:${port}`) && response.status() >= 400) {
+      brokenAssets.push(`${currentRoute} ${response.status()} ${url}`);
+    }
+  });
 
-  for (const route of ['/home.html', '/register', '/terms.html', '/privacy-policy.html', '/delete-account.html']) {
+  for (const route of ['/home.html', '/landing-check', '/register', '/login', '/forgot-password', '/terms.html', '/privacy-policy.html', '/delete-account.html']) {
     currentRoute = route;
     await page.goto(`http://127.0.0.1:${port}${route}`, { waitUntil: 'networkidle' });
+    const brokenImages = await page.$$eval('img', (images) =>
+      images
+        .filter((image) => image.complete && image.naturalWidth === 0)
+        .map((image) => image.getAttribute('src') || image.currentSrc),
+    );
+    for (const image of brokenImages) {
+      brokenAssets.push(`${route} broken image ${image}`);
+    }
     const routeStyleHashes = await page.$$eval('style', (styles) =>
       styles.map((style) => style.textContent || ''),
     );
@@ -100,10 +115,19 @@ try {
   await page.click('.nav-cta');
   await page.waitForURL(`http://127.0.0.1:${port}/register`, { timeout: 5000 });
 
+  currentRoute = '/landing-check interaction';
+  await page.goto(`http://127.0.0.1:${port}/landing-check`, { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Começar grátis' }).click();
+  await page.waitForURL(`http://127.0.0.1:${port}/register`, { timeout: 5000 });
+
   await browser.close();
 
-  if (violations.length) {
-    throw new Error(`CSP violations found:\n${violations.join('\n')}\n\nStyle diagnostics:\n${styleDiagnostics.join('\n')}`);
+  if (violations.length || brokenAssets.length) {
+    throw new Error([
+      violations.length ? `CSP violations found:\n${violations.join('\n')}` : '',
+      brokenAssets.length ? `Broken assets found:\n${brokenAssets.join('\n')}` : '',
+      `Style diagnostics:\n${styleDiagnostics.join('\n')}`,
+    ].filter(Boolean).join('\n\n'));
   }
 
   console.log('CSP smoke test passed.');

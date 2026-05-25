@@ -1,8 +1,6 @@
-// NOVO FICHEIRO: src/pages/PaymentFailure.js
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import './PaymentFailure.css'; // Importa o CSS que acabámos de criar
+import './PaymentFailure.css';
 
 const PaymentFailure = () => {
   const navigate = useNavigate();
@@ -13,16 +11,16 @@ const PaymentFailure = () => {
         <div className="status-icon failure">
           <span>❌</span>
         </div>
-        <h1 className="status-title">Pagamento Falhou</h1>
+        <h1 className="status-title">Pagamento não concluído</h1>
         <p className="status-message">
-          Houve um problema ao processar o seu pagamento. Nenhum valor foi
-          cobrado. Por favor, tente novamente.
+          Não conseguimos confirmar o pagamento. Se você ainda não finalizou no Asaas,
+          tente novamente. Se já pagou, aguarde a confirmação ou fale com o suporte.
         </p>
         <button
           className="btn-back-plans"
           onClick={() => navigate('/plans')}
         >
-          Tentar Novamente
+          Voltar para os planos
         </button>
       </div>
     </div>

@@ -246,8 +246,8 @@ const Checkout = () => {
             <div className="trial-info-checkout">
               <div className="trial-icon-checkout">🎁</div>
               <div>
-                <strong>15 dias grátis</strong>
-                <p>O plano pago começa após o teste gratuito.</p>
+                <strong>15 dias grátis sem cartão</strong>
+                <p>Você só paga se concluir a assinatura no Asaas.</p>
               </div>
             </div>
           </div>
