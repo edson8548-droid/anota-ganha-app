@@ -90,6 +90,15 @@ def _validate_remote_image_url(url: str) -> str:
     return parsed.geturl()
 
 
+def _stored_vitrine_image_url(value: str | None) -> Optional[str]:
+    if not value:
+        return None
+    text = str(value)
+    marker = "/api/vitrine/imagens/"
+    index = text.find(marker)
+    return text[index:] if index >= 0 else None
+
+
 def _remote_image_filename(url: str, content_type: str, fallback: str = "produto") -> str:
     suffix = REMOTE_IMAGE_CONTENT_TYPES.get(content_type.split(";")[0].strip().lower(), ".jpg")
     name = Path(urlparse(url).path).name or fallback
@@ -861,14 +870,7 @@ async def criar_oferta(req: CreateOfferRequest, uid: str = Depends(get_user_id))
             bool(item_dict.get("image_url")),
         )
         _normalizar_precos_vitrine_item(item_dict)
-        if item_dict.get("image_url"):
-            item_dict["image_url"] = await _store_remote_image_url(
-                item_dict["image_url"],
-                uid=uid,
-                product_name=item_dict.get("product_name") or "",
-                item_id=item_id,
-                source="offer_create",
-            )
+        item_dict["image_url"] = _stored_vitrine_image_url(item_dict.get("image_url"))
 
         items.append({
             "id": item_id,
@@ -978,15 +980,7 @@ async def adicionar_item(offer_id: str, item: OfferItem, uid: str = Depends(get_
     item_id = str(uuid.uuid4())
 
     _normalizar_precos_vitrine_item(item_dict)
-    if item_dict.get("image_url"):
-        item_dict["image_url"] = await _store_remote_image_url(
-            item_dict["image_url"],
-            uid=uid,
-            product_name=item_dict.get("product_name") or "",
-            offer_id=offer_id,
-            item_id=item_id,
-            source="item_create",
-        )
+    item_dict["image_url"] = _stored_vitrine_image_url(item_dict.get("image_url"))
 
     new_item = {
         "id": item_id,
@@ -1038,17 +1032,13 @@ async def atualizar_item(offer_id: str, item_id: str, req: UpdateItemRequest, ui
         updates["unit_price"] = merged["unit_price"]
         updates["units_per_package"] = merged.get("units_per_package")
 
-    if "image_url" in updates and updates.get("image_url") == item_atual.get("image_url"):
+    if "image_url" in updates:
+        updates["image_url"] = _stored_vitrine_image_url(updates.get("image_url"))
+
+    if "image_url" in updates and not updates.get("image_url"):
         updates.pop("image_url", None)
-    elif updates.get("image_url"):
-        updates["image_url"] = await _store_remote_image_url(
-            updates["image_url"],
-            uid=uid,
-            product_name=updates.get("product_name") or item_atual.get("product_name") or "",
-            offer_id=offer_id,
-            item_id=item_id,
-            source="item_update",
-        )
+    elif "image_url" in updates and updates.get("image_url") == item_atual.get("image_url"):
+        updates.pop("image_url", None)
 
     set_fields = {f"items.$[elem].{k}": v for k, v in updates.items()}
     set_fields["updated_at"] = datetime.now(timezone.utc)

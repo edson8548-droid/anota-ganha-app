@@ -14,6 +14,14 @@ const toNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const normalizeStoredImageUrl = (value) => {
+  if (!value) return null;
+  const text = String(value);
+  const marker = '/api/vitrine/imagens/';
+  const index = text.indexOf(marker);
+  return index >= 0 ? text.slice(index) : null;
+};
+
 const buildItemPayload = (it, sortOrder) => {
   const unitPrice = toNumber(it.price);
   const unitsPerPackage = it.units_per_package ? parseInt(it.units_per_package) || null : null;
@@ -25,7 +33,7 @@ const buildItemPayload = (it, sortOrder) => {
     unit: it.unit || 'UN',
     units_per_package: unitsPerPackage,
     unit_price: unitPrice,
-    image_url: it._imageUrl || it.image_url || null,
+    image_url: normalizeStoredImageUrl(it._imageUrl || it.image_url),
     sort_order: sortOrder,
     active: true,
   };
@@ -38,6 +46,10 @@ const buildExistingItemPayload = (it, sortOrder) => {
   }
   return payload;
 };
+
+const getItemsWithoutPhoto = (items) => items.filter(it =>
+  !it._deleted && !it._imageFile && !normalizeStoredImageUrl(it._imageUrl || it.image_url)
+);
 
 function imgUrl(path) {
   if (!path) return null;
@@ -206,7 +218,7 @@ export default function VitrineEditar() {
             encontradas += 1;
             setItens(prev => prev.map(it =>
               it._key === item._key
-                ? { ...it, _imagePreview: res.data.image_url, _imageUrl: res.data.image_url, _imageFile: null, _searching: false }
+                ? { ...it, _imagePreview: vitrineService.imagemUrl(res.data.image_url), _imageUrl: res.data.image_url, _imageFile: null, _searching: false }
                 : it
             ));
           } else {
@@ -231,6 +243,17 @@ export default function VitrineEditar() {
     const itensAtivos = itens.filter(it => !it._deleted);
     if (itensAtivos.length === 0) {
       toast.warning('A vitrine precisa ter pelo menos um produto');
+      return;
+    }
+    const fotosBuscando = itensAtivos.filter(it => it._searching).length;
+    if (fotosBuscando > 0) {
+      toast.info(`Aguarde: ainda estamos buscando foto para ${fotosBuscando} produto(s).`);
+      return;
+    }
+    const semFoto = getItemsWithoutPhoto(itensAtivos);
+    if (semFoto.length > 0) {
+      const nomes = semFoto.slice(0, 3).map(it => it.product_name || 'Produto sem nome').join(', ');
+      toast.warning(`${semFoto.length} produto(s) sem foto: ${nomes}. Clique em Foto ou envie uma imagem antes de salvar.`);
       return;
     }
     setSaving(true);
