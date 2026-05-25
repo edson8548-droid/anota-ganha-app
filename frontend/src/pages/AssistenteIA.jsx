@@ -124,6 +124,7 @@ const PROMPTS_RAPIDOS = [
 
 const IA_SHORTCUTS = [
   { name: 'ChatGPT', url: 'https://chatgpt.com/' },
+  { name: 'Gemini', url: 'https://gemini.google.com/app' },
   { name: 'DeepSeek', url: 'https://chat.deepseek.com/' },
   { name: 'Claude', url: 'https://claude.ai/new' },
 ];
