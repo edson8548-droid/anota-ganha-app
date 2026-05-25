@@ -36,30 +36,6 @@ service cloud.firestore {
         ]);
     }
 
-    function validUserCreateFields() {
-      return request.resource.data.keys().hasOnly([
-        'email',
-        'name',
-        'nome',
-        'displayName',
-        'cpf',
-        'telefone',
-        'role',
-        'license_type',
-        'trial_ends_at',
-        'created_at',
-        'updated_at'
-      ]);
-    }
-
-    function validUserCreateValues() {
-      return request.resource.data.role == 'user'
-        && request.resource.data.license_type == 'trial'
-        && request.resource.data.email is string
-        && request.resource.data.cpf is string
-        && request.resource.data.telefone is string;
-    }
-
     function onlySafeUserProfileFieldsChanged() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'name',
@@ -68,23 +44,6 @@ service cloud.firestore {
         'photoURL',
         'updated_at'
       ]);
-    }
-
-    function validTrialSubscriptionCreate(userId) {
-      return isSelf(userId)
-        && request.resource.data.keys().hasOnly([
-          'userId',
-          'planId',
-          'status',
-          'trialEndsAt',
-          'createdAt',
-          'updatedAt',
-          'paymentMethod'
-        ])
-        && request.resource.data.userId == userId
-        && request.resource.data.planId == 'trial'
-        && request.resource.data.status == 'trialing'
-        && request.resource.data.paymentMethod == null;
     }
 
     function validTrialSubscriptionExpire(userId) {
