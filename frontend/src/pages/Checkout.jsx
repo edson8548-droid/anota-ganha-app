@@ -4,8 +4,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import { apiUrl, backendUrl } from '../config/api';
+import { saveBillingProfile } from '../services/api';
 import { auth, db } from '../firebase/config';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import './Checkout.css';
 
 const onlyDigits = (value) => String(value || '').replace(/\D/g, '');
@@ -145,12 +146,11 @@ const Checkout = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-      await setDoc(doc(db, 'users', user.uid), {
+      await saveBillingProfile({
         name: payerName,
         cpf: cleanCpf,
         telefone: cleanPhone,
-        updated_at: new Date()
-      }, { merge: true });
+      });
 
       const response = await fetch(apiUrl('/asaas/create-subscription'), {
         method: 'POST',

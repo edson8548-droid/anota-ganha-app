@@ -43,6 +43,9 @@ export const getCampaignStats = (campaignId) => api.get(`/stats/${campaignId}`);
 export const getCampaignStatsByCity = (campaignId) => api.get(`/stats/${campaignId}/cities`);
 
 // Users
+export const registerUser = (data) => api.post('/users/register', data);
+export const ensureTrialSubscription = () => api.post('/users/ensure-trial');
+export const saveBillingProfile = (data) => api.post('/users/billing-profile', data);
 export const sendWelcomeEmail = () => api.post('/users/welcome-email');
 
 export const uploadAvatar = (file) => {

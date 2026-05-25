@@ -14,7 +14,7 @@ import pandas as pd
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import firebase_admin
 from firebase_admin import auth as firebase_auth, firestore
 from services.public_files import PUBLIC_IMAGE_TYPES, PUBLIC_PDF_TYPES, stream_public_gridfs_file
@@ -302,7 +302,7 @@ async def deletar_fotos(uid: str = Depends(get_user_id)):
 
 
 class MensagemPayload(BaseModel):
-    message: str
+    message: str = Field(..., min_length=1, max_length=2000)
 
 
 @router.put("/campanha/mensagem")
@@ -320,7 +320,7 @@ async def salvar_mensagem(payload: MensagemPayload, uid: str = Depends(get_user_
 
 
 class EnviadosPayload(BaseModel):
-    telefone: str
+    telefone: str = Field(..., min_length=10, max_length=20)
 
 
 @router.post("/campanha/enviados")
@@ -346,7 +346,7 @@ async def limpar_enviados(uid: str = Depends(get_user_id)):
 
 
 class IaMensagemPayload(BaseModel):
-    descricao: str
+    descricao: str = Field(..., min_length=1, max_length=1200)
 
 
 @router.post("/campanha/ia-mensagem")

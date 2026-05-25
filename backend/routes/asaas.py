@@ -85,7 +85,13 @@ def _asaas_request(method: str, path: str, **kwargs) -> dict:
     url = f"{_asaas_base_url()}{path}"
     response = requests.request(method, url, headers=_asaas_headers(), timeout=30, **kwargs)
     if response.status_code >= 400:
-        logger.error("[ASAAS] %s %s falhou: %s", method, path, response.text)
+        logger.error(
+            "[ASAAS] %s %s falhou status=%s body_len=%s",
+            method,
+            path,
+            response.status_code,
+            len(response.text or ""),
+        )
         raise HTTPException(status_code=502, detail="Erro ao comunicar com Asaas")
     return response.json() if response.content else {}
 
@@ -97,7 +103,12 @@ def _cancel_asaas_subscription(subscription_id: str) -> None:
         logger.warning("[ASAAS] Assinatura já não existe no Asaas: %s", subscription_id)
         return
     if response.status_code >= 400:
-        logger.error("[ASAAS] DELETE /subscriptions/%s falhou: %s", subscription_id, response.text)
+        logger.error(
+            "[ASAAS] DELETE /subscriptions/%s falhou status=%s body_len=%s",
+            subscription_id,
+            response.status_code,
+            len(response.text or ""),
+        )
         raise HTTPException(status_code=502, detail="Erro ao cancelar assinatura no Asaas")
 
 
@@ -259,7 +270,12 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
     payment_url = first_payment.get("invoiceUrl") or first_payment.get("bankSlipUrl")
 
     if not payment_url:
-        logger.error("[ASAAS] Cobrança inicial sem invoiceUrl: %s", first_payment)
+        logger.error(
+            "[ASAAS] Cobrança inicial sem invoiceUrl subscription=%s payment=%s keys=%s",
+            subscription_id,
+            first_payment.get("id"),
+            sorted(first_payment.keys()),
+        )
         raise HTTPException(status_code=502, detail="Asaas não retornou link de pagamento")
 
     _fs().collection("subscriptions").document(uid).set(

@@ -137,6 +137,7 @@ const Register = () => {
       navigate('/dashboard');
     } catch (err) {
       console.error('Erro no registro:', err);
+      const backendMessage = err?.response?.data?.detail || err?.message;
       
       switch (err.code) {
         case 'auth/invalid-cpf':
@@ -154,8 +155,11 @@ const Register = () => {
         case 'auth/weak-password':
           setError('Senha muito fraca. Use no mínimo 6 caracteres');
           break;
+        case 'backend/register':
+          setError(backendMessage || 'Erro ao criar conta. Tente novamente.');
+          break;
         default:
-          setError('Erro ao criar conta. Tente novamente.');
+          setError(backendMessage || 'Erro ao criar conta. Tente novamente.');
       }
     } finally {
       setLoading(false);

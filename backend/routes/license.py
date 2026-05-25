@@ -154,12 +154,17 @@ async def get_or_create_license_key(
     if not user_doc.exists:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
-    user_data = user_doc.to_dict()
-    is_admin = user_data.get("role") == "admin"
+    if uid_token != user_id:
+        requester_doc = db.collection("users").document(uid_token).get()
+        requester_is_admin = requester_doc.exists and requester_doc.to_dict().get("role") == "admin"
+    else:
+        requester_is_admin = False
 
-    if uid_token != user_id and not is_admin:
+    if uid_token != user_id and not requester_is_admin:
         logger.warning("[SECURITY] access_denied route=license_key reason=user_mismatch")
         raise HTTPException(status_code=403, detail="Acesso negado")
+
+    user_data = user_doc.to_dict()
 
     license_key = user_data.get("license_key")
     if not license_key:

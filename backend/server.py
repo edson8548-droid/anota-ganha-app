@@ -108,6 +108,14 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
     def _rate_config_for_path(self, path):
         if path in {"/", "/health"}:
             return None
+        if path == "/api/users/register":
+            return (20, 60, "/api/users/register")
+        if path in {"/api/users/ensure-trial", "/api/users/billing-profile"}:
+            return (60, 60, "/api/users/account")
+        if path in {"/api/asaas/create-subscription", "/api/asaas/cancel-subscription"}:
+            return (30, 60, "/api/asaas/subscription")
+        if path == "/api/users/welcome-email":
+            return (20, 60, "/api/users/welcome-email")
         if path == "/api/asaas/webhook":
             return (300, 60, "/api/asaas/webhook")
         if path == "/api/license/validate":

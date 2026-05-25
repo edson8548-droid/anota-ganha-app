@@ -6,11 +6,10 @@ import { useAuthContext } from './AuthContext';
 import { 
   getFirestore, 
   doc, 
-  getDoc, 
-  setDoc, 
   updateDoc,
   onSnapshot
 } from 'firebase/firestore';
+import { ensureTrialSubscription } from '../services/api';
 
 const SubscriptionContext = createContext();
 
@@ -155,29 +154,16 @@ export const SubscriptionProvider = ({ children }) => {
     if (!userId) return;
 
     try {
-      console.log('🎁 Criando trial de 15 dias...');
-      
-      const now = new Date();
-      const trialEnd = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000); // 15 dias
-
-      const trialData = {
-        userId: userId,
-        planId: 'trial',
-        status: 'trialing',
-        trialEndsAt: trialEnd,
-        createdAt: now,
-        updatedAt: now,
-        paymentMethod: null,
-      };
-
-      const subscriptionRef = doc(db, 'subscriptions', userId);
-      await setDoc(subscriptionRef, trialData);
+      console.log('🎁 Solicitando trial no backend...');
+      const response = await ensureTrialSubscription();
+      const trialData = response.data?.subscription || {};
+      const trialEnd = trialData.trialEndsAt ? new Date(trialData.trialEndsAt) : null;
 
       console.log('✅ Trial criado:', trialData);
       setSubscription(trialData);
       setCurrentPlan(PLANS.trial);
       setTrialEndsAt(trialEnd);
-      setIsTrialActive(true);
+      setIsTrialActive(Boolean(trialEnd && trialEnd > new Date()));
 
     } catch (error) {
       console.error('❌ Erro ao criar trial:', error);

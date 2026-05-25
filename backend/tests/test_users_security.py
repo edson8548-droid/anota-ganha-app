@@ -46,6 +46,8 @@ def test_cpf_duplicate_check_returns_available_when_not_found():
 
 
 class _ExistingDoc:
+    id = "outro-uid"
+
     def to_dict(self):
         return {"email": "cliente@example.com", "name": "Cliente Teste"}
 
@@ -75,3 +77,24 @@ def test_cpf_duplicate_check_does_not_expose_existing_user_data():
     assert "cliente@example.com" not in mensagem
     assert "Cliente Teste" not in mensagem
     assert mensagem == "CPF já cadastrado. Faça login ou entre em contato com o suporte."
+
+
+def test_cpf_duplicate_check_ignores_current_user():
+    duplicado, mensagem = users._verificar_duplicidade_cpf(
+        "52998224725",
+        _ExistingDb(),
+        current_uid="outro-uid",
+    )
+
+    assert duplicado is False
+    assert mensagem == "CPF disponível"
+
+
+def test_validar_dados_pagador_normalizes_valid_data():
+    dados = users._validar_dados_pagador(" Cliente Teste ", "529.982.247-25", "(13) 99900-1234")
+
+    assert dados == {
+        "nome": "Cliente Teste",
+        "cpf": "52998224725",
+        "telefone": "13999001234",
+    }

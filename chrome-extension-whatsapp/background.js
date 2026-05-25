@@ -21,6 +21,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Download a photo from Firebase Storage URL and return as base64
   // (content scripts can't bypass CORS — background can)
   if (msg.action === 'downloadPhoto') {
+    if (!isAllowedMediaUrl(msg.url)) {
+      sendResponse({ ok: false });
+      return true;
+    }
     fetch(msg.url)
       .then(r => {
         if (!r.ok) throw new Error(`download_failed_${r.status}`);
@@ -78,6 +82,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 });
+
+function isAllowedMediaUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:'
+      && parsed.hostname === 'api.venpro.com.br'
+      && (
+        parsed.pathname.startsWith('/api/whatsapp/fotos/')
+        || parsed.pathname.startsWith('/api/vitrine/imagens/')
+        || parsed.pathname.startsWith('/api/users/avatars/')
+      );
+  } catch {
+    return false;
+  }
+}
 
 async function getValidToken() {
   const stored = await chrome.storage.local.get(['venpro_token', 'venpro_token_ts']);

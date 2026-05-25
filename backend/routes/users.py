@@ -6,6 +6,7 @@ import re
 import asyncio
 import logging
 import os
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
@@ -21,6 +22,7 @@ router = APIRouter()
 security = HTTPBearer(auto_error=False)
 
 _db = None
+TRIAL_DAYS = 15
 
 # ============================================
 # VALIDAÇÃO DE CPF
@@ -72,7 +74,7 @@ def _calcular_digitos_verificadores(cpf: str) -> tuple[int, int]:
     return primeiro_digito, segundo_digito
 
 
-def _verificar_duplicidade_cpf(cpf: str, db) -> tuple[bool, str]:
+def _verificar_duplicidade_cpf(cpf: str, db, current_uid: str | None = None) -> tuple[bool, str]:
     """
     Verifica se o CPF já está cadastrado.
 
@@ -88,6 +90,8 @@ def _verificar_duplicidade_cpf(cpf: str, db) -> tuple[bool, str]:
     try:
         usuarios_query = db.collection("users").where("cpf", "==", cpf_limpo).limit(1)
         usuarios = list(usuarios_query.stream())
+        if current_uid:
+            usuarios = [doc for doc in usuarios if getattr(doc, "id", None) != current_uid]
 
         if usuarios:
             logger.warning(
@@ -100,6 +104,56 @@ def _verificar_duplicidade_cpf(cpf: str, db) -> tuple[bool, str]:
         return True, "Erro ao verificar duplicidade. Por favor, tente novamente."
 
     return False, "CPF disponível"
+
+
+def _trial_end(now: datetime | None = None) -> datetime:
+    base = now or datetime.now(timezone.utc)
+    return base + timedelta(days=TRIAL_DAYS)
+
+
+def _validar_dados_pagador(nome: str, cpf: str, telefone: str) -> dict:
+    nome_limpo = str(nome or "").strip()
+    cpf_limpo = _remover_caracteres_cpf(cpf)
+    telefone_limpo = re.sub(r'\D', '', str(telefone or ""))
+
+    if not nome_limpo:
+        raise HTTPException(400, "Nome completo é obrigatório")
+    if len(nome_limpo) > 120:
+        raise HTTPException(400, "Nome completo é muito longo")
+
+    cpf_valido, msg_cpf = _validar_formato_cpf(cpf_limpo)
+    if not cpf_valido:
+        raise HTTPException(400, f"CPF inválido: {msg_cpf}")
+    if cpf_limpo == cpf_limpo[0] * 11:
+        raise HTTPException(400, "CPF inválido")
+
+    dv1_esperado, dv2_esperado = _calcular_digitos_verificadores(cpf_limpo)
+    if (dv1_esperado, dv2_esperado) != (int(cpf_limpo[9]), int(cpf_limpo[10])):
+        raise HTTPException(400, "Dígitos verificadores do CPF incorretos")
+
+    if len(telefone_limpo) < 10 or len(telefone_limpo) > 11:
+        raise HTTPException(400, "Telefone inválido. Inclua o DDD (mínimo 10 dígitos, máximo 11)")
+
+    return {"nome": nome_limpo, "cpf": cpf_limpo, "telefone": telefone_limpo}
+
+
+def _trial_subscription_data(uid: str, now: datetime | None = None) -> dict:
+    return {
+        "userId": uid,
+        "planId": "trial",
+        "status": "trialing",
+        "trialEndsAt": _trial_end(now),
+        "createdAt": firestore.SERVER_TIMESTAMP,
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+        "paymentMethod": None,
+    }
+
+
+def _create_user_and_trial(uid: str, user_data: dict, db) -> None:
+    batch = db.batch()
+    batch.set(db.collection("users").document(uid), user_data)
+    batch.set(db.collection("subscriptions").document(uid), _trial_subscription_data(uid))
+    batch.commit()
 
 def init_users(database):
     global _db
@@ -187,6 +241,13 @@ class RegisterRequest(BaseModel):
     password: str
     nome: str | None = None
     name: str | None = None
+    cpf: str
+    telefone: str
+
+
+class BillingProfileRequest(BaseModel):
+    name: str | None = Field(default=None, max_length=120)
+    nome: str | None = Field(default=None, max_length=120)
     cpf: str
     telefone: str
 
@@ -296,6 +357,69 @@ async def register_device_session(
     return {"ok": True, "deviceHash": device_hash, "newDevice": new_device}
 
 
+@router.post("/ensure-trial")
+async def ensure_trial_subscription(
+    uid: str = Depends(get_user_id),
+):
+    """Garante trial server-side para usuários legítimos já cadastrados."""
+    db = _fs()
+    user_ref = db.collection("users").document(uid)
+    sub_ref = db.collection("subscriptions").document(uid)
+
+    def _ensure():
+        user_doc = user_ref.get()
+        if not user_doc.exists:
+            return None
+        sub_doc = sub_ref.get()
+        if sub_doc.exists:
+            return sub_doc.to_dict()
+        data = _trial_subscription_data(uid)
+        sub_ref.set(data)
+        return data
+
+    data = await asyncio.to_thread(_ensure)
+    if data is None:
+        raise HTTPException(404, "Usuário não encontrado")
+    return {
+        "ok": True,
+        "subscription": {
+            **data,
+            "trialEndsAt": data.get("trialEndsAt").isoformat() if hasattr(data.get("trialEndsAt"), "isoformat") else data.get("trialEndsAt"),
+        },
+    }
+
+
+@router.post("/billing-profile")
+async def update_billing_profile(
+    payload: BillingProfileRequest,
+    uid: str = Depends(get_user_id),
+):
+    """Atualiza CPF/telefone pelo backend, com validação e proteção contra duplicidade."""
+    dados = _validar_dados_pagador(payload.name or payload.nome or "", payload.cpf, payload.telefone)
+    cpf_duplicado, msg_duplicidade = await asyncio.to_thread(
+        _verificar_duplicidade_cpf,
+        dados["cpf"],
+        _fs(),
+        uid,
+    )
+    if cpf_duplicado:
+        raise HTTPException(400, msg_duplicidade)
+
+    await asyncio.to_thread(
+        _fs().collection("users").document(uid).set,
+        {
+            "name": dados["nome"],
+            "nome": dados["nome"],
+            "cpf": dados["cpf"],
+            "telefone": dados["telefone"],
+            "updated_at": firestore.SERVER_TIMESTAMP,
+        },
+        merge=True,
+    )
+    await audit_event("billing_profile_updated", uid=uid, status="success")
+    return {"ok": True}
+
+
 @router.post("/register")
 async def register(
     payload: RegisterRequest,
@@ -313,13 +437,11 @@ async def register(
     email = str(payload.email).strip().lower()
     password = payload.password
     nome = (payload.nome or payload.name or "").strip()
-    cpf = _remover_caracteres_cpf(payload.cpf)
-    telefone = payload.telefone
 
     logger.info("[REGISTER] Novo registro solicitado: email_hash=%s", hash_identifier(email))
 
     # 1. Validação básica de campos
-    if not email or not password or not nome or not cpf or not telefone:
+    if not email or not password or not nome or not payload.cpf or not payload.telefone:
         raise HTTPException(400, "Todos os campos são obrigatórios")
 
     if not email or '@' not in email or '.' not in email:
@@ -328,28 +450,14 @@ async def register(
     if len(password) < 6:
         raise HTTPException(400, "A senha deve ter no mínimo 6 caracteres")
 
-    # 2. Validação robusta de CPF
-    cpf_valido, msg_cpf = _validar_formato_cpf(cpf)
-    if not cpf_valido:
-        raise HTTPException(400, f"CPF inválido: {msg_cpf}")
-
-    if cpf == cpf[0] * 11:
-        raise HTTPException(400, "CPF inválido")
-
-    dv1_esperado, dv2_esperado = _calcular_digitos_verificadores(cpf)
-    dv1_real, dv2_real = int(cpf[9]), int(cpf[10])
-    if (dv1_esperado, dv2_esperado) != (dv1_real, dv2_real):
-        raise HTTPException(400, "Dígitos verificadores do CPF incorretos")
+    dados_pagador = _validar_dados_pagador(nome, payload.cpf, payload.telefone)
+    cpf = dados_pagador["cpf"]
+    telefone_clean = dados_pagador["telefone"]
 
     # 3. Verificação de duplicidade de CPF
     cpf_duplicado, msg_duplicidade = await asyncio.to_thread(_verificar_duplicidade_cpf, cpf, _fs())
     if cpf_duplicado:
         raise HTTPException(400, msg_duplicidade)
-
-    # 4. Validação de telefone
-    telefone_clean = re.sub(r'\D', '', telefone)
-    if len(telefone_clean) < 10 or len(telefone_clean) > 11:
-        raise HTTPException(400, "Telefone inválido. Inclua o DDD (mínimo 10 dígitos, máximo 11)")
 
     # 5. Cria usuário no Firebase Auth
     try:
@@ -362,7 +470,7 @@ async def register(
         uid = user.uid
         logger.info("[REGISTER] Firebase user criado: uid=%s", uid)
     except Exception as e:
-        logger.error("[REGISTER] Erro ao criar Firebase user: %s", e)
+        logger.error("[REGISTER] Erro ao criar Firebase user: %s", e.__class__.__name__)
         error_text = str(e)
         if "EMAIL_EXISTS" in error_text or "already exists" in error_text.lower():
             raise HTTPException(400, "Este email já está cadastrado")
@@ -373,8 +481,8 @@ async def register(
     # 6. Salva dados adicionais no Firestore (incluindo CPF validado)
     user_data = {
         "email": email,
-        "name": nome,
-        "nome": nome,
+        "name": dados_pagador["nome"],
+        "nome": dados_pagador["nome"],
         "cpf": cpf,
         "telefone": telefone_clean,
         "role": "user",
@@ -385,8 +493,8 @@ async def register(
     }
 
     try:
-        await asyncio.to_thread(_fs().collection("users").document(uid).set, user_data)
-        logger.info("[REGISTER] Dados salvos no Firestore: uid=%s", uid)
+        await asyncio.to_thread(_create_user_and_trial, uid, user_data, _fs())
+        logger.info("[REGISTER] Dados e trial salvos no Firestore: uid=%s", uid)
     except Exception:
         logger.exception("[REGISTER] Erro ao salvar dados no Firestore: uid=%s", uid)
         # Desfaz o usuário Firebase para evitar estado inconsistente

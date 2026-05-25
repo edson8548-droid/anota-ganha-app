@@ -4,7 +4,6 @@
 import { useState, useEffect } from 'react';
 import { 
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   updateProfile,
@@ -14,6 +13,7 @@ import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { isValidCPF, onlyDigits } from '../utils/documentValidators';
 import { registerDeviceSession } from '../utils/deviceSession';
+import { registerUser } from '../services/api';
 
 export const useAuth = () => {
   const [user, setUser] = useState(null);
@@ -29,7 +29,7 @@ export const useAuth = () => {
           const userData = userDoc.data();
           
           const isAdmin = userData?.role === 'admin';
-          console.log(`[Auth] Utilizador ${firebaseUser.email} é Admin? ${isAdmin}`);
+          console.log(`[Auth] Usuário autenticado. Admin? ${isAdmin}`);
 
           setUser({
             uid: firebaseUser.uid,
@@ -102,31 +102,25 @@ export const useAuth = () => {
         throw invalidPhoneError;
       }
       
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Define o nome no perfil de autenticação
-      await updateProfile(userCredential.user, {
-        displayName: additionalData.name 
-      });
-
-      // ⭐️ Guarda os dados (incluindo CPF e Telefone) no Firestore
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
-        email: email,
+      await registerUser({
+        email,
+        password,
         name: additionalData.name,
-        displayName: additionalData.name,
         cpf,
         telefone,
-        role: 'user', 
-        license_type: 'trial',
-        trial_ends_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 dias
-        created_at: new Date(),
-        updated_at: new Date()
       });
+
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      if (additionalData.name && userCredential.user.displayName !== additionalData.name) {
+        await updateProfile(userCredential.user, { displayName: additionalData.name });
+      }
 
       return userCredential.user;
     } catch (err) {
       console.error('Erro no registro:', err);
-      setError(getErrorMessage(err.code));
+      const backendMessage = err?.response?.data?.detail;
+      if (backendMessage && !err.code) err.code = 'backend/register';
+      setError(backendMessage || getErrorMessage(err.code));
       throw err;
     }
   };
@@ -169,8 +163,16 @@ export const useAuth = () => {
         });
       }
 
+      const safeData = {};
+      if (data.displayName) {
+        safeData.displayName = data.displayName;
+        safeData.name = data.displayName;
+        safeData.nome = data.displayName;
+      }
+      if (data.photoURL) safeData.photoURL = data.photoURL;
+
       await setDoc(doc(db, 'users', user.uid), {
-        ...data,
+        ...safeData,
         updated_at: new Date()
       }, { merge: true });
 
