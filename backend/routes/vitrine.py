@@ -11,8 +11,12 @@ import asyncio
 import logging
 import unicodedata
 import requests
+import ipaddress
+import socket
 from datetime import datetime, timezone, time
 from typing import List, Optional, Any
+from pathlib import Path
+from urllib.parse import urlparse, urljoin
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -32,6 +36,14 @@ security = HTTPBearer(auto_error=False)
 
 _db = None
 MAX_VITRINES = 3
+MAX_REMOTE_IMAGE_BYTES = 5 * 1024 * 1024
+REMOTE_IMAGE_CONTENT_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/pjpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
 
 
 def init_vitrine(database):
@@ -41,6 +53,172 @@ def init_vitrine(database):
 
 def _gridfs():
     return AsyncIOMotorGridFSBucket(_db, bucket_name="vitrine_images")
+
+
+def _is_public_host(hostname: str) -> bool:
+    if not hostname:
+        return False
+    try:
+        infos = socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        return False
+
+    for info in infos:
+        address = info[4][0]
+        try:
+            ip = ipaddress.ip_address(address)
+        except ValueError:
+            return False
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+        ):
+            return False
+    return True
+
+
+def _validate_remote_image_url(url: str) -> str:
+    parsed = urlparse((url or "").strip())
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise ValueError("URL de imagem inválida")
+    if not _is_public_host(parsed.hostname):
+        raise ValueError("Host de imagem não permitido")
+    return parsed.geturl()
+
+
+def _remote_image_filename(url: str, content_type: str, fallback: str = "produto") -> str:
+    suffix = REMOTE_IMAGE_CONTENT_TYPES.get(content_type.split(";")[0].strip().lower(), ".jpg")
+    name = Path(urlparse(url).path).name or fallback
+    stem = Path(name).stem or fallback
+    return safe_filename(f"{stem[:80]}{suffix}", f"{fallback}{suffix}")
+
+
+def _download_remote_image(url: str, max_redirects: int = 3) -> tuple[bytes, str, str]:
+    current = _validate_remote_image_url(url)
+
+    for _ in range(max_redirects + 1):
+        response = requests.get(
+            current,
+            timeout=(4, 12),
+            stream=True,
+            headers={"User-Agent": "Venpro/1.0 (+https://venpro.com.br)"},
+            allow_redirects=False,
+        )
+
+        if 300 <= response.status_code < 400 and response.headers.get("Location"):
+            current = _validate_remote_image_url(urljoin(current, response.headers["Location"]))
+            continue
+
+        response.raise_for_status()
+        content_type = response.headers.get("content-type", "").split(";")[0].strip().lower()
+        if content_type not in REMOTE_IMAGE_CONTENT_TYPES:
+            raise ValueError("Tipo de imagem remoto não suportado")
+
+        chunks = []
+        total = 0
+        for chunk in response.iter_content(64 * 1024):
+            if not chunk:
+                continue
+            total += len(chunk)
+            if total > MAX_REMOTE_IMAGE_BYTES:
+                raise ValueError("Imagem remota muito grande")
+            chunks.append(chunk)
+
+        content = b"".join(chunks)
+        filename = _remote_image_filename(current, content_type)
+        return content, content_type, filename
+
+    raise ValueError("Redirecionamentos demais ao baixar imagem")
+
+
+async def _store_remote_image_url(
+    image_url: str,
+    *,
+    uid: str,
+    product_name: str,
+    offer_id: Optional[str] = None,
+    item_id: Optional[str] = None,
+    source: str = "remote",
+) -> Optional[str]:
+    if not image_url or image_url.startswith("/api/vitrine/imagens/"):
+        return image_url
+    if not image_url.startswith("https://"):
+        return None
+
+    try:
+        content, content_type, filename = await asyncio.to_thread(_download_remote_image, image_url)
+
+        upload_like = type("RemoteImageUpload", (), {"filename": filename, "content_type": content_type})()
+        validated_filename = validate_upload(
+            upload_like,
+            content,
+            label="Imagem",
+            allowed_extensions={".jpg", ".jpeg", ".png", ".webp"},
+            allowed_kinds={"jpg", "png", "webp"},
+            allowed_content_types=IMAGE_CONTENT_TYPES,
+            max_bytes=MAX_REMOTE_IMAGE_BYTES,
+        )
+
+        grid_id = await _gridfs().upload_from_stream(
+            safe_filename(validated_filename, "produto.jpg"),
+            io.BytesIO(content),
+            metadata={
+                "content_type": content_type,
+                "source": source,
+                "source_url": image_url[:500],
+                "created_by": uid,
+                "offer_id": offer_id,
+                "item_id": item_id,
+                "product_name": product_name[:160] if product_name else None,
+            },
+        )
+        return f"/api/vitrine/imagens/{str(grid_id)}"
+    except Exception as exc:
+        logger.warning(
+            "[vitrine_image] remote_copy_failed product=%r reason=%s",
+            (product_name or "")[:80],
+            str(exc)[:160],
+        )
+        return image_url
+
+
+async def _localize_offer_remote_images(doc: dict) -> bool:
+    uid = doc.get("created_by") or ""
+    oid = doc.get("_id")
+    if not uid or not oid:
+        return False
+
+    changed = False
+    items = doc.get("items", [])
+    offer_id = str(oid)
+
+    for item in items:
+        image_url = item.get("image_url")
+        if not image_url or not image_url.startswith("https://"):
+            continue
+        local_url = await _store_remote_image_url(
+            image_url,
+            uid=uid,
+            product_name=item.get("product_name") or "",
+            offer_id=offer_id,
+            item_id=item.get("id"),
+            source="offer_public_repair",
+        )
+        if local_url and local_url != image_url:
+            item["image_url"] = local_url
+            changed = True
+
+    if changed:
+        await _db.vitrine_offers.update_one(
+            {"_id": oid},
+            {"$set": {"items": items, "updated_at": datetime.now(timezone.utc)}},
+        )
+
+    return changed
 
 
 async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
@@ -675,6 +853,7 @@ async def criar_oferta(req: CreateOfferRequest, uid: str = Depends(get_user_id))
     items = []
     for i, item in enumerate(req.items or []):
         item_dict = item.model_dump()
+        item_id = str(uuid.uuid4())
 
         logger.info(
             "[CRIAR_OFERTA] Item recebido index=%s has_image=%s",
@@ -682,9 +861,17 @@ async def criar_oferta(req: CreateOfferRequest, uid: str = Depends(get_user_id))
             bool(item_dict.get("image_url")),
         )
         _normalizar_precos_vitrine_item(item_dict)
+        if item_dict.get("image_url"):
+            item_dict["image_url"] = await _store_remote_image_url(
+                item_dict["image_url"],
+                uid=uid,
+                product_name=item_dict.get("product_name") or "",
+                item_id=item_id,
+                source="offer_create",
+            )
 
         items.append({
-            "id": str(uuid.uuid4()),
+            "id": item_id,
             **item_dict,
             "sort_order": i,
             "created_at": datetime.now(timezone.utc),
@@ -788,11 +975,21 @@ async def adicionar_item(offer_id: str, item: OfferItem, uid: str = Depends(get_
         raise HTTPException(400, "ID inválido")
 
     item_dict = item.model_dump()
+    item_id = str(uuid.uuid4())
 
     _normalizar_precos_vitrine_item(item_dict)
+    if item_dict.get("image_url"):
+        item_dict["image_url"] = await _store_remote_image_url(
+            item_dict["image_url"],
+            uid=uid,
+            product_name=item_dict.get("product_name") or "",
+            offer_id=offer_id,
+            item_id=item_id,
+            source="item_create",
+        )
 
     new_item = {
-        "id": str(uuid.uuid4()),
+        "id": item_id,
         **item_dict,
         "created_at": datetime.now(timezone.utc),
     }
@@ -840,6 +1037,16 @@ async def atualizar_item(offer_id: str, item_id: str, req: UpdateItemRequest, ui
         updates["price"] = merged["price"]
         updates["unit_price"] = merged["unit_price"]
         updates["units_per_package"] = merged.get("units_per_package")
+
+    if updates.get("image_url"):
+        updates["image_url"] = await _store_remote_image_url(
+            updates["image_url"],
+            uid=uid,
+            product_name=updates.get("product_name") or item_atual.get("product_name") or "",
+            offer_id=offer_id,
+            item_id=item_id,
+            source="item_update",
+        )
 
     set_fields = {f"items.$[elem].{k}": v for k, v in updates.items()}
     set_fields["updated_at"] = datetime.now(timezone.utc)
@@ -1195,6 +1402,14 @@ async def sugerir_imagem(product_name: str, uid: str = Depends(get_user_id)):
     # 3. Serper.dev — Google Images (via thread para não bloquear event loop)
     result = await asyncio.to_thread(_serper_search, product_name)
     if result.get("found") and result.get("image_url"):
+        local_url = await _store_remote_image_url(
+            result["image_url"],
+            uid=uid,
+            product_name=product_name,
+            source="serper_auto",
+        )
+        if local_url:
+            result["image_url"] = local_url
         await _db.vitrine_product_images.update_one(
             {"normalized_name": nome_norm},
             {
@@ -1229,6 +1444,14 @@ async def aprender_imagem(req: LearnImageRequest, uid: str = Depends(get_user_id
 
     nome_norm = normalizar(product_name)
     now = datetime.now(timezone.utc)
+    local_image_url = await _store_remote_image_url(
+        image_url,
+        uid=uid,
+        product_name=product_name,
+        source=req.source or "manual_select",
+    )
+    image_url = local_image_url or image_url
+
     await _db.vitrine_product_images.update_one(
         {"normalized_name": nome_norm, "created_by": uid},
         {
@@ -1286,4 +1509,5 @@ async def pagina_publica(slug: str):
         logger.warning("[SECURITY] vitrine_public_blocked reason=expired slug_len=%s", len(slug or ""))
         raise HTTPException(410, "Vitrine expirada")
 
+    await _localize_offer_remote_images(doc)
     return _public_offer_response(doc)

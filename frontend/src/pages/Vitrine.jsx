@@ -206,11 +206,18 @@ export default function Vitrine() {
     ));
     setImagePicker(null);
     try {
-      await vitrineService.aprenderImagem(
+      const res = await vitrineService.aprenderImagem(
         selectedItem?.product_name || imagePicker.productName,
         imageUrl,
         selectedItem?.ean || null,
       );
+      if (res.data?.image_url && res.data.image_url !== imageUrl) {
+        setItensParsed(prev => prev.map(it =>
+          it._key === imagePicker.key
+            ? { ...it, _imagePreview: vitrineService.imagemUrl(res.data.image_url), _imageUrl: res.data.image_url, _imageFile: null }
+            : it
+        ));
+      }
       toast.success('Foto trocada e salva para as próximas vitrines');
     } catch {
       toast.success('Foto trocada');
