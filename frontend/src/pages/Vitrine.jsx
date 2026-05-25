@@ -18,7 +18,8 @@ const normalizeStoredImageUrl = (value) => {
   const text = String(value);
   const marker = '/api/vitrine/imagens/';
   const index = text.indexOf(marker);
-  return index >= 0 ? text.slice(index) : null;
+  if (index >= 0) return text.slice(index);
+  return text.startsWith('https://') ? text : null;
 };
 
 const buildItemPayload = (it, sortOrder) => {
@@ -40,7 +41,7 @@ const buildItemPayload = (it, sortOrder) => {
 };
 
 const getItemsWithoutPhoto = (items) => items.filter(it =>
-  !it._imageFile && !normalizeStoredImageUrl(it._imageUrl || it.image_url)
+  !it._imageFile && !(it._imagePreview || it._imageUrl || it.image_url)
 );
 
 export default function Vitrine() {

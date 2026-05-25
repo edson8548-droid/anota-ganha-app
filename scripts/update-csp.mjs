@@ -72,7 +72,7 @@ function buildCsp({ scriptHashes, styleHashes }) {
     // attributes allowed until those components are moved to CSS classes.
     `style-src-attr 'unsafe-inline'`,
     `font-src 'self' https://fonts.gstatic.com data:`,
-    `img-src 'self' data: blob: https://venpro.com.br https://www.venpro.com.br https://api.venpro.com.br`,
+    `img-src 'self' data: blob: https:`,
     `media-src 'self' data: blob: https://api.venpro.com.br`,
     [
       `connect-src 'self'`,

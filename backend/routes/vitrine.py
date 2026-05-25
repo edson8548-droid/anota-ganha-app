@@ -99,6 +99,16 @@ def _stored_vitrine_image_url(value: str | None) -> Optional[str]:
     return text[index:] if index >= 0 else None
 
 
+def _safe_vitrine_image_url(value: str | None) -> Optional[str]:
+    stored = _stored_vitrine_image_url(value)
+    if stored:
+        return stored
+    try:
+        return _validate_remote_image_url(str(value or ""))
+    except ValueError:
+        return None
+
+
 def _remote_image_filename(url: str, content_type: str, fallback: str = "produto") -> str:
     suffix = REMOTE_IMAGE_CONTENT_TYPES.get(content_type.split(";")[0].strip().lower(), ".jpg")
     name = Path(urlparse(url).path).name or fallback
@@ -870,7 +880,7 @@ async def criar_oferta(req: CreateOfferRequest, uid: str = Depends(get_user_id))
             bool(item_dict.get("image_url")),
         )
         _normalizar_precos_vitrine_item(item_dict)
-        item_dict["image_url"] = _stored_vitrine_image_url(item_dict.get("image_url"))
+        item_dict["image_url"] = _safe_vitrine_image_url(item_dict.get("image_url"))
 
         items.append({
             "id": item_id,
@@ -980,7 +990,7 @@ async def adicionar_item(offer_id: str, item: OfferItem, uid: str = Depends(get_
     item_id = str(uuid.uuid4())
 
     _normalizar_precos_vitrine_item(item_dict)
-    item_dict["image_url"] = _stored_vitrine_image_url(item_dict.get("image_url"))
+    item_dict["image_url"] = _safe_vitrine_image_url(item_dict.get("image_url"))
 
     new_item = {
         "id": item_id,
@@ -1033,7 +1043,7 @@ async def atualizar_item(offer_id: str, item_id: str, req: UpdateItemRequest, ui
         updates["units_per_package"] = merged.get("units_per_package")
 
     if "image_url" in updates:
-        updates["image_url"] = _stored_vitrine_image_url(updates.get("image_url"))
+        updates["image_url"] = _safe_vitrine_image_url(updates.get("image_url"))
 
     if "image_url" in updates and not updates.get("image_url"):
         updates.pop("image_url", None)
