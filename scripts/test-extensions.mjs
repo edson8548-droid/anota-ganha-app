@@ -31,6 +31,11 @@ describe('extensoes Chrome', () => {
       ...manifest.content_scripts.flatMap(script => script.js || []),
     ]);
     assert.ok(manifest.host_permissions.includes('https://api.venpro.com.br/*'));
+    assert.match(manifest.description, /VR Cotação/);
+    assert.ok(
+      manifest.content_scripts.some(script => (script.matches || []).includes('http://179.0.124.205/*')),
+      'manifest precisa carregar content script no VR Cotacao conhecido'
+    );
   });
 
   it('manifest da extensao WhatsApp referencia arquivos existentes', () => {

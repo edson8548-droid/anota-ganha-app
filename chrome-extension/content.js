@@ -1,12 +1,12 @@
-// Content script — runs on cotatudo.com.br pages
+// Content script — runs on supported quotation pages.
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'extractItems') {
-    const items = extractCotatudoItems({ empresaColuna: msg.empresaColuna });
+    const items = extractQuotationItems({ empresaColuna: msg.empresaColuna });
     sendResponse({ items });
   } else if (msg.action === 'fillPrices') {
-    const result = fillCotatudoPrices(msg.prices, { empresaColuna: msg.empresaColuna });
+    const result = fillQuotationPrices(msg.prices, { empresaColuna: msg.empresaColuna });
     sendResponse(result);
   }
   return true; // keep channel open for async
@@ -44,8 +44,32 @@ function getSelectedPriceInput(row, empresaColuna) {
   return candidates[normalizeEmpresaColuna(empresaColuna)] || null;
 }
 
-function extractCotatudoItems(options = {}) {
-  const rows = document.querySelectorAll('table#conteudo_gvItem tbody tr');
+function detectQuotationSite() {
+  const path = window.location.pathname || '';
+  const bodyText = document.body?.innerText || '';
+  if (window.location.hostname.includes('cotatudo.com.br')) return 'cotatudo';
+  if (/\/php\/vrcotacao\/cotacao\.php/i.test(path) || /\bVR\s+COTA[ÇC][ÃA]O\b/i.test(bodyText)) return 'vr-cotacao';
+  return 'generic';
+}
+
+function getQuotationRows(site) {
+  if (site === 'cotatudo') {
+    return Array.from(document.querySelectorAll('table#conteudo_gvItem tbody tr'));
+  }
+
+  if (site === 'vr-cotacao') {
+    return Array.from(document.querySelectorAll('tr')).filter(row => {
+      const text = row.textContent || '';
+      return getEditableInputs(row).length > 0 && /\d{8,14}/.test(text) && /[A-Za-zÀ-ú]{3}/.test(text);
+    });
+  }
+
+  return Array.from(document.querySelectorAll('tr')).filter(row => getEditableInputs(row).length > 0);
+}
+
+function extractQuotationItems(options = {}) {
+  const site = detectQuotationSite();
+  const rows = getQuotationRows(site);
   const items = [];
   const empresaColuna = normalizeEmpresaColuna(options.empresaColuna);
 
@@ -103,7 +127,9 @@ function extractCotatudoItems(options = {}) {
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const priceInput = getSelectedPriceInput(row, empresaColuna);
+    const priceInput = site === 'vr-cotacao'
+      ? getEditableInputs(row)[0]
+      : getSelectedPriceInput(row, empresaColuna);
     if (!priceInput) continue;
     const currentVal = (priceInput.value || '').trim();
 
@@ -138,8 +164,9 @@ function extractCotatudoItems(options = {}) {
   return items;
 }
 
-function fillCotatudoPrices(prices, options = {}) {
-  const rows = document.querySelectorAll('table#conteudo_gvItem tbody tr');
+function fillQuotationPrices(prices, options = {}) {
+  const site = detectQuotationSite();
+  const rows = getQuotationRows(site);
   let count = 0;
   const failed = [];
   const empresaColuna = normalizeEmpresaColuna(options.empresaColuna);
@@ -172,7 +199,9 @@ function fillCotatudoPrices(prices, options = {}) {
       failed.push(item.idx);
       continue;
     }
-    const input = getSelectedPriceInput(row, empresaColuna);
+    const input = site === 'vr-cotacao'
+      ? getEditableInputs(row)[0]
+      : getSelectedPriceInput(row, empresaColuna);
     if (!input) {
       failed.push(item.idx);
       continue;

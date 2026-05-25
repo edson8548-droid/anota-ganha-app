@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Venpro — Preencher Cotatudo",
-  "version": "1.0.18",
-  "description": "Preenche cotações no Cotatudo automaticamente com preços da sua tabela Venpro.",
+  "name": "Venpro — Preencher Cotação",
+  "version": "1.0.19",
+  "description": "Preenche cotações no Cotatudo e VR Cotação automaticamente com preços da sua tabela Venpro.",
   "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel"],
   "host_permissions": [
     "https://cotatudo.com.br/*",
@@ -31,7 +31,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://cotatudo.com.br/*", "https://www.cotatudo.com.br/*"],
+      "matches": ["https://cotatudo.com.br/*", "https://www.cotatudo.com.br/*", "http://179.0.124.205/*"],
       "js": ["content.js"],
       "css": ["content.css"]
     },

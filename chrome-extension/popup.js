@@ -164,9 +164,13 @@ async function getToken() {
   });
 }
 
-async function getCotatudoTab() {
+function isSupportedQuotationUrl(url = '') {
+  return url.includes('cotatudo.com.br') || /\/php\/vrcotacao\/cotacao\.php/i.test(url);
+}
+
+async function getQuotationTab() {
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (active?.id && active.url?.includes('cotatudo.com.br')) return active;
+  if (active?.id && isSupportedQuotationUrl(active.url || '')) return active;
 
   const tabs = await chrome.tabs.query({ url: ['https://cotatudo.com.br/*', 'https://www.cotatudo.com.br/*'] });
   return tabs.find(tab => tab?.id) || null;
@@ -176,9 +180,9 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function sendToCotatudo(message) {
-  const tab = await getCotatudoTab();
-  if (!tab) throw new Error('Abra uma cotação no cotatudo.com.br primeiro.');
+async function sendToQuotationPage(message) {
+  const tab = await getQuotationTab();
+  if (!tab) throw new Error('Abra uma cotação no Cotatudo ou no VR Cotação primeiro.');
 
   const send = () => new Promise(resolve => {
     chrome.tabs.sendMessage(tab.id, message, response => {
@@ -197,7 +201,7 @@ async function sendToCotatudo(message) {
   await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ['content.css'] });
   await sleep(500);
   response = await send();
-  if (!response) throw new Error('Não consegui conectar com a página do Cotatudo. Atualize a aba e tente novamente.');
+  if (!response) throw new Error('Não consegui conectar com a página da cotação. Atualize a aba e tente novamente.');
   return response;
 }
 
@@ -312,14 +316,14 @@ async function runJob(job, startBatch = 0, initial = {}) {
 
     let filled = 0;
     if (precos.length > 0) {
-      const fillResult = await sendToCotatudo({
+      const fillResult = await sendToQuotationPage({
         action: 'fillPrices',
         prices: precos,
         empresaColuna: job.empresaColuna || 0,
       });
       filled = fillResult?.filled || 0;
       if (filled === 0) {
-        throw new Error('Encontrei preços, mas não consegui preencher os campos do Cotatudo. Atualize a cotação e tente novamente.');
+        throw new Error('Encontrei preços, mas não consegui preencher os campos da cotação. Atualize a página e tente novamente.');
       }
     }
 
@@ -352,7 +356,7 @@ async function startProcessing() {
   setStatus('Lendo itens da cotação...', 'info');
 
   try {
-    const extractResult = await sendToCotatudo({ action: 'extractItems', empresaColuna });
+    const extractResult = await sendToQuotationPage({ action: 'extractItems', empresaColuna });
     const items = (extractResult.items || []).filter(item => !item.filled && (item.nome || item.ean));
 
     if (items.length === 0) {
@@ -428,10 +432,10 @@ async function init() {
     empresaColunaEl.value = String(data.cotatudoEmpresaColuna);
   }
 
-  const tab = await getCotatudoTab();
+  const tab = await getQuotationTab();
   if (!tab) {
-    setStatus('Abra uma cotação no cotatudo.com.br primeiro.', 'err');
-    tabelasEl.innerHTML = '<option value="">Necessário estar no Cotatudo</option>';
+    setStatus('Abra uma cotação no Cotatudo ou no VR Cotação primeiro.', 'err');
+    tabelasEl.innerHTML = '<option value="">Necessário estar na cotação</option>';
     btnEl.disabled = true;
     return;
   }
