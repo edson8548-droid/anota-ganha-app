@@ -25,7 +25,7 @@ const buildItemPayload = (it, sortOrder) => {
     unit: it.unit || 'UN',
     units_per_package: unitsPerPackage,
     unit_price: unitPrice,
-    image_url: it._imageUrl || null,
+    image_url: it._imageUrl || it.image_url || null,
     sort_order: sortOrder,
     active: true,
   };
@@ -33,8 +33,9 @@ const buildItemPayload = (it, sortOrder) => {
 
 function imgUrl(path) {
   if (!path) return null;
-  if (path.startsWith('http')) return path;
-  return backendUrl(path);
+  const value = String(path);
+  if (value.startsWith('http')) return value;
+  return backendUrl(value);
 }
 
 export default function VitrineEditar() {
@@ -66,7 +67,7 @@ export default function VitrineEditar() {
         rca_name: oferta.rca_name || '',
         rca_whatsapp: oferta.rca_whatsapp || '',
         minimum_order_value: oferta.minimum_order_value ? String(oferta.minimum_order_value) : '',
-        expires_at: oferta.expires_at ? oferta.expires_at.split('T')[0] : '',
+        expires_at: oferta.expires_at ? String(oferta.expires_at).split('T')[0] : '',
         notes: oferta.notes || '',
       });
       setItens((oferta.items || []).map((item, i) => ({

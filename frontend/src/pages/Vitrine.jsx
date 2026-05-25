@@ -25,7 +25,7 @@ const buildItemPayload = (it, sortOrder) => {
     unit: it.unit || 'UN',
     units_per_package: unitsPerPackage,
     unit_price: unitPrice,
-    image_url: it._imageUrl || null,
+    image_url: it._imageUrl || it.image_url || null,
     sort_order: sortOrder,
     active: true,
   };
