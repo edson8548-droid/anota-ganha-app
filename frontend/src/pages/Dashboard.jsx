@@ -1035,11 +1035,12 @@ const Dashboard = () => {
             </thead>
             <tbody>${rows}</tbody>
           </table>
-          <script>window.onload = () => { window.print(); };</script>
         </body>
       </html>
     `);
     printWindow.document.close();
+    printWindow.focus();
+    printWindow.setTimeout(() => printWindow.print(), 250);
   };
 
   const cities = ['all', ...new Set(campaignClients.map(c => c.CIDADE).filter(Boolean))];
@@ -1364,11 +1365,12 @@ const Dashboard = () => {
             <tbody>${pendingRows || '<tr><td colspan="7">Nenhum cliente no filtro atual.</td></tr>'}</tbody>
           </table>
 
-          <script>window.onload = () => { window.print(); };</script>
         </body>
       </html>
     `);
     printWindow.document.close();
+    printWindow.focus();
+    printWindow.setTimeout(() => printWindow.print(), 250);
   };
 
   const todayAgendaKey = todayISO();
