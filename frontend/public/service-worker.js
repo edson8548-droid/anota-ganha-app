@@ -1,11 +1,22 @@
-const CACHE_NAME = 'venpro-app-v5';
+const CACHE_NAME = 'venpro-app-v6';
 const urlsToCache = [
-  '/',
+  '/home.html',
   '/index.html',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png'
 ];
+
+const shouldHandleRequest = (request) => {
+  if (!request.url.startsWith(self.location.origin)) return false;
+  if (request.method !== 'GET') return false;
+
+  const requestUrl = new URL(request.url);
+  if (requestUrl.pathname.startsWith('/api/')) return false;
+  if (requestUrl.pathname.endsWith('.zip')) return false;
+
+  return true;
+};
 
 // Install Service Worker
 self.addEventListener('install', (event) => {
@@ -40,15 +51,7 @@ self.addEventListener('activate', (event) => {
 
 // Fetch Event - Network First with Cache Fallback
 self.addEventListener('fetch', (event) => {
-  // Skip cross-origin requests
-  if (!event.request.url.startsWith(self.location.origin)) {
-    return;
-  }
-
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') {
-    return;
-  }
+  if (!shouldHandleRequest(event.request)) return;
 
   event.respondWith(
     fetch(event.request)
@@ -77,7 +80,7 @@ self.addEventListener('fetch', (event) => {
           
           // If not in cache, return offline page for navigations
           if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
+            return caches.match('/home.html');
           }
         });
       })
@@ -93,4 +96,3 @@ self.addEventListener('sync', (event) => {
 self.addEventListener('push', (event) => {
   console.log('Service Worker: Push notification received', event);
 });
-

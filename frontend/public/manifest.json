@@ -21,8 +21,8 @@
   "start_url": "/",
   "display": "standalone",
   "display_override": ["standalone", "fullscreen"],
-  "theme_color": "#2563eb",
-  "background_color": "#2563eb",
+  "theme_color": "#2B2D31",
+  "background_color": "#2B2D31",
   "orientation": "portrait-primary",
   "scope": "/",
   "categories": ["business", "productivity"],
@@ -30,4 +30,3 @@
   "related_applications": [],
   "shortcuts": []
 }
-
