@@ -19,7 +19,11 @@ def _clean_env(name: str) -> str | None:
 
 
 def _email_config() -> dict:
-    zeptomail_token = _clean_env("ZEPTOMAIL_SEND_MAIL_TOKEN")
+    zeptomail_token = (
+        _clean_env("ZEPTOMAIL_SEND_MAIL_TOKEN")
+        or _clean_env("ZEPTOMAIL_API_TOKEN")
+        or _clean_env("ZEPTOMAIL_TOKEN")
+    )
     provider = (_clean_env("EMAIL_PROVIDER") or ("zeptomail" if zeptomail_token else "sendgrid")).lower()
     return {
         "provider": provider,
