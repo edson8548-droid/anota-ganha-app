@@ -110,6 +110,7 @@ Antes de rodar, a variavel `$uri` precisa estar definida no PowerShell com a `MO
 
 ### 6. Campanha
 
+- [ ] 2026-05-26 pela manha: verificar novamente o cadastro Murillo/B2List para ver se houve uso real durante a noite. Tratar como `Possivel concorrente / observar`; nao enviar onboarding proativo, nao compartilhar bastidores e responder apenas com informacao publica se ele chamar.
 - [ ] 2026-05-25: Lancamento oficial do site Venpro com divulgacao organica no WhatsApp.
 - [ ] 2026-05-25: Divulgar em grupos de RCA/representantes comerciais onde houver permissao e contexto.
 - [ ] 2026-05-25: Enviar mensagem individual para RCAs proximos/conhecidos.
