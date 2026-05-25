@@ -41,3 +41,37 @@ Vou analisar sua mensagem e ja te respondo com calma. Se puder, me envie tambem 
 ```text
 Me diga qual etapa esta com duvida: cadastro, licenca, Cotacao Pronta, Vitrine Inteligente, Carteira no WhatsApp ou Cotatudo.
 ```
+
+## Problema de pagamento ou assinatura
+
+```text
+Entendi. Para eu conferir com cuidado, me diga qual email voce usou no cadastro e me mande um print da tela do pagamento ou da mensagem que apareceu.
+
+Nao precisa mandar senha, codigo de cartao ou nenhum dado sensivel.
+
+Vou verificar se o pagamento foi gerado corretamente e te falo o proximo passo.
+```
+
+## Duvida de cotacao
+
+```text
+Claro, eu te ajudo.
+
+Para entender melhor, me mande um print da cotacao ou me diga em qual etapa voce parou:
+1. subir tabela de preco;
+2. subir cotacao do cliente;
+3. revisar produtos encontrados;
+4. baixar o Excel final.
+
+Com isso eu te oriento pelo caminho mais rapido.
+```
+
+## Outras plataformas de cotacao
+
+```text
+Boa pergunta. Algumas plataformas da para resolver com importacao/exportacao de Excel. Outras precisam de uma adaptacao com extensao, como fizemos no Cotatudo.
+
+Para eu te responder certo, me mande um print ou video curto da tela onde voce recebe a cotacao e onde precisa preencher os precos.
+
+Ai eu vejo se ja da para usar com o Venpro hoje ou se precisa adaptar.
+```

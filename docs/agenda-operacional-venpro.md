@@ -104,8 +104,9 @@ Antes de rodar, a variavel `$uri` precisa estar definida no PowerShell com a `MO
 - [ ] Criar mensagem de ausencia.
 - [x] Criar respostas rapidas iniciais: site, teste, suporte, preco e instalacao.
 - [x] Criar etiquetas iniciais no WhatsApp Business.
-- [ ] Criar resposta rapida para problema de pagamento/assinatura.
-- [ ] Criar resposta rapida para duvida de cotacao.
+- [x] Criar resposta rapida para problema de pagamento/assinatura.
+- [x] Criar resposta rapida para duvida de cotacao.
+- [x] Criar resposta rapida para outras plataformas de cotacao.
 
 ### 6. Campanha
 
