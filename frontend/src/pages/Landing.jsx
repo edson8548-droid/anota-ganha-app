@@ -351,6 +351,12 @@ const Landing = () => {
             <p>Vai ajudar muito os representantes comerciais no dia a dia.</p>
             <span>Rodney N. · Representante comercial</span>
           </div>
+          <div className="landing-proof-slot real">
+            <small>★★★★★</small>
+            <strong>“Excelente ferramenta. As cotações são preenchidas em instantes e as ofertas chegam ao cliente de forma simples e fácil.”</strong>
+            <p>O Venpro agiliza processos e deixa mais tempo para atender melhor.</p>
+            <span>Robson · RCA Vila Nova</span>
+          </div>
         </div>
 
         <div className="landing-proof-banner">
