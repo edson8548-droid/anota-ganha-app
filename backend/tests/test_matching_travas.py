@@ -1162,3 +1162,17 @@ def test_matching_mantem_preco_ervilha_quero_lata_170g_quando_marca_confere():
 
     assert preco == 3.49
     assert tipo is not None
+
+def test_matching_mantem_preco_ervilha_quero_lata_170g_com_unidade_cx():
+    item_quero = _price_item("ERVILHA QUERO LT 170G", 3.49)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "ERVILHA QUERO LATA 170GR CX",
+        {},
+        [item_quero],
+        [item_quero["norm"]],
+    )
+
+    assert preco == 3.49
+    assert tipo is not None
