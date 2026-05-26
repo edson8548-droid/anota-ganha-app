@@ -1381,6 +1381,8 @@ def _marcas_para_categorias(categorias):
             'AMIDO': ('AMIDO',),
             'ANIL': ('ANIL',),
             'COPO': ('COPO', 'COPO DESC'),
+            'ERVILHA': ('ERVILHA',),
+            'MILHO': ('MILHO',),
             'DETERGENTE LOUCA': ('DET', 'LV LOUCA'),
             'DESINF': ('DESINF',),
             'LIMPADOR': ('LIMP',),
@@ -1466,7 +1468,8 @@ def _travas_seguras_nome(nome1, nome2):
                 'AMAC', 'AMIDO', 'ANIL', 'DESINF', 'DETERGENTE LOUCA',
                 'LAVA ROUPA', 'LIMPADOR', 'LIMPA VIDRO', 'LUSTRA MOVEL',
                 'FRAL', 'INSET', 'APAR', 'ALCOOL', 'SH', 'COND', 'CR TRAT', 'CR LEITE',
-                'SAB', 'DESOD', 'CREME DENTAL', 'SALG', 'BATATA', 'LA ACO', 'COPO',
+                'SAB', 'DESOD', 'CREME DENTAL', 'SALG', 'BATATA', 'LA ACO',
+                'COPO', 'ERVILHA', 'MILHO',
             }
             if cats_comuns & cats_marca_obrigatoria and bool(marcas1) != bool(marcas2):
                 return True
@@ -1791,6 +1794,10 @@ def nomes_incompativeis_v4(nome1, nome2):
 
         # 8. TRAVA ERVILHA/MILHO MISTO: produto combinado ≠ produto puro
         # "ERVILHA/MILHO QUERO" não deve casar com "MILHO VERDE QUERO" (dois produtos distintos)
+        if ('ERVILHA' in nome1 and 'MILHO' in nome2 and 'MILHO' not in nome1 and 'ERVILHA' not in nome2):
+            return True
+        if ('ERVILHA' in nome2 and 'MILHO' in nome1 and 'MILHO' not in nome2 and 'ERVILHA' not in nome1):
+            return True
         if 'MILHO' in nome1 and 'ERVILHA' in nome1 and 'MILHO' in nome2 and 'ERVILHA' not in nome2:
             return True
         if 'MILHO' in nome2 and 'ERVILHA' in nome2 and 'MILHO' in nome1 and 'ERVILHA' not in nome1:

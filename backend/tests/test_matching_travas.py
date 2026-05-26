@@ -1120,3 +1120,45 @@ def test_matching_mantem_preco_creme_de_leite_nestle_quando_marca_confere():
 
     assert preco == 3.99
     assert tipo is not None
+
+def test_ervilha_quero_lata_170g_nao_casa_com_generico_ou_outra_marca():
+    assert _incompat(
+        "ERVILHA QUERO LATA 170GR",
+        "ERVILHA LATA 170G",
+    ), "Ervilha Quero nao deve pegar preco de item sem marca"
+    assert _incompat(
+        "ERVILHA QUERO LATA 170GR",
+        "ERVILHA PREDILECTA LATA 170G",
+    ), "Ervilha Quero nao deve pegar preco de outra marca"
+    assert _incompat(
+        "ERVILHA QUERO LATA 170GR",
+        "MILHO QUERO LATA 170G",
+    ), "Ervilha Quero nao deve pegar preco de milho Quero"
+
+def test_matching_nao_usa_preco_generico_para_ervilha_quero_lata_170g():
+    item_generico = _price_item("ERVILHA LATA 170G", 2.79)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "ERVILHA QUERO LATA 170GR",
+        {},
+        [item_generico],
+        [item_generico["norm"]],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_matching_mantem_preco_ervilha_quero_lata_170g_quando_marca_confere():
+    item_quero = _price_item("ERVILHA QUERO LT 170G", 3.49)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "ERVILHA QUERO LATA 170GR",
+        {},
+        [item_quero],
+        [item_quero["norm"]],
+    )
+
+    assert preco == 3.49
+    assert tipo is not None
