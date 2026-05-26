@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Venpro — Preencher Cotação",
-  "version": "1.0.19",
-  "description": "Preenchedor de cotações do Venpro para Cotatudo, VR Cotação e novos portais compatíveis.",
+  "version": "1.0.20",
+  "description": "Preenchedor de cotações do Venpro para Cotatudo, VR Cotação, RP HUB e novos portais compatíveis.",
   "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel"],
   "host_permissions": [
     "https://cotatudo.com.br/*",
     "https://www.cotatudo.com.br/*",
     "https://venpro.com.br/*",
     "https://www.venpro.com.br/*",
+    "https://fornecedor.rpinfo.com.br/*",
     "https://api.venpro.com.br/*"
   ],
   "action": {
@@ -31,7 +32,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://cotatudo.com.br/*", "https://www.cotatudo.com.br/*", "http://179.0.124.205/*"],
+      "matches": [
+        "https://cotatudo.com.br/*",
+        "https://www.cotatudo.com.br/*",
+        "http://179.0.124.205/*",
+        "https://fornecedor.rpinfo.com.br/*"
+      ],
       "js": ["content.js"],
       "css": ["content.css"]
     },

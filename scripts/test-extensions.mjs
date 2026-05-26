@@ -33,9 +33,14 @@ describe('extensoes Chrome', () => {
     assert.ok(manifest.host_permissions.includes('https://api.venpro.com.br/*'));
     assert.match(manifest.description, /Preenchedor de cotações/);
     assert.match(manifest.description, /VR Cotação/);
+    assert.match(manifest.description, /RP HUB/);
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('http://179.0.124.205/*')),
       'manifest precisa carregar content script no VR Cotacao conhecido'
+    );
+    assert.ok(
+      manifest.content_scripts.some(script => (script.matches || []).includes('https://fornecedor.rpinfo.com.br/*')),
+      'manifest precisa carregar content script no RP HUB'
     );
   });
 

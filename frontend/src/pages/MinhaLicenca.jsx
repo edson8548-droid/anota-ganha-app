@@ -200,7 +200,7 @@ const MinhaLicenca = () => {
               <div style={s.extIcon}>🧩</div>
               <div style={{ flex: 1 }}>
                 <div style={s.extName}>Preenchedor de Cotação</div>
-                <div style={s.extDesc}>Preenche cotações no Cotatudo e VR Cotação com os preços da sua tabela.</div>
+                <div style={s.extDesc}>Preenche cotações no Cotatudo, VR Cotação e RP HUB com os preços da sua tabela.</div>
               </div>
               <a href="/venpro-cotatudo-extension.zip" download style={s.btnDownload}>
                 Baixar →

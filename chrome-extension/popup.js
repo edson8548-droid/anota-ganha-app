@@ -41,6 +41,9 @@ function setDetectedSite(tab) {
   } else if (/\/php\/vrcotacao\/cotacao\.php/i.test(url)) {
     label = 'Site detectado: VR Cotação';
     type = 'ok';
+  } else if (url.includes('fornecedor.rpinfo.com.br') && /\/supplier\/quotations\//i.test(url)) {
+    label = 'Site detectado: RP HUB';
+    type = 'ok';
   }
 
   siteDetectadoEl.textContent = label;
@@ -183,14 +186,22 @@ async function getToken() {
 }
 
 function isSupportedQuotationUrl(url = '') {
-  return url.includes('cotatudo.com.br') || /\/php\/vrcotacao\/cotacao\.php/i.test(url);
+  return url.includes('cotatudo.com.br')
+    || /\/php\/vrcotacao\/cotacao\.php/i.test(url)
+    || (url.includes('fornecedor.rpinfo.com.br') && /\/supplier\/quotations\//i.test(url));
 }
 
 async function getQuotationTab() {
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (active?.id && isSupportedQuotationUrl(active.url || '')) return active;
 
-  const tabs = await chrome.tabs.query({ url: ['https://cotatudo.com.br/*', 'https://www.cotatudo.com.br/*'] });
+  const tabs = await chrome.tabs.query({
+    url: [
+      'https://cotatudo.com.br/*',
+      'https://www.cotatudo.com.br/*',
+      'https://fornecedor.rpinfo.com.br/*',
+    ],
+  });
   return tabs.find(tab => tab?.id) || null;
 }
 
@@ -200,7 +211,7 @@ function sleep(ms) {
 
 async function sendToQuotationPage(message) {
   const tab = await getQuotationTab();
-  if (!tab) throw new Error('Abra uma cotação no Cotatudo ou no VR Cotação primeiro.');
+  if (!tab) throw new Error('Abra uma cotação no Cotatudo, VR Cotação ou RP HUB primeiro.');
 
   const send = () => new Promise(resolve => {
     chrome.tabs.sendMessage(tab.id, message, response => {
@@ -453,7 +464,7 @@ async function init() {
   const tab = await getQuotationTab();
   setDetectedSite(tab);
   if (!tab) {
-    setStatus('Abra uma cotação no Cotatudo ou no VR Cotação primeiro.', 'err');
+    setStatus('Abra uma cotação no Cotatudo, VR Cotação ou RP HUB primeiro.', 'err');
     tabelasEl.innerHTML = '<option value="">Necessário estar na cotação</option>';
     btnEl.disabled = true;
     return;
