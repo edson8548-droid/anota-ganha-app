@@ -912,3 +912,63 @@ def test_anil_liquido_colman_nao_casa_com_outra_marca():
         "ANIL LIQUIDO COLMAN 200ML",
         "ANIL LIQUIDO GLOBO 200ML",
     ), "Anil liquido Colman nao deve pegar preco de outra marca"
+
+def test_cafe_melitta_250g_nao_casa_com_500g():
+    assert "MELITTA" in normalizar_nome("CAFE MELITA VACUO 250GR TRAD")
+    assert _incompat(
+        "CAFE MELITA VACUO 250GR TRAD",
+        "CAFE MELLITA 500GR TRAD",
+    ), "Cafe Melitta 250g nao deve pegar preco de 500g"
+
+def test_matching_nao_usa_preco_cafe_melitta_500g_para_250g():
+    item_500g = _price_item("CAFE MELLITA 500GR TRAD", 23.90)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "CAFE MELITA VACUO 250GR TRAD",
+        {},
+        [item_500g],
+        [item_500g["norm"]],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_matching_mantem_preco_cafe_melitta_250g_quando_peso_confere():
+    item_250g = _price_item("CAFE MELITTA VACUO 250G TRAD", 12.90)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "CAFE MELITA VACUO 250GR TRAD",
+        {},
+        [item_250g],
+        [item_250g["norm"]],
+    )
+
+    assert preco == 12.90
+    assert tipo is not None
+
+def test_catchup_quero_400g_nao_casa_com_outro_peso():
+    assert normalizar_nome("CATCHUP QUERO 400GR TRAD").startswith("KETCHUP QUERO")
+    assert _incompat(
+        "CATCHUP QUERO 400GR TRAD",
+        "KETCHUP QUERO 200G TRAD",
+    ), "Ketchup Quero 400g nao deve pegar preco de 200g"
+    assert _incompat(
+        "CATCHUP QUERO 400GR TRAD",
+        "KETCHUP QUERO 1KG TRAD",
+    ), "Ketchup Quero 400g nao deve pegar preco de 1kg"
+
+def test_matching_mantem_preco_catchup_quero_400g_quando_peso_confere():
+    item_400g = _price_item("KETCHUP QUERO 400G TRAD", 5.49)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "CATCHUP QUERO 400GR TRAD",
+        {},
+        [item_400g],
+        [item_400g["norm"]],
+    )
+
+    assert preco == 5.49
+    assert tipo is not None

@@ -41,7 +41,7 @@ MARCAS_POR_CATEGORIA = {
     'LEITE COCO': {'DUCOCO', 'SOCOCO', 'KEROCOCO', 'KERO COCO', 'MAISCOCO', 'MAIS COCO', 'NOCOKO', 'PURO COCO', 'PUROCOCO', 'VITA COCO', 'QUALICOCO'},
     'AZEITE': {'GALLO', 'GALO', 'ANDORINHA', 'BORGES', 'CARBONELL', 'COCINERO', 'COCINEIRO', 'FILIPPO BERIO', 'FILLIPO BERIO', 'COLAVITA', 'DELEYDA', 'LA ESPANOLA', 'LA ESPANHOLA', 'MONINI', 'ESPORAO', 'DE CECCO', 'PAGANINI', 'SINTRA', 'CASA DO AZEITE', 'TRADICAO', 'VALE FERTIL', 'RESERVA', 'ESPECIAL'},
     'BISC': {'ADRIA', 'MARILAN', 'VITARELLA', 'VITAR', 'PIRAQUE', 'BAUDUCCO', 'BAUDUCO', 'BAUDUC', 'MABEL', 'RANCHEIRO', 'OREO', 'CLUBSOCIAL', 'TRAKINAS', 'TRAKI', 'TODDY', 'NIKITO', 'NABISCO', 'LACTA', 'ARCOR', 'TORTINHA', 'TUC', 'TUCS', 'BELVITA', 'NAGA', 'DADINHO', 'GALO', 'PASSATEMPO', 'BONO', 'PITSTOP', 'TRIUNFO', 'PRODASA', 'LOLI', 'GIRASSOL', 'TORTUGUITA', 'LUANITOS', 'NESTLE', 'LIANE', 'COOKIES', 'SALT PLUS', 'AGUIA', 'NESTLE RECH'},
-    'CAFE': {'3 CORACOES', '3CORACOES', 'PILAO', 'BRASILEIRO', 'CABOCLO', 'SELETO', 'UNIAO', 'PELE', 'MELITTA', 'NESCAFE', 'FORT', 'CANECAO', 'SANTO ANDRE', 'FAZENDA MINEIRA', 'MOKA'},
+    'CAFE': {'3 CORACOES', '3CORACOES', 'PILAO', 'BRASILEIRO', 'CABOCLO', 'SELETO', 'UNIAO', 'PELE', 'MELITTA', 'MELITA', 'MELLITA', 'NESCAFE', 'FORT', 'CANECAO', 'SANTO ANDRE', 'FAZENDA MINEIRA', 'MOKA'},
     'CATCHUP': {'HEINZ', 'QUERO', 'HELLMANNS', 'HELLMANN', 'HEMMER', 'KONSUMO', 'CEPERA'},
     'KETCHUP': {'HEINZ', 'QUERO', 'HELLMANNS', 'HELLMANN', 'HEMMER', 'KONSUMO', 'CEPERA'},  # alias pós-normalização
     'MAIONESE': {'HELLMANNS', 'HELLMANN', 'ARISCO', 'SOYA', 'HELLMAN', 'HEMMER', 'LIZA', 'MARIA', 'HEINZ', 'QUERO', 'VIGOR', 'DANCOW', 'SUAVIT'},
@@ -384,6 +384,7 @@ inteligencia_marcas = {
 
             # Mercearia
             "UNIAO": "ACUCAR", "MAGRO": "ACUCAR",
+            "MELITTA": "CAFE", "MELITA": "CAFE", "MELLITA": "CAFE",
             "CAMPOLARGO": "AGUA COCO", "CAMPO LARGO": "AGUA COCO",
             "SOCOCO": "AGUA COCO", "SO COCO": "AGUA COCO",
             "NEILAR": "AMIDO", "KIMIMO": "AMIDO", "MAIZENA": "AMIDO",
@@ -755,6 +756,7 @@ def normalizar_nome(nome):
         nome = nome.replace('COPER ALCOOL', 'COPERALCOOL')
         nome = re.sub(r'\bCOPERA\b', 'COPERALCOOL', nome)
         nome = re.sub(r'\bPINGLES\b', 'PRINGLES', nome)
+        nome = re.sub(r'\bMELL?ITA\b', 'MELITTA', nome)
         nome = nome.replace('KERO 1L', 'KERO COCO 1L')
         nome = nome.replace('KERO 200ML', 'KERO COCO 200ML')
         nome = nome.replace('SANGUE DE BOI', 'SANGUEDEBOI')
@@ -1098,7 +1100,7 @@ def _tolerancia_medida(nome1, nome2):
         if _is_vin:
             return 0.85
         _estritas = (
-            'MAIONESE', 'MAION', 'ACHOC', 'AZEITE', 'OLEO', 'PAPEL ALUM',
+            'MAIONESE', 'MAION', 'ACHOC', 'AZEITE', 'OLEO', 'CAFE', 'PAPEL ALUM',
             'TRIDENT', 'SH ', 'COND ', 'CR PENTE', 'SUSTAGEM', 'EXTR TOM',
         )
         if any(cat in nome1 or cat in nome2 for cat in _estritas):
