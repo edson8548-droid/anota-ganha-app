@@ -972,3 +972,113 @@ def test_matching_mantem_preco_catchup_quero_400g_quando_peso_confere():
 
     assert preco == 5.49
     assert tipo is not None
+
+def test_catchup_quero_400g_picante_nao_casa_com_tradicional_ou_generico():
+    assert _incompat(
+        "CATCHUP QUERO 400GR PICANTE",
+        "KETCHUP QUERO 400G TRAD",
+    ), "Ketchup Quero picante nao deve pegar preco do tradicional"
+    assert _incompat(
+        "CATCHUP QUERO 400GR PICANTE",
+        "KETCHUP QUERO 400G",
+    ), "Ketchup Quero picante nao deve pegar preco de item sem variedade"
+
+def test_matching_nao_usa_preco_ketchup_quero_trad_para_picante():
+    item_trad = _price_item("KETCHUP QUERO 400G TRAD", 5.49)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "CATCHUP QUERO 400GR PICANTE",
+        {},
+        [item_trad],
+        [item_trad["norm"]],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_matching_mantem_preco_catchup_quero_picante_quando_variedade_confere():
+    item_picante = _price_item("KETCHUP QUERO 400G PICANTE", 5.89)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "CATCHUP QUERO 400GR PICANTE",
+        {},
+        [item_picante],
+        [item_picante["norm"]],
+    )
+
+    assert preco == 5.89
+    assert tipo is not None
+
+def test_copo_copobras_50ml_nao_casa_com_cristalcopo():
+    assert _incompat(
+        "COPO COPOBRAS 50ML",
+        "COPO CRISTALCOPO 50ML",
+    ), "Copo Copobras nao deve pegar preco de Cristalcopo"
+
+def test_matching_nao_usa_preco_cristalcopo_para_copobras():
+    item_cristal = _price_item("COPO CRISTALCOPO 50ML", 3.99)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "COPO COPOBRAS 50ML",
+        {},
+        [item_cristal],
+        [item_cristal["norm"]],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_matching_mantem_preco_copo_copobras_quando_marca_confere():
+    item_copobras = _price_item("COPO COPOBRAS 50ML", 4.49)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "COPO COPOBRAS 50ML",
+        {},
+        [item_copobras],
+        [item_copobras["norm"]],
+    )
+
+    assert preco == 4.49
+    assert tipo is not None
+
+def test_creme_de_leite_nestle_nao_casa_com_generico_ou_outra_marca():
+    assert _incompat(
+        "CREME DE LEITE NESTLE TP 200GR",
+        "CREME DE LEITE TP 200G",
+    ), "Creme de leite Nestle nao deve pegar preco de item sem marca"
+    assert _incompat(
+        "CREME DE LEITE NESTLE TP 200GR",
+        "CREME DE LEITE ITALAC TP 200G",
+    ), "Creme de leite Nestle nao deve pegar preco de outra marca"
+
+def test_matching_nao_usa_preco_generico_para_creme_de_leite_nestle():
+    item_generico = _price_item("CREME DE LEITE TP 200G", 1.54)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "CREME DE LEITE NESTLE TP 200GR",
+        {},
+        [item_generico],
+        [item_generico["norm"]],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_matching_mantem_preco_creme_de_leite_nestle_quando_marca_confere():
+    item_nestle = _price_item("CREME DE LEITE NESTLE TP 200G", 3.99)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "CREME DE LEITE NESTLE TP 200GR",
+        {},
+        [item_nestle],
+        [item_nestle["norm"]],
+    )
+
+    assert preco == 3.99
+    assert tipo is not None

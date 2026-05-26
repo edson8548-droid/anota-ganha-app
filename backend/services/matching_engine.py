@@ -182,7 +182,7 @@ MARCAS_POR_CATEGORIA = {
     'TENYS': {'BARUEL'},
     'APERIT': {'APEROL', 'CYNAR'},
     'COB': {'OETKER', 'DR OETKER'},
-    'COPO': {'CRISTALCOPO'},
+    'COPO': {'CRISTALCOPO', 'COPOBRAS', 'COPOMAIS', 'COPOSUL', 'KEROCOPO', 'TOTALPLAST', 'ALTACOPPO', 'COPAZA'},
     'POTE': {'CRISTALCOPO'},
     'PRATO': {'CRISTALCOPO'},
     'ESPUM': {'CHANDON'},
@@ -394,6 +394,7 @@ inteligencia_marcas = {
             "APOLO": "ALGODAO", "APOLLO": "ALGODAO",
             "COPERA": "ALCOOL", "COPER ALCOOL": "ALCOOL",
             "BOMBRIL": "LA ACO", "ASSOLAN": "LA ACO",
+            "COPOBRAS": "COPO", "CRISTALCOPO": "COPO",
 
             # Desinfetante
             "PATO":      "DESINFETANTE", "VEJA":      "LIMPADOR",
@@ -1178,7 +1179,7 @@ def _extrato_tomate_incompativel(nome1, nome2):
         return _variedade(tokens1) != _variedade(tokens2)
 
 def _ketchup_marca_incompativel(nome1, nome2):
-        """Ketchup com marca conhecida nao deve casar com outra marca ou generico."""
+        """Ketchup exige mesma marca e mesma variedade quando informada."""
         tokens1 = set(nome1.split())
         tokens2 = set(nome2.split())
         if 'KETCHUP' not in tokens1 or 'KETCHUP' not in tokens2:
@@ -1188,8 +1189,25 @@ def _ketchup_marca_incompativel(nome1, nome2):
         marcas1 = tokens1 & marcas
         marcas2 = tokens2 & marcas
         if marcas1 and marcas2:
-            return not marcas1.intersection(marcas2)
-        return bool(marcas1 or marcas2)
+            if not marcas1.intersection(marcas2):
+                return True
+        elif marcas1 or marcas2:
+            return True
+
+        def _variedade(tokens):
+            if 'PICANTE' in tokens or 'PIMENTA' in tokens or 'APIMENTADO' in tokens:
+                return 'PICANTE'
+            if 'TRAD' in tokens or 'TRADICIONAL' in tokens:
+                return 'TRAD'
+            return ''
+
+        var1 = _variedade(tokens1)
+        var2 = _variedade(tokens2)
+        if var1 and var2 and var1 != var2:
+            return True
+        if (var1 == 'PICANTE') != (var2 == 'PICANTE'):
+            return True
+        return False
 
 def _maionese_limao_incompativel(nome1, nome2):
         """Maionese sabor limao nao deve casar com versao sem limao."""
@@ -1362,6 +1380,7 @@ def _marcas_para_categorias(categorias):
             'ALGODAO': ('ALGODAO',),
             'AMIDO': ('AMIDO',),
             'ANIL': ('ANIL',),
+            'COPO': ('COPO', 'COPO DESC'),
             'DETERGENTE LOUCA': ('DET', 'LV LOUCA'),
             'DESINF': ('DESINF',),
             'LIMPADOR': ('LIMP',),
@@ -1377,6 +1396,7 @@ def _marcas_para_categorias(categorias):
             'SH': ('SH',),
             'COND': ('COND',),
             'CR TRAT': ('CR TRAT',),
+            'CR LEITE': ('CR LEITE',),
             'SAB': ('SAB',),
             'DESOD': ('DESOD', 'DES'),
             'SALG': ('SALG', 'BATATA'),
@@ -1445,8 +1465,8 @@ def _travas_seguras_nome(nome1, nome2):
                 'AGUA SANITARIA', 'AGUA COCO', 'ACUCAR', 'ALGODAO',
                 'AMAC', 'AMIDO', 'ANIL', 'DESINF', 'DETERGENTE LOUCA',
                 'LAVA ROUPA', 'LIMPADOR', 'LIMPA VIDRO', 'LUSTRA MOVEL',
-                'FRAL', 'INSET', 'APAR', 'ALCOOL', 'SH', 'COND', 'CR TRAT',
-                'SAB', 'DESOD', 'CREME DENTAL', 'SALG', 'BATATA', 'LA ACO',
+                'FRAL', 'INSET', 'APAR', 'ALCOOL', 'SH', 'COND', 'CR TRAT', 'CR LEITE',
+                'SAB', 'DESOD', 'CREME DENTAL', 'SALG', 'BATATA', 'LA ACO', 'COPO',
             }
             if cats_comuns & cats_marca_obrigatoria and bool(marcas1) != bool(marcas2):
                 return True
