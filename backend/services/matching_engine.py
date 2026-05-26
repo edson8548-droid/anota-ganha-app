@@ -77,7 +77,7 @@ MARCAS_POR_CATEGORIA = {
     'CONHAQUE': {'DOMECQ', 'DOMEC', 'DREHER', 'PRESIDENTE', 'POLINHO', 'SAO JOAO DA BARRA'},
     'LAVA ROUPA': {'OMO', 'SURF', 'TIXAN', 'BRILHANTE', 'ARIEL', 'ACE', 'YPE', 'YPÊ', 'URCA', 'ASSIM', 'MINUANO'},
     'AMAC': {'DOWNY', 'COMFORT', 'FOFO', 'AMACITEL', 'VIDA MACIA', 'BABYSOFT', 'BABY SOFT', 'ZERO A DOIS', 'ZEROADOIS', 'GIRANDO SOL', 'URCA', 'MONBIJU', 'SOBRILHO', 'SUPREMA', 'TUFF', 'ZULU', 'CANDURA', 'YPE', 'YPÊ'},
-    'SANITARIA': {'CANDURA', 'CANDIDA', 'QBOA', 'Q-BOA', 'YPE', 'YPÊ', 'BARBAREX', 'SUPERCANDIDA', 'BRILUX', 'ALPES'},
+    'SANITARIA': {'CANDURA', 'CANDIDA', 'QBOA', 'Q-BOA', 'Q BOA', 'YPE', 'YPÊ', 'BARBAREX', 'SUPERCANDIDA', 'BRILUX', 'ALPES', 'GIRANDO SOL'},
     'PAPEL HIG': {'NEVE', 'PERSONAL', 'ELITE', 'MILI', 'COTTON', 'SUBLIME', 'DUETTO', 'DELUXE', 'MAX', 'SCOTT', 'MIMMO', 'NOBRE', 'ISAPEL', 'FANCY', 'PALOMA', 'FLORAL', 'QUALITE', 'PRIMACARE', 'FOLHALEV', 'TIFFY', 'FAMILIAR', 'FOFINHO', 'PRIMAVERA'},
     'PAPEL HIGIENICO': {'NEVE', 'PERSONAL', 'ELITE', 'MILI', 'COTTON', 'SUBLIME', 'DUETTO', 'DELUXE', 'MAX', 'SCOTT', 'MIRIMMO', 'NOBRE', 'ISAPEL', 'FANCY', 'PALOMA', 'FLORAL', 'QUALITE', 'FOLHALEV', 'TIFFY', 'FAMILIAR', 'FOFINHO', 'PRIMAVERA'},
     'FILTRO PAPEL': {'3CORACOES', 'BRIGITTA', 'BRITTA', 'MELITTA', 'SENSEO', 'HARIO', 'JAGUARI'},
@@ -101,9 +101,9 @@ MARCAS_POR_CATEGORIA = {
     'SABAO BARRA': {'ASSIM', 'MINUANO', 'RAZZO', 'UFE', 'YPE'},
     'DESOD': {'REXONA', 'DOVE', 'NIVEA', 'AXE', 'OLDSPICE', 'MONANGE', 'BOZZANO', 'HERBISSIMO', 'ABOVE', 'FRANCIS', 'DAVENE', 'GIOVANNABABY', 'TABU', 'HYDRATTA', 'POTY', 'SKALA', 'SECRET', 'GILLETTE', 'ADIDAS', 'PERSPIREX', 'CORPO A CORPO'},
     'DES':   {'REXONA', 'DOVE', 'NIVEA', 'AXE', 'OLDSPICE', 'MONANGE', 'BOZZANO', 'BOZ', 'HERBISSIMO', 'ABOVE', 'FRANCIS', 'DAVENE', 'GIOV', 'GIOVANNABABY', 'TABU', 'POTY', 'SKALA', 'SECRET', 'GILLETTE', 'ADIDAS', 'PERSPIREX', 'HYDRATTA', 'CORPO A CORPO'},
-    'SH': {'PANTENE', 'SEDA', 'DOVE', 'ELSEVE', 'KOLENE', 'DARLING', 'CLEAR', 'JOHNSONS', 'MONANGE', 'NEUTROX', 'PALMOLIVE', 'POTY', 'SKALA', 'GOTADOURADA', 'TRALALA', 'NOVEX', 'OX', 'VULT', 'BARUEL', 'H&S'},
-    'COND': {'PANTENE', 'SEDA', 'DOVE', 'ELSEVE', 'KOLENE', 'MONANGE', 'NEUTROX', 'PALMOLIVE', 'POTY', 'SKALA', 'GOTADOURADA', 'NOVEX', 'VULT'},
-    'CR TRAT': {'SKALA', 'NOVEX', 'SEDA', 'ELSEVE', 'POTY', 'PANTENE'},
+    'SH': {'PANTENE', 'SEDA', 'DOVE', 'ELSEVE', 'KOLENE', 'DARLING', 'CLEAR', 'JOHNSONS', 'MONANGE', 'NEUTROX', 'PALMOLIVE', 'POTY', 'SKALA', 'GOTADOURADA', 'TRALALA', 'NOVEX', 'OX', 'VULT', 'BARUEL', 'H&S', 'SALON LINE', 'SALONLINE'},
+    'COND': {'PANTENE', 'SEDA', 'DOVE', 'ELSEVE', 'KOLENE', 'MONANGE', 'NEUTROX', 'PALMOLIVE', 'POTY', 'SKALA', 'GOTADOURADA', 'NOVEX', 'VULT', 'SALON LINE', 'SALONLINE'},
+    'CR TRAT': {'SKALA', 'NOVEX', 'SEDA', 'ELSEVE', 'POTY', 'PANTENE', 'SALON LINE', 'SALONLINE'},
     'SAPONACEO': {'CIF', 'RADIUM', 'SAPOLIO'},
     'SAB': {'DOVE', 'LUX', 'PALMOLIVE', 'FRANCIS', 'JOHNSONS', 'JOHNSON', 'LIVY', 'ALBANY', 'GRANADO', 'PROTEX', 'REXONA', 'NIVEA', 'YPE', 'SIENE', 'MONANGE', 'PHEBO'},
     'INSET': {'BAYGON', 'SBP', 'RAID', 'MATINSET', 'MORTEIN'},
@@ -375,6 +375,7 @@ inteligencia_marcas = {
 
             # Água Sanitária / Alvejante
             "CANDURA":   "SANITARIA", "CANDIDA":   "SANITARIA", "QBOA":      "SANITARIA",
+            "Q BOA":     "SANITARIA", "Q-BOA":     "SANITARIA",
             "GIRANDO SOL": "SANITARIA", "BARBAREX":  "SANITARIA", "BRILUX":    "SANITARIA",
 
             # Desinfetante
@@ -416,6 +417,9 @@ inteligencia_marcas = {
             "MONANGE":   "DESOD", "BOZZANO":   "DESOD", "HERBISSIMO": "DESOD",
             "ABOVE":     "DESOD",
             "HYDRATTA":  "DESOD",
+
+            # Cabelo
+            "SALON LINE": "SH", "SALONLINE": "SH",
 
             # Perfume / Colônia
             "BOTICARIO": "DEO COLONIA", "BOTICÁRIO": "DEO COLONIA", "NATURA": "DEO COLONIA",
@@ -803,6 +807,8 @@ def normalizar_nome(nome):
         nome = nome.replace("S ACUCAR", "SEMACUCAR")
         nome = nome.replace("SEM ACUCAR", "SEMACUCAR")
         nome = nome.replace("Q-BOA", "QBOA")
+        nome = re.sub(r'\bQ\s+BOA\b', 'QBOA', nome)
+        nome = nome.replace("SALON LINE", "SALONLINE")
         nome = nome.replace("GOMES COSTA", "GCOSTA")
         nome = nome.replace("GOMES DA COSTA", "GCOSTA")
         nome = nome.replace("PINHO SOL", "PINHOSOL")
@@ -1310,6 +1316,11 @@ def _marcas_para_categorias(categorias):
             'INSET': ('INSET',),
             'APAR': ('APAR',),
             'ALCOOL': ('ALCOOL',),
+            'SH': ('SH',),
+            'COND': ('COND',),
+            'CR TRAT': ('CR TRAT',),
+            'SAB': ('SAB',),
+            'DESOD': ('DESOD', 'DES'),
             'CREME DENTAL': ('CR D', 'CR DENTAL'),
             'VINHO': ('VIN', 'VINHO'),
         }
@@ -1373,7 +1384,8 @@ def _travas_seguras_nome(nome1, nome2):
             cats_marca_obrigatoria = {
                 'AGUA SANITARIA', 'AMAC', 'DESINF', 'DETERGENTE LOUCA',
                 'LAVA ROUPA', 'LIMPADOR', 'LIMPA VIDRO', 'LUSTRA MOVEL',
-                'FRAL', 'INSET', 'APAR', 'ALCOOL',
+                'FRAL', 'INSET', 'APAR', 'ALCOOL', 'SH', 'COND', 'CR TRAT',
+                'SAB', 'DESOD', 'CREME DENTAL',
             }
             if cats_comuns & cats_marca_obrigatoria and bool(marcas1) != bool(marcas2):
                 return True

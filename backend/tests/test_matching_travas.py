@@ -712,3 +712,65 @@ def test_papel_manteiga_nao_casa_com_aluminio():
         "PAPEL MANTEIGA WYDA",
         "PAPEL ALUM WYDA 30X4 MTS",
     ), "Papel manteiga nao deve casar com papel aluminio"
+
+def test_shampoo_seda_nao_casa_com_salon_line():
+    assert _incompat(
+        "SHAMPOO SEDA CERAMIDAS 325ML",
+        "SHAMPOO SALON LINE CERAMIDAS 300ML",
+    ), "Shampoo Seda nao deve casar com Salon Line mesmo com linha parecida"
+
+def test_matching_nao_usa_preco_salon_line_para_shampoo_seda():
+    item_salon_line = _price_item("SHAMPOO SALON LINE CERAMIDAS 300ML", 8.99)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "SHAMPOO SEDA CERAMIDAS 325ML",
+        {},
+        [item_salon_line],
+        [item_salon_line["norm"]],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_agua_sanitaria_qboa_nao_casa_com_outra_marca():
+    assert "QBOA" in normalizar_nome("AGUA SANIT Q BOA 1 LT")
+    assert _incompat(
+        "AGUA SANIT Q BOA 1 LT",
+        "AGUA SANITARIA BRILUX 1L",
+    ), "Agua sanitaria Qboa nao deve casar com Brilux"
+    assert _incompat(
+        "AGUA SANIT QBOA 1L",
+        "AGUA SANITARIA 1L",
+    ), "Agua sanitaria com marca conhecida nao deve casar com item sem marca"
+
+def test_matching_nao_usa_preco_outra_marca_para_agua_sanitaria_qboa():
+    itens = [
+        _price_item("AGUA SANITARIA BRILUX 1L", 2.49),
+        _price_item("AGUA SANITARIA 1L", 2.19),
+    ]
+
+    preco, tipo = encontrar_preco(
+        "",
+        "AGUA SANIT Q BOA 1 LT",
+        {},
+        itens,
+        [item["norm"] for item in itens],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_matching_mantem_preco_quando_marca_shampoo_confere():
+    item_seda = _price_item("SHAMPOO SEDA CERAMIDAS 325ML", 8.99)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "SHAMPOO SEDA CERAMIDAS 325ML",
+        {},
+        [item_seda],
+        [item_seda["norm"]],
+    )
+
+    assert preco == 8.99
+    assert tipo is not None
