@@ -44,8 +44,8 @@ MARCAS_POR_CATEGORIA = {
     'CAFE': {'3 CORACOES', '3CORACOES', 'PILAO', 'BRASILEIRO', 'CABOCLO', 'SELETO', 'UNIAO', 'PELE', 'MELITTA', 'MELITA', 'MELLITA', 'NESCAFE', 'FORT', 'CANECAO', 'SANTO ANDRE', 'FAZENDA MINEIRA', 'MOKA'},
     'CATCHUP': {'HEINZ', 'QUERO', 'HELLMANNS', 'HELLMANN', 'HEMMER', 'KONSUMO', 'CEPERA'},
     'KETCHUP': {'HEINZ', 'QUERO', 'HELLMANNS', 'HELLMANN', 'HEMMER', 'KONSUMO', 'CEPERA'},  # alias pós-normalização
-    'MAIONESE': {'HELLMANNS', 'HELLMANN', 'ARISCO', 'SOYA', 'HELLMAN', 'HEMMER', 'LIZA', 'MARIA', 'HEINZ', 'QUERO', 'VIGOR', 'DANCOW', 'SUAVIT'},
-    'MAION': {'HELLMANNS', 'HELLMANN', 'ARISCO', 'SOYA', 'HELLMAN', 'HEMMER', 'LIZA', 'MARIA', 'HEINZ', 'QUERO', 'VIGOR', 'DANCOW', 'SUAVIT'},
+    'MAIONESE': {'HELLMANNS', 'HELLMANN', 'ARISCO', 'SOYA', 'HELLMAN', 'HEMMER', 'LIZA', 'MARIA', 'HEINZ', 'QUERO', 'VIGOR', 'DANCOW', 'SUAVIT', 'SAUDE'},
+    'MAION': {'HELLMANNS', 'HELLMANN', 'ARISCO', 'SOYA', 'HELLMAN', 'HEMMER', 'LIZA', 'MARIA', 'HEINZ', 'QUERO', 'VIGOR', 'DANCOW', 'SUAVIT', 'SAUDE'},
     'CHOC': {'LACTA', 'NESTLE', 'HERSHEY', 'HERSHEYS', 'GAROTO', 'ARCOR', 'GALAK', 'ALPINO', 'NUTELLA', 'BATON', 'TRENTO', 'BIS', 'KINDER', 'KITKAT', 'APTI', 'BIBS'},
     'ENERG': {'BALY', 'REDBULL', 'MONSTER', 'ENGOV', 'FUSION'},
     'EXTR TOM': {'ELEFANTE', 'QUERO', 'FUGINI', 'PREDILECTA', 'OLE', 'POMAROLA', 'SALSARETTI'},
@@ -1399,6 +1399,7 @@ def _marcas_para_categorias(categorias):
             'COND': ('COND',),
             'CR TRAT': ('CR TRAT',),
             'CR LEITE': ('CR LEITE',),
+            'MAION': ('MAIONESE', 'MAION'),
             'SAB': ('SAB',),
             'DESOD': ('DESOD', 'DES'),
             'SALG': ('SALG', 'BATATA'),
@@ -1468,7 +1469,7 @@ def _travas_seguras_nome(nome1, nome2):
                 'AMAC', 'AMIDO', 'ANIL', 'DESINF', 'DETERGENTE LOUCA',
                 'LAVA ROUPA', 'LIMPADOR', 'LIMPA VIDRO', 'LUSTRA MOVEL',
                 'FRAL', 'INSET', 'APAR', 'ALCOOL', 'SH', 'COND', 'CR TRAT', 'CR LEITE',
-                'SAB', 'DESOD', 'CREME DENTAL', 'SALG', 'BATATA', 'LA ACO',
+                'SAB', 'DESOD', 'CREME DENTAL', 'SALG', 'BATATA', 'LA ACO', 'MAION',
                 'COPO', 'ERVILHA', 'MILHO',
             }
             if cats_comuns & cats_marca_obrigatoria and bool(marcas1) != bool(marcas2):

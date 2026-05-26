@@ -583,6 +583,53 @@ def test_matching_nao_usa_preco_de_outra_marca_para_maionese_suavit():
     assert preco is None
     assert tipo is None
 
+def test_maionese_saude_vigor_quero_respeita_marca():
+    assert _incompat(
+        "MAIONESE SAUDE 500G",
+        "MAIONESE QUERO 500G",
+    ), "Maionese Saude nao deve pegar preco de Quero"
+    assert _incompat(
+        "MAIONESE VIGOR 500G",
+        "MAIONESE QUERO 500G",
+    ), "Maionese Vigor nao deve pegar preco de Quero"
+    assert _incompat(
+        "MAIONESE QUERO 500G",
+        "MAIONESE SAUDE 500G",
+    ), "Maionese Quero nao deve pegar preco de Saude"
+
+def test_matching_nao_usa_preco_quero_para_maionese_saude_ou_vigor():
+    item_quero = _price_item("MAIONESE QUERO 500G", 7.99)
+
+    for nome in ("MAIONESE SAUDE 500G", "MAIONESE VIGOR 500G"):
+        preco, tipo = encontrar_preco(
+            "",
+            nome,
+            {},
+            [item_quero],
+            [item_quero["norm"]],
+        )
+
+        assert preco is None
+        assert tipo is None
+
+def test_matching_mantem_preco_maionese_saude_e_vigor_quando_marca_confere():
+    itens = [
+        _price_item("MAIONESE SAUDE 500G", 8.49),
+        _price_item("MAIONESE VIGOR 500G", 8.99),
+    ]
+
+    for item in itens:
+        preco, tipo = encontrar_preco(
+            "",
+            item["orig"],
+            {},
+            itens,
+            [i["norm"] for i in itens],
+        )
+
+        assert preco == item["preco"]
+        assert tipo is not None
+
 def test_molho_fugini_bolonhesa_nao_casa_com_quero_ou_tradicional():
     assert _incompat(
         "MOLHO FUGINI 300G BOLONHESA",
