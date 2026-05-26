@@ -1435,6 +1435,8 @@ def _contagens_embalagem(nome):
         contagens = set()
         for valor in re.findall(r'\bC(\d+)\b', nome):
             contagens.add(('C', valor))
+        for valor in re.findall(r'\bCX\s*(\d+)\b', nome):
+            contagens.add(('CX', valor))
         for valor in re.findall(r'\b(\d+)\s*NOIT(?:E|ES)?\b', nome):
             contagens.add(('NOITE', valor))
         for valor in re.findall(r'\b(\d+)\s*PAST(?:ILHA|ILHAS)?\b', nome):
@@ -1490,7 +1492,7 @@ def _travas_seguras_nome(nome1, nome2):
             if frag1 and frag2 and frag1 != frag2:
                 return True
 
-        if cats1 & cats2 & {'FRAL', 'INSET', 'APAR'}:
+        if cats1 & cats2 & {'FRAL', 'INSET', 'APAR', 'COPO'}:
             embal1 = _contagens_embalagem(nome1)
             embal2 = _contagens_embalagem(nome2)
             if embal1 and embal2 and not embal1.intersection(embal2):
