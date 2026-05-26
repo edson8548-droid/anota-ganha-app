@@ -18,7 +18,7 @@ from typing import List, Optional, Any
 from pathlib import Path
 from urllib.parse import urlparse, urljoin
 
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel
@@ -238,6 +238,19 @@ async def _localize_offer_remote_images(doc: dict) -> bool:
         )
 
     return changed
+
+
+def _schedule_offer_image_localization(doc: dict) -> None:
+    async def _run():
+        try:
+            await _localize_offer_remote_images(doc)
+        except Exception as exc:
+            logger.warning("[vitrine_publica] background_image_repair_failed reason=%s", str(exc)[:160])
+
+    try:
+        asyncio.create_task(_run())
+    except RuntimeError as exc:
+        logger.warning("[vitrine_publica] background_image_repair_not_scheduled reason=%s", str(exc)[:160])
 
 
 async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
@@ -1566,7 +1579,7 @@ async def sugerir_imagens(product_name: str, uid: str = Depends(get_user_id)):
 # ═══════════════════════════════════════
 
 @router.get("/publica/{slug}")
-async def pagina_publica(slug: str, background_tasks: BackgroundTasks):
+async def pagina_publica(slug: str):
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{2,80}", slug):
         logger.warning("[SECURITY] vitrine_public_blocked reason=bad_slug slug_len=%s", len(slug or ""))
         raise HTTPException(404, "Vitrine não encontrada ou inativa")
@@ -1581,5 +1594,5 @@ async def pagina_publica(slug: str, background_tasks: BackgroundTasks):
         logger.warning("[SECURITY] vitrine_public_blocked reason=expired slug_len=%s", len(slug or ""))
         raise HTTPException(410, "Vitrine expirada")
 
-    background_tasks.add_task(_localize_offer_remote_images, doc)
+    _schedule_offer_image_localization(doc)
     return _public_offer_response(doc)
