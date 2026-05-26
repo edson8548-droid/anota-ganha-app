@@ -1172,6 +1172,20 @@ def test_matching_mantem_preco_copo_copobras_300ml_quando_volume_confere():
     assert preco == 9.99
     assert tipo is not None
 
+def test_matching_mantem_preco_copo_copobras_300ml_com_cx_20():
+    item_300ml = _price_item("COPO COPOBRAS 300ML", 9.99)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "COPO COPOBRAS 300ML CX 20",
+        {},
+        [item_300ml],
+        [item_300ml["norm"]],
+    )
+
+    assert preco == 9.99
+    assert tipo is not None
+
 def test_creme_de_leite_nestle_nao_casa_com_generico_ou_outra_marca():
     assert _incompat(
         "CREME DE LEITE NESTLE TP 200GR",
