@@ -40,11 +40,9 @@ const buildItemPayload = (it, sortOrder) => {
   };
 };
 
-const buildExistingItemPayload = (it, sortOrder) => {
+const buildBulkItemPayload = (it, sortOrder) => {
   const payload = buildItemPayload(it, sortOrder);
-  if (!it._imageUrl) {
-    delete payload.image_url;
-  }
+  if (it.id) payload.id = it.id;
   return payload;
 };
 
@@ -273,38 +271,25 @@ export default function VitrineEditar() {
         try { await vitrineService.uploadLogo(id, logoFile); } catch {}
       }
 
-      for (const it of itens.filter(it => it._deleted && it.id)) {
-        try { await vitrineService.removerItem(id, it.id); } catch {}
-      }
+      const itensParaSalvar = itensAtivos.map((it, index) => buildBulkItemPayload(it, index));
+      const bulkRes = await vitrineService.substituirItens(id, itensParaSalvar);
+      const itensSalvos = bulkRes.data?.items || [];
 
-      const existentes = itens.filter(it => !it._deleted && it.id);
-      for (const it of existentes) {
-        try {
-          await vitrineService.atualizarItem(id, it.id, buildExistingItemPayload(it, it.sort_order || 0));
-          if (it._imageFile) {
-            await vitrineService.uploadImagem(id, it.id, it._imageFile);
-          }
-        } catch {}
-      }
-
-      const novos = itens.filter(it => !it._deleted && !it.id);
-      for (let i = 0; i < novos.length; i++) {
-        const it = novos[i];
-        try {
-          const res = await vitrineService.adicionarItem(id, buildItemPayload(it, existentes.length + i));
-          const novoId = res.data?.id;
-          if (it._imageFile && novoId) {
-            try { await vitrineService.uploadImagem(id, novoId, it._imageFile); } catch {}
-          }
-        } catch {}
+      for (let index = 0; index < itensAtivos.length; index++) {
+        const it = itensAtivos[index];
+        const itemSalvo = itensSalvos[index];
+        if (it._imageFile && itemSalvo?.id) {
+          try { await vitrineService.uploadImagem(id, itemSalvo.id, it._imageFile); } catch {}
+        }
       }
 
       toast.success('Vitrine atualizada!');
       navigate('/vitrine');
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Erro ao salvar');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   if (loading) return (

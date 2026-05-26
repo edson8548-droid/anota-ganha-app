@@ -80,6 +80,23 @@ test('uploadImagem envia arquivo em FormData sem content-type manual', async () 
   expect(form.get('arquivo')).toBe(file);
 });
 
+test('substituirItens envia lista em lote', async () => {
+  const items = [{ id: 'item-1', product_name: 'Produto', price: 10 }];
+
+  await vitrineService.substituirItens('oferta-1', items);
+
+  expect(axios.put).toHaveBeenCalledWith(
+    'https://api.venpro.com.br/api/vitrine/ofertas/oferta-1/items',
+    { items },
+    {
+      headers: {
+        Authorization: 'Bearer token-123',
+        'Content-Type': 'application/json',
+      },
+    },
+  );
+});
+
 test('aprenderImagem salva preferencia de foto do produto', async () => {
   await vitrineService.aprenderImagem('Produto Teste', 'https://cdn.exemplo.com/produto.jpg', '789');
 

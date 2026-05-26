@@ -421,6 +421,14 @@ class UpdateItemRequest(BaseModel):
     active: Optional[bool] = None
 
 
+class BulkOfferItem(OfferItem):
+    id: Optional[str] = None
+
+
+class BulkItemsRequest(BaseModel):
+    items: List[BulkOfferItem]
+
+
 # ═══════════════════════════════════════
 # PARSE DE LISTA POR CODIGO
 # ═══════════════════════════════════════
@@ -798,6 +806,39 @@ def _normalizar_precos_vitrine_item(item: dict) -> dict:
     return item
 
 
+def _preparar_item_vitrine(
+    item_dict: dict,
+    *,
+    existing_item: Optional[dict] = None,
+    sort_order: Optional[int] = None,
+) -> dict:
+    now = datetime.now(timezone.utc)
+    current = existing_item or {}
+    raw_id = (item_dict.get("id") or current.get("id") or "").strip()
+    item_id = raw_id if raw_id else str(uuid.uuid4())
+
+    item_dict = {k: v for k, v in item_dict.items() if k not in {"id", "created_at"}}
+    _normalizar_precos_vitrine_item(item_dict)
+
+    safe_image_url = _safe_vitrine_image_url(item_dict.get("image_url"))
+    if safe_image_url:
+        item_dict["image_url"] = safe_image_url
+    elif current.get("image_url"):
+        item_dict["image_url"] = current.get("image_url")
+    else:
+        item_dict["image_url"] = None
+
+    item_dict["sort_order"] = sort_order if sort_order is not None else item_dict.get("sort_order", 0)
+    item_dict["active"] = item_dict.get("active", True)
+
+    return {
+        "id": item_id,
+        **item_dict,
+        "created_at": current.get("created_at") or now,
+        "updated_at": now,
+    }
+
+
 async def parse_lista_codigo(lista: str) -> List[dict]:
     # Lista colada de IA/Excel/PDF sem quebras de linha:
     # "Produto CX-24 2,05 Produto 2 CX-12 4,90 ..."
@@ -872,22 +913,13 @@ async def criar_oferta(req: CreateOfferRequest, uid: str = Depends(get_user_id))
     items = []
     for i, item in enumerate(req.items or []):
         item_dict = item.model_dump()
-        item_id = str(uuid.uuid4())
 
         logger.info(
             "[CRIAR_OFERTA] Item recebido index=%s has_image=%s",
             i,
             bool(item_dict.get("image_url")),
         )
-        _normalizar_precos_vitrine_item(item_dict)
-        item_dict["image_url"] = _safe_vitrine_image_url(item_dict.get("image_url"))
-
-        items.append({
-            "id": item_id,
-            **item_dict,
-            "sort_order": i,
-            "created_at": datetime.now(timezone.utc),
-        })
+        items.append(_preparar_item_vitrine(item_dict, sort_order=i))
 
     logger.info(f"[CRIAR_OFERTA] Total de itens: {len(items)}")
 
@@ -986,17 +1018,7 @@ async def adicionar_item(offer_id: str, item: OfferItem, uid: str = Depends(get_
     except Exception:
         raise HTTPException(400, "ID inválido")
 
-    item_dict = item.model_dump()
-    item_id = str(uuid.uuid4())
-
-    _normalizar_precos_vitrine_item(item_dict)
-    item_dict["image_url"] = _safe_vitrine_image_url(item_dict.get("image_url"))
-
-    new_item = {
-        "id": item_id,
-        **item_dict,
-        "created_at": datetime.now(timezone.utc),
-    }
+    new_item = _preparar_item_vitrine(item.model_dump())
     result = await _db.vitrine_offers.update_one(
         {"_id": oid, "created_by": uid},
         {"$push": {"items": new_item}, "$set": {"updated_at": datetime.now(timezone.utc)}}
@@ -1087,6 +1109,54 @@ async def remover_item(offer_id: str, item_id: str, uid: str = Depends(get_user_
         metadata={"offerId": offer_id, "itemId": item_id},
     )
     return {"ok": True}
+
+
+@router.put("/ofertas/{offer_id}/items")
+async def substituir_items(offer_id: str, req: BulkItemsRequest, uid: str = Depends(get_user_id)):
+    try:
+        oid = ObjectId(offer_id)
+    except Exception:
+        raise HTTPException(400, "ID inválido")
+
+    if not req.items:
+        raise HTTPException(400, "A vitrine precisa ter pelo menos um produto")
+    if len(req.items) > 300:
+        raise HTTPException(400, "Máximo de 300 produtos por vitrine")
+
+    doc = await _db.vitrine_offers.find_one({"_id": oid, "created_by": uid})
+    if not doc:
+        raise HTTPException(404, "Oferta não encontrada")
+
+    existing_by_id = {
+        item.get("id"): item
+        for item in doc.get("items", [])
+        if item.get("id")
+    }
+
+    items = []
+    seen_ids = set()
+    for index, item in enumerate(req.items):
+        raw = item.model_dump()
+        requested_id = raw.get("id")
+        existing_item = existing_by_id.get(requested_id)
+        prepared = _preparar_item_vitrine(raw, existing_item=existing_item, sort_order=index)
+
+        if prepared["id"] in seen_ids:
+            prepared["id"] = str(uuid.uuid4())
+        seen_ids.add(prepared["id"])
+        items.append(prepared)
+
+    await _db.vitrine_offers.update_one(
+        {"_id": oid, "created_by": uid},
+        {"$set": {"items": items, "updated_at": datetime.now(timezone.utc)}},
+    )
+    await audit_event(
+        "vitrine_items_bulk_updated",
+        uid=uid,
+        status="success",
+        metadata={"offerId": offer_id, "items": len(items)},
+    )
+    return {"ok": True, "items": [doc_to_dict(item) for item in items]}
 
 
 @router.post("/ofertas/{offer_id}/items/reorder")

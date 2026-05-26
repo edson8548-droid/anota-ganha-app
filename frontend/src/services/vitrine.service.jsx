@@ -69,6 +69,11 @@ export const vitrineService = {
     return axios.delete(apiUrl(`/vitrine/ofertas/${offerId}/items/${itemId}`), { headers });
   },
 
+  async substituirItens(offerId, items) {
+    const headers = await getHeaders();
+    return axios.put(apiUrl(`/vitrine/ofertas/${offerId}/items`), { items }, { headers });
+  },
+
   // ── Parse de lista ───────────────────────────────
   async parseLista(lista) {
     const headers = await getHeaders();
