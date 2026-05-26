@@ -818,3 +818,52 @@ def test_matching_mantem_preco_quando_pringles_original_confere():
 
     assert preco == 11.90
     assert tipo is not None
+
+def test_acucar_uniao_fit_nao_casa_com_magro_400g():
+    assert _incompat(
+        "ACUCAR UNIAO FIT 400G",
+        "ACUCAR MAGRO 400G",
+    ), "Acucar Uniao Fit nao deve pegar preco de Magro 400g"
+
+def test_matching_nao_usa_preco_magro_para_acucar_uniao_fit():
+    item_magro = _price_item("ACUCAR MAGRO 400G", 6.90)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "ACUCAR UNIAO FIT 400G",
+        {},
+        [item_magro],
+        [item_magro["norm"]],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_agua_coco_campo_largo_nao_casa_com_sococo():
+    assert _incompat(
+        "AGUA DE COCO CAMPO LARGO 1L",
+        "AGUA DE COCO SO COCO 1L",
+    ), "Agua de coco Campo Largo nao deve pegar preco de So Coco"
+
+def test_algodao_apolo_nao_casa_com_outra_marca():
+    assert _incompat(
+        "ALGODAO APOLO 50G",
+        "ALGODAO FAROL 50G",
+    ), "Algodao Apolo nao deve pegar preco de outra marca"
+
+def test_alcool_gel_copera_nao_casa_com_outra_marca():
+    assert "COPERALCOOL" in normalizar_nome("ALCOOL GEL COPERA 500G")
+    assert _incompat(
+        "ALCOOL GEL COPERA 500G",
+        "ALCOOL GEL TUPI 500G",
+    ), "Alcool gel Copera/Coperalcool nao deve pegar preco de outra marca"
+
+def test_bombril_nao_casa_com_sabao_ou_detergente():
+    assert _incompat(
+        "BOMBRIL 8UN",
+        "SABAO BRILHANTE 800G",
+    ), "Bombril/la de aco nao deve pegar preco de sabao"
+    assert _incompat(
+        "BOMBRIL 8UN",
+        "DETERGENTE BRILHANTE 500ML",
+    ), "Bombril/la de aco nao deve pegar preco de detergente"

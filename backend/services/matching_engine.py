@@ -32,9 +32,10 @@ TAXA_SIMILARIDADE = 0.82  # era 0.75
 
 MARCAS_POR_CATEGORIA = {
     # Adoçantes
+    'ACUCAR': {'UNIAO', 'MAGRO', 'DA BARRA', 'DABARRA', 'CARAVELAS', 'ALTO ALEGRE', 'GUARANI', 'NATIVE'},
     'ADOC': {'ADOCYL', 'ZERO', 'MARATA', 'ASSUGRIN', 'TAL QUAL', 'FINN', 'LINEA', 'VIST', 'UNIAO', 'GOLD', 'DIET'},
     'ACHOC': {'NESCAU', 'TODDY', 'TODD', 'NESQUIK', 'OVOMALTINE', 'APTI', 'ITALAC', 'MUKY', 'CHOCOLATTO', 'GOLD', 'NESTLE', 'SUSTAGEN'},
-    'AGUA COCO': {'DUCOCO', 'SOCOCO', 'KERO', 'KEROCOCO', 'KERO COCO', 'MAISCOCO', 'MAIS COCO', 'QUADRADO', 'COCO QUADRADO', 'PURO COCO', 'PUROCOCO', 'NOCOKO', 'COCO SUPER', 'COCOSUPER', 'AQUA', 'VITA COCO', 'QUALICOCO'},
+    'AGUA COCO': {'DUCOCO', 'SOCOCO', 'SO COCO', 'KERO', 'KEROCOCO', 'KERO COCO', 'MAISCOCO', 'MAIS COCO', 'QUADRADO', 'COCO QUADRADO', 'PURO COCO', 'PUROCOCO', 'NOCOKO', 'COCO SUPER', 'COCOSUPER', 'AQUA', 'VITA COCO', 'QUALICOCO', 'CAMPOLARGO', 'CAMPO LARGO'},
     'LEITE COCO': {'DUCOCO', 'SOCOCO', 'KEROCOCO', 'KERO COCO', 'MAISCOCO', 'MAIS COCO', 'NOCOKO', 'PURO COCO', 'PUROCOCO', 'VITA COCO', 'QUALICOCO'},
     'AZEITE': {'GALLO', 'GALO', 'ANDORINHA', 'BORGES', 'CARBONELL', 'COCINERO', 'COCINEIRO', 'FILIPPO BERIO', 'FILLIPO BERIO', 'COLAVITA', 'DELEYDA', 'LA ESPANOLA', 'LA ESPANHOLA', 'MONINI', 'ESPORAO', 'DE CECCO', 'PAGANINI', 'SINTRA', 'CASA DO AZEITE', 'TRADICAO', 'VALE FERTIL', 'RESERVA', 'ESPECIAL'},
     'BISC': {'ADRIA', 'MARILAN', 'VITARELLA', 'VITAR', 'PIRAQUE', 'BAUDUCCO', 'BAUDUCO', 'BAUDUC', 'MABEL', 'RANCHEIRO', 'OREO', 'CLUBSOCIAL', 'TRAKINAS', 'TRAKI', 'TODDY', 'NIKITO', 'NABISCO', 'LACTA', 'ARCOR', 'TORTINHA', 'TUC', 'TUCS', 'BELVITA', 'NAGA', 'DADINHO', 'GALO', 'PASSATEMPO', 'BONO', 'PITSTOP', 'TRIUNFO', 'PRODASA', 'LOLI', 'GIRASSOL', 'TORTUGUITA', 'LUANITOS', 'NESTLE', 'LIANE', 'COOKIES', 'SALT PLUS', 'AGUIA', 'NESTLE RECH'},
@@ -131,7 +132,7 @@ MARCAS_POR_CATEGORIA = {
     'TOMATE PELADO': {'POMAROLA', 'PREDILECTA', 'QUERO', 'HEINZ', 'COPEX'},
     'RACAO': {'PEDIGREE', 'GOLDEN', 'SPECIAL DOG', 'WHISKAS', 'FRISKIES', 'PREMIER', 'ROYAL CANIN'},
     'GUARDANAPO': {'KITCHEN', 'SNOB', 'SCOTT'},
-    'ALCOOL': {'COPERALCOOL', 'COPERACOOL', 'FLOPS', 'SAFRA', 'TUPI', 'ZULU'},
+    'ALCOOL': {'COPERALCOOL', 'COPERACOOL', 'COPERA', 'COPER ALCOOL', 'FLOPS', 'SAFRA', 'TUPI', 'ZULU'},
     'ACENDEDOR': {'TUPI', 'ZULU', 'TAKA FOGO'},
     'APERITIVO': {'CAMPARI', 'DA ROCHA', 'DAROCHA'},
     'LIMP': {'VEJA', 'UAU', 'UAL', 'PATO', 'FLASH', 'MR MUSCULO', 'BUFALO', 'AJAX', 'LYSOFORM', 'SCOTCH', 'BRILHOME'},
@@ -162,6 +163,7 @@ MARCAS_POR_CATEGORIA = {
     'PAST': {'TICTAC'},
     'APAR': {'BIC', 'PREST', 'GILLETTE', 'VENUS'},
     'BATATA': {'PRINGLES', 'CROCANTE', 'KARI KARI', 'MUFFATO'},
+    'ALGODAO': {'APOLO', 'APOLLO', 'COTTON', 'FAROL'},
     'DOCE': {'AVIACAO', 'TRIANGULO', 'OLIVEIRA', 'ITALAC'},
     'QUEROSENE': {'BUFALO'},
     'RUM': {'MONTILLA'},
@@ -378,6 +380,16 @@ inteligencia_marcas = {
             "Q BOA":     "SANITARIA", "Q-BOA":     "SANITARIA",
             "GIRANDO SOL": "SANITARIA", "BARBAREX":  "SANITARIA", "BRILUX":    "SANITARIA",
 
+            # Mercearia
+            "UNIAO": "ACUCAR", "MAGRO": "ACUCAR",
+            "CAMPOLARGO": "AGUA COCO", "CAMPO LARGO": "AGUA COCO",
+            "SOCOCO": "AGUA COCO", "SO COCO": "AGUA COCO",
+
+            # Higiene / limpeza
+            "APOLO": "ALGODAO", "APOLLO": "ALGODAO",
+            "COPERA": "ALCOOL", "COPER ALCOOL": "ALCOOL",
+            "BOMBRIL": "LA ACO", "ASSOLAN": "LA ACO",
+
             # Desinfetante
             "PATO":      "DESINFETANTE", "VEJA":      "LIMPADOR",
             "LYSOFORM":  "DESINFETANTE", "DOMESTOS":  "DESINFETANTE",
@@ -475,8 +487,10 @@ _CAT_EQUIV_SEGURA = {
 
 _CATEGORIAS_FORTES = (
     ('AGUA SANITARIA', ('AGUA SANIT', 'AGUA SAN ', 'SANITARIA', 'QBOA', 'Q-BOA')),
+    ('ACUCAR', ('ACUCAR',)),
     ('ALVEJANTE', ('ALVEJ', 'ALV ', 'T MANCHA', 'VANISH')),
     ('ALCOOL', ('ALCOOL',)),
+    ('ALGODAO', ('ALGODAO',)),
     ('AMAC', ('AMAC', 'AMACIANTE')),
     ('APAR', ('APAR', 'BARB')),
     ('CREME DENTAL', ('CR D ', 'CR DENT', 'CREME DENT')),
@@ -489,6 +503,7 @@ _CATEGORIAS_FORTES = (
     ('LIMPADOR', ('LIMP ', 'LIMPADOR', 'MULTIUSO', 'VEJA M U')),
     ('LIMPA VIDRO', ('LIMPA VID', 'LIMP VID')),
     ('LUSTRA MOVEL', ('LUSTRA', 'LUST MOV')),
+    ('LA ACO', ('LA ACO', 'BOMBRIL', 'ASSOLAN')),
     ('SAPONACEO', ('SAPON', 'SAPOLIO', 'SAPOLEO')),
     ('VINHO', ('VIN ', 'VINHO')),
 )
@@ -703,7 +718,11 @@ def normalizar_nome(nome):
             (r'^APERITIVO\b',                 'APERITIVO'),
             (r'^COQUETEL\b',                  'COQUETEL'),
             (r'^DOCE\s+LEITE\b',              'DOCE LEITE'),
+            (r'^ACUCAR\b',                    'ACUCAR'),
+            (r'^AÇUCAR\b',                    'ACUCAR'),
             (r'^ARROZ\b',                     'ARROZ'),
+            (r'^ALGODAO\b',                   'ALGODAO'),
+            (r'^BOMBRIL\b',                   'LA ACO BOMBRIL'),
             (r'^VINAGRE\b',                   'VINAGRE'),
             (r'^PALITO\s+DENTE\b',            'PALITO DENTE'),
             (r'^RACAO\b',                     'RACAO'),
@@ -725,6 +744,8 @@ def normalizar_nome(nome):
         nome = re.sub(r'(\d+),(\d+)', r'\1.\2', nome)
         nome = nome.replace('COCINEIRO', 'COCINERO')
         nome = nome.replace('COPERACOOL', 'COPERALCOOL')
+        nome = nome.replace('COPER ALCOOL', 'COPERALCOOL')
+        nome = re.sub(r'\bCOPERA\b', 'COPERALCOOL', nome)
         nome = nome.replace('KERO 1L', 'KERO COCO 1L')
         nome = nome.replace('KERO 200ML', 'KERO COCO 200ML')
         nome = nome.replace('SANGUE DE BOI', 'SANGUEDEBOI')
@@ -858,6 +879,7 @@ def normalizar_nome(nome):
 
         # 8a. v5.0: Sinônimos compostos adicionais
         nome = nome.replace("CAMPO LARGO", "CAMPOLARGO")
+        nome = nome.replace("SO COCO", "SOCOCO")
         nome = nome.replace("DOM BOSCO", "DOMBOSCO")
         nome = nome.replace("COUNTRY WINE", "COUNTRYWINE")
         nome = nome.replace("SALTON", "SALTON")
@@ -1324,6 +1346,9 @@ def _categorias_seguras(nome):
 def _marcas_para_categorias(categorias):
         mapa = {
             'AGUA SANITARIA': ('SANITARIA',),
+            'AGUA COCO': ('AGUA COCO',),
+            'ACUCAR': ('ACUCAR',),
+            'ALGODAO': ('ALGODAO',),
             'DETERGENTE LOUCA': ('DET', 'LV LOUCA'),
             'DESINF': ('DESINF',),
             'LIMPADOR': ('LIMP',),
@@ -1331,6 +1356,7 @@ def _marcas_para_categorias(categorias):
             'LUSTRA MOVEL': ('LUSTRA',),
             'AMAC': ('AMAC',),
             'LAVA ROUPA': ('LAVA ROUPA',),
+            'LA ACO': ('LA ACO',),
             'FRAL': ('FRAL', 'FRALDA'),
             'INSET': ('INSET',),
             'APAR': ('APAR',),
@@ -1403,10 +1429,11 @@ def _travas_seguras_nome(nome1, nome2):
             if marcas1 and marcas2 and not marcas1.intersection(marcas2):
                 return True
             cats_marca_obrigatoria = {
-                'AGUA SANITARIA', 'AMAC', 'DESINF', 'DETERGENTE LOUCA',
+                'AGUA SANITARIA', 'AGUA COCO', 'ACUCAR', 'ALGODAO',
+                'AMAC', 'DESINF', 'DETERGENTE LOUCA',
                 'LAVA ROUPA', 'LIMPADOR', 'LIMPA VIDRO', 'LUSTRA MOVEL',
                 'FRAL', 'INSET', 'APAR', 'ALCOOL', 'SH', 'COND', 'CR TRAT',
-                'SAB', 'DESOD', 'CREME DENTAL', 'SALG', 'BATATA',
+                'SAB', 'DESOD', 'CREME DENTAL', 'SALG', 'BATATA', 'LA ACO',
             }
             if cats_comuns & cats_marca_obrigatoria and bool(marcas1) != bool(marcas2):
                 return True
