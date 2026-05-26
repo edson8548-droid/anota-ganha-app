@@ -4,6 +4,9 @@ import { vitrineService } from '../services/vitrine.service';
 import { backendUrl } from '../config/api';
 import './VitrinePublica.css';
 
+const INITIAL_PRODUCT_COUNT = 32;
+const PRODUCT_BATCH_SIZE = 32;
+
 function imgUrl(path) {
   if (!path) return null;
   if (path.startsWith('http')) return path;
@@ -54,7 +57,9 @@ export default function VitrinePublica() {
   const [showCarrinho, setShowCarrinho] = useState(false);
   const [cliente, setCliente] = useState({ nome: '', empresa: '', cidade: '', obs: '' });
   const [pedidoAnterior, setPedidoAnterior] = useState(null);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_PRODUCT_COUNT);
   const headerRef = useRef(null);
+  const loadMoreRef = useRef(null);
 
   useEffect(() => {
     vitrineService.obterPublica(slug)
@@ -104,6 +109,28 @@ export default function VitrinePublica() {
       return matchBusca && matchCat;
     });
   }, [oferta, busca, categoriaSel]);
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_PRODUCT_COUNT);
+  }, [busca, categoriaSel, oferta]);
+
+  const itensVisiveis = useMemo(
+    () => itensFiltrados.slice(0, visibleCount),
+    [itensFiltrados, visibleCount],
+  );
+  const temMaisProdutos = visibleCount < itensFiltrados.length;
+
+  useEffect(() => {
+    if (!temMaisProdutos || !loadMoreRef.current) return undefined;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      setVisibleCount(count => Math.min(count + PRODUCT_BATCH_SIZE, itensFiltrados.length));
+    }, { rootMargin: '600px 0px' });
+
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [temMaisProdutos, itensFiltrados.length]);
 
   const setQty = (id, valor) => {
     const v = Math.max(0, parseInt(valor) || 0);
@@ -279,17 +306,29 @@ export default function VitrinePublica() {
         {itensFiltrados.length === 0 ? (
           <div className="vp-no-products">Nenhum produto encontrado</div>
         ) : (
-          itensFiltrados.map(item => {
+          itensVisiveis.map((item, index) => {
             const qty = quantidades[item.id] || 0;
             const subtotal = getPackagePrice(item) * qty;
             const unitPrice = getUnitPrice(item);
             const packagePrice = getPackagePrice(item);
+            const src = imgUrl(item.image_url);
 
             return (
               <div key={item.id} className={`vp-product-card ${qty > 0 ? 'has-qty' : ''}`}>
                 {/* Imagem */}
-                {imgUrl(item.image_url)
-                  ? <img className="vp-product-img" src={imgUrl(item.image_url)} alt={item.product_name} loading="lazy" />
+                {src
+                  ? (
+                    <img
+                      className="vp-product-img"
+                      src={src}
+                      alt={item.product_name}
+                      loading={index < 4 ? 'eager' : 'lazy'}
+                      decoding="async"
+                      fetchPriority={index < 4 ? 'high' : 'low'}
+                      width="72"
+                      height="72"
+                    />
+                  )
                   : <div className="vp-product-img-placeholder">🛒</div>
                 }
 
@@ -336,6 +375,19 @@ export default function VitrinePublica() {
               </div>
             );
           })
+        )}
+
+        {temMaisProdutos && (
+          <div className="vp-load-more" ref={loadMoreRef}>
+            <button
+              type="button"
+              className="vp-load-more-btn"
+              onClick={() => setVisibleCount(count => Math.min(count + PRODUCT_BATCH_SIZE, itensFiltrados.length))}
+            >
+              Mostrar mais produtos
+            </button>
+            <span>{Math.min(visibleCount, itensFiltrados.length)} de {itensFiltrados.length}</span>
+          </div>
         )}
       </div>
 
