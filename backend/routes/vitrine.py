@@ -18,7 +18,7 @@ from typing import List, Optional, Any
 from pathlib import Path
 from urllib.parse import urlparse, urljoin
 
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel
@@ -1566,7 +1566,7 @@ async def sugerir_imagens(product_name: str, uid: str = Depends(get_user_id)):
 # ═══════════════════════════════════════
 
 @router.get("/publica/{slug}")
-async def pagina_publica(slug: str):
+async def pagina_publica(slug: str, background_tasks: BackgroundTasks):
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{2,80}", slug):
         logger.warning("[SECURITY] vitrine_public_blocked reason=bad_slug slug_len=%s", len(slug or ""))
         raise HTTPException(404, "Vitrine não encontrada ou inativa")
@@ -1581,5 +1581,5 @@ async def pagina_publica(slug: str):
         logger.warning("[SECURITY] vitrine_public_blocked reason=expired slug_len=%s", len(slug or ""))
         raise HTTPException(410, "Vitrine expirada")
 
-    await _localize_offer_remote_images(doc)
+    background_tasks.add_task(_localize_offer_remote_images, doc)
     return _public_offer_response(doc)
