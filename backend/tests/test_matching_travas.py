@@ -774,3 +774,47 @@ def test_matching_mantem_preco_quando_marca_shampoo_confere():
 
     assert preco == 8.99
     assert tipo is not None
+
+def test_batata_pringles_original_nao_casa_com_outros_sabores():
+    assert _incompat(
+        "BATATA PRINGLES QUEIJO 109G",
+        "BATATA PRINGLES ORIGINAL 109G",
+    ), "Pringles queijo nao deve pegar preco do Original"
+    assert _incompat(
+        "BATATA PRINGLES CHURRASCO 109G",
+        "BATATA PRINGLES ORIGINAL 109G",
+    ), "Pringles churrasco nao deve pegar preco do Original"
+
+def test_batata_pringles_nao_casa_com_marca_propria_muffato():
+    assert _incompat(
+        "BATATA PRINGLES QUEIJO 109G",
+        "BATATA MUFFATO QUEIJO 100G",
+    ), "Pringles nao deve pegar preco de marca propria Muffato"
+
+def test_matching_nao_usa_preco_pringles_original_para_queijo():
+    item_original = _price_item("BATATA PRINGLES ORIGINAL 109G", 11.90)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "BATATA PRINGLES QUEIJO 109G",
+        {},
+        [item_original],
+        [item_original["norm"]],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_matching_mantem_preco_quando_pringles_original_confere():
+    item_original = _price_item("BATATA PRINGLES ORIGINAL 109G", 11.90)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "BATATA PRINGLES ORIGINAL 109G",
+        {},
+        [item_original],
+        [item_original["norm"]],
+    )
+
+    assert preco == 11.90
+    assert tipo is not None

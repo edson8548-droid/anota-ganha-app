@@ -147,7 +147,7 @@ MARCAS_POR_CATEGORIA = {
     'C.M': {'ALCAFOOD', 'KELLOGGS', 'NESTLE', 'NESCAU', 'NESTON', 'SUCRILHOS'},
     'BARRA': {'3 CORACOES', '3CORACOES'},
     'PIL': {'PANASONIC', 'DURACELL', 'RAYOVAC', 'ELGIN'},
-    'SALG': {'LUCKY', 'TORCIDA', 'PIRAQUE', 'KARITOS', 'PRINGLES'},
+    'SALG': {'LUCKY', 'TORCIDA', 'PIRAQUE', 'KARITOS', 'PRINGLES', 'MUFFATO'},
     'SAPON': {'SAPOLIO', 'CIF', 'RADIUM'},
     'TOALHA': {'KITCHEN', 'SCALA', 'HUGGIES', 'MEU BEBE', 'TROPOLINO'},
     'CHICLE': {'BUBBALOO', 'TRIDENT'},
@@ -161,7 +161,7 @@ MARCAS_POR_CATEGORIA = {
     'LAMP': {'ELGIN'},
     'PAST': {'TICTAC'},
     'APAR': {'BIC', 'PREST', 'GILLETTE', 'VENUS'},
-    'BATATA': {'PRINGLES', 'CROCANTE', 'KARI KARI'},
+    'BATATA': {'PRINGLES', 'CROCANTE', 'KARI KARI', 'MUFFATO'},
     'DOCE': {'AVIACAO', 'TRIANGULO', 'OLIVEIRA', 'ITALAC'},
     'QUEROSENE': {'BUFALO'},
     'RUM': {'MONTILLA'},
@@ -1276,6 +1276,25 @@ def _sabores_caldo_incompativeis(nome1, nome2):
         sabores2 = tokens2 & SABORES_CALDO
         return bool(sabores1 and sabores2 and sabores1 != sabores2)
 
+def _snack_sabor_incompativel(nome1, nome2):
+        """Batata/salgadinho exige mesmo sabor/linha quando sabor aparece."""
+        cats1 = _categorias_seguras(nome1)
+        cats2 = _categorias_seguras(nome2)
+        if not (cats1 & cats2 & {'BATATA', 'SALG'}):
+            return False
+
+        sabores_snack = {
+            'ORIG', 'ORIGINAL', 'TRAD', 'TRADICIONAL', 'QUEIJO', 'CHEDDAR',
+            'REQUEIJAO', 'CHURRASCO', 'CEBOLA', 'SALSA', 'BACON', 'PAPRICA',
+            'PIMENTA', 'PICANTE', 'CREME', 'CREM', 'NACHO', 'PRESUNTO',
+            'BARBECUE', 'BBQ', 'RANCH', 'CREAMCHEESE',
+        }
+        tokens1 = set(re.findall(r'[A-Z]{3,}', nome1))
+        tokens2 = set(re.findall(r'[A-Z]{3,}', nome2))
+        sabor1 = tokens1 & sabores_snack
+        sabor2 = tokens2 & sabores_snack
+        return bool(sabor1 and sabor2 and not sabor1.intersection(sabor2))
+
 def _tem_sinal_categoria(nome, sinal):
         if sinal.endswith(' '):
             return nome.startswith(sinal) or f' {sinal}' in f' {nome} '
@@ -1321,6 +1340,8 @@ def _marcas_para_categorias(categorias):
             'CR TRAT': ('CR TRAT',),
             'SAB': ('SAB',),
             'DESOD': ('DESOD', 'DES'),
+            'SALG': ('SALG', 'BATATA'),
+            'BATATA': ('BATATA', 'SALG'),
             'CREME DENTAL': ('CR D', 'CR DENTAL'),
             'VINHO': ('VIN', 'VINHO'),
         }
@@ -1385,10 +1406,13 @@ def _travas_seguras_nome(nome1, nome2):
                 'AGUA SANITARIA', 'AMAC', 'DESINF', 'DETERGENTE LOUCA',
                 'LAVA ROUPA', 'LIMPADOR', 'LIMPA VIDRO', 'LUSTRA MOVEL',
                 'FRAL', 'INSET', 'APAR', 'ALCOOL', 'SH', 'COND', 'CR TRAT',
-                'SAB', 'DESOD', 'CREME DENTAL',
+                'SAB', 'DESOD', 'CREME DENTAL', 'SALG', 'BATATA',
             }
             if cats_comuns & cats_marca_obrigatoria and bool(marcas1) != bool(marcas2):
                 return True
+
+        if _snack_sabor_incompativel(nome1, nome2):
+            return True
 
         cats_variantes = {
             'AGUA SANITARIA', 'ALCOOL', 'AMAC', 'DESINF', 'DETERGENTE LOUCA',
