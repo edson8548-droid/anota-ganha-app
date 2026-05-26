@@ -240,19 +240,6 @@ async def _localize_offer_remote_images(doc: dict) -> bool:
     return changed
 
 
-def _schedule_offer_image_localization(doc: dict) -> None:
-    async def _run():
-        try:
-            await _localize_offer_remote_images(doc)
-        except Exception as exc:
-            logger.warning("[vitrine_publica] background_image_repair_failed reason=%s", str(exc)[:160])
-
-    try:
-        asyncio.create_task(_run())
-    except RuntimeError as exc:
-        logger.warning("[vitrine_publica] background_image_repair_not_scheduled reason=%s", str(exc)[:160])
-
-
 async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
     if not credentials:
         logger.warning("[SECURITY] auth_missing route=vitrine")
@@ -1594,5 +1581,4 @@ async def pagina_publica(slug: str):
         logger.warning("[SECURITY] vitrine_public_blocked reason=expired slug_len=%s", len(slug or ""))
         raise HTTPException(410, "Vitrine expirada")
 
-    _schedule_offer_image_localization(doc)
     return _public_offer_response(doc)
