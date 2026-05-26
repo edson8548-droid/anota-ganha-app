@@ -36,6 +36,8 @@ MARCAS_POR_CATEGORIA = {
     'ADOC': {'ADOCYL', 'ZERO', 'MARATA', 'ASSUGRIN', 'TAL QUAL', 'FINN', 'LINEA', 'VIST', 'UNIAO', 'GOLD', 'DIET'},
     'ACHOC': {'NESCAU', 'TODDY', 'TODD', 'NESQUIK', 'OVOMALTINE', 'APTI', 'ITALAC', 'MUKY', 'CHOCOLATTO', 'GOLD', 'NESTLE', 'SUSTAGEN'},
     'AGUA COCO': {'DUCOCO', 'SOCOCO', 'SO COCO', 'KERO', 'KEROCOCO', 'KERO COCO', 'MAISCOCO', 'MAIS COCO', 'QUADRADO', 'COCO QUADRADO', 'PURO COCO', 'PUROCOCO', 'NOCOKO', 'COCO SUPER', 'COCOSUPER', 'AQUA', 'VITA COCO', 'QUALICOCO', 'CAMPOLARGO', 'CAMPO LARGO'},
+    'AMIDO': {'NEILAR', 'KIMIMO', 'MAIZENA', 'QUERO', 'YOKI', 'SINHA', 'SINHÁ'},
+    'ANIL': {'COLMAN', 'GLOBO', 'GUARANI'},
     'LEITE COCO': {'DUCOCO', 'SOCOCO', 'KEROCOCO', 'KERO COCO', 'MAISCOCO', 'MAIS COCO', 'NOCOKO', 'PURO COCO', 'PUROCOCO', 'VITA COCO', 'QUALICOCO'},
     'AZEITE': {'GALLO', 'GALO', 'ANDORINHA', 'BORGES', 'CARBONELL', 'COCINERO', 'COCINEIRO', 'FILIPPO BERIO', 'FILLIPO BERIO', 'COLAVITA', 'DELEYDA', 'LA ESPANOLA', 'LA ESPANHOLA', 'MONINI', 'ESPORAO', 'DE CECCO', 'PAGANINI', 'SINTRA', 'CASA DO AZEITE', 'TRADICAO', 'VALE FERTIL', 'RESERVA', 'ESPECIAL'},
     'BISC': {'ADRIA', 'MARILAN', 'VITARELLA', 'VITAR', 'PIRAQUE', 'BAUDUCCO', 'BAUDUCO', 'BAUDUC', 'MABEL', 'RANCHEIRO', 'OREO', 'CLUBSOCIAL', 'TRAKINAS', 'TRAKI', 'TODDY', 'NIKITO', 'NABISCO', 'LACTA', 'ARCOR', 'TORTINHA', 'TUC', 'TUCS', 'BELVITA', 'NAGA', 'DADINHO', 'GALO', 'PASSATEMPO', 'BONO', 'PITSTOP', 'TRIUNFO', 'PRODASA', 'LOLI', 'GIRASSOL', 'TORTUGUITA', 'LUANITOS', 'NESTLE', 'LIANE', 'COOKIES', 'SALT PLUS', 'AGUIA', 'NESTLE RECH'},
@@ -384,6 +386,8 @@ inteligencia_marcas = {
             "UNIAO": "ACUCAR", "MAGRO": "ACUCAR",
             "CAMPOLARGO": "AGUA COCO", "CAMPO LARGO": "AGUA COCO",
             "SOCOCO": "AGUA COCO", "SO COCO": "AGUA COCO",
+            "NEILAR": "AMIDO", "KIMIMO": "AMIDO", "MAIZENA": "AMIDO",
+            "COLMAN": "ANIL",
 
             # Higiene / limpeza
             "APOLO": "ALGODAO", "APOLLO": "ALGODAO",
@@ -491,7 +495,9 @@ _CATEGORIAS_FORTES = (
     ('ALVEJANTE', ('ALVEJ', 'ALV ', 'T MANCHA', 'VANISH')),
     ('ALCOOL', ('ALCOOL',)),
     ('ALGODAO', ('ALGODAO',)),
+    ('AMIDO', ('AMIDO',)),
     ('AMAC', ('AMAC', 'AMACIANTE')),
+    ('ANIL', ('ANIL',)),
     ('APAR', ('APAR', 'BARB')),
     ('CREME DENTAL', ('CR D ', 'CR DENT', 'CREME DENT')),
     ('CREOLINA', ('CREOLINA',)),
@@ -720,6 +726,8 @@ def normalizar_nome(nome):
             (r'^DOCE\s+LEITE\b',              'DOCE LEITE'),
             (r'^ACUCAR\b',                    'ACUCAR'),
             (r'^AÇUCAR\b',                    'ACUCAR'),
+            (r'^AMIDO\b',                     'AMIDO'),
+            (r'^ANIL\b',                      'ANIL'),
             (r'^ARROZ\b',                     'ARROZ'),
             (r'^ALGODAO\b',                   'ALGODAO'),
             (r'^BOMBRIL\b',                   'LA ACO BOMBRIL'),
@@ -746,6 +754,7 @@ def normalizar_nome(nome):
         nome = nome.replace('COPERACOOL', 'COPERALCOOL')
         nome = nome.replace('COPER ALCOOL', 'COPERALCOOL')
         nome = re.sub(r'\bCOPERA\b', 'COPERALCOOL', nome)
+        nome = re.sub(r'\bPINGLES\b', 'PRINGLES', nome)
         nome = nome.replace('KERO 1L', 'KERO COCO 1L')
         nome = nome.replace('KERO 200ML', 'KERO COCO 200ML')
         nome = nome.replace('SANGUE DE BOI', 'SANGUEDEBOI')
@@ -1349,6 +1358,8 @@ def _marcas_para_categorias(categorias):
             'AGUA COCO': ('AGUA COCO',),
             'ACUCAR': ('ACUCAR',),
             'ALGODAO': ('ALGODAO',),
+            'AMIDO': ('AMIDO',),
+            'ANIL': ('ANIL',),
             'DETERGENTE LOUCA': ('DET', 'LV LOUCA'),
             'DESINF': ('DESINF',),
             'LIMPADOR': ('LIMP',),
@@ -1430,7 +1441,7 @@ def _travas_seguras_nome(nome1, nome2):
                 return True
             cats_marca_obrigatoria = {
                 'AGUA SANITARIA', 'AGUA COCO', 'ACUCAR', 'ALGODAO',
-                'AMAC', 'DESINF', 'DETERGENTE LOUCA',
+                'AMAC', 'AMIDO', 'ANIL', 'DESINF', 'DETERGENTE LOUCA',
                 'LAVA ROUPA', 'LIMPADOR', 'LIMPA VIDRO', 'LUSTRA MOVEL',
                 'FRAL', 'INSET', 'APAR', 'ALCOOL', 'SH', 'COND', 'CR TRAT',
                 'SAB', 'DESOD', 'CREME DENTAL', 'SALG', 'BATATA', 'LA ACO',
