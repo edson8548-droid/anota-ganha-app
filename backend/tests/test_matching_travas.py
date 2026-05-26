@@ -1172,7 +1172,7 @@ def test_matching_mantem_preco_copo_copobras_300ml_quando_volume_confere():
     assert preco == 9.99
     assert tipo is not None
 
-def test_matching_mantem_preco_copo_copobras_300ml_com_cx_20():
+def test_matching_nao_usa_preco_generico_para_copo_copobras_300ml_cx_20():
     item_300ml = _price_item("COPO COPOBRAS 300ML", 9.99)
 
     preco, tipo = encontrar_preco(
@@ -1183,7 +1183,24 @@ def test_matching_mantem_preco_copo_copobras_300ml_com_cx_20():
         [item_300ml["norm"]],
     )
 
-    assert preco == 9.99
+    assert preco is None
+    assert tipo is None
+
+def test_matching_prefere_preco_exato_copo_copobras_300ml_cx_20():
+    itens = [
+        _price_item("COPO COPOBRAS 300ML", 9.99),
+        _price_item("COPO COPOBRAS 300ML CX 20", 11.61),
+    ]
+
+    preco, tipo = encontrar_preco(
+        "",
+        "COPO COPOBRAS 300ML CX 20",
+        {},
+        itens,
+        [item["norm"] for item in itens],
+    )
+
+    assert preco == 11.61
     assert tipo is not None
 
 def test_copo_copobras_180ml_cx_25_nao_casa_com_outra_caixa():

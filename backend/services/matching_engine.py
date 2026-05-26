@@ -1495,6 +1495,8 @@ def _travas_seguras_nome(nome1, nome2):
         if cats1 & cats2 & {'FRAL', 'INSET', 'APAR', 'COPO'}:
             embal1 = _contagens_embalagem(nome1)
             embal2 = _contagens_embalagem(nome2)
+            if cats1 & cats2 & {'COPO'} and bool(embal1) != bool(embal2):
+                return True
             if embal1 and embal2 and not embal1.intersection(embal2):
                 return True
 
