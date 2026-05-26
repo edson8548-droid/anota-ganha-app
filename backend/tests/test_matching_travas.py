@@ -1334,3 +1334,44 @@ def test_matching_mantem_preco_ervilha_quero_lata_170g_com_unidade_cx():
 
     assert preco == 3.49
     assert tipo is not None
+
+def test_ervilha_e_milho_quero_lata_170g_nao_casa_com_produto_puro():
+    assert _incompat(
+        "ERVILHA E MILHO QUERO LATA 170GR",
+        "ERVILHA QUERO LATA 170G",
+    ), "Ervilha e milho Quero nao deve pegar preco de ervilha pura"
+    assert _incompat(
+        "ERVILHA E MILHO QUERO LATA 170GR",
+        "MILHO QUERO LATA 170G",
+    ), "Ervilha e milho Quero nao deve pegar preco de milho puro"
+
+def test_matching_nao_usa_preco_ervilha_pura_para_ervilha_e_milho_quero():
+    itens = [
+        _price_item("ERVILHA QUERO LT 170G", 3.49),
+        _price_item("MILHO QUERO LT 170G", 3.79),
+    ]
+
+    preco, tipo = encontrar_preco(
+        "",
+        "ERVILHA E MILHO QUERO LATA 170GR",
+        {},
+        itens,
+        [item["norm"] for item in itens],
+    )
+
+    assert preco is None
+    assert tipo is None
+
+def test_matching_mantem_preco_ervilha_e_milho_quero_quando_misto_confere():
+    item_misto = _price_item("ERVILHA E MILHO QUERO LT 170G", 4.29)
+
+    preco, tipo = encontrar_preco(
+        "",
+        "ERVILHA E MILHO QUERO LATA 170GR",
+        {},
+        [item_misto],
+        [item_misto["norm"]],
+    )
+
+    assert preco == 4.29
+    assert tipo is not None

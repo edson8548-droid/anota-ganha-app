@@ -1799,6 +1799,10 @@ def nomes_incompativeis_v4(nome1, nome2):
 
         # 8. TRAVA ERVILHA/MILHO MISTO: produto combinado ≠ produto puro
         # "ERVILHA/MILHO QUERO" não deve casar com "MILHO VERDE QUERO" (dois produtos distintos)
+        misto1 = 'MILHO' in nome1 and 'ERVILHA' in nome1
+        misto2 = 'MILHO' in nome2 and 'ERVILHA' in nome2
+        if misto1 != misto2:
+            return True
         if ('ERVILHA' in nome1 and 'MILHO' in nome2 and 'MILHO' not in nome1 and 'ERVILHA' not in nome2):
             return True
         if ('ERVILHA' in nome2 and 'MILHO' in nome1 and 'MILHO' not in nome2 and 'ERVILHA' not in nome1):
