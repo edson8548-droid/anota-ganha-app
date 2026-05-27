@@ -101,12 +101,12 @@ test('substituirItens envia lista em lote', async () => {
   );
 });
 
-test('excluir usa rota POST dedicada primeiro', async () => {
+test('excluir usa rota neutra de status primeiro', async () => {
   await vitrineService.excluir('oferta-1');
 
   expect(axios.post).toHaveBeenCalledWith(
-    'https://api.venpro.com.br/api/users/vitrine-delete',
-    { offer_id: 'oferta-1' },
+    'https://api.venpro.com.br/api/users/vitrine-status',
+    { offer_id: 'oferta-1', status: 'removed' },
     {
       headers: {
         Authorization: 'Bearer token-123',
@@ -118,15 +118,15 @@ test('excluir usa rota POST dedicada primeiro', async () => {
   expect(axios.delete).not.toHaveBeenCalled();
 });
 
-test('excluir usa rota da vitrine quando fallback de usuarios falha no servidor', async () => {
+test('excluir usa rota de usuarios quando status neutro falha no servidor', async () => {
   axios.post.mockRejectedValueOnce({ response: { status: 500 } });
 
   await vitrineService.excluir('oferta-1');
 
   expect(axios.post).toHaveBeenNthCalledWith(
     2,
-    'https://api.venpro.com.br/api/vitrine/ofertas/oferta-1/excluir',
-    {},
+    'https://api.venpro.com.br/api/users/vitrine-delete',
+    { offer_id: 'oferta-1' },
     {
       headers: {
         Authorization: 'Bearer token-123',
@@ -138,6 +138,7 @@ test('excluir usa rota da vitrine quando fallback de usuarios falha no servidor'
 
 test('excluir usa DELETE como fallback quando POSTs e PUT falham no servidor', async () => {
   axios.post
+    .mockRejectedValueOnce({ response: { status: 500 } })
     .mockRejectedValueOnce({ response: { status: 500 } })
     .mockRejectedValueOnce({ response: { status: 500 } });
   axios.put.mockRejectedValueOnce({ response: { status: 500 } });
@@ -157,6 +158,7 @@ test('excluir usa DELETE como fallback quando POSTs e PUT falham no servidor', a
 
 test('excluir tenta PUT quando POST dedicado falha no servidor', async () => {
   axios.post
+    .mockRejectedValueOnce({ response: { status: 500 } })
     .mockRejectedValueOnce({ response: { status: 500 } })
     .mockRejectedValueOnce({ response: { status: 500 } });
 
@@ -178,6 +180,7 @@ test('excluir tenta PUT quando POST dedicado falha no servidor', async () => {
 test('excluir usa fallback simples sem preflight quando chamadas ajax falham por Network Error', async () => {
   axios.post
     .mockRejectedValueOnce(new Error('Network Error'))
+    .mockRejectedValueOnce(new Error('Network Error'))
     .mockRejectedValueOnce(new Error('Network Error'));
   axios.put.mockRejectedValueOnce(new Error('Network Error'));
   axios.delete.mockRejectedValueOnce(new Error('Network Error'));
@@ -197,6 +200,7 @@ test('excluir usa fallback simples sem preflight quando chamadas ajax falham por
 
 test('excluir com no-cors só confirma depois da vitrine sumir da listagem', async () => {
   axios.post
+    .mockRejectedValueOnce(new Error('Network Error'))
     .mockRejectedValueOnce(new Error('Network Error'))
     .mockRejectedValueOnce(new Error('Network Error'));
   axios.put.mockRejectedValueOnce(new Error('Network Error'));

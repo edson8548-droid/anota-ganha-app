@@ -203,6 +203,13 @@ async def _soft_delete_vitrine_for_user(offer_id: str, uid: str, request: Reques
     try:
         offer_oid = ObjectId(offer_id)
     except Exception:
+        await audit_event(
+            "vitrine_offer_delete_failed",
+            uid=uid,
+            status="blocked",
+            metadata={"offerId": offer_id, "reason": "invalid_id"},
+            request=request,
+        )
         raise HTTPException(400, "ID inválido")
 
     result = await _db.vitrine_offers.update_one(
@@ -210,6 +217,20 @@ async def _soft_delete_vitrine_for_user(offer_id: str, uid: str, request: Reques
         {"$set": {"status": "deleted", "updated_at": datetime.now(timezone.utc)}},
     )
     if result.matched_count == 0:
+        existing = await _db.vitrine_offers.find_one({"_id": offer_oid}, {"created_by": 1, "status": 1})
+        await audit_event(
+            "vitrine_offer_delete_failed",
+            uid=uid,
+            status="blocked",
+            metadata={
+                "offerId": offer_id,
+                "reason": "not_found_for_user",
+                "exists": bool(existing),
+                "storedStatus": existing.get("status") if existing else None,
+                "ownerHash": hash_identifier(existing.get("created_by")) if existing else None,
+            },
+            request=request,
+        )
         raise HTTPException(404, "Oferta não encontrada")
 
     await audit_event(
@@ -306,6 +327,11 @@ class DeviceSessionPayload(BaseModel):
 
 class DeleteVitrinePayload(BaseModel):
     offer_id: str = Field(..., min_length=12, max_length=40)
+
+
+class VitrineStatusPayload(BaseModel):
+    offer_id: str = Field(..., min_length=12, max_length=40)
+    status: str = Field(..., max_length=20)
 
 
 @router.post("/welcome-email")
@@ -410,6 +436,18 @@ async def delete_vitrine_from_user_route(
     uid: str = Depends(get_user_id),
 ):
     """Fallback autenticado para exclusão de vitrine via rota /users."""
+    return await _soft_delete_vitrine_for_user(payload.offer_id, uid, request=request)
+
+
+@router.post("/vitrine-status")
+async def update_vitrine_status_from_user_route(
+    payload: VitrineStatusPayload,
+    request: Request,
+    uid: str = Depends(get_user_id),
+):
+    """Rota neutra para remover vitrine quando redes bloqueiam URLs com delete/excluir."""
+    if payload.status != "removed":
+        raise HTTPException(400, "Status inválido")
     return await _soft_delete_vitrine_for_user(payload.offer_id, uid, request=request)
 
 
