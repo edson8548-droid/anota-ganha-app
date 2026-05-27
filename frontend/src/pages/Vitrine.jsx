@@ -44,6 +44,9 @@ const getItemsWithoutPhoto = (items) => items.filter(it =>
   !it._imageFile && !(it._imagePreview || it._imageUrl || it.image_url)
 );
 
+const getApiErrorMessage = (err, fallback) =>
+  err?.response?.data?.detail || err?.message || fallback;
+
 export default function Vitrine() {
   const navigate = useNavigate();
   const [view, setView] = useState('lista'); // 'lista' | 'nova' | 'revisao'
@@ -73,7 +76,7 @@ export default function Vitrine() {
       setOfertas(res.data.filter(o => o.status !== 'deleted'));
     } catch (err) {
       console.error('[Vitrine] Erro ao carregar vitrines:', err);
-      toast.error(err?.response?.data?.detail || 'Erro ao carregar vitrines');
+      toast.error(getApiErrorMessage(err, 'Erro ao carregar vitrines'));
     }
     setLoading(false);
   }, []);
@@ -98,7 +101,7 @@ export default function Vitrine() {
       carregar();
     } catch (err) {
       console.error('[Vitrine] Erro ao alterar status:', err);
-      toast.error(err?.response?.data?.detail || 'Erro ao alterar status');
+      toast.error(getApiErrorMessage(err, 'Erro ao alterar status'));
     }
   };
 
@@ -111,7 +114,7 @@ export default function Vitrine() {
       carregar();
     } catch (err) {
       console.error('[Vitrine] Erro ao excluir:', err);
-      toast.error(err?.response?.data?.detail || 'Erro ao excluir');
+      toast.error(getApiErrorMessage(err, 'Erro ao excluir'));
     }
   };
 

@@ -3,15 +3,27 @@ import { auth } from '../firebase/config';
 import { BACKEND_URL, apiUrl, backendUrl } from '../config/api';
 
 async function getHeaders() {
-  const token = await auth.currentUser?.getIdToken();
+  if (!auth.currentUser && typeof auth.authStateReady === 'function') {
+    await auth.authStateReady();
+  }
+  if (!auth.currentUser) {
+    throw new Error('Sessão expirada. Faça login novamente.');
+  }
+  const token = await auth.currentUser.getIdToken();
   const headers = { 'Content-Type': 'application/json' };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  headers.Authorization = `Bearer ${token}`;
   return headers;
 }
 
 async function getMultipartHeaders() {
-  const token = await auth.currentUser?.getIdToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  if (!auth.currentUser && typeof auth.authStateReady === 'function') {
+    await auth.authStateReady();
+  }
+  if (!auth.currentUser) {
+    throw new Error('Sessão expirada. Faça login novamente.');
+  }
+  const token = await auth.currentUser.getIdToken();
+  return { Authorization: `Bearer ${token}` };
 }
 
 function shouldTryDeleteFallback(err) {
