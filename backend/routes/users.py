@@ -11,6 +11,7 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from firebase_admin import auth as firebase_auth, firestore
+from bson import ObjectId
 from services.public_files import stream_public_gridfs_file
 from services.security_audit import audit_event, hash_identifier
 from services.email_service import build_welcome_email, send_transactional_email
@@ -262,6 +263,10 @@ class DeviceSessionPayload(BaseModel):
     appVersion: str | None = Field(default=None, max_length=40)
 
 
+class DeleteVitrinePayload(BaseModel):
+    offer_id: str = Field(..., min_length=12, max_length=40)
+
+
 @router.post("/welcome-email")
 async def send_welcome_email(
     request: Request,
@@ -355,6 +360,35 @@ async def register_device_session(
         request=request,
     )
     return {"ok": True, "deviceHash": device_hash, "newDevice": new_device}
+
+
+@router.post("/vitrine-delete")
+async def delete_vitrine_from_user_route(
+    payload: DeleteVitrinePayload,
+    request: Request,
+    uid: str = Depends(get_user_id),
+):
+    """Fallback autenticado para exclusão de vitrine via rota /users."""
+    try:
+        offer_oid = ObjectId(payload.offer_id)
+    except Exception:
+        raise HTTPException(400, "ID inválido")
+
+    result = await _db.vitrine_offers.update_one(
+        {"_id": offer_oid, "created_by": uid},
+        {"$set": {"status": "deleted", "updated_at": datetime.now(timezone.utc)}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(404, "Oferta não encontrada")
+
+    await audit_event(
+        "vitrine_offer_deleted",
+        uid=uid,
+        status="success",
+        metadata={"offerId": payload.offer_id, "route": "users_fallback"},
+        request=request,
+    )
+    return {"ok": True, "route": "users_fallback"}
 
 
 @router.post("/ensure-trial")
