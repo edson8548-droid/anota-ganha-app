@@ -62,6 +62,26 @@ async function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Acorda o servidor caso esteja hibernado (Render free tier / cold start).
+// Tenta pingar /health ate o servidor responder ou o tempo esgotar.
+async function ensureServerAwake(maxWaitMs = 15000) {
+  const checkUrl = (BACKEND_URL || '') + '/health';
+  const deadline = Date.now() + maxWaitMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(checkUrl, {
+        method: 'GET',
+        mode: 'cors',
+        signal: AbortSignal.timeout(4000),
+      });
+      if (res.ok) return;
+    } catch {
+      // servidor ainda acordando
+    }
+    await wait(2000);
+  }
+}
+
 async function loadImage(url, timeoutMs = 3000) {
   await new Promise(resolve => {
     const img = new Image();
@@ -86,17 +106,17 @@ async function confirmarExclusao(id, headers) {
     oferta._id === id && oferta.status !== 'deleted'
   );
   if (aindaExiste) {
-    throw new Error('A API não confirmou a exclusão. Atualize a página e tente novamente.');
+    throw new Error('Servidor indisponivel no momento. Aguarde alguns segundos e tente excluir novamente.');
   }
 }
 
 async function excluirViaSimpleFallback(id, url, headers) {
   const token = String(headers.Authorization || '').replace(/^Bearer\s+/i, '');
-  if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+  if (!token) throw new Error('Sessao expirada. Faca login novamente.');
   const tokenParam = encodeURIComponent(token);
 
   try {
-    const response = await fetch(`${url}/excluir-simple`, {
+    const response = await fetch(url + '/excluir-simple', {
       method: 'POST',
       mode: 'cors',
       headers: { 'Content-Type': 'text/plain' },
@@ -110,7 +130,7 @@ async function excluirViaSimpleFallback(id, url, headers) {
     if (!isFetchNetworkError(err)) throw err;
   }
 
-  await fetch(`${url}/excluir-simple`, {
+  await fetch(url + '/excluir-simple', {
     method: 'POST',
     mode: 'no-cors',
     body: new URLSearchParams({ token }),
@@ -123,7 +143,7 @@ async function excluirViaSimpleFallback(id, url, headers) {
     // Last-resort path for browsers/networks that block cross-origin POST/PUT/DELETE.
   }
 
-  await loadImage(`${apiUrl('/users/vitrine-delete-link')}?offer_id=${encodeURIComponent(id)}&token=${tokenParam}&t=${Date.now()}`);
+  await loadImage(apiUrl('/users/vitrine-delete-link') + '?offer_id=' + encodeURIComponent(id) + '&token=' + tokenParam + '&t=' + Date.now());
   await wait(1500);
   try {
     await confirmarExclusao(id, headers);
@@ -132,26 +152,26 @@ async function excluirViaSimpleFallback(id, url, headers) {
     // Keep the older vitrine image fallback as a final compatibility path.
   }
 
-  await loadImage(`${url}/excluir-link?token=${tokenParam}&t=${Date.now()}`);
+  await loadImage(url + '/excluir-link?token=' + tokenParam + '&t=' + Date.now());
   await wait(1500);
   await confirmarExclusao(id, headers);
   return { data: { ok: true, fallback: 'image-verified' } };
 }
 
-function slugifyPathSegment(value, fallback = 'empresa') {
+function slugifyPathSegment(value, fallback) {
+  var fb = fallback || 'empresa';
   const slug = String(value || '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 60);
-
-  return slug || fallback;
+  return slug || fb;
 }
 
 export const vitrineService = {
-  // ── Ofertas ──────────────────────────────────────
+  // Ofertas
   async listar() {
     const headers = await getHeaders();
     return axios.get(apiUrl('/vitrine/ofertas'), { headers });
@@ -164,107 +184,123 @@ export const vitrineService = {
 
   async obter(id) {
     const headers = await getHeaders();
-    return axios.get(apiUrl(`/vitrine/ofertas/${id}`), { headers });
+    return axios.get(apiUrl('/vitrine/ofertas/' + id), { headers });
   },
 
   async atualizar(id, data) {
     const headers = await getHeaders();
-    return axios.put(apiUrl(`/vitrine/ofertas/${id}`), data, { headers });
+    return axios.put(apiUrl('/vitrine/ofertas/' + id), data, { headers });
   },
 
-  async excluir(id) {
-    const headers = await getHeaders();
-    const url = apiUrl(`/vitrine/ofertas/${id}`);
-    let lastErr = null;
-    try {
-      return await axios.post(apiUrl('/users/resource-state'), {
-        resource: 'catalog',
-        resource_id: id,
-        state: 'removed',
-      }, { headers });
-    } catch (err) {
-      lastErr = err;
-      if (!shouldTryDeleteFallback(err)) throw err;
-    }
+  async excluir(id, options) {
+    const onAguardandoServidor = (options || {}).onAguardandoServidor;
+    const url = apiUrl('/vitrine/ofertas/' + id);
 
-    try {
-      return await axios.post(apiUrl('/users/vitrine-status'), { offer_id: id, status: 'removed' }, { headers });
-    } catch (err) {
-      lastErr = err;
-      if (!shouldTryDeleteFallback(err)) throw err;
-    }
+    // Executa a cadeia completa de metodos de exclusao.
+    // Retorna o resultado se algum metodo funcionar.
+    // Lanca imediatamente se o erro for definitivo (4xx exceto 405/408/429).
+    // Retorna { networkError: true } se todos falharam por falta de conexao (cold start).
+    const tentarCadeia = async () => {
+      const hdrs = await getHeaders();
+      let todosNetworkError = true;
 
-    try {
-      return await axios.post(apiUrl('/users/vitrine-delete'), { offer_id: id }, { headers });
-    } catch (err) {
-      lastErr = err;
-      if (!shouldTryDeleteFallback(err)) throw err;
-    }
+      const tryMethod = async (fn) => {
+        try {
+          return { ok: await fn(hdrs) };
+        } catch (err) {
+          if (!shouldTryDeleteFallback(err)) throw err;
+          if (err && err.response) todosNetworkError = false;
+          return null;
+        }
+      };
 
-    try {
-      return await axios.post(`${url}/excluir`, {}, { headers });
-    } catch (err) {
-      lastErr = err;
-      if (!shouldTryDeleteFallback(err)) throw err;
-    }
+      let r;
 
-    try {
-      return await axios.put(url, { status: 'deleted' }, { headers });
-    } catch (err) {
-      lastErr = err;
-      if (!shouldTryDeleteFallback(err)) throw err;
-    }
+      r = await tryMethod(function(h) {
+        return axios.post(apiUrl('/users/vitrine-status'), { offer_id: id, status: 'removed' }, { headers: h });
+      });
+      if (r) return r.ok;
 
-    try {
-      return await axios.delete(url, { headers });
-    } catch (err) {
-      lastErr = err;
-      if (!isNetworkError(err)) throw err;
-    }
+      r = await tryMethod(function(h) {
+        return axios.post(apiUrl('/users/vitrine-delete'), { offer_id: id }, { headers: h });
+      });
+      if (r) return r.ok;
 
-    return excluirViaSimpleFallback(id, url, headers);
+      r = await tryMethod(function(h) {
+        return axios.post(url + '/excluir', {}, { headers: h });
+      });
+      if (r) return r.ok;
+
+      r = await tryMethod(function(h) {
+        return axios.put(url, { status: 'deleted' }, { headers: h });
+      });
+      if (r) return r.ok;
+
+      r = await tryMethod(function(h) {
+        return axios.delete(url, { headers: h });
+      });
+      if (r) return r.ok;
+
+      return { networkError: todosNetworkError };
+    };
+
+    // Primeira tentativa
+    const primeira = await tentarCadeia();
+    if (!primeira || !primeira.networkError) return primeira;
+
+    // Todos os erros foram de rede: servidor provavelmente hibernado (cold start).
+    // Acorda o servidor e tenta novamente antes de cair no fallback de imagem.
+    if (typeof onAguardandoServidor === 'function') onAguardandoServidor();
+    await ensureServerAwake();
+
+    const segunda = await tentarCadeia();
+    if (!segunda || !segunda.networkError) return segunda;
+
+    // Ultimo recurso: fallbacks via imagem
+    const hdrs = await getHeaders();
+    return excluirViaSimpleFallback(id, url, hdrs);
   },
 
-  // ── Itens ─────────────────────────────────────────
+  // Itens
   async adicionarItem(offerId, item) {
     const headers = await getHeaders();
-    return axios.post(apiUrl(`/vitrine/ofertas/${offerId}/items`), item, { headers });
+    return axios.post(apiUrl('/vitrine/ofertas/' + offerId + '/items'), item, { headers });
   },
 
   async atualizarItem(offerId, itemId, data) {
     const headers = await getHeaders();
-    return axios.put(apiUrl(`/vitrine/ofertas/${offerId}/items/${itemId}`), data, { headers });
+    return axios.put(apiUrl('/vitrine/ofertas/' + offerId + '/items/' + itemId), data, { headers });
   },
 
   async removerItem(offerId, itemId) {
     const headers = await getHeaders();
-    return axios.delete(apiUrl(`/vitrine/ofertas/${offerId}/items/${itemId}`), { headers });
+    return axios.delete(apiUrl('/vitrine/ofertas/' + offerId + '/items/' + itemId), { headers });
   },
 
   async substituirItens(offerId, items) {
     const headers = await getHeaders();
-    return axios.put(apiUrl(`/vitrine/ofertas/${offerId}/items`), { items }, { headers });
+    return axios.put(apiUrl('/vitrine/ofertas/' + offerId + '/items'), { items }, { headers });
   },
 
-  // ── Parse de lista ───────────────────────────────
+  // Parse de lista
   async parseLista(lista) {
     const headers = await getHeaders();
     return axios.post(apiUrl('/vitrine/parse-lista'), { lista }, { headers });
   },
 
-  // ── Imagens ──────────────────────────────────────
+  // Imagens
   async uploadImagem(offerId, itemId, file) {
     const headers = await getMultipartHeaders();
     const form = new FormData();
     form.append('arquivo', file);
-    return axios.post(apiUrl(`/vitrine/ofertas/${offerId}/items/${itemId}/imagem`), form, { headers });
+    return axios.post(apiUrl('/vitrine/ofertas/' + offerId + '/items/' + itemId + '/imagem'), form, { headers });
   },
 
   async uploadLogo(offerId, file) {
     const headers = await getMultipartHeaders();
     const form = new FormData();
     form.append('arquivo', file);
-    return axios.post(apiUrl(`/vitrine/ofertas/${offerId}/logo`), form, { headers });
+    return axios.post(apiUrl('/vitrine/ofertas/' + offerId + '/logo'), form, { headers });
   },
 
   async sugerirImagem(productName) {
@@ -283,31 +319,31 @@ export const vitrineService = {
     });
   },
 
-  async aprenderImagem(productName, imageUrl, ean = null) {
+  async aprenderImagem(productName, imageUrl, ean) {
     const headers = await getHeaders();
     return axios.post(apiUrl('/vitrine/aprender-imagem'), {
       product_name: productName,
       image_url: imageUrl,
-      ean,
+      ean: ean || null,
       source: 'manual_select',
     }, { headers });
   },
 
-  // ── Página pública (sem auth) ─────────────────────
+  // Pagina publica (sem auth)
   async obterPublica(slug) {
-    return axios.get(apiUrl(`/vitrine/publica/${slug}`));
+    return axios.get(apiUrl('/vitrine/publica/' + slug));
   },
 
-  // ── Helpers ──────────────────────────────────────
+  // Helpers
   gerarEmpresaSlug(companyName) {
     return slugifyPathSegment(companyName);
   },
 
   gerarLinkPublico(slug, companyName) {
     if (companyName) {
-      return `${window.location.origin}/${slugifyPathSegment(companyName)}/ofertas/${slug}`;
+      return window.location.origin + '/' + slugifyPathSegment(companyName) + '/ofertas/' + slug;
     }
-    return `${window.location.origin}/oferta/${slug}`;
+    return window.location.origin + '/oferta/' + slug;
   },
 
   imagemUrl(path) {

@@ -112,12 +112,19 @@ export default function Vitrine() {
   // ── Excluir ──────────────────────────────────────────
   const excluir = async (id) => {
     if (!window.confirm('Excluir esta vitrine? Esta ação não pode ser desfeita.')) return;
+    let toastAguardando = null;
     try {
-      await vitrineService.excluir(id);
+      await vitrineService.excluir(id, {
+        onAguardandoServidor: () => {
+          toastAguardando = toast.loading('Servidor hibernado, aguardando reconexão… (pode levar até 15s)');
+        },
+      });
+      if (toastAguardando) toast.dismiss(toastAguardando);
       setOfertas(prev => prev.filter(oferta => oferta._id !== id));
       toast.success('Vitrine excluída');
       carregar();
     } catch (err) {
+      if (toastAguardando) toast.dismiss(toastAguardando);
       console.error('[Vitrine] Erro ao excluir:', err);
       toast.error(getApiErrorMessage(err, 'Erro ao excluir'));
     }
@@ -676,19 +683,3 @@ function ImagePickerModal({ picker, onClose, onSelect }) {
           <div className="vt-image-picker-loading">Buscando opções de foto...</div>
         ) : (
           <div className="vt-image-picker-grid">
-            {picker.images.map((img, i) => (
-              <button
-                key={`${img.image_url}-${i}`}
-                className="vt-image-option"
-                onClick={() => onSelect(img.image_url)}
-              >
-                <img src={img.thumbnail_url || img.image_url} alt="" />
-                <span>Usar esta foto</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
