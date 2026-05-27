@@ -991,8 +991,7 @@ async def atualizar_oferta(offer_id: str, req: UpdateOfferRequest, uid: str = De
     return doc_to_dict(doc)
 
 
-@router.delete("/ofertas/{offer_id}")
-async def excluir_oferta(offer_id: str, uid: str = Depends(get_user_id)):
+async def _soft_delete_oferta(offer_id: str, uid: str) -> dict:
     try:
         oid = ObjectId(offer_id)
     except Exception:
@@ -1005,6 +1004,16 @@ async def excluir_oferta(offer_id: str, uid: str = Depends(get_user_id)):
         raise HTTPException(404, "Oferta não encontrada")
     await audit_event("vitrine_offer_deleted", uid=uid, status="success", metadata={"offerId": offer_id})
     return {"ok": True}
+
+
+@router.delete("/ofertas/{offer_id}")
+async def excluir_oferta(offer_id: str, uid: str = Depends(get_user_id)):
+    return await _soft_delete_oferta(offer_id, uid)
+
+
+@router.post("/ofertas/{offer_id}/excluir")
+async def excluir_oferta_post(offer_id: str, uid: str = Depends(get_user_id)):
+    return await _soft_delete_oferta(offer_id, uid)
 
 
 # ═══════════════════════════════════════

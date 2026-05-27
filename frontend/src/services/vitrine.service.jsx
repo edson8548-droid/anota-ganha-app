@@ -14,6 +14,17 @@ async function getMultipartHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function shouldTryDeleteFallback(err) {
+  const status = err?.response?.status;
+  return (
+    !err?.response ||
+    status === 405 ||
+    status === 408 ||
+    status === 429 ||
+    status >= 500
+  );
+}
+
 function slugifyPathSegment(value, fallback = 'empresa') {
   const slug = String(value || '')
     .normalize('NFD')
@@ -50,7 +61,20 @@ export const vitrineService = {
 
   async excluir(id) {
     const headers = await getHeaders();
-    return axios.delete(apiUrl(`/vitrine/ofertas/${id}`), { headers });
+    const url = apiUrl(`/vitrine/ofertas/${id}`);
+    try {
+      return await axios.put(url, { status: 'deleted' }, { headers });
+    } catch (err) {
+      if (!shouldTryDeleteFallback(err)) throw err;
+    }
+
+    try {
+      return await axios.post(`${url}/excluir`, {}, { headers });
+    } catch (err) {
+      if (!shouldTryDeleteFallback(err)) throw err;
+    }
+
+    return axios.delete(url, { headers });
   },
 
   // ── Itens ─────────────────────────────────────────

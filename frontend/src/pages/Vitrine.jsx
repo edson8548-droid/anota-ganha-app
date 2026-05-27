@@ -71,8 +71,9 @@ export default function Vitrine() {
     try {
       const res = await vitrineService.listar();
       setOfertas(res.data.filter(o => o.status !== 'deleted'));
-    } catch {
-      toast.error('Erro ao carregar vitrines');
+    } catch (err) {
+      console.error('[Vitrine] Erro ao carregar vitrines:', err);
+      toast.error(err?.response?.data?.detail || 'Erro ao carregar vitrines');
     }
     setLoading(false);
   }, []);
@@ -95,8 +96,9 @@ export default function Vitrine() {
       await vitrineService.atualizar(oferta._id, { status: novoStatus });
       toast.success(novoStatus === 'active' ? 'Vitrine ativada' : 'Vitrine desativada');
       carregar();
-    } catch {
-      toast.error('Erro ao alterar status');
+    } catch (err) {
+      console.error('[Vitrine] Erro ao alterar status:', err);
+      toast.error(err?.response?.data?.detail || 'Erro ao alterar status');
     }
   };
 
@@ -107,8 +109,9 @@ export default function Vitrine() {
       await vitrineService.excluir(id);
       toast.success('Vitrine excluída');
       carregar();
-    } catch {
-      toast.error('Erro ao excluir');
+    } catch (err) {
+      console.error('[Vitrine] Erro ao excluir:', err);
+      toast.error(err?.response?.data?.detail || 'Erro ao excluir');
     }
   };
 

@@ -97,6 +97,57 @@ test('substituirItens envia lista em lote', async () => {
   );
 });
 
+test('excluir marca oferta como deleted por PUT', async () => {
+  await vitrineService.excluir('oferta-1');
+
+  expect(axios.put).toHaveBeenCalledWith(
+    'https://api.venpro.com.br/api/vitrine/ofertas/oferta-1',
+    { status: 'deleted' },
+    {
+      headers: {
+        Authorization: 'Bearer token-123',
+        'Content-Type': 'application/json',
+      },
+    },
+  );
+  expect(axios.delete).not.toHaveBeenCalled();
+});
+
+test('excluir usa DELETE como fallback quando PUT falha no servidor', async () => {
+  axios.put.mockRejectedValueOnce({ response: { status: 500 } });
+  axios.post.mockRejectedValueOnce({ response: { status: 500 } });
+
+  await vitrineService.excluir('oferta-1');
+
+  expect(axios.delete).toHaveBeenCalledWith(
+    'https://api.venpro.com.br/api/vitrine/ofertas/oferta-1',
+    {
+      headers: {
+        Authorization: 'Bearer token-123',
+        'Content-Type': 'application/json',
+      },
+    },
+  );
+});
+
+test('excluir tenta rota POST dedicada quando PUT falha no servidor', async () => {
+  axios.put.mockRejectedValueOnce({ response: { status: 500 } });
+
+  await vitrineService.excluir('oferta-1');
+
+  expect(axios.post).toHaveBeenCalledWith(
+    'https://api.venpro.com.br/api/vitrine/ofertas/oferta-1/excluir',
+    {},
+    {
+      headers: {
+        Authorization: 'Bearer token-123',
+        'Content-Type': 'application/json',
+      },
+    },
+  );
+  expect(axios.delete).not.toHaveBeenCalled();
+});
+
 test('aprenderImagem salva preferencia de foto do produto', async () => {
   await vitrineService.aprenderImagem('Produto Teste', 'https://cdn.exemplo.com/produto.jpg', '789');
 
