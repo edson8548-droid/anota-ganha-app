@@ -177,6 +177,17 @@ export const vitrineService = {
     const url = apiUrl(`/vitrine/ofertas/${id}`);
     let lastErr = null;
     try {
+      return await axios.post(apiUrl('/users/resource-state'), {
+        resource: 'catalog',
+        resource_id: id,
+        state: 'removed',
+      }, { headers });
+    } catch (err) {
+      lastErr = err;
+      if (!shouldTryDeleteFallback(err)) throw err;
+    }
+
+    try {
       return await axios.post(apiUrl('/users/vitrine-status'), { offer_id: id, status: 'removed' }, { headers });
     } catch (err) {
       lastErr = err;

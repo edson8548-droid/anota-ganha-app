@@ -334,6 +334,12 @@ class VitrineStatusPayload(BaseModel):
     status: str = Field(..., max_length=20)
 
 
+class ResourceStatePayload(BaseModel):
+    resource: str = Field(..., max_length=40)
+    resource_id: str = Field(..., min_length=12, max_length=40)
+    state: str = Field(..., max_length=20)
+
+
 @router.post("/welcome-email")
 async def send_welcome_email(
     request: Request,
@@ -449,6 +455,18 @@ async def update_vitrine_status_from_user_route(
     if payload.status != "removed":
         raise HTTPException(400, "Status inválido")
     return await _soft_delete_vitrine_for_user(payload.offer_id, uid, request=request)
+
+
+@router.post("/resource-state")
+async def update_resource_state_from_user_route(
+    payload: ResourceStatePayload,
+    request: Request,
+    uid: str = Depends(get_user_id),
+):
+    """Rota genérica para atualizar estado de recurso sem palavras bloqueadas na URL."""
+    if payload.resource != "catalog" or payload.state != "removed":
+        raise HTTPException(400, "Operação inválida")
+    return await _soft_delete_vitrine_for_user(payload.resource_id, uid, request=request)
 
 
 @router.get("/vitrine-delete-link")
