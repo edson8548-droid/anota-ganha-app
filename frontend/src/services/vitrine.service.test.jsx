@@ -40,6 +40,7 @@ vi.mock('../config/api', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({})));
 });
 
 test('listar busca ofertas autenticadas', async () => {
@@ -147,6 +148,24 @@ test('excluir tenta PUT quando POST dedicado falha no servidor', async () => {
     },
   );
   expect(axios.delete).not.toHaveBeenCalled();
+});
+
+test('excluir usa fallback simples quando chamadas ajax falham por Network Error', async () => {
+  axios.post.mockRejectedValueOnce(new Error('Network Error'));
+  axios.put.mockRejectedValueOnce(new Error('Network Error'));
+  axios.delete.mockRejectedValueOnce(new Error('Network Error'));
+
+  await vitrineService.excluir('oferta-1');
+
+  expect(fetch).toHaveBeenCalledWith(
+    'https://api.venpro.com.br/api/vitrine/ofertas/oferta-1/excluir-simple',
+    expect.objectContaining({
+      method: 'POST',
+      mode: 'no-cors',
+      body: expect.any(URLSearchParams),
+    }),
+  );
+  expect(fetch.mock.calls[0][1].body.get('token')).toBe('token-123');
 });
 
 test('aprenderImagem salva preferencia de foto do produto', async () => {

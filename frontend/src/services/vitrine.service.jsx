@@ -37,6 +37,21 @@ function shouldTryDeleteFallback(err) {
   );
 }
 
+function isNetworkError(err) {
+  return !err?.response && err?.message === 'Network Error';
+}
+
+async function excluirViaSimpleFallback(url, headers) {
+  const token = String(headers.Authorization || '').replace(/^Bearer\s+/i, '');
+  if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+  await fetch(`${url}/excluir-simple`, {
+    method: 'POST',
+    mode: 'no-cors',
+    body: new URLSearchParams({ token }),
+  });
+  return { data: { ok: true, fallback: 'simple' } };
+}
+
 function slugifyPathSegment(value, fallback = 'empresa') {
   const slug = String(value || '')
     .normalize('NFD')
@@ -74,19 +89,31 @@ export const vitrineService = {
   async excluir(id) {
     const headers = await getHeaders();
     const url = apiUrl(`/vitrine/ofertas/${id}`);
+    let lastErr = null;
     try {
       return await axios.post(`${url}/excluir`, {}, { headers });
     } catch (err) {
+      lastErr = err;
       if (!shouldTryDeleteFallback(err)) throw err;
     }
 
     try {
       return await axios.put(url, { status: 'deleted' }, { headers });
     } catch (err) {
+      lastErr = err;
       if (!shouldTryDeleteFallback(err)) throw err;
     }
 
-    return axios.delete(url, { headers });
+    try {
+      return await axios.delete(url, { headers });
+    } catch (err) {
+      lastErr = err;
+      if (!isNetworkError(err)) throw err;
+    }
+
+    return excluirViaSimpleFallback(url, headers).catch(() => {
+      throw lastErr;
+    });
   },
 
   // ── Itens ─────────────────────────────────────────

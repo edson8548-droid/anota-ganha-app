@@ -1,6 +1,7 @@
 import pytest
 
 from routes.vitrine import (
+    _extract_simple_delete_token,
     _preparar_item_vitrine,
     _safe_vitrine_image_url,
     _stored_vitrine_image_url,
@@ -58,3 +59,15 @@ def test_preparar_item_vitrine_preserves_existing_image_when_not_sent():
     assert item["image_url"] == "/api/vitrine/imagens/abc"
     assert item["sort_order"] == 3
     assert item["price"] == 120
+
+
+def test_extract_simple_delete_token_prefers_query_token():
+    assert _extract_simple_delete_token(b"token=body-token", "query-token") == "query-token"
+
+
+def test_extract_simple_delete_token_accepts_form_body():
+    assert _extract_simple_delete_token(b"token=firebase-token") == "firebase-token"
+
+
+def test_extract_simple_delete_token_accepts_raw_body():
+    assert _extract_simple_delete_token(b"firebase-token") == "firebase-token"

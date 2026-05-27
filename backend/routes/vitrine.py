@@ -16,9 +16,9 @@ import socket
 from datetime import datetime, timezone, time
 from typing import List, Optional, Any
 from pathlib import Path
-from urllib.parse import urlparse, urljoin
+from urllib.parse import parse_qs, urlparse, urljoin
 
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel
@@ -240,12 +240,11 @@ async def _localize_offer_remote_images(doc: dict) -> bool:
     return changed
 
 
-async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
-    if not credentials:
-        logger.warning("[SECURITY] auth_missing route=vitrine")
+async def _verify_user_token(token: str) -> str:
+    if not token:
         raise HTTPException(401, "Token obrigatório")
     try:
-        decoded = await asyncio.to_thread(firebase_auth.verify_id_token, credentials.credentials)
+        decoded = await asyncio.to_thread(firebase_auth.verify_id_token, token)
         uid = decoded["uid"]
         await ensure_subscription_access(uid)
         return uid
@@ -254,6 +253,29 @@ async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(securi
     except Exception:
         logger.warning("[SECURITY] auth_invalid route=vitrine")
         raise HTTPException(401, "Token inválido")
+
+
+async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+    if not credentials:
+        logger.warning("[SECURITY] auth_missing route=vitrine")
+        raise HTTPException(401, "Token obrigatório")
+    return await _verify_user_token(credentials.credentials)
+
+
+def _extract_simple_delete_token(raw_body: bytes, query_token: str | None = None) -> str:
+    if query_token:
+        return query_token.strip()
+
+    text = raw_body.decode("utf-8", errors="ignore").strip()
+    if not text:
+        return ""
+
+    parsed = parse_qs(text, keep_blank_values=False)
+    token_values = parsed.get("token") or parsed.get("idToken")
+    if token_values:
+        return token_values[0].strip()
+
+    return text
 
 
 def normalizar(texto: str) -> str:
@@ -1013,6 +1035,14 @@ async def excluir_oferta(offer_id: str, uid: str = Depends(get_user_id)):
 
 @router.post("/ofertas/{offer_id}/excluir")
 async def excluir_oferta_post(offer_id: str, uid: str = Depends(get_user_id)):
+    return await _soft_delete_oferta(offer_id, uid)
+
+
+@router.post("/ofertas/{offer_id}/excluir-simple")
+async def excluir_oferta_simple(offer_id: str, request: Request):
+    raw_body = await request.body()
+    token = _extract_simple_delete_token(raw_body, request.query_params.get("token"))
+    uid = await _verify_user_token(token)
     return await _soft_delete_oferta(offer_id, uid)
 
 

@@ -114,6 +114,7 @@ export default function Vitrine() {
     if (!window.confirm('Excluir esta vitrine? Esta ação não pode ser desfeita.')) return;
     try {
       await vitrineService.excluir(id);
+      setOfertas(prev => prev.filter(oferta => oferta._id !== id));
       toast.success('Vitrine excluída');
       carregar();
     } catch (err) {
