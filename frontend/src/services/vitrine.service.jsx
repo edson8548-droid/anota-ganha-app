@@ -75,13 +75,13 @@ export const vitrineService = {
     const headers = await getHeaders();
     const url = apiUrl(`/vitrine/ofertas/${id}`);
     try {
-      return await axios.put(url, { status: 'deleted' }, { headers });
+      return await axios.post(`${url}/excluir`, {}, { headers });
     } catch (err) {
       if (!shouldTryDeleteFallback(err)) throw err;
     }
 
     try {
-      return await axios.post(`${url}/excluir`, {}, { headers });
+      return await axios.put(url, { status: 'deleted' }, { headers });
     } catch (err) {
       if (!shouldTryDeleteFallback(err)) throw err;
     }

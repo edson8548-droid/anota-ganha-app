@@ -45,7 +45,11 @@ const getItemsWithoutPhoto = (items) => items.filter(it =>
 );
 
 const getApiErrorMessage = (err, fallback) =>
-  err?.response?.data?.detail || err?.message || fallback;
+  err?.response?.data?.detail ||
+  (err?.message === 'Network Error'
+    ? 'Falha de conexão com a API. Feche a aba/app, abra novamente e tente excluir outra vez.'
+    : err?.message) ||
+  fallback;
 
 export default function Vitrine() {
   const navigate = useNavigate();

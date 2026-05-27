@@ -97,12 +97,12 @@ test('substituirItens envia lista em lote', async () => {
   );
 });
 
-test('excluir marca oferta como deleted por PUT', async () => {
+test('excluir usa rota POST dedicada primeiro', async () => {
   await vitrineService.excluir('oferta-1');
 
-  expect(axios.put).toHaveBeenCalledWith(
-    'https://api.venpro.com.br/api/vitrine/ofertas/oferta-1',
-    { status: 'deleted' },
+  expect(axios.post).toHaveBeenCalledWith(
+    'https://api.venpro.com.br/api/vitrine/ofertas/oferta-1/excluir',
+    {},
     {
       headers: {
         Authorization: 'Bearer token-123',
@@ -110,12 +110,13 @@ test('excluir marca oferta como deleted por PUT', async () => {
       },
     },
   );
+  expect(axios.put).not.toHaveBeenCalled();
   expect(axios.delete).not.toHaveBeenCalled();
 });
 
-test('excluir usa DELETE como fallback quando PUT falha no servidor', async () => {
-  axios.put.mockRejectedValueOnce({ response: { status: 500 } });
+test('excluir usa DELETE como fallback quando POST e PUT falham no servidor', async () => {
   axios.post.mockRejectedValueOnce({ response: { status: 500 } });
+  axios.put.mockRejectedValueOnce({ response: { status: 500 } });
 
   await vitrineService.excluir('oferta-1');
 
@@ -130,14 +131,14 @@ test('excluir usa DELETE como fallback quando PUT falha no servidor', async () =
   );
 });
 
-test('excluir tenta rota POST dedicada quando PUT falha no servidor', async () => {
-  axios.put.mockRejectedValueOnce({ response: { status: 500 } });
+test('excluir tenta PUT quando POST dedicado falha no servidor', async () => {
+  axios.post.mockRejectedValueOnce({ response: { status: 500 } });
 
   await vitrineService.excluir('oferta-1');
 
-  expect(axios.post).toHaveBeenCalledWith(
-    'https://api.venpro.com.br/api/vitrine/ofertas/oferta-1/excluir',
-    {},
+  expect(axios.put).toHaveBeenCalledWith(
+    'https://api.venpro.com.br/api/vitrine/ofertas/oferta-1',
+    { status: 'deleted' },
     {
       headers: {
         Authorization: 'Bearer token-123',
