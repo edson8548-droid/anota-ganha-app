@@ -40,7 +40,10 @@ vi.mock('../config/api', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({})));
+  vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({
+    ok: true,
+    json: vi.fn(() => Promise.resolve({ ok: true })),
+  })));
 });
 
 test('listar busca ofertas autenticadas', async () => {
@@ -150,7 +153,7 @@ test('excluir tenta PUT quando POST dedicado falha no servidor', async () => {
   expect(axios.delete).not.toHaveBeenCalled();
 });
 
-test('excluir usa fallback simples quando chamadas ajax falham por Network Error', async () => {
+test('excluir usa fallback simples sem preflight quando chamadas ajax falham por Network Error', async () => {
   axios.post.mockRejectedValueOnce(new Error('Network Error'));
   axios.put.mockRejectedValueOnce(new Error('Network Error'));
   axios.delete.mockRejectedValueOnce(new Error('Network Error'));
@@ -161,11 +164,40 @@ test('excluir usa fallback simples quando chamadas ajax falham por Network Error
     'https://api.venpro.com.br/api/vitrine/ofertas/oferta-1/excluir-simple',
     expect.objectContaining({
       method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: 'token-123',
+    }),
+  );
+});
+
+test('excluir com no-cors só confirma depois da vitrine sumir da listagem', async () => {
+  axios.post.mockRejectedValueOnce(new Error('Network Error'));
+  axios.put.mockRejectedValueOnce(new Error('Network Error'));
+  axios.delete.mockRejectedValueOnce(new Error('Network Error'));
+  fetch
+    .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    .mockResolvedValueOnce({});
+  axios.get.mockResolvedValueOnce({ data: [] });
+
+  await vitrineService.excluir('oferta-1');
+
+  expect(fetch).toHaveBeenNthCalledWith(
+    2,
+    'https://api.venpro.com.br/api/vitrine/ofertas/oferta-1/excluir-simple',
+    expect.objectContaining({
+      method: 'POST',
       mode: 'no-cors',
       body: expect.any(URLSearchParams),
     }),
   );
-  expect(fetch.mock.calls[0][1].body.get('token')).toBe('token-123');
+  expect(fetch.mock.calls[1][1].body.get('token')).toBe('token-123');
+  expect(axios.get).toHaveBeenCalledWith('https://api.venpro.com.br/api/vitrine/ofertas', {
+    headers: {
+      Authorization: 'Bearer token-123',
+      'Content-Type': 'application/json',
+    },
+  });
 });
 
 test('aprenderImagem salva preferencia de foto do produto', async () => {
