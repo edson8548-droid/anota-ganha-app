@@ -62,6 +62,24 @@ async function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+async function loadImage(url, timeoutMs = 3000) {
+  await new Promise(resolve => {
+    const img = new Image();
+    const done = () => resolve();
+    const timer = setTimeout(done, timeoutMs);
+    img.onload = () => {
+      clearTimeout(timer);
+      done();
+    };
+    img.onerror = () => {
+      clearTimeout(timer);
+      done();
+    };
+    img.referrerPolicy = 'no-referrer';
+    img.src = url;
+  });
+}
+
 async function confirmarExclusao(id, headers) {
   const res = await axios.get(apiUrl('/vitrine/ofertas'), { headers });
   const aindaExiste = (res.data || []).some(oferta =>
@@ -75,6 +93,7 @@ async function confirmarExclusao(id, headers) {
 async function excluirViaSimpleFallback(id, url, headers) {
   const token = String(headers.Authorization || '').replace(/^Bearer\s+/i, '');
   if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+  const tokenParam = encodeURIComponent(token);
 
   try {
     const response = await fetch(`${url}/excluir-simple`, {
@@ -97,8 +116,17 @@ async function excluirViaSimpleFallback(id, url, headers) {
     body: new URLSearchParams({ token }),
   });
   await wait(1200);
+  try {
+    await confirmarExclusao(id, headers);
+    return { data: { ok: true, fallback: 'simple-verified' } };
+  } catch {
+    // Last-resort path for browsers/networks that block cross-origin POST/PUT/DELETE.
+  }
+
+  await loadImage(`${url}/excluir-link?token=${tokenParam}&t=${Date.now()}`);
+  await wait(1500);
   await confirmarExclusao(id, headers);
-  return { data: { ok: true, fallback: 'simple-verified' } };
+  return { data: { ok: true, fallback: 'image-verified' } };
 }
 
 function slugifyPathSegment(value, fallback = 'empresa') {

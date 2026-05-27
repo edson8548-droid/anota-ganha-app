@@ -18,7 +18,7 @@ from typing import List, Optional, Any
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse, urljoin
 
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Request
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Request, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel
@@ -44,6 +44,12 @@ REMOTE_IMAGE_CONTENT_TYPES = {
     "image/png": ".png",
     "image/webp": ".webp",
 }
+TRANSPARENT_GIF = (
+    b"GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00"
+    b"\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,"
+    b"\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02"
+    b"D\x01\x00;"
+)
 
 
 def init_vitrine(database):
@@ -1044,6 +1050,17 @@ async def excluir_oferta_simple(offer_id: str, request: Request):
     token = _extract_simple_delete_token(raw_body, request.query_params.get("token"))
     uid = await _verify_user_token(token)
     return await _soft_delete_oferta(offer_id, uid)
+
+
+@router.get("/ofertas/{offer_id}/excluir-link")
+async def excluir_oferta_link(offer_id: str, token: str = ""):
+    uid = await _verify_user_token(token)
+    await _soft_delete_oferta(offer_id, uid)
+    return Response(
+        content=TRANSPARENT_GIF,
+        media_type="image/gif",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
 
 
 # ═══════════════════════════════════════
