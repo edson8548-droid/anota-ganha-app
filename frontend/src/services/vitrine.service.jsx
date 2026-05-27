@@ -123,6 +123,15 @@ async function excluirViaSimpleFallback(id, url, headers) {
     // Last-resort path for browsers/networks that block cross-origin POST/PUT/DELETE.
   }
 
+  await loadImage(`${apiUrl('/users/vitrine-delete-link')}?offer_id=${encodeURIComponent(id)}&token=${tokenParam}&t=${Date.now()}`);
+  await wait(1500);
+  try {
+    await confirmarExclusao(id, headers);
+    return { data: { ok: true, fallback: 'users-image-verified' } };
+  } catch {
+    // Keep the older vitrine image fallback as a final compatibility path.
+  }
+
   await loadImage(`${url}/excluir-link?token=${tokenParam}&t=${Date.now()}`);
   await wait(1500);
   await confirmarExclusao(id, headers);

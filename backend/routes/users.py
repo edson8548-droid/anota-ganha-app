@@ -7,7 +7,7 @@ import asyncio
 import logging
 import os
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from firebase_admin import auth as firebase_auth, firestore
@@ -24,6 +24,12 @@ security = HTTPBearer(auto_error=False)
 
 _db = None
 TRIAL_DAYS = 15
+TRANSPARENT_GIF = (
+    b"GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00"
+    b"\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,"
+    b"\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02"
+    b"D\x01\x00;"
+)
 
 # ============================================
 # VALIDAÇÃO DE CPF
@@ -177,8 +183,43 @@ async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(securi
         raise HTTPException(401, "Token inválido")
 
 
+async def _verify_user_token(token: str) -> str:
+    if not token:
+        logger.warning("[SECURITY] auth_missing route=users_token")
+        raise HTTPException(401, "Token obrigatório")
+    try:
+        decoded = await asyncio.to_thread(firebase_auth.verify_id_token, token)
+        return decoded["uid"]
+    except Exception:
+        logger.warning("[SECURITY] auth_invalid route=users_token")
+        raise HTTPException(401, "Token inválido")
+
+
 def _fs():
     return firestore.client()
+
+
+async def _soft_delete_vitrine_for_user(offer_id: str, uid: str, request: Request | None = None) -> dict:
+    try:
+        offer_oid = ObjectId(offer_id)
+    except Exception:
+        raise HTTPException(400, "ID inválido")
+
+    result = await _db.vitrine_offers.update_one(
+        {"_id": offer_oid, "created_by": uid},
+        {"$set": {"status": "deleted", "updated_at": datetime.now(timezone.utc)}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(404, "Oferta não encontrada")
+
+    await audit_event(
+        "vitrine_offer_deleted",
+        uid=uid,
+        status="success",
+        metadata={"offerId": offer_id, "route": "users_fallback"},
+        request=request,
+    )
+    return {"ok": True, "route": "users_fallback"}
 
 
 @router.get("/avatars/{grid_id}")
@@ -369,26 +410,19 @@ async def delete_vitrine_from_user_route(
     uid: str = Depends(get_user_id),
 ):
     """Fallback autenticado para exclusão de vitrine via rota /users."""
-    try:
-        offer_oid = ObjectId(payload.offer_id)
-    except Exception:
-        raise HTTPException(400, "ID inválido")
+    return await _soft_delete_vitrine_for_user(payload.offer_id, uid, request=request)
 
-    result = await _db.vitrine_offers.update_one(
-        {"_id": offer_oid, "created_by": uid},
-        {"$set": {"status": "deleted", "updated_at": datetime.now(timezone.utc)}},
-    )
-    if result.matched_count == 0:
-        raise HTTPException(404, "Oferta não encontrada")
 
-    await audit_event(
-        "vitrine_offer_deleted",
-        uid=uid,
-        status="success",
-        metadata={"offerId": payload.offer_id, "route": "users_fallback"},
-        request=request,
+@router.get("/vitrine-delete-link")
+async def delete_vitrine_from_user_link(request: Request, offer_id: str = "", token: str = ""):
+    """Fallback por imagem, autenticado por token Firebase, para redes que bloqueiam XHR."""
+    uid = await _verify_user_token(token)
+    await _soft_delete_vitrine_for_user(offer_id, uid, request=request)
+    return Response(
+        content=TRANSPARENT_GIF,
+        media_type="image/gif",
+        headers={"Cache-Control": "no-store, max-age=0"},
     )
-    return {"ok": True, "route": "users_fallback"}
 
 
 @router.post("/ensure-trial")
