@@ -36,7 +36,7 @@ router = APIRouter()
 security = HTTPBearer(auto_error=False)
 
 _db = None
-MAX_VITRINES = 3
+MAX_VITRINES = 2
 MAX_REMOTE_IMAGE_BYTES = 5 * 1024 * 1024
 REMOTE_IMAGE_CONTENT_TYPES = {
     "image/jpeg": ".jpg",

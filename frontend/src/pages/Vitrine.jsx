@@ -352,21 +352,21 @@ export default function Vitrine() {
         <div className="vt-list-header">
           <div>
             <div className="vt-list-title">Minhas Vitrines</div>
-            <div className="vt-list-sub">{ofertas.length}/3 vitrines criadas</div>
+            <div className="vt-list-sub">{ofertas.length}/2 vitrines criadas</div>
           </div>
           <button
             className="vt-btn-new"
             onClick={() => setView('nova')}
-            disabled={ofertas.length >= 3}
+            disabled={ofertas.length >= 2}
           >
             <Plus size={16} style={{ verticalAlign: 'middle', marginRight: 4 }} />
             Nova Vitrine
           </button>
         </div>
 
-        {ofertas.length >= 3 && (
+        {ofertas.length >= 2 && (
           <div className="vt-limit-info">
-            ℹ️ Você atingiu o limite de 3 vitrines. Exclua uma para criar outra.
+            ℹ️ Você atingiu o limite de 2 vitrines. Exclua uma para criar outra.
           </div>
         )}
 
