@@ -9,7 +9,7 @@ import logging
 import uuid
 import asyncio
 import multiprocessing
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from io import BytesIO
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Body
@@ -57,7 +57,6 @@ MAX_COTACAO_PREVIEW_BYTES = 14 * 1024 * 1024
 MAX_TABELA_PRAZOS_BYTES = 25 * 1024 * 1024
 MAX_ACTIVE_PREVIEW_JOBS_PER_USER = int(os.environ.get("MAX_ACTIVE_PREVIEW_JOBS_PER_USER", "1"))
 MAX_RUNNING_COTACAO_JOBS = int(os.environ.get("MAX_RUNNING_COTACAO_JOBS", "3"))
-TEMP_MAINTENANCE_UID = "MxBzLPpF5aUiWHKI3vq3kHPZfhB2"
 
 
 def _gerar_excel_multiprazos_worker(caminho_base, prazos, queue):
@@ -719,69 +718,6 @@ async def _cleanup_job_output(job):
             await _bucket().delete(grid_id)
         except Exception:
             pass
-
-
-@router.post("/maintenance/cleanup-storage")
-async def cleanup_cotacao_storage(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    uid = await get_user_id(credentials)
-    if uid != TEMP_MAINTENANCE_UID:
-        raise HTTPException(403, "Operação restrita")
-
-    now = datetime.now(timezone.utc)
-    session_cutoff = now + timedelta(seconds=1)
-    job_cutoff = now + timedelta(seconds=1)
-
-    deleted_sessions = await db.cotacao_sessoes.delete_many({"created_at": {"$lt": session_cutoff}})
-
-    deleted_job_files = 0
-    deleted_jobs = 0
-    async for job in db.cotacao_jobs.find({
-        "$or": [
-            {"created_at": {"$lt": job_cutoff}},
-            {"active": False},
-            {"status": {"$in": ["done", "error", "canceled"]}},
-        ]
-    }):
-        await _cleanup_job_input(job)
-        await _cleanup_job_output(job)
-        deleted_job_files += int(bool(job.get("input_grid_id"))) + int(bool(job.get("grid_id")))
-        await db.cotacao_jobs.delete_one({"_id": job["_id"]})
-        deleted_jobs += 1
-
-    referenced_ids = set()
-    for grid_id in await db.tabelas_mestre.distinct("grid_id"):
-        if grid_id:
-            referenced_ids.add(grid_id)
-    async for job in db.cotacao_jobs.find({"status": {"$in": ["queued", "processing"]}}):
-        for key in ("input_grid_id", "grid_id"):
-            if job.get(key):
-                referenced_ids.add(job[key])
-
-    deleted_orphan_files = 0
-    deleted_orphan_bytes = 0
-    async for file_doc in db.fs.files.find({}):
-        grid_id = file_doc.get("_id")
-        if grid_id in referenced_ids:
-            continue
-        try:
-            await _bucket().delete(grid_id)
-            deleted_orphan_files += 1
-            deleted_orphan_bytes += int(file_doc.get("length") or 0)
-        except Exception:
-            logger.exception("Erro ao remover arquivo órfão do GridFS: %s", grid_id)
-
-    file_ids = await db.fs.files.distinct("_id")
-    deleted_orphan_chunks = await db.fs.chunks.delete_many({"files_id": {"$nin": file_ids}})
-
-    return {
-        "ok": True,
-        "deleted_sessions": deleted_sessions.deleted_count,
-        "deleted_jobs": deleted_jobs,
-        "deleted_job_files": deleted_job_files,
-        "deleted_orphan_files": deleted_orphan_files,
-        "deleted_orphan_chunks": deleted_orphan_chunks.deleted_count,
-        "deleted_orphan_mb": round(deleted_orphan_bytes / (1024 * 1024), 2),
-    }
 
 
 async def _preview_job_foi_cancelado(job_id):
