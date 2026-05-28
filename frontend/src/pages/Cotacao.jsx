@@ -46,6 +46,20 @@ export default function Cotacao() {
     setConfirmDialog({ open: true, title, description, onConfirm });
   const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false }));
 
+  const baixarCotacaoPreenchida = (blob) => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'cotacao_preenchida.xlsx';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const isStorageQuotaError = (err) => {
+    const msg = String(err.response?.data?.detail || err.message || '');
+    return /space quota|writes are blocked|erro ao salvar arquivo no servidor/i.test(msg);
+  };
+
   const carregarTabelas = useCallback(async () => {
     setLoading(true);
     try {
@@ -118,7 +132,18 @@ export default function Cotacao() {
       if (err.name === 'AbortError' && !processingCancelRequestedRef.current) {
         toast.info('Processamento cancelado.');
       } else if (err.name !== 'AbortError') {
-        toast.error('Erro ao processar: ' + (err.response?.data?.detail || err.message));
+        if (isStorageQuotaError(err)) {
+          try {
+            const { blob, stats, semMatch } = await processarCotacao(arquivoCotacao, tabelaSelecionada, modoMatch);
+            baixarCotacaoPreenchida(blob);
+            setResultado({ stats, semMatch });
+            toast.warning('Banco no limite: processei em modo direto, sem tela de revisão.');
+          } catch (fallbackErr) {
+            toast.error('Erro ao processar: ' + (fallbackErr.response?.data?.detail || fallbackErr.message));
+          }
+        } else {
+          toast.error('Erro ao processar: ' + (err.response?.data?.detail || err.message));
+        }
       }
     }
     processingAbortRef.current = null;
@@ -147,12 +172,7 @@ export default function Cotacao() {
     setConfirmando(true);
     try {
       const { blob, stats, semMatch } = await confirmarCotacao(reviewData.session_id, aprovacoes, precosEditados);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'cotacao_preenchida.xlsx';
-      a.click();
-      window.URL.revokeObjectURL(url);
+      baixarCotacaoPreenchida(blob);
       setResultado({ stats, semMatch });
       setReviewData(null);
     } catch (err) {
