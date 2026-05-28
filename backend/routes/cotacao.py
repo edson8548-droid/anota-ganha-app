@@ -183,6 +183,7 @@ def _resultados_para_preview(itens, resultados):
 
         preview.append({
             "nome_cotacao": item["nome"],
+            "ean": item.get("ean", ""),
             "preco": res.get("preco"),
             "tipo": tipo,
             "score": score,

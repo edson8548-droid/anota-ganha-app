@@ -236,12 +236,45 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
                   {item.tipo && item.status === 'pendente' ? item.tipo : badgeAtual.label}
                 </span>
 
-                <span style={{
-                  color: '#f1f5f9', fontSize: 13, flex: 1, minWidth: 0,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                <div style={{
+                  flex: 1,
+                  minWidth: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 3,
                 }}>
-                  {item.nome_cotacao}
-                </span>
+                  <span style={{
+                    color: '#f1f5f9',
+                    fontSize: 13,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {item.nome_cotacao}
+                  </span>
+                  {item.ean ? (
+                    <span style={{
+                      color: aprovado ? '#86efac' : '#94a3b8',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      Código de barras: {item.ean}
+                    </span>
+                  ) : (
+                    <span style={{
+                      color: '#64748b',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: 0,
+                    }}>
+                      Sem código de barras lido
+                    </span>
+                  )}
+                </div>
 
                 {automaticoConfiavel && item.preco && (
                   <span style={{
