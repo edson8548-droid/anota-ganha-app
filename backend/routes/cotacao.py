@@ -12,7 +12,7 @@ import multiprocessing
 from datetime import datetime, timezone
 from io import BytesIO
 
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import Response
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
@@ -243,12 +243,12 @@ async def resume_cotacao_jobs():
         logger.info("[Job %s] Recolocado na fila após restart", job_id)
 
 
-async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
-    if not credentials:
+async def _get_user_id_from_token(token: str | None) -> str:
+    if not token:
         logger.warning("[SECURITY] auth_missing route=cotacao")
         raise HTTPException(401, "Token obrigatório")
     try:
-        decoded = firebase_auth.verify_id_token(credentials.credentials)
+        decoded = firebase_auth.verify_id_token(token)
         uid = decoded['uid']
         await ensure_subscription_access(uid)
         return uid
@@ -257,6 +257,10 @@ async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(securi
     except Exception:
         logger.warning("[SECURITY] auth_invalid route=cotacao")
         raise HTTPException(401, "Token inválido")
+
+
+async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+    return await _get_user_id_from_token(credentials.credentials if credentials else None)
 
 
 @router.post("/tabelas")
@@ -584,16 +588,14 @@ async def preview_cotacao(
     return {"session_id": session_id, "itens": preview_items}
 
 
-@router.post("/preview-async")
-async def preview_cotacao_async(
-    arquivo: UploadFile = File(...),
-    tabela_id: str = Form(...),
-    modo: str = Form("completo"),
-    prazo: int = Form(0),
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+async def _criar_preview_job(
+    uid: str,
+    arquivo: UploadFile,
+    tabela_id: str,
+    modo: str,
+    prazo: int,
 ):
-    """Cria um job para o preview da Cotação Pronta sem segurar a requisição aberta."""
-    uid = await get_user_id(credentials)
+    """Cria um job de preview já com usuário autenticado."""
     oid = _object_id_or_400(tabela_id)
     modo = str(modo or "completo").strip().lower()
 
@@ -645,6 +647,32 @@ async def preview_cotacao_async(
 
     _start_preview_job(job_id)
     return {"job_id": job_id}
+
+
+@router.post("/preview-async")
+async def preview_cotacao_async(
+    arquivo: UploadFile = File(...),
+    tabela_id: str = Form(...),
+    modo: str = Form("completo"),
+    prazo: int = Form(0),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Cria um job para o preview da Cotação Pronta sem segurar a requisição aberta."""
+    uid = await get_user_id(credentials)
+    return await _criar_preview_job(uid, arquivo, tabela_id, modo, prazo)
+
+
+@router.post("/preview-async-simple")
+async def preview_cotacao_async_simple(
+    arquivo: UploadFile = File(...),
+    tabela_id: str = Form(...),
+    modo: str = Form("completo"),
+    prazo: int = Form(0),
+    auth_token: str = Form(...),
+):
+    """Fallback sem header Authorization para redes que bloqueiam preflight CORS."""
+    uid = await _get_user_id_from_token(auth_token)
+    return await _criar_preview_job(uid, arquivo, tabela_id, modo, prazo)
 
 
 async def _cleanup_job_input(job):
@@ -785,12 +813,7 @@ async def _processar_preview_job(job_id):
                 pass
 
 
-@router.get("/preview-jobs/{job_id}")
-async def get_preview_job_status(
-    job_id: str,
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-):
-    uid = await get_user_id(credentials)
+async def _get_preview_job_status_for_user(job_id: str, uid: str):
     job = await db.cotacao_jobs.find_one({"_id": job_id, "user_id": uid, "type": "preview"})
     if not job:
         raise HTTPException(404, "Job não encontrado")
@@ -831,12 +854,26 @@ async def get_preview_job_status(
     return result
 
 
-@router.delete("/preview-jobs/{job_id}")
-async def cancelar_preview_job(
+@router.get("/preview-jobs/{job_id}")
+async def get_preview_job_status(
     job_id: str,
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     uid = await get_user_id(credentials)
+    return await _get_preview_job_status_for_user(job_id, uid)
+
+
+@router.post("/preview-jobs/{job_id}/status-simple")
+async def get_preview_job_status_simple(
+    job_id: str,
+    auth_token: str = Body(..., media_type="text/plain"),
+):
+    """Fallback sem header Authorization para polling quando o preflight falha."""
+    uid = await _get_user_id_from_token(auth_token)
+    return await _get_preview_job_status_for_user(job_id, uid)
+
+
+async def _cancelar_preview_job_for_user(job_id: str, uid: str):
     job = await db.cotacao_jobs.find_one({"_id": job_id, "user_id": uid, "type": "preview"})
     if not job:
         return {"status": "canceled"}
@@ -854,6 +891,24 @@ async def cancelar_preview_job(
         _running_job_ids.discard(job_id)
 
     return {"status": "canceled"}
+
+
+@router.delete("/preview-jobs/{job_id}")
+async def cancelar_preview_job(
+    job_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    uid = await get_user_id(credentials)
+    return await _cancelar_preview_job_for_user(job_id, uid)
+
+
+@router.post("/preview-jobs/{job_id}/cancel-simple")
+async def cancelar_preview_job_simple(
+    job_id: str,
+    auth_token: str = Body(..., media_type="text/plain"),
+):
+    uid = await _get_user_id_from_token(auth_token)
+    return await _cancelar_preview_job_for_user(job_id, uid)
 
 
 @router.post("/gerar-tabela-prazos")

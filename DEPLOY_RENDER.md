@@ -19,7 +19,7 @@ Configure no Render as variaveis abaixo. As que contem segredo devem ficar como 
 | --- | --- |
 | `APP_ENV` | `production` |
 | `RATE_LIMIT_ENABLED` | `true` |
-| `CORS_ORIGINS` | `https://venpro.com.br,https://www.venpro.com.br` |
+| `CORS_ORIGINS` | `https://venpro.com.br,https://www.venpro.com.br,https://anota-ganha-app.web.app,https://anota-ganha-app.firebaseapp.com` |
 | `FRONTEND_URL` | `https://venpro.com.br` |
 | `BACKEND_URL` | `https://api.venpro.com.br` |
 | `MONGO_URL` | connection string do MongoDB Atlas |
@@ -78,7 +78,7 @@ Tambem valide no navegador:
 
 ## Checklist rapido
 
-- CORS limitado a `venpro.com.br` e `www.venpro.com.br`.
+- CORS limitado aos dominios Venpro e aos dominios Firebase Hosting do projeto.
 - Health check do Render apontando para `/health`.
 - `DB_NAME` de producao preenchido no painel.
 - Webhook Asaas usando `/api/asaas/webhook`.

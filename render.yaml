@@ -14,7 +14,7 @@ services:
       - key: RATE_LIMIT_ENABLED
         value: "true"
       - key: CORS_ORIGINS
-        value: https://venpro.com.br,https://www.venpro.com.br
+        value: https://venpro.com.br,https://www.venpro.com.br,https://anota-ganha-app.web.app,https://anota-ganha-app.firebaseapp.com
       - key: MONGO_URL
         sync: false
       - key: DB_NAME

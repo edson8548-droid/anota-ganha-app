@@ -214,19 +214,29 @@ export const cancelarPreviewCotacao = async (jobId) => {
   const user = auth.currentUser;
   if (!user) return;
   const token = await user.getIdToken();
-  await fetch(apiUrl(`/cotacao/preview-jobs/${jobId}`), {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  try {
+    await fetch(apiUrl(`/cotacao/preview-jobs/${jobId}`), {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (err) {
+    if (!isConnectionError(err)) throw err;
+    await fetch(apiUrl(`/cotacao/preview-jobs/${jobId}/cancel-simple`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: token,
+    });
+  }
 };
 
 export const previewCotacao = async (arquivo, tabelaId, modo = 'completo', prazo = 0, options = {}) => {
-  const buildFormData = () => {
+  const buildFormData = (authToken = '') => {
     const formData = new FormData();
     formData.append('arquivo', arquivo);
     formData.append('tabela_id', tabelaId);
     formData.append('modo', modo);
     formData.append('prazo', prazo);
+    if (authToken) formData.append('auth_token', authToken);
     return formData;
   };
 
@@ -242,6 +252,7 @@ export const previewCotacao = async (arquivo, tabelaId, modo = 'completo', prazo
   await waitForBackend(10000);
 
   let submitRes;
+  let useSimplePreviewApi = false;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       submitRes = await fetch(apiUrl('/cotacao/preview-async'), {
@@ -259,7 +270,23 @@ export const previewCotacao = async (arquivo, tabelaId, modo = 'completo', prazo
         await waitForBackend();
         continue;
       }
-      throw new Error(connectionMessage);
+      if (isConnectionError(err)) {
+        try {
+          submitRes = await fetch(apiUrl('/cotacao/preview-async-simple'), {
+            method: 'POST',
+            body: buildFormData(token),
+            signal: options.signal,
+          });
+          useSimplePreviewApi = true;
+          break;
+        } catch (fallbackErr) {
+          if (options.signal?.aborted) {
+            throw new DOMException('Processamento cancelado', 'AbortError');
+          }
+          throw new Error(connectionMessage);
+        }
+      }
+      throw err;
     }
   }
 
@@ -274,6 +301,8 @@ export const previewCotacao = async (arquivo, tabelaId, modo = 'completo', prazo
   options.onJobId?.(jobId);
   const maxAttempts = 180; // 9 minutos, alinhado ao limite do backend
   let notFoundAttempts = 0;
+  let pollWithSimpleApi = useSimplePreviewApi;
+  let pollNetworkErrors = 0;
 
   for (let i = 0; i < maxAttempts; i += 1) {
     await new Promise(r => setTimeout(r, 3000));
@@ -282,10 +311,26 @@ export const previewCotacao = async (arquivo, tabelaId, modo = 'completo', prazo
     }
     let pollRes;
     try {
-      pollRes = await fetch(apiUrl(`/cotacao/preview-jobs/${jobId}`), { headers, signal: options.signal });
+      if (pollWithSimpleApi) {
+        pollRes = await fetch(apiUrl(`/cotacao/preview-jobs/${jobId}/status-simple`), {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: token,
+          signal: options.signal,
+        });
+      } else {
+        pollRes = await fetch(apiUrl(`/cotacao/preview-jobs/${jobId}`), { headers, signal: options.signal });
+      }
+      pollNetworkErrors = 0;
     } catch (err) {
       if (options.signal?.aborted) {
         throw new DOMException('Processamento cancelado', 'AbortError');
+      }
+      if (!pollWithSimpleApi && isConnectionError(err)) {
+        pollNetworkErrors += 1;
+        if (pollNetworkErrors >= 2) {
+          pollWithSimpleApi = true;
+        }
       }
       continue;
     }

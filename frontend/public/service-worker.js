@@ -1,7 +1,6 @@
-const CACHE_NAME = 'venpro-app-v6';
+const CACHE_NAME = 'venpro-app-v7';
 const urlsToCache = [
   '/home.html',
-  '/index.html',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png'
