@@ -728,9 +728,8 @@ async def cleanup_cotacao_storage(credentials: HTTPAuthorizationCredentials = De
         raise HTTPException(403, "Operação restrita")
 
     now = datetime.now(timezone.utc)
-    session_cutoff = now - timedelta(hours=2)
-    job_cutoff = now - timedelta(minutes=30)
-    orphan_cutoff = now - timedelta(minutes=30)
+    session_cutoff = now + timedelta(seconds=1)
+    job_cutoff = now + timedelta(seconds=1)
 
     deleted_sessions = await db.cotacao_sessoes.delete_many({"created_at": {"$lt": session_cutoff}})
 
@@ -760,7 +759,7 @@ async def cleanup_cotacao_storage(credentials: HTTPAuthorizationCredentials = De
 
     deleted_orphan_files = 0
     deleted_orphan_bytes = 0
-    async for file_doc in db.fs.files.find({"uploadDate": {"$lt": orphan_cutoff}}):
+    async for file_doc in db.fs.files.find({}):
         grid_id = file_doc.get("_id")
         if grid_id in referenced_ids:
             continue
@@ -771,12 +770,16 @@ async def cleanup_cotacao_storage(credentials: HTTPAuthorizationCredentials = De
         except Exception:
             logger.exception("Erro ao remover arquivo órfão do GridFS: %s", grid_id)
 
+    file_ids = await db.fs.files.distinct("_id")
+    deleted_orphan_chunks = await db.fs.chunks.delete_many({"files_id": {"$nin": file_ids}})
+
     return {
         "ok": True,
         "deleted_sessions": deleted_sessions.deleted_count,
         "deleted_jobs": deleted_jobs,
         "deleted_job_files": deleted_job_files,
         "deleted_orphan_files": deleted_orphan_files,
+        "deleted_orphan_chunks": deleted_orphan_chunks.deleted_count,
         "deleted_orphan_mb": round(deleted_orphan_bytes / (1024 * 1024), 2),
     }
 
