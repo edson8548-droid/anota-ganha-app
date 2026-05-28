@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
 
 const ROUTE_RELOAD_KEY = 'venpro-route-chunk-reload';
+const ROUTE_RELOAD_PARAM = 'venpro_reload';
 
 const isLazyLoadFailure = (error) => {
   const message = String(error?.message || error || '');
@@ -21,14 +22,6 @@ const safeSessionGet = (key) => {
   }
 };
 
-const safeSessionSet = (key, value) => {
-  try {
-    window.sessionStorage.setItem(key, value);
-  } catch {
-    // Session storage can be unavailable in private or restricted browsers.
-  }
-};
-
 const safeSessionRemove = (key) => {
   try {
     window.sessionStorage.removeItem(key);
@@ -37,15 +30,54 @@ const safeSessionRemove = (key) => {
   }
 };
 
+const hasReloadMarker = () => {
+  if (safeSessionGet(ROUTE_RELOAD_KEY) === '1') return true;
+  try {
+    return new URL(window.location.href).searchParams.get(ROUTE_RELOAD_PARAM) === '1';
+  } catch {
+    return false;
+  }
+};
+
+const reloadWithMarker = () => {
+  try {
+    window.sessionStorage.setItem(ROUTE_RELOAD_KEY, '1');
+    window.location.reload();
+    return;
+  } catch {
+    // Fall back to the URL marker below.
+  }
+
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set(ROUTE_RELOAD_PARAM, '1');
+    window.location.replace(url.toString());
+    return;
+  } catch {
+    window.location.reload();
+  }
+};
+
+const clearReloadMarker = () => {
+  safeSessionRemove(ROUTE_RELOAD_KEY);
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has(ROUTE_RELOAD_PARAM)) return;
+    url.searchParams.delete(ROUTE_RELOAD_PARAM);
+    window.history.replaceState(window.history.state, '', url.toString());
+  } catch {
+    // Ignore browsers that restrict history or URL APIs.
+  }
+};
+
 const lazyWithRetry = (importer) => lazy(async () => {
   try {
     const module = await importer();
-    safeSessionRemove(ROUTE_RELOAD_KEY);
+    clearReloadMarker();
     return module;
   } catch (error) {
-    if (isLazyLoadFailure(error) && safeSessionGet(ROUTE_RELOAD_KEY) !== '1') {
-      safeSessionSet(ROUTE_RELOAD_KEY, '1');
-      window.location.reload();
+    if (isLazyLoadFailure(error) && !hasReloadMarker()) {
+      reloadWithMarker();
       return new Promise(() => {});
     }
     throw error;

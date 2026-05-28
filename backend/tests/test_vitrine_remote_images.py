@@ -7,6 +7,7 @@ from pymongo.errors import OperationFailure
 from routes import vitrine
 from routes.vitrine import (
     _extract_simple_delete_token,
+    _is_link_preview_user_agent,
     _is_storage_quota_error,
     _preparar_item_vitrine,
     _safe_vitrine_image_url,
@@ -87,6 +88,14 @@ def test_storage_quota_error_is_detected():
     )
 
     assert _is_storage_quota_error(exc)
+
+
+def test_link_preview_user_agent_detection_keeps_regular_mobile_users_direct():
+    assert _is_link_preview_user_agent("facebookexternalhit/1.1") is True
+    assert _is_link_preview_user_agent("Twitterbot/1.0") is True
+    assert _is_link_preview_user_agent(
+        "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/126 Mobile Safari/537.36"
+    ) is False
 
 
 def test_soft_delete_uses_hard_delete_when_storage_quota_blocks_update(monkeypatch):

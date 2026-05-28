@@ -7,7 +7,6 @@ import os
 import re
 import io
 import html
-import json
 import uuid
 import asyncio
 import logging
@@ -21,6 +20,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse, urljoin
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel
@@ -422,6 +422,27 @@ def _share_image_url() -> str:
 
 def _favicon_url() -> str:
     return f"{_frontend_base_url()}/assets/logo/venpro-favicon.png"
+
+
+def _is_link_preview_user_agent(user_agent: str | None) -> bool:
+    ua = (user_agent or "").lower()
+    preview_tokens = (
+        "facebookexternalhit",
+        "facebot",
+        "twitterbot",
+        "linkedinbot",
+        "slackbot",
+        "discordbot",
+        "telegrambot",
+        "pinterest",
+        "embedly",
+        "quora link preview",
+        "googlebot",
+        "bingbot",
+        "crawler",
+        "spider",
+    )
+    return any(token in ua for token in preview_tokens)
 
 
 # ═══════════════════════════════════════
@@ -1703,7 +1724,7 @@ async def pagina_publica(slug: str):
 
 @router.get("/abrir/{slug}")
 async def abrir_vitrine(slug: str, request: Request):
-    """HTML leve para previews do WhatsApp antes de abrir a vitrine pública."""
+    """Abre a vitrine pública, sem página intermediária para clientes."""
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{2,80}", slug):
         logger.warning("[SECURITY] vitrine_share_blocked reason=bad_slug slug_len=%s", len(slug or ""))
         raise HTTPException(404, "Vitrine não encontrada ou inativa")
@@ -1730,12 +1751,14 @@ async def abrir_vitrine(slug: str, request: Request):
     if item_count:
         share_description += f" {item_count} produtos disponíveis."
 
+    if not _is_link_preview_user_agent(request.headers.get("user-agent")):
+        return RedirectResponse(public_url, status_code=302)
+
     escaped_title = html.escape(share_title)
     escaped_description = html.escape(share_description)
     escaped_public_url = html.escape(public_url, quote=True)
     escaped_image_url = html.escape(_share_image_url(), quote=True)
     escaped_favicon_url = html.escape(_favicon_url(), quote=True)
-    js_public_url = json.dumps(public_url)
 
     return Response(
         f"""<!doctype html>
@@ -1762,11 +1785,9 @@ async def abrir_vitrine(slug: str, request: Request):
     <meta name="twitter:description" content="{escaped_description}" />
     <meta name="twitter:image" content="{escaped_image_url}" />
     <link rel="canonical" href="{escaped_public_url}" />
-    <meta http-equiv="refresh" content="0;url={escaped_public_url}" />
-    <script>window.location.replace({js_public_url});</script>
   </head>
   <body>
-    <p>Abrindo ofertas de {html.escape(company)}...</p>
+    <p>Ofertas de {html.escape(company)}</p>
     <p><a href="{escaped_public_url}">Abrir vitrine de ofertas</a></p>
   </body>
 </html>""",

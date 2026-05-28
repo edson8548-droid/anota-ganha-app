@@ -5,6 +5,7 @@ import App from './App';
 import { Toaster } from "sonner";
 
 const ROUTE_RELOAD_KEY = 'venpro-route-chunk-reload';
+const ROUTE_RELOAD_PARAM = 'venpro_reload';
 
 const isRouteLoadFailure = (error) => {
   const message = String(error?.message || error?.reason?.message || error || '');
@@ -15,9 +16,23 @@ const reloadOnceForFreshAssets = () => {
   try {
     if (window.sessionStorage.getItem(ROUTE_RELOAD_KEY) === '1') return;
     window.sessionStorage.setItem(ROUTE_RELOAD_KEY, '1');
+    window.location.reload();
+    return;
   } catch {
-    // Continue with reload even if storage is restricted.
+    // Some in-app mobile browsers restrict sessionStorage. Fall back to a URL marker
+    // so a failed asset cannot cause an endless reload loop.
   }
+
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get(ROUTE_RELOAD_PARAM) === '1') return;
+    url.searchParams.set(ROUTE_RELOAD_PARAM, '1');
+    window.location.replace(url.toString());
+    return;
+  } catch {
+    // Last resort: reload once for normal browsers.
+  }
+
   window.location.reload();
 };
 

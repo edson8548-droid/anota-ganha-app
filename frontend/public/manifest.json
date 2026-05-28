@@ -1,29 +1,16 @@
 {
   "short_name": "Venpro",
-  "name": "Venpro — Ferramentas para RCAs",
+  "name": "Venpro",
   "description": "Cotação Pronta, Carteira no WhatsApp, Vitrine Inteligente e gestão para representantes comerciais",
   "lang": "pt-BR",
   "dir": "ltr",
-  "icons": [
-    {
-      "src": "/icon-192.png",
-      "type": "image/png",
-      "sizes": "192x192",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-512.png",
-      "type": "image/png",
-      "sizes": "512x512",
-      "purpose": "any maskable"
-    }
-  ],
+  "icons": [],
   "start_url": "/",
-  "display": "standalone",
-  "display_override": ["standalone", "fullscreen"],
+  "display": "browser",
+  "display_override": ["browser"],
   "theme_color": "#2B2D31",
   "background_color": "#2B2D31",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "scope": "/",
   "categories": ["business", "productivity"],
   "prefer_related_applications": false,
