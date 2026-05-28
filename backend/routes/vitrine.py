@@ -420,6 +420,10 @@ def _share_image_url() -> str:
     return f"{_frontend_base_url()}/assets/logo/venpro-og-image-v2.png"
 
 
+def _favicon_url() -> str:
+    return f"{_frontend_base_url()}/assets/logo/venpro-favicon.png"
+
+
 # ═══════════════════════════════════════
 # MODELOS
 # ═══════════════════════════════════════
@@ -1730,6 +1734,7 @@ async def abrir_vitrine(slug: str, request: Request):
     escaped_description = html.escape(share_description)
     escaped_public_url = html.escape(public_url, quote=True)
     escaped_image_url = html.escape(_share_image_url(), quote=True)
+    escaped_favicon_url = html.escape(_favicon_url(), quote=True)
     js_public_url = json.dumps(public_url)
 
     return Response(
@@ -1740,12 +1745,16 @@ async def abrir_vitrine(slug: str, request: Request):
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{escaped_title}</title>
     <meta name="description" content="{escaped_description}" />
+    <link rel="icon" href="{escaped_favicon_url}" sizes="32x32" />
+    <link rel="shortcut icon" href="{escaped_favicon_url}" />
+    <link rel="apple-touch-icon" href="{escaped_favicon_url}" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Venpro Ofertas" />
     <meta property="og:title" content="{escaped_title}" />
     <meta property="og:description" content="{escaped_description}" />
     <meta property="og:url" content="{escaped_public_url}" />
     <meta property="og:image" content="{escaped_image_url}" />
+    <meta property="og:logo" content="{escaped_favicon_url}" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
