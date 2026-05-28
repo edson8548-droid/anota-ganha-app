@@ -481,6 +481,26 @@ async def delete_vitrine_from_user_link(request: Request, offer_id: str = "", to
     )
 
 
+@router.get("/resource-state-link")
+async def update_resource_state_from_link(
+    request: Request,
+    resource: str = "",
+    resource_id: str = "",
+    state: str = "",
+    token: str = "",
+):
+    """Fallback por imagem com URL neutra para redes que bloqueiam termos como delete/excluir."""
+    if resource != "catalog" or state != "removed":
+        raise HTTPException(400, "Operação inválida")
+    uid = await _verify_user_token(token)
+    await _soft_delete_vitrine_for_user(resource_id, uid, request=request)
+    return Response(
+        content=TRANSPARENT_GIF,
+        media_type="image/gif",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
+
+
 @router.post("/ensure-trial")
 async def ensure_trial_subscription(
     uid: str = Depends(get_user_id),

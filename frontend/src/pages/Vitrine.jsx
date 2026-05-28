@@ -116,7 +116,7 @@ export default function Vitrine() {
     try {
       await vitrineService.excluir(id, {
         onAguardandoServidor: () => {
-          toastAguardando = toast.loading('Servidor hibernado, aguardando reconexão… (pode levar até 15s)');
+          toastAguardando = toast.loading('Servidor hibernado, aguardando reconexão... (pode levar até 60s)');
         },
       });
       if (toastAguardando) toast.dismiss(toastAguardando);

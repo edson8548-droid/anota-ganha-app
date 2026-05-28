@@ -64,15 +64,24 @@ async function wait(ms) {
 
 // Acorda o servidor caso esteja hibernado (Render free tier / cold start).
 // Tenta pingar /health ate o servidor responder ou o tempo esgotar.
-async function ensureServerAwake(maxWaitMs = 15000) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 4000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function ensureServerAwake(maxWaitMs = 60000) {
   const checkUrl = (BACKEND_URL || '') + '/health';
   const deadline = Date.now() + maxWaitMs;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(checkUrl, {
+      const res = await fetchWithTimeout(checkUrl, {
         method: 'GET',
         mode: 'cors',
-        signal: AbortSignal.timeout(4000),
       });
       if (res.ok) return;
     } catch {
@@ -141,6 +150,20 @@ async function excluirViaSimpleFallback(id, url, headers) {
     return { data: { ok: true, fallback: 'simple-verified' } };
   } catch {
     // Last-resort path for browsers/networks that block cross-origin POST/PUT/DELETE.
+  }
+
+  await loadImage(
+    apiUrl('/users/resource-state-link')
+    + '?resource=catalog&resource_id=' + encodeURIComponent(id)
+    + '&state=removed&token=' + tokenParam
+    + '&t=' + Date.now()
+  );
+  await wait(1500);
+  try {
+    await confirmarExclusao(id, headers);
+    return { data: { ok: true, fallback: 'resource-image-verified' } };
+  } catch {
+    // Keep the older image fallbacks for compatibility with already deployed APIs.
   }
 
   await loadImage(apiUrl('/users/vitrine-delete-link') + '?offer_id=' + encodeURIComponent(id) + '&token=' + tokenParam + '&t=' + Date.now());
