@@ -14,6 +14,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from firebase_admin import auth as firebase_auth, firestore
 from bson import ObjectId
+from pymongo.errors import OperationFailure
 from services.public_files import stream_public_gridfs_file
 from services.security_audit import audit_event, hash_identifier
 from services.email_service import build_welcome_email, send_transactional_email
@@ -235,6 +236,18 @@ def _append_query(url: str, params: dict[str, str]) -> str:
     return urlunparse(parsed._replace(query=urlencode(query)))
 
 
+def _is_storage_quota_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return (
+        isinstance(exc, OperationFailure)
+        and (
+            getattr(exc, "code", None) == 8000
+            or "space quota" in message
+            or "writes are blocked" in message
+        )
+    )
+
+
 def _fs():
     return firestore.client()
 
@@ -261,11 +274,38 @@ async def _soft_delete_vitrine_for_user(offer_id: str, uid: str, request: Reques
         ],
     }
 
+    hard_deleted_due_quota = False
     try:
         result = await _db.vitrine_offers.update_one(
             owner_filter,
             {"$set": {"status": "deleted", "updated_at": datetime.now(timezone.utc)}},
         )
+        matched_count = result.matched_count
+    except OperationFailure as exc:
+        if not _is_storage_quota_error(exc):
+            logger.exception("[USERS] Erro Mongo ao excluir vitrine offer_id=%s uid=%s", offer_id, uid)
+            await audit_event(
+                "vitrine_offer_delete_failed",
+                uid=uid,
+                status="error",
+                metadata={"offerId": offer_id, "reason": "mongo_error", "error": str(exc)[:180]},
+                request=request,
+            )
+            raise HTTPException(500, "Erro no banco ao excluir a vitrine. Tente novamente em alguns segundos.")
+        try:
+            delete_result = await _db.vitrine_offers.delete_one(owner_filter)
+        except Exception as delete_exc:
+            logger.exception("[USERS] Erro Mongo ao hard-delete vitrine offer_id=%s uid=%s", offer_id, uid)
+            await audit_event(
+                "vitrine_offer_delete_failed",
+                uid=uid,
+                status="error",
+                metadata={"offerId": offer_id, "reason": "mongo_delete_error", "error": str(delete_exc)[:180]},
+                request=request,
+            )
+            raise HTTPException(500, "Erro no banco ao excluir a vitrine. Tente novamente em alguns segundos.")
+        matched_count = delete_result.deleted_count
+        hard_deleted_due_quota = matched_count > 0
     except Exception as exc:
         logger.exception("[USERS] Erro Mongo ao excluir vitrine offer_id=%s uid=%s", offer_id, uid)
         await audit_event(
@@ -277,7 +317,7 @@ async def _soft_delete_vitrine_for_user(offer_id: str, uid: str, request: Reques
         )
         raise HTTPException(500, "Erro no banco ao excluir a vitrine. Tente novamente em alguns segundos.")
 
-    if result.matched_count == 0:
+    if matched_count == 0:
         try:
             existing = await _db.vitrine_offers.find_one(
                 {"_id": offer_oid},
@@ -318,10 +358,10 @@ async def _soft_delete_vitrine_for_user(offer_id: str, uid: str, request: Reques
         "vitrine_offer_deleted",
         uid=uid,
         status="success",
-        metadata={"offerId": offer_id, "route": "users_fallback"},
+        metadata={"offerId": offer_id, "route": "users_fallback", "hardDeletedDueQuota": hard_deleted_due_quota},
         request=request,
     )
-    return {"ok": True, "route": "users_fallback"}
+    return {"ok": True, "route": "users_fallback", "hardDeletedDueQuota": hard_deleted_due_quota}
 
 
 @router.get("/avatars/{grid_id}")

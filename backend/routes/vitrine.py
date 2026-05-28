@@ -23,6 +23,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel
 from bson import ObjectId
+from pymongo.errors import OperationFailure
 import firebase_admin
 from firebase_admin import auth as firebase_auth
 from services.public_files import stream_public_gridfs_file
@@ -282,6 +283,18 @@ def _extract_simple_delete_token(raw_body: bytes, query_token: str | None = None
         return token_values[0].strip()
 
     return text
+
+
+def _is_storage_quota_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return (
+        isinstance(exc, OperationFailure)
+        and (
+            getattr(exc, "code", None) == 8000
+            or "space quota" in message
+            or "writes are blocked" in message
+        )
+    )
 
 
 def normalizar(texto: str) -> str:
@@ -1024,14 +1037,35 @@ async def _soft_delete_oferta(offer_id: str, uid: str) -> dict:
         oid = ObjectId(offer_id)
     except Exception:
         raise HTTPException(400, "ID inválido")
-    result = await _db.vitrine_offers.update_one(
-        {"_id": oid, "created_by": uid},
-        {"$set": {"status": "deleted", "updated_at": datetime.now(timezone.utc)}}
-    )
-    if result.matched_count == 0:
+
+    owner_filter = {"_id": oid, "created_by": uid}
+    hard_deleted_due_quota = False
+    try:
+        result = await _db.vitrine_offers.update_one(
+            owner_filter,
+            {"$set": {"status": "deleted", "updated_at": datetime.now(timezone.utc)}}
+        )
+        matched_count = result.matched_count
+    except OperationFailure as exc:
+        if not _is_storage_quota_error(exc):
+            raise
+        try:
+            delete_result = await _db.vitrine_offers.delete_one(owner_filter)
+        except Exception as delete_exc:
+            logger.exception("[VITRINE] Erro Mongo ao excluir oferta apos quota offer_id=%s uid=%s", offer_id, uid)
+            raise HTTPException(500, "Erro no banco ao excluir a vitrine. Tente novamente em alguns segundos.") from delete_exc
+        matched_count = delete_result.deleted_count
+        hard_deleted_due_quota = matched_count > 0
+
+    if matched_count == 0:
         raise HTTPException(404, "Oferta não encontrada")
-    await audit_event("vitrine_offer_deleted", uid=uid, status="success", metadata={"offerId": offer_id})
-    return {"ok": True}
+    await audit_event(
+        "vitrine_offer_deleted",
+        uid=uid,
+        status="success",
+        metadata={"offerId": offer_id, "hardDeletedDueQuota": hard_deleted_due_quota},
+    )
+    return {"ok": True, "hardDeletedDueQuota": hard_deleted_due_quota}
 
 
 @router.delete("/ofertas/{offer_id}")

@@ -1,9 +1,16 @@
-import pytest
+import asyncio
+from types import SimpleNamespace
 
+import pytest
+from pymongo.errors import OperationFailure
+
+from routes import vitrine
 from routes.vitrine import (
     _extract_simple_delete_token,
+    _is_storage_quota_error,
     _preparar_item_vitrine,
     _safe_vitrine_image_url,
+    _soft_delete_oferta,
     _stored_vitrine_image_url,
     _validate_remote_image_url,
 )
@@ -71,3 +78,44 @@ def test_extract_simple_delete_token_accepts_form_body():
 
 def test_extract_simple_delete_token_accepts_raw_body():
     assert _extract_simple_delete_token(b"firebase-token") == "firebase-token"
+
+
+def test_storage_quota_error_is_detected():
+    exc = OperationFailure(
+        "you are over your space quota. Writes are blocked on your cluster.",
+        code=8000,
+    )
+
+    assert _is_storage_quota_error(exc)
+
+
+def test_soft_delete_uses_hard_delete_when_storage_quota_blocks_update(monkeypatch):
+    offer_id = "000000000000000000000001"
+
+    class FakeOffers:
+        def __init__(self):
+            self.deleted_filter = None
+
+        async def update_one(self, *_args, **_kwargs):
+            raise OperationFailure(
+                "you are over your space quota. Writes are blocked on your cluster.",
+                code=8000,
+            )
+
+        async def delete_one(self, owner_filter):
+            self.deleted_filter = owner_filter
+            return SimpleNamespace(deleted_count=1)
+
+    fake_offers = FakeOffers()
+
+    async def fake_audit_event(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(vitrine, "_db", SimpleNamespace(vitrine_offers=fake_offers))
+    monkeypatch.setattr(vitrine, "audit_event", fake_audit_event)
+
+    result = asyncio.run(_soft_delete_oferta(offer_id, "uid-1"))
+
+    assert result == {"ok": True, "hardDeletedDueQuota": True}
+    assert str(fake_offers.deleted_filter["_id"]) == offer_id
+    assert fake_offers.deleted_filter["created_by"] == "uid-1"
