@@ -59,6 +59,9 @@ MAX_ACTIVE_PREVIEW_JOBS_PER_USER = int(os.environ.get("MAX_ACTIVE_PREVIEW_JOBS_P
 MAX_RUNNING_COTACAO_JOBS = int(os.environ.get("MAX_RUNNING_COTACAO_JOBS", "3"))
 COTACAO_CLEANUP_INTERVAL_SECONDS = int(os.environ.get("COTACAO_CLEANUP_INTERVAL_SECONDS", "3600"))
 COTACAO_TEMP_ARTIFACT_TTL_SECONDS = 12 * 60 * 60
+COTACAO_TABELA_MESTRE_TTL_SECONDS = int(
+    os.environ.get("COTACAO_TABELA_MESTRE_TTL_SECONDS", str(8 * 24 * 60 * 60))
+)
 COTACAO_COMPLETED_JOB_TTL_SECONDS = int(
     os.environ.get("COTACAO_COMPLETED_JOB_TTL_SECONDS", str(COTACAO_TEMP_ARTIFACT_TTL_SECONDS))
 )
@@ -232,6 +235,43 @@ def _should_cleanup_cotacao_job(job: dict, now: datetime | None = None) -> bool:
     return False
 
 
+def _tabela_mestre_age_seconds(tabela: dict, now: datetime) -> float:
+    data_upload = tabela.get("data_upload")
+    if not data_upload:
+        return 0
+    return (now - _utc_datetime(data_upload)).total_seconds()
+
+
+def _should_cleanup_tabela_mestre(tabela: dict, now: datetime | None = None) -> bool:
+    now = now or datetime.now(timezone.utc)
+    return _tabela_mestre_age_seconds(tabela, now) >= COTACAO_TABELA_MESTRE_TTL_SECONDS
+
+
+async def _active_cotacao_tabela_ids() -> set[str]:
+    active: set[str] = set()
+    async for job in db.cotacao_jobs.find(
+        {"status": {"$in": ["queued", "processing"]}},
+        {"tabela_id": 1},
+    ):
+        if job.get("tabela_id"):
+            active.add(str(job["tabela_id"]))
+    return active
+
+
+async def _delete_tabela_mestre_doc(tabela: dict) -> int:
+    if not tabela or not tabela.get("_id"):
+        return 0
+
+    await _delete_grid_file(tabela.get("grid_id"))
+    result = await db.tabelas_mestre.delete_one({"_id": tabela["_id"]})
+    if result.deleted_count:
+        await db.cotacao_aprendizado.delete_many({
+            "user_id": tabela.get("user_id"),
+            "tabela_id": str(tabela["_id"]),
+        })
+    return result.deleted_count
+
+
 async def _referenced_cotacao_grid_ids() -> set[str]:
     referenced: set[str] = set()
 
@@ -250,15 +290,16 @@ async def _referenced_cotacao_grid_ids() -> set[str]:
 async def cleanup_cotacao_storage_once(now: datetime | None = None) -> dict:
     """Remove apenas artefatos temporários antigos da Cotação Pronta."""
     if db is None:
-        return {"jobs": 0, "sessions": 0, "orphan_files": 0}
+        return {"jobs": 0, "sessions": 0, "tables": 0, "orphan_files": 0}
 
     now = now or datetime.now(timezone.utc)
     completed_cutoff = now - timedelta(seconds=COTACAO_COMPLETED_JOB_TTL_SECONDS)
     stale_active_cutoff = now - timedelta(seconds=COTACAO_STALE_ACTIVE_JOB_TTL_SECONDS)
     session_cutoff = now - timedelta(seconds=COTACAO_SESSION_TTL_SECONDS)
+    table_cutoff = now - timedelta(seconds=COTACAO_TABELA_MESTRE_TTL_SECONDS)
     orphan_cutoff = now - timedelta(seconds=COTACAO_ORPHAN_GRIDFS_TTL_SECONDS)
 
-    stats = {"jobs": 0, "sessions": 0, "orphan_files": 0}
+    stats = {"jobs": 0, "sessions": 0, "tables": 0, "orphan_files": 0}
 
     job_query = {
         "$or": [
@@ -276,6 +317,15 @@ async def cleanup_cotacao_storage_once(now: datetime | None = None) -> dict:
 
     session_result = await db.cotacao_sessoes.delete_many({"created_at": {"$lt": session_cutoff}})
     stats["sessions"] = session_result.deleted_count
+
+    active_tabela_ids = await _active_cotacao_tabela_ids()
+    async for tabela in db.tabelas_mestre.find(
+        {"data_upload": {"$lt": table_cutoff}},
+        {"_id": 1, "grid_id": 1, "user_id": 1, "data_upload": 1},
+    ).sort("data_upload", 1).limit(COTACAO_CLEANUP_BATCH_SIZE):
+        if str(tabela["_id"]) in active_tabela_ids or not _should_cleanup_tabela_mestre(tabela, now):
+            continue
+        stats["tables"] += await _delete_tabela_mestre_doc(tabela)
 
     referenced_ids = await _referenced_cotacao_grid_ids()
     async for file_doc in db["fs.files"].find(
@@ -556,11 +606,7 @@ async def excluir_tabela(
     doc = await db.tabelas_mestre.find_one({"_id": oid, "user_id": uid})
     if not doc:
         raise HTTPException(404, "Tabela não encontrada")
-    try:
-        await _bucket().delete(doc["grid_id"])
-    except Exception:
-        pass
-    await db.tabelas_mestre.delete_one({"_id": oid})
+    await _delete_tabela_mestre_doc(doc)
     return {"ok": True}
 
 

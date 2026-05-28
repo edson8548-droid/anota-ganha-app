@@ -64,6 +64,19 @@ def test_cotacao_temp_artifacts_default_to_twelve_hours():
     assert cotacao.COTACAO_ORPHAN_GRIDFS_TTL_SECONDS == cotacao.COTACAO_TEMP_ARTIFACT_TTL_SECONDS
 
 
+def test_tabela_mestre_cleanup_rules_keep_one_week(monkeypatch):
+    now = datetime(2026, 5, 28, 12, tzinfo=timezone.utc)
+    monkeypatch.setattr(cotacao, "COTACAO_TABELA_MESTRE_TTL_SECONDS", 8 * 24 * 60 * 60)
+
+    recent = {"data_upload": now.replace(day=21)}
+    stale = {"data_upload": now.replace(day=20)}
+    missing_date = {}
+
+    assert not cotacao._should_cleanup_tabela_mestre(recent, now)
+    assert cotacao._should_cleanup_tabela_mestre(stale, now)
+    assert not cotacao._should_cleanup_tabela_mestre(missing_date, now)
+
+
 def test_cleanup_candidate_rules_skip_recent_and_running_jobs(monkeypatch):
     now = datetime(2026, 5, 28, 12, tzinfo=timezone.utc)
     monkeypatch.setattr(cotacao, "COTACAO_COMPLETED_JOB_TTL_SECONDS", 3600)
