@@ -11,6 +11,7 @@ IMAGE_CONTENT_TYPES = {"image/jpeg", "image/jpg", "image/pjpeg", "image/png", "i
 PDF_CONTENT_TYPES = {"application/pdf", "application/octet-stream"}
 XLSX_CONTENT_TYPES = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
     "application/octet-stream",
 }
 CSV_CONTENT_TYPES = {"text/csv", "application/vnd.ms-excel", "application/octet-stream", "text/plain"}
@@ -30,6 +31,8 @@ def _detected_kind(content: bytes) -> str:
         return "webp"
     if content.startswith(b"%PDF-"):
         return "pdf"
+    if content.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+        return "xls"
     if content.startswith((b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")):
         try:
             with ZipFile(BytesIO(content)) as zf:

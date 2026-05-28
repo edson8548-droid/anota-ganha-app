@@ -106,6 +106,16 @@ def _object_id_or_400(value: str, label: str = "ID inválido") -> ObjectId:
     return ObjectId(value)
 
 
+def _excel_suffix(filename: str | None) -> str:
+    return ".xls" if str(filename or "").lower().endswith(".xls") else ".xlsx"
+
+
+def _tabela_suffix(doc: dict | None) -> str:
+    if not doc:
+        return ".xlsx"
+    return doc.get("ext") or _excel_suffix(doc.get("filename"))
+
+
 def _aprendizado_query(user_id: str, tabela_id: str, nomes_norm):
     return {
         "user_id": user_id,
@@ -281,8 +291,8 @@ async def upload_tabela(
         arquivo,
         conteudo,
         label="Tabela mestre",
-        allowed_extensions={".xlsx"},
-        allowed_kinds={"xlsx"},
+        allowed_extensions={".xlsx", ".xls"},
+        allowed_kinds={"xlsx", "xls"},
         allowed_content_types=XLSX_CONTENT_TYPES,
         max_bytes=MAX_EXCEL_BYTES,
     )
@@ -293,7 +303,7 @@ async def upload_tabela(
         metadata={"content_type": arquivo.content_type},
     )
 
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=_excel_suffix(arquivo.filename))
     tmp.write(conteudo)
     tmp.close()
 
@@ -316,6 +326,7 @@ async def upload_tabela(
         "user_id": uid,
         "nome": nome,
         "filename": arquivo.filename,
+        "ext": _excel_suffix(arquivo.filename),
         "grid_id": grid_id,
         "prazo": prazo_padrao,
         "prazos_disponiveis": prazos_disponiveis,
@@ -348,7 +359,7 @@ async def listar_tabelas(credentials: HTTPAuthorizationCredentials = Depends(sec
             try:
                 grid_out = await _bucket().open_download_stream(doc["grid_id"])
                 conteudo = await grid_out.read()
-                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=_tabela_suffix(doc))
                 tmp.write(conteudo)
                 tmp.close()
                 prazos_disponiveis = await asyncio.to_thread(detectar_prazos_disponiveis, tmp.name)
@@ -434,8 +445,8 @@ async def processar_cotacao(
         arquivo,
         conteudo_cotacao,
         label="Arquivo de cotação",
-        allowed_extensions={".xlsx"},
-        allowed_kinds={"xlsx"},
+        allowed_extensions={".xlsx", ".xls"},
+        allowed_kinds={"xlsx", "xls"},
         allowed_content_types=XLSX_CONTENT_TYPES,
         max_bytes=MAX_EXCEL_BYTES,
     )
@@ -444,11 +455,11 @@ async def processar_cotacao(
     grid_out = await _bucket().open_download_stream(doc["grid_id"])
     conteudo_mestre = await grid_out.read()
 
-    tmp_mestre = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    tmp_mestre = tempfile.NamedTemporaryFile(delete=False, suffix=_tabela_suffix(doc))
     tmp_mestre.write(conteudo_mestre)
     tmp_mestre.close()
 
-    tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=_excel_suffix(arquivo.filename))
     tmp_cotacao.write(conteudo_cotacao)
     tmp_cotacao.close()
 
@@ -520,8 +531,8 @@ async def preview_cotacao(
         arquivo,
         conteudo_cotacao,
         label="Arquivo de cotação",
-        allowed_extensions={".xlsx"},
-        allowed_kinds={"xlsx"},
+        allowed_extensions={".xlsx", ".xls"},
+        allowed_kinds={"xlsx", "xls"},
         allowed_content_types=XLSX_CONTENT_TYPES,
         max_bytes=MAX_COTACAO_PREVIEW_BYTES,
     )
@@ -529,11 +540,11 @@ async def preview_cotacao(
     grid_out = await _bucket().open_download_stream(doc["grid_id"])
     conteudo_mestre = await grid_out.read()
 
-    tmp_mestre = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    tmp_mestre = tempfile.NamedTemporaryFile(delete=False, suffix=_tabela_suffix(doc))
     tmp_mestre.write(conteudo_mestre)
     tmp_mestre.close()
 
-    tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=_excel_suffix(arquivo.filename))
     tmp_cotacao.write(conteudo_cotacao)
     tmp_cotacao.close()
 
@@ -569,6 +580,7 @@ async def preview_cotacao(
             "user_id": uid,
             "tabela_id": tabela_id,
             "prazo": prazo_efetivo,
+            "cotacao_suffix": _excel_suffix(arquivo.filename),
             "cotacao_bytes": conteudo_cotacao,
             "itens": itens,
             "resultados": resultados,
@@ -608,8 +620,8 @@ async def _criar_preview_job(
         arquivo,
         conteudo_cotacao,
         label="Arquivo de cotação",
-        allowed_extensions={".xlsx"},
-        allowed_kinds={"xlsx"},
+        allowed_extensions={".xlsx", ".xls"},
+        allowed_kinds={"xlsx", "xls"},
         allowed_content_types=XLSX_CONTENT_TYPES,
         max_bytes=MAX_COTACAO_PREVIEW_BYTES,
     )
@@ -630,6 +642,7 @@ async def _criar_preview_job(
         "created_at": datetime.now(timezone.utc),
         "tabela_id": tabela_id,
         "input_grid_id": cotacao_grid_id,
+        "input_suffix": _excel_suffix(arquivo.filename),
         "modo": modo,
         "prazo": prazo,
     }
@@ -727,11 +740,11 @@ async def _processar_preview_job(job_id):
         cotacao_out = await _bucket().open_download_stream(job["input_grid_id"])
         conteudo_cotacao = await cotacao_out.read()
 
-        tmp_mestre = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+        tmp_mestre = tempfile.NamedTemporaryFile(delete=False, suffix=_tabela_suffix(doc))
         tmp_mestre.write(conteudo_mestre)
         tmp_mestre.close()
 
-        tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+        tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=job.get("input_suffix", ".xlsx"))
         tmp_cotacao.write(conteudo_cotacao)
         tmp_cotacao.close()
 
@@ -777,6 +790,7 @@ async def _processar_preview_job(job_id):
             "user_id": job["user_id"],
             "tabela_id": job["tabela_id"],
             "prazo": prazo_efetivo,
+            "cotacao_suffix": job.get("input_suffix", ".xlsx"),
             "cotacao_bytes": conteudo_cotacao,
             "itens": itens,
             "resultados": resultados,
@@ -1264,7 +1278,7 @@ async def confirmar_cotacao(
             resultados_filtrados.append({"linha": res.get("linha", 0), "preco": None, "tipo": None})
 
     try:
-        tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+        tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=sessao.get("cotacao_suffix", ".xlsx"))
         tmp_cotacao.write(cotacao_bytes)
         tmp_cotacao.close()
 
@@ -1356,7 +1370,7 @@ async def match_cotatudo(
     grid_out = await _bucket().open_download_stream(doc["grid_id"])
     conteudo_mestre = await grid_out.read()
 
-    tmp_mestre = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    tmp_mestre = tempfile.NamedTemporaryFile(delete=False, suffix=_tabela_suffix(doc))
     tmp_mestre.write(conteudo_mestre)
     tmp_mestre.close()
 

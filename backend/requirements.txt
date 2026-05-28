@@ -28,6 +28,7 @@ google-genai
 rapidfuzz
 openpyxl
 pandas
+xlrd
 
 pdfplumber==0.11.9
 pdfminer.six==20251230
