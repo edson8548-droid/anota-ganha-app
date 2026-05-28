@@ -417,7 +417,7 @@ def _public_offer_url(doc: dict, slug: str) -> str:
 
 
 def _share_image_url() -> str:
-    return f"{_frontend_base_url()}/assets/logo/venpro-og-image-v2.png"
+    return f"{_frontend_base_url()}/icon-192.png"
 
 
 def _favicon_url() -> str:
@@ -1778,9 +1778,9 @@ async def abrir_vitrine(slug: str, request: Request):
     <meta property="og:url" content="{escaped_public_url}" />
     <meta property="og:image" content="{escaped_image_url}" />
     <meta property="og:logo" content="{escaped_favicon_url}" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta property="og:image:width" content="192" />
+    <meta property="og:image:height" content="192" />
+    <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="{escaped_title}" />
     <meta name="twitter:description" content="{escaped_description}" />
     <meta name="twitter:image" content="{escaped_image_url}" />
