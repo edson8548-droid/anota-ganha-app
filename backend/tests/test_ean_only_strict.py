@@ -46,6 +46,22 @@ def test_coluna_codigo_na_cotacao_nao_e_tratada_como_ean():
     assert itens[0]["ean"] == ""
 
 
+def test_cotacao_codigo_nome_preco_reconhece_ean_e_nome():
+    path = _xlsx([
+        ["CÓDIGO", "NOME", "PREÇO"],
+        ["7891000379585", "ACHOC. NESCAU 200G", ""],
+        ["7891000412855", "ACHOC. PO NESCAU LT 350G", ""],
+    ])
+    try:
+        itens, _ = ler_cotacao(path)
+    finally:
+        os.unlink(path)
+
+    assert itens[0]["ean"] == "7891000379585"
+    assert itens[0]["nome"] == "ACHOC. NESCAU 200G"
+    assert itens[0]["col_preco"] == 2
+
+
 def test_coluna_cod_produto_nao_e_tratada_como_descricao():
     path = _xlsx([
         ["Cód. Produto", "Ean", "Descrição", "Emb."],
@@ -72,6 +88,21 @@ def test_coluna_codigo_na_tabela_mestre_nao_entra_no_dict_de_ean():
 
     assert "12345678" not in precos
     assert precos_nome[0]["preco"] == 25.9
+
+
+def test_tabela_mestre_codigo_nome_preco_reconhece_ean_por_valores():
+    path = _xlsx([
+        ["CÓDIGO", "NOME", "PREÇO"],
+        ["7891000379585", "ACHOC. NESCAU 200G", 8.75],
+        ["7891000412855", "ACHOC. PO NESCAU LT 350G", 12.4],
+    ])
+    try:
+        precos, precos_nome = ler_tabela_mestre(path)
+    finally:
+        os.unlink(path)
+
+    assert precos["7891000379585"] == 8.75
+    assert precos_nome[0]["orig"] == "ACHOC. NESCAU 200G"
 
 
 def test_tabela_mestre_sem_prazo_usa_preco_unitario_e_nao_total():

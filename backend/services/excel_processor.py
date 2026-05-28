@@ -11,15 +11,34 @@ import os
 import io
 import zipfile
 import re as _re
+import unicodedata
 
 from .matching_engine import limpar_ean, normalizar_nome, ordenar_palavras, processar_cotacao_com_ia
 
 
+def _normalizar_cabecalho(valor) -> str:
+    c = str(valor or "").upper().strip()
+    c = unicodedata.normalize("NFKD", c).encode("ASCII", "ignore").decode("ascii")
+    c = _re.sub(r"[^A-Z0-9]+", " ", c)
+    return _re.sub(r"\s+", " ", c).strip()
+
+
+def _score_coluna_nome(nome_coluna) -> int:
+    c_norm = _normalizar_cabecalho(nome_coluna)
+    if not c_norm:
+        return 0
+    if "PRODUTO" in c_norm and any(k in c_norm for k in ("COD", "CODIGO")):
+        return 0
+    if c_norm in {"NOME", "NOME PRODUTO", "NOME DO PRODUTO", "DESCRICAO", "DESCRICAO PRODUTO"}:
+        return 100
+    if any(k in c_norm for k in ("PRODUTO", "DESCRI", "ITEM", "MERCAD")):
+        return 80
+    return 0
+
+
 def _score_coluna_ean(nome_coluna) -> int:
     """Pontua colunas prováveis de EAN/GTIN evitando confundir com código interno."""
-    c = str(nome_coluna or "").upper().strip()
-    c = _re.sub(r"\s+", " ", c)
-    c_norm = _re.sub(r"[^A-Z0-9]+", " ", c).strip()
+    c_norm = _normalizar_cabecalho(nome_coluna)
 
     if not c_norm:
         return 0
@@ -28,7 +47,7 @@ def _score_coluna_ean(nome_coluna) -> int:
         or "CODIGO PROD" in c_norm
         or "COD INTERNO" in c_norm
         or "CODIGO INTERNO" in c_norm
-        or c_norm in {"COD", "CODIGO", "CÓDIGO"}
+        or c_norm in {"COD", "CODIGO"}
     ):
         return 0
     if "EAN" in c_norm or "GTIN" in c_norm:
@@ -53,11 +72,82 @@ def _melhor_coluna_ean(colunas):
     return melhor_col if melhor_score >= 80 else None
 
 
+def _permite_inferir_ean_por_valores(nome_coluna) -> bool:
+    c_norm = _normalizar_cabecalho(nome_coluna)
+    if not c_norm:
+        return False
+    if any(k in c_norm for k in ("COD PROD", "CODIGO PROD", "COD INTERNO", "CODIGO INTERNO", "INTERNO")):
+        return False
+    return (
+        c_norm in {"COD", "CODIGO"}
+        or "EAN" in c_norm
+        or "GTIN" in c_norm
+        or "BARRA" in c_norm
+        or "BARCODE" in c_norm
+    )
+
+
+def _parece_ean_real(valor) -> bool:
+    ean = limpar_ean(valor)
+    return 12 <= len(ean) <= 14
+
+
+def _inferir_coluna_ean_openpyxl(ws, header_row: int, ignorar_cols=None):
+    ignorar_cols = {c for c in (ignorar_cols or set()) if c is not None}
+    melhor_col = None
+    melhor_score = 0
+
+    for col_idx in range(ws.max_column):
+        if col_idx in ignorar_cols:
+            continue
+        if not _permite_inferir_ean_por_valores(ws.cell(row=header_row, column=col_idx + 1).value):
+            continue
+
+        total = 0
+        hits = 0
+        for row_idx in range(header_row + 1, min(ws.max_row, header_row + 50) + 1):
+            value = ws.cell(row=row_idx, column=col_idx + 1).value
+            if value is None or str(value).strip() == "":
+                continue
+            total += 1
+            if _parece_ean_real(value):
+                hits += 1
+
+        if hits and total:
+            score = hits / total
+            if score >= 0.8 and score > melhor_score:
+                melhor_col = col_idx
+                melhor_score = score
+
+    return melhor_col
+
+
+def _inferir_coluna_ean_dataframe(df, ignorar_cols=None):
+    ignorar_cols = {c for c in (ignorar_cols or set()) if c is not None}
+    melhor_col = None
+    melhor_score = 0
+
+    for col_idx, col in enumerate(df.columns):
+        if col_idx in ignorar_cols:
+            continue
+        if not _permite_inferir_ean_por_valores(col):
+            continue
+
+        values = [v for v in df.iloc[:50, col_idx].tolist() if v is not None and str(v).strip() not in ("", "nan")]
+        if not values:
+            continue
+        hits = sum(1 for v in values if _parece_ean_real(v))
+        score = hits / len(values)
+        if hits and score >= 0.8 and score > melhor_score:
+            melhor_col = col_idx
+            melhor_score = score
+
+    return melhor_col
+
+
 def _score_coluna_preco(nome_coluna, prazo=None) -> int:
     """Pontua colunas de preco evitando total, embalagem e quantidade."""
-    c = str(nome_coluna or "").upper().strip()
-    c = _re.sub(r"\s+", " ", c)
-    c_norm = _re.sub(r"[^A-Z0-9]+", " ", c).strip()
+    c_norm = _normalizar_cabecalho(nome_coluna)
 
     if not c_norm:
         return 0
@@ -153,8 +243,6 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
     """
     buf = _xlsx_safe_bytes(caminho_arquivo)
 
-    _NOME_KW = ("PRODUTO", "DESCRI", "ITEM", "MERCAD")
-
     df_final = None
     col_nome_final = None
     col_ean_final = None
@@ -168,21 +256,28 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
                 continue
 
             cols = df.columns
-            cols_str = [str(c) for c in cols]
-            cols_up = [c.upper() for c in cols_str]
-
             # Coluna de preço: prazo quando existir; senão preço unitário.
             c_preco = _melhor_coluna_preco(cols, prazo=prazo)
 
             # Coluna de nome
             c_nome = None
-            for i, c in enumerate(cols_up):
-                if any(k in c for k in _NOME_KW):
+            for i, c in enumerate(cols):
+                if _score_coluna_nome(c) >= 80:
                     c_nome = cols[i]
                     break
 
             # Coluna de EAN/GTIN. Prioriza códigos de barras reais e evita COD PRODUTO.
             c_ean = _melhor_coluna_ean(cols)
+            if c_ean is None:
+                idx_ean = _inferir_coluna_ean_dataframe(
+                    df,
+                    ignorar_cols={
+                        df.columns.get_loc(c_nome) if c_nome is not None else None,
+                        df.columns.get_loc(c_preco) if c_preco is not None else None,
+                    },
+                )
+                if idx_ean is not None:
+                    c_ean = cols[idx_ean]
 
             if c_nome is not None and c_preco is not None:
                 df_final = df
@@ -242,16 +337,11 @@ def ler_cotacao(caminho_arquivo):
     Usa detecção parcial de cabeçalhos para tolerar variações de nome.
     Retorna: (itens, header_row)
     """
-    _NOME_KW  = ("PRODUTO", "DESCRI", "ITEM", "MERCAD")
-    _EAN_KW   = ("EAN", "COD.BARRAS", "COD BARRAS", "CODIGO DE BARRAS",
-                 "CÓDIGO DE BARRAS", "CÓDIGO BARRAS", "COD BARRA", "GTIN", "BARRAS")
     _PRECO_KW = ("PREÇO", "PRECO", "VALOR UNIT", "VALOR UNI", "VALOR", "R$",
                  "PRECO UNIT", "PREÇO UNIT", "UNIT", "CUSTO", "VLR", "VLR. CUSTO", "VLR CUSTO")
 
     def _match_nome(val):
-        if "PRODUTO" in val and any(k in val for k in ("COD", "CÓD", "CODIGO", "CÓDIGO")):
-            return False
-        return any(k in val for k in _NOME_KW)
+        return _score_coluna_nome(val) >= 80
 
     def _match_ean(val):
         return _score_coluna_ean(val) >= 80
@@ -292,6 +382,12 @@ def ler_cotacao(caminho_arquivo):
 
         if found_header:
             header_row = found_header
+        if col_ean is None:
+            col_ean = _inferir_coluna_ean_openpyxl(
+                ws,
+                header_row,
+                ignorar_cols={col_nome, col_preco},
+            )
         if col_nome is None:
             col_nome = 0
         for row_idx in range(header_row + 1, ws.max_row + 1):
@@ -332,6 +428,8 @@ def ler_cotacao(caminho_arquivo):
 
                 if col_nome is None:
                     continue
+                if col_ean is None:
+                    col_ean = _inferir_coluna_ean_dataframe(df, ignorar_cols={col_nome, col_preco})
 
                 header_row = hdr + 1
 
