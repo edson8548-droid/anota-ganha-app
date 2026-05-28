@@ -252,12 +252,51 @@ async def _soft_delete_vitrine_for_user(offer_id: str, uid: str, request: Reques
         )
         raise HTTPException(400, "ID inválido")
 
-    result = await _db.vitrine_offers.update_one(
-        {"_id": offer_oid, "created_by": uid},
-        {"$set": {"status": "deleted", "updated_at": datetime.now(timezone.utc)}},
-    )
+    owner_filter = {
+        "_id": offer_oid,
+        "$or": [
+            {"created_by": uid},
+            {"user_id": uid},
+            {"owner_id": uid},
+        ],
+    }
+
+    try:
+        result = await _db.vitrine_offers.update_one(
+            owner_filter,
+            {"$set": {"status": "deleted", "updated_at": datetime.now(timezone.utc)}},
+        )
+    except Exception as exc:
+        logger.exception("[USERS] Erro Mongo ao excluir vitrine offer_id=%s uid=%s", offer_id, uid)
+        await audit_event(
+            "vitrine_offer_delete_failed",
+            uid=uid,
+            status="error",
+            metadata={"offerId": offer_id, "reason": "mongo_error", "error": str(exc)[:180]},
+            request=request,
+        )
+        raise HTTPException(500, "Erro no banco ao excluir a vitrine. Tente novamente em alguns segundos.")
+
     if result.matched_count == 0:
-        existing = await _db.vitrine_offers.find_one({"_id": offer_oid}, {"created_by": 1, "status": 1})
+        try:
+            existing = await _db.vitrine_offers.find_one(
+                {"_id": offer_oid},
+                {"created_by": 1, "user_id": 1, "owner_id": 1, "status": 1},
+            )
+        except Exception as exc:
+            logger.exception("[USERS] Erro Mongo ao conferir vitrine offer_id=%s uid=%s", offer_id, uid)
+            await audit_event(
+                "vitrine_offer_delete_failed",
+                uid=uid,
+                status="error",
+                metadata={"offerId": offer_id, "reason": "mongo_lookup_error", "error": str(exc)[:180]},
+                request=request,
+            )
+            raise HTTPException(500, "Erro no banco ao conferir a vitrine. Tente novamente em alguns segundos.")
+
+        if existing and existing.get("status") == "deleted":
+            return {"ok": True, "route": "users_fallback", "alreadyDeleted": True}
+
         await audit_event(
             "vitrine_offer_delete_failed",
             uid=uid,
@@ -268,6 +307,8 @@ async def _soft_delete_vitrine_for_user(offer_id: str, uid: str, request: Reques
                 "exists": bool(existing),
                 "storedStatus": existing.get("status") if existing else None,
                 "ownerHash": hash_identifier(existing.get("created_by")) if existing else None,
+                "userIdHash": hash_identifier(existing.get("user_id")) if existing else None,
+                "ownerIdHash": hash_identifier(existing.get("owner_id")) if existing else None,
             },
             request=request,
         )
