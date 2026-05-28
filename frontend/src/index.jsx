@@ -43,14 +43,6 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 });
 
-window.addEventListener('error', (event) => {
-  const target = event.target;
-  const isAssetError = target && ['SCRIPT', 'LINK'].includes(target.tagName);
-  if (isAssetError || isRouteLoadFailure(event.error || event.message)) {
-    reloadOnceForFreshAssets();
-  }
-}, true);
-
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
