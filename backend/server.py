@@ -27,6 +27,7 @@ from routes.vitrine import router as vitrine_router, init_vitrine
 import uuid
 from datetime import datetime, timezone
 import asyncio
+import httpx
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 
@@ -305,8 +306,8 @@ async def startup_event():
         logger.warning(f"⚠️  Retomada de jobs de cotação: {e}")
     logger.info("✅ Asaas integrado em /api/asaas")
     logger.info("✅ Cotação integrado em /api/cotacao")
+    asyncio.create_task(_keep_alive_loop())
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
-    logger.info("Mongo client closed")
+
+async def _keep_alive_loop():
+    """Pinga o próprio /hea
