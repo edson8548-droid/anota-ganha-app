@@ -2,6 +2,42 @@ import api from './api';
 import { auth } from '../firebase/config';
 import { apiUrl, backendUrl } from '../config/api';
 
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const isConnectionError = (err) =>
+  err instanceof TypeError ||
+  /Failed to fetch|NetworkError|Load failed|Network request failed/i.test(err?.message || '');
+
+async function fetchHealthWithTimeout(timeoutMs = 4000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(backendUrl('/health'), {
+      mode: 'cors',
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function waitForBackend(maxWaitMs = 60000) {
+  const deadline = Date.now() + maxWaitMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetchHealthWithTimeout();
+      if (res.ok) return true;
+    } catch {
+      // backend ainda reiniciando/acordando
+    }
+    await wait(2000);
+  }
+  return false;
+}
+
+const connectionMessage = 'Não foi possível conectar ao servidor. Aguarde alguns segundos e tente novamente.';
+
 export const listarTabelas = () => api.get('/cotacao/tabelas');
 
 export const uploadTabela = (arquivo, nome) => {
@@ -71,24 +107,27 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress, option
 
   const headers = { Authorization: `Bearer ${token}` };
 
-  const wakeBackend = async () => {
-    try { await fetch(backendUrl('/health'), { mode: 'cors' }); } catch {}
-  };
-
   const submitJob = async () => {
     let submitRes;
-    try {
-      submitRes = await fetch(apiUrl('/cotacao/gerar-tabela-prazos'), {
-        method: 'POST',
-        headers,
-        body: buildFormData(),
-        signal: options.signal,
-      });
-    } catch (err) {
-      if (options.signal?.aborted) {
-        throw new DOMException('Processamento cancelado', 'AbortError');
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        submitRes = await fetch(apiUrl('/cotacao/gerar-tabela-prazos'), {
+          method: 'POST',
+          headers,
+          body: buildFormData(),
+          signal: options.signal,
+        });
+        break;
+      } catch (err) {
+        if (options.signal?.aborted) {
+          throw new DOMException('Processamento cancelado', 'AbortError');
+        }
+        if (attempt === 0 && isConnectionError(err)) {
+          await waitForBackend();
+          continue;
+        }
+        throw new Error(connectionMessage);
       }
-      throw new Error('Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.');
     }
 
     if (!submitRes.ok) {
@@ -154,7 +193,7 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress, option
   const isServerRestartError = (err) =>
     /servidor reiniciou durante o processamento/i.test(err?.message || '');
 
-  await wakeBackend();
+  await waitForBackend(10000);
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -162,7 +201,7 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress, option
       return await pollJob(jobId, attempt * 15);
     } catch (err) {
       if (attempt === 0 && isServerRestartError(err)) {
-        await wakeBackend();
+        await waitForBackend();
         continue;
       }
       throw err;
@@ -182,11 +221,14 @@ export const cancelarPreviewCotacao = async (jobId) => {
 };
 
 export const previewCotacao = async (arquivo, tabelaId, modo = 'completo', prazo = 0, options = {}) => {
-  const formData = new FormData();
-  formData.append('arquivo', arquivo);
-  formData.append('tabela_id', tabelaId);
-  formData.append('modo', modo);
-  formData.append('prazo', prazo);
+  const buildFormData = () => {
+    const formData = new FormData();
+    formData.append('arquivo', arquivo);
+    formData.append('tabela_id', tabelaId);
+    formData.append('modo', modo);
+    formData.append('prazo', prazo);
+    return formData;
+  };
 
   const user = auth.currentUser;
   if (!user) {
@@ -197,19 +239,28 @@ export const previewCotacao = async (arquivo, tabelaId, modo = 'completo', prazo
   const token = await userFinal.getIdToken();
   const headers = { Authorization: `Bearer ${token}` };
 
+  await waitForBackend(10000);
+
   let submitRes;
-  try {
-    submitRes = await fetch(apiUrl('/cotacao/preview-async'), {
-      method: 'POST',
-      headers,
-      body: formData,
-      signal: options.signal,
-    });
-  } catch (err) {
-    if (options.signal?.aborted) {
-      throw new DOMException('Processamento cancelado', 'AbortError');
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      submitRes = await fetch(apiUrl('/cotacao/preview-async'), {
+        method: 'POST',
+        headers,
+        body: buildFormData(),
+        signal: options.signal,
+      });
+      break;
+    } catch (err) {
+      if (options.signal?.aborted) {
+        throw new DOMException('Processamento cancelado', 'AbortError');
+      }
+      if (attempt === 0 && isConnectionError(err)) {
+        await waitForBackend();
+        continue;
+      }
+      throw new Error(connectionMessage);
     }
-    throw new Error('Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.');
   }
 
   if (!submitRes.ok) {
