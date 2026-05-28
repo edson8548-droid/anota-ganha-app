@@ -147,12 +147,12 @@
     "redirects": [
       {
         "source": "/abrir/:slug",
-        "destination": "https://api.venpro.com.br/api/vitrine/abrir/:slug",
+        "destination": "/oferta/:slug",
         "type": 302
       },
       {
         "source": "/:empresa/abrir/:slug",
-        "destination": "https://api.venpro.com.br/api/vitrine/abrir/:slug",
+        "destination": "/:empresa/ofertas/:slug",
         "type": 302
       },
       {
