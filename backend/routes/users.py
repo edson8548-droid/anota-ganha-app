@@ -7,6 +7,7 @@ import asyncio
 import logging
 import os
 from datetime import datetime, timedelta, timezone
+from urllib.parse import parse_qs
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
@@ -193,6 +194,22 @@ async def _verify_user_token(token: str) -> str:
     except Exception:
         logger.warning("[SECURITY] auth_invalid route=users_token")
         raise HTTPException(401, "Token inválido")
+
+
+def _extract_simple_token(raw_body: bytes, query_token: str | None = None) -> str:
+    if query_token:
+        return query_token.strip()
+
+    text = raw_body.decode("utf-8", errors="ignore").strip()
+    if not text:
+        return ""
+
+    parsed = parse_qs(text, keep_blank_values=False)
+    token_values = parsed.get("token") or parsed.get("idToken")
+    if token_values:
+        return token_values[0].strip()
+
+    return text
 
 
 def _fs():
@@ -499,6 +516,17 @@ async def update_resource_state_from_link(
         media_type="image/gif",
         headers={"Cache-Control": "no-store, max-age=0"},
     )
+
+
+@router.post("/resource-state-simple")
+async def update_resource_state_simple(request: Request, resource: str = "", resource_id: str = "", state: str = ""):
+    """Fallback POST simples sem Authorization header/preflight para navegadores restritivos."""
+    if resource != "catalog" or state != "removed":
+        raise HTTPException(400, "Operação inválida")
+    raw_body = await request.body()
+    token = _extract_simple_token(raw_body, request.query_params.get("token"))
+    uid = await _verify_user_token(token)
+    return await _soft_delete_vitrine_for_user(resource_id, uid, request=request)
 
 
 @router.post("/ensure-trial")

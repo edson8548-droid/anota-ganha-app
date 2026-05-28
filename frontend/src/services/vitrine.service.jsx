@@ -123,6 +123,39 @@ async function excluirViaSimpleFallback(id, url, headers) {
   const token = String(headers.Authorization || '').replace(/^Bearer\s+/i, '');
   if (!token) throw new Error('Sessao expirada. Faca login novamente.');
   const tokenParam = encodeURIComponent(token);
+  const neutralSimpleUrl = (
+    apiUrl('/users/resource-state-simple')
+    + '?resource=catalog&resource_id=' + encodeURIComponent(id)
+    + '&state=removed'
+  );
+
+  try {
+    const response = await fetch(neutralSimpleUrl, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: token,
+    });
+    if (!response.ok) {
+      throw new Error(await readFetchError(response) || 'Erro ao excluir');
+    }
+    return { data: await response.json().catch(() => ({ ok: true, fallback: 'neutral-simple' })) };
+  } catch (err) {
+    if (!isFetchNetworkError(err)) throw err;
+  }
+
+  await fetch(neutralSimpleUrl, {
+    method: 'POST',
+    mode: 'no-cors',
+    body: new URLSearchParams({ token }),
+  });
+  await wait(1500);
+  try {
+    await confirmarExclusao(id, headers);
+    return { data: { ok: true, fallback: 'neutral-simple-verified' } };
+  } catch {
+    // Continue with compatibility fallbacks below.
+  }
 
   try {
     const response = await fetch(url + '/excluir-simple', {

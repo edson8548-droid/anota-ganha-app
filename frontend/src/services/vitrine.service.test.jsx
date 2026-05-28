@@ -207,7 +207,7 @@ test('excluir usa fallback simples sem preflight quando chamadas ajax falham por
   await vitrineService.excluir('oferta-1');
 
   expect(fetch).toHaveBeenCalledWith(
-    'https://api.venpro.com.br/api/vitrine/ofertas/oferta-1/excluir-simple',
+    'https://api.venpro.com.br/api/users/resource-state-simple?resource=catalog&resource_id=oferta-1&state=removed',
     expect.objectContaining({
       method: 'POST',
       mode: 'cors',
@@ -246,7 +246,7 @@ test('excluir com no-cors só confirma depois da vitrine sumir da listagem', asy
 
   expect(fetch).toHaveBeenNthCalledWith(
     3,
-    'https://api.venpro.com.br/api/vitrine/ofertas/oferta-1/excluir-simple',
+    'https://api.venpro.com.br/api/users/resource-state-simple?resource=catalog&resource_id=oferta-1&state=removed',
     expect.objectContaining({
       method: 'POST',
       mode: 'no-cors',
