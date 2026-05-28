@@ -116,6 +116,18 @@ def _tabela_suffix(doc: dict | None) -> str:
     return doc.get("ext") or _excel_suffix(doc.get("filename"))
 
 
+async def _upload_grid_file(bucket, filename: str, content: bytes, content_type: str | None):
+    try:
+        return await bucket.upload_from_stream(
+            filename,
+            BytesIO(content),
+            metadata={"content_type": content_type or "application/octet-stream"},
+        )
+    except Exception as e:
+        logger.exception("Erro ao salvar arquivo no GridFS: filename=%s type=%s", filename, type(e).__name__)
+        raise HTTPException(500, f"Erro ao salvar arquivo no servidor: {type(e).__name__}: {str(e)}")
+
+
 def _aprendizado_query(user_id: str, tabela_id: str, nomes_norm):
     return {
         "user_id": user_id,
@@ -287,7 +299,7 @@ async def upload_tabela(
         raise HTTPException(400, f"Máximo de {MAX_TABELAS} tabelas permitidas")
 
     conteudo = await arquivo.read()
-    validate_upload(
+    filename = validate_upload(
         arquivo,
         conteudo,
         label="Tabela mestre",
@@ -297,13 +309,14 @@ async def upload_tabela(
         max_bytes=MAX_EXCEL_BYTES,
     )
     bucket = _bucket()
-    grid_id = await bucket.upload_from_stream(
-        arquivo.filename,
-        BytesIO(conteudo),
-        metadata={"content_type": arquivo.content_type},
+    grid_id = await _upload_grid_file(
+        bucket,
+        filename,
+        conteudo,
+        arquivo.content_type,
     )
 
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=_excel_suffix(arquivo.filename))
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=_excel_suffix(filename))
     tmp.write(conteudo)
     tmp.close()
 
@@ -325,8 +338,8 @@ async def upload_tabela(
     doc = {
         "user_id": uid,
         "nome": nome,
-        "filename": arquivo.filename,
-        "ext": _excel_suffix(arquivo.filename),
+        "filename": filename,
+        "ext": _excel_suffix(filename),
         "grid_id": grid_id,
         "prazo": prazo_padrao,
         "prazos_disponiveis": prazos_disponiveis,
@@ -441,7 +454,7 @@ async def processar_cotacao(
         raise HTTPException(404, "Tabela mestre não encontrada")
 
     conteudo_cotacao = await arquivo.read()
-    validate_upload(
+    filename = validate_upload(
         arquivo,
         conteudo_cotacao,
         label="Arquivo de cotação",
@@ -459,7 +472,7 @@ async def processar_cotacao(
     tmp_mestre.write(conteudo_mestre)
     tmp_mestre.close()
 
-    tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=_excel_suffix(arquivo.filename))
+    tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=_excel_suffix(filename))
     tmp_cotacao.write(conteudo_cotacao)
     tmp_cotacao.close()
 
@@ -527,7 +540,7 @@ async def preview_cotacao(
         raise HTTPException(404, "Tabela mestre não encontrada")
 
     conteudo_cotacao = await arquivo.read()
-    validate_upload(
+    filename = validate_upload(
         arquivo,
         conteudo_cotacao,
         label="Arquivo de cotação",
@@ -544,7 +557,7 @@ async def preview_cotacao(
     tmp_mestre.write(conteudo_mestre)
     tmp_mestre.close()
 
-    tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=_excel_suffix(arquivo.filename))
+    tmp_cotacao = tempfile.NamedTemporaryFile(delete=False, suffix=_excel_suffix(filename))
     tmp_cotacao.write(conteudo_cotacao)
     tmp_cotacao.close()
 
@@ -580,7 +593,7 @@ async def preview_cotacao(
             "user_id": uid,
             "tabela_id": tabela_id,
             "prazo": prazo_efetivo,
-            "cotacao_suffix": _excel_suffix(arquivo.filename),
+            "cotacao_suffix": _excel_suffix(filename),
             "cotacao_bytes": conteudo_cotacao,
             "itens": itens,
             "resultados": resultados,
@@ -616,7 +629,7 @@ async def _criar_preview_job(
         raise HTTPException(404, "Tabela mestre não encontrada")
 
     conteudo_cotacao = await arquivo.read()
-    validate_upload(
+    filename = validate_upload(
         arquivo,
         conteudo_cotacao,
         label="Arquivo de cotação",
@@ -626,10 +639,11 @@ async def _criar_preview_job(
         max_bytes=MAX_COTACAO_PREVIEW_BYTES,
     )
 
-    cotacao_grid_id = await _bucket().upload_from_stream(
-        arquivo.filename or "cotacao.xlsx",
-        BytesIO(conteudo_cotacao),
-        metadata={"content_type": arquivo.content_type or "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+    cotacao_grid_id = await _upload_grid_file(
+        _bucket(),
+        filename,
+        conteudo_cotacao,
+        arquivo.content_type or "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
     job_id = str(uuid.uuid4())
@@ -642,7 +656,7 @@ async def _criar_preview_job(
         "created_at": datetime.now(timezone.utc),
         "tabela_id": tabela_id,
         "input_grid_id": cotacao_grid_id,
-        "input_suffix": _excel_suffix(arquivo.filename),
+        "input_suffix": _excel_suffix(filename),
         "modo": modo,
         "prazo": prazo,
     }
@@ -937,7 +951,7 @@ async def gerar_tabela_prazos(
     uid = await get_user_id(credentials)
 
     conteudo = await arquivo.read()
-    validate_upload(
+    filename = validate_upload(
         arquivo,
         conteudo,
         label="Tabela para prazos",
@@ -950,10 +964,11 @@ async def gerar_tabela_prazos(
 
     job_id = str(uuid.uuid4())
     bucket = _bucket()
-    input_grid_id = await bucket.upload_from_stream(
-        arquivo.filename or f"tabela_base{ext}",
-        BytesIO(conteudo),
-        metadata={"content_type": arquivo.content_type or "application/octet-stream"},
+    input_grid_id = await _upload_grid_file(
+        bucket,
+        filename or f"tabela_base{ext}",
+        conteudo,
+        arquivo.content_type,
     )
     await db.cotacao_jobs.insert_one({
         "_id": job_id,
@@ -1046,10 +1061,11 @@ async def _processar_tabela_prazos(job_id):
         os.unlink(resultado_path)
 
         bucket = _bucket()
-        grid_id = await bucket.upload_from_stream(
+        grid_id = await _upload_grid_file(
+            bucket,
             "tabela_com_prazos.xlsx",
-            BytesIO(resultado_bytes),
-            metadata={"content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+            resultado_bytes,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
         await db.cotacao_jobs.update_one(
