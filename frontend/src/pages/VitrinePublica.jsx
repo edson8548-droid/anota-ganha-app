@@ -88,9 +88,15 @@ export default function VitrinePublica() {
   // Atualiza CSS variable para sticky search bar
   useEffect(() => {
     if (!headerRef.current) return;
-    const obs = new ResizeObserver(() => {
+    const setHeaderHeight = () => {
       document.documentElement.style.setProperty('--header-h', `${headerRef.current?.offsetHeight || 120}px`);
-    });
+    };
+    setHeaderHeight();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', setHeaderHeight);
+      return () => window.removeEventListener('resize', setHeaderHeight);
+    }
+    const obs = new ResizeObserver(setHeaderHeight);
     obs.observe(headerRef.current);
     return () => obs.disconnect();
   }, [oferta]);
@@ -122,6 +128,7 @@ export default function VitrinePublica() {
 
   useEffect(() => {
     if (!temMaisProdutos || !loadMoreRef.current) return undefined;
+    if (typeof IntersectionObserver === 'undefined') return undefined;
 
     const observer = new IntersectionObserver((entries) => {
       if (!entries.some(entry => entry.isIntersecting)) return;

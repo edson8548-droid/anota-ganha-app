@@ -419,9 +419,9 @@ export const vitrineService = {
 
   gerarLinkPublico(slug, companyName) {
     if (companyName) {
-      return window.location.origin + '/' + slugifyPathSegment(companyName) + '/ofertas/' + slug;
+      return window.location.origin + '/' + slugifyPathSegment(companyName) + '/abrir/' + slug;
     }
-    return window.location.origin + '/oferta/' + slug;
+    return window.location.origin + '/abrir/' + slug;
   },
 
   imagemUrl(path) {

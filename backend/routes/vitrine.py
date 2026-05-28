@@ -6,6 +6,8 @@ Cliente abre, monta pedido e finaliza via WhatsApp.
 import os
 import re
 import io
+import html
+import json
 import uuid
 import asyncio
 import logging
@@ -395,6 +397,27 @@ def _public_offer_response(doc: dict) -> dict:
             for item in items_ativos
         ],
     }
+
+
+def _public_path_slug(value: str | None, fallback: str = "empresa") -> str:
+    slug = unicodedata.normalize("NFKD", value or "")
+    slug = "".join(c for c in slug if not unicodedata.combining(c))
+    slug = slug.lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", slug).strip("-")
+    return slug[:60] or fallback
+
+
+def _frontend_base_url() -> str:
+    return (os.environ.get("FRONTEND_URL") or "https://venpro.com.br").rstrip("/")
+
+
+def _public_offer_url(doc: dict, slug: str) -> str:
+    company_slug = _public_path_slug(doc.get("company_name"))
+    return f"{_frontend_base_url()}/{company_slug}/ofertas/{slug}"
+
+
+def _share_image_url() -> str:
+    return f"{_frontend_base_url()}/assets/logo/venpro-og-image-v2.png"
 
 
 # ═══════════════════════════════════════
@@ -1672,3 +1695,72 @@ async def pagina_publica(slug: str):
         raise HTTPException(410, "Vitrine expirada")
 
     return _public_offer_response(doc)
+
+
+@router.get("/abrir/{slug}")
+async def abrir_vitrine(slug: str, request: Request):
+    """HTML leve para previews do WhatsApp antes de abrir a vitrine pública."""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{2,80}", slug):
+        logger.warning("[SECURITY] vitrine_share_blocked reason=bad_slug slug_len=%s", len(slug or ""))
+        raise HTTPException(404, "Vitrine não encontrada ou inativa")
+
+    doc = await _db.vitrine_offers.find_one({"slug": slug, "status": "active"})
+    if not doc:
+        logger.warning("[SECURITY] vitrine_share_blocked reason=not_found_or_inactive slug_len=%s", len(slug or ""))
+        raise HTTPException(404, "Vitrine não encontrada ou inativa")
+
+    expires_at = _parse_public_expiration(doc.get("expires_at"))
+    if expires_at and datetime.now(timezone.utc) > expires_at:
+        logger.warning("[SECURITY] vitrine_share_blocked reason=expired slug_len=%s", len(slug or ""))
+        raise HTTPException(410, "Vitrine expirada")
+
+    company = (doc.get("company_name") or "Empresa").strip()
+    offer_title = (doc.get("title") or "Ofertas para sua loja").strip()
+    item_count = len([i for i in doc.get("items", []) if i.get("active", True)])
+    public_url = _public_offer_url(doc, slug)
+    share_title = f"{company} - {offer_title}"
+    share_description = (
+        f"Vitrine de ofertas da {company}. "
+        f"Abra o link, escolha os produtos e envie seu pedido pelo WhatsApp."
+    )
+    if item_count:
+        share_description += f" {item_count} produtos disponíveis."
+
+    escaped_title = html.escape(share_title)
+    escaped_description = html.escape(share_description)
+    escaped_public_url = html.escape(public_url, quote=True)
+    escaped_image_url = html.escape(_share_image_url(), quote=True)
+    js_public_url = json.dumps(public_url)
+
+    return Response(
+        f"""<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{escaped_title}</title>
+    <meta name="description" content="{escaped_description}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Venpro Ofertas" />
+    <meta property="og:title" content="{escaped_title}" />
+    <meta property="og:description" content="{escaped_description}" />
+    <meta property="og:url" content="{escaped_public_url}" />
+    <meta property="og:image" content="{escaped_image_url}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="{escaped_title}" />
+    <meta name="twitter:description" content="{escaped_description}" />
+    <meta name="twitter:image" content="{escaped_image_url}" />
+    <link rel="canonical" href="{escaped_public_url}" />
+    <meta http-equiv="refresh" content="0;url={escaped_public_url}" />
+    <script>window.location.replace({js_public_url});</script>
+  </head>
+  <body>
+    <p>Abrindo ofertas de {html.escape(company)}...</p>
+    <p><a href="{escaped_public_url}">Abrir vitrine de ofertas</a></p>
+  </body>
+</html>""",
+        media_type="text/html; charset=utf-8",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
