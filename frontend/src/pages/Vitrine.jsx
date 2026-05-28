@@ -683,3 +683,19 @@ function ImagePickerModal({ picker, onClose, onSelect }) {
           <div className="vt-image-picker-loading">Buscando opções de foto...</div>
         ) : (
           <div className="vt-image-picker-grid">
+            {picker.images.map((img, i) => (
+              <button
+                key={`${img.image_url}-${i}`}
+                className="vt-image-option"
+                onClick={() => onSelect(img.image_url)}
+              >
+                <img src={img.thumbnail_url || img.image_url} alt="" />
+                <span>Usar esta foto</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

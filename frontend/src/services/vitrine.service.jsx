@@ -217,6 +217,15 @@ export const vitrineService = {
       let r;
 
       r = await tryMethod(function(h) {
+        return axios.post(apiUrl('/users/resource-state'), {
+          resource: 'catalog',
+          resource_id: id,
+          state: 'removed',
+        }, { headers: h });
+      });
+      if (r) return r.ok;
+
+      r = await tryMethod(function(h) {
         return axios.post(apiUrl('/users/vitrine-status'), { offer_id: id, status: 'removed' }, { headers: h });
       });
       if (r) return r.ok;

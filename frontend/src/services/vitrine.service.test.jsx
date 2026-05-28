@@ -40,6 +40,14 @@ vi.mock('../config/api', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  axios.get.mockReset();
+  axios.post.mockReset();
+  axios.put.mockReset();
+  axios.delete.mockReset();
+  axios.get.mockResolvedValue({ data: [] });
+  axios.post.mockResolvedValue({ data: { ok: true } });
+  axios.put.mockResolvedValue({ data: { ok: true } });
+  axios.delete.mockResolvedValue({ data: { ok: true } });
   vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({
     ok: true,
     json: vi.fn(() => Promise.resolve({ ok: true })),
@@ -184,9 +192,17 @@ test('excluir usa fallback simples sem preflight quando chamadas ajax falham por
     .mockRejectedValueOnce(new Error('Network Error'))
     .mockRejectedValueOnce(new Error('Network Error'))
     .mockRejectedValueOnce(new Error('Network Error'))
+    .mockRejectedValueOnce(new Error('Network Error'))
+    .mockRejectedValueOnce(new Error('Network Error'))
+    .mockRejectedValueOnce(new Error('Network Error'))
+    .mockRejectedValueOnce(new Error('Network Error'))
     .mockRejectedValueOnce(new Error('Network Error'));
-  axios.put.mockRejectedValueOnce(new Error('Network Error'));
-  axios.delete.mockRejectedValueOnce(new Error('Network Error'));
+  axios.put
+    .mockRejectedValueOnce(new Error('Network Error'))
+    .mockRejectedValueOnce(new Error('Network Error'));
+  axios.delete
+    .mockRejectedValueOnce(new Error('Network Error'))
+    .mockRejectedValueOnce(new Error('Network Error'));
 
   await vitrineService.excluir('oferta-1');
 
@@ -206,10 +222,22 @@ test('excluir com no-cors só confirma depois da vitrine sumir da listagem', asy
     .mockRejectedValueOnce(new Error('Network Error'))
     .mockRejectedValueOnce(new Error('Network Error'))
     .mockRejectedValueOnce(new Error('Network Error'))
+    .mockRejectedValueOnce(new Error('Network Error'))
+    .mockRejectedValueOnce(new Error('Network Error'))
+    .mockRejectedValueOnce(new Error('Network Error'))
+    .mockRejectedValueOnce(new Error('Network Error'))
     .mockRejectedValueOnce(new Error('Network Error'));
-  axios.put.mockRejectedValueOnce(new Error('Network Error'));
-  axios.delete.mockRejectedValueOnce(new Error('Network Error'));
+  axios.put
+    .mockRejectedValueOnce(new Error('Network Error'))
+    .mockRejectedValueOnce(new Error('Network Error'));
+  axios.delete
+    .mockRejectedValueOnce(new Error('Network Error'))
+    .mockRejectedValueOnce(new Error('Network Error'));
   fetch
+    .mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn(() => Promise.resolve({ ok: true })),
+    })
     .mockRejectedValueOnce(new TypeError('Failed to fetch'))
     .mockResolvedValueOnce({});
   axios.get.mockResolvedValueOnce({ data: [] });
@@ -217,7 +245,7 @@ test('excluir com no-cors só confirma depois da vitrine sumir da listagem', asy
   await vitrineService.excluir('oferta-1');
 
   expect(fetch).toHaveBeenNthCalledWith(
-    2,
+    3,
     'https://api.venpro.com.br/api/vitrine/ofertas/oferta-1/excluir-simple',
     expect.objectContaining({
       method: 'POST',
@@ -225,7 +253,7 @@ test('excluir com no-cors só confirma depois da vitrine sumir da listagem', asy
       body: expect.any(URLSearchParams),
     }),
   );
-  expect(fetch.mock.calls[1][1].body.get('token')).toBe('token-123');
+  expect(fetch.mock.calls[2][1].body.get('token')).toBe('token-123');
   expect(axios.get).toHaveBeenCalledWith('https://api.venpro.com.br/api/vitrine/ofertas', {
     headers: {
       Authorization: 'Bearer token-123',
