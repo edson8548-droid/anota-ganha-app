@@ -7,8 +7,9 @@ import asyncio
 import logging
 import os
 from datetime import datetime, timedelta, timezone
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, parse_qsl, urlencode, urlparse, urlunparse
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from firebase_admin import auth as firebase_auth, firestore
@@ -31,6 +32,7 @@ TRANSPARENT_GIF = (
     b"\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02"
     b"D\x01\x00;"
 )
+ALLOWED_REDIRECT_HOSTS = {"venpro.com.br", "www.venpro.com.br", "anota-ganha-app.web.app"}
 
 # ============================================
 # VALIDAÇÃO DE CPF
@@ -210,6 +212,27 @@ def _extract_simple_token(raw_body: bytes, query_token: str | None = None) -> st
         return token_values[0].strip()
 
     return text
+
+
+def _safe_frontend_redirect(next_url: str | None = None) -> str:
+    fallback = (os.environ.get("FRONTEND_URL") or "https://venpro.com.br").rstrip("/") + "/vitrine"
+    if not next_url:
+        return fallback
+
+    if next_url.startswith("/"):
+        return (os.environ.get("FRONTEND_URL") or "https://venpro.com.br").rstrip("/") + next_url
+
+    parsed = urlparse(next_url)
+    if parsed.scheme != "https" or parsed.hostname not in ALLOWED_REDIRECT_HOSTS:
+        return fallback
+    return next_url
+
+
+def _append_query(url: str, params: dict[str, str]) -> str:
+    parsed = urlparse(url)
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    query.update(params)
+    return urlunparse(parsed._replace(query=urlencode(query)))
 
 
 def _fs():
@@ -527,6 +550,36 @@ async def update_resource_state_simple(request: Request, resource: str = "", res
     token = _extract_simple_token(raw_body, request.query_params.get("token"))
     uid = await _verify_user_token(token)
     return await _soft_delete_vitrine_for_user(resource_id, uid, request=request)
+
+
+@router.get("/resource-state-redirect")
+async def update_resource_state_redirect(
+    request: Request,
+    resource: str = "",
+    resource_id: str = "",
+    state: str = "",
+    token: str = "",
+    next: str = "",
+):
+    """Fallback final por navegação direta; exclui e volta para a Vitrine."""
+    target = _safe_frontend_redirect(next)
+    headers = {"Cache-Control": "no-store, max-age=0"}
+    try:
+        if resource != "catalog" or state != "removed":
+            raise HTTPException(400, "Operação inválida")
+        uid = await _verify_user_token(token)
+        await _soft_delete_vitrine_for_user(resource_id, uid, request=request)
+        return RedirectResponse(
+            _append_query(target, {"removed": "1", "fix": "redirect13"}),
+            status_code=303,
+            headers=headers,
+        )
+    except HTTPException as exc:
+        return RedirectResponse(
+            _append_query(target, {"remove_error": str(exc.detail), "fix": "redirect13"}),
+            status_code=303,
+            headers=headers,
+        )
 
 
 @router.post("/ensure-trial")

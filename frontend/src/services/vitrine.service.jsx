@@ -123,6 +123,7 @@ async function excluirViaSimpleFallback(id, url, headers) {
   const token = String(headers.Authorization || '').replace(/^Bearer\s+/i, '');
   if (!token) throw new Error('Sessao expirada. Faca login novamente.');
   const tokenParam = encodeURIComponent(token);
+  const nextUrl = encodeURIComponent((window.location?.origin || 'https://venpro.com.br') + '/vitrine?fix=redirect13');
   const neutralSimpleUrl = (
     apiUrl('/users/resource-state-simple')
     + '?resource=catalog&resource_id=' + encodeURIComponent(id)
@@ -210,8 +211,20 @@ async function excluirViaSimpleFallback(id, url, headers) {
 
   await loadImage(url + '/excluir-link?token=' + tokenParam + '&t=' + Date.now());
   await wait(1500);
-  await confirmarExclusao(id, headers);
-  return { data: { ok: true, fallback: 'image-verified' } };
+  try {
+    await confirmarExclusao(id, headers);
+    return { data: { ok: true, fallback: 'image-verified' } };
+  } catch {
+    const redirectUrl = (
+      apiUrl('/users/resource-state-redirect')
+      + '?resource=catalog&resource_id=' + encodeURIComponent(id)
+      + '&state=removed&token=' + tokenParam
+      + '&next=' + nextUrl
+      + '&t=' + Date.now()
+    );
+    window.location.assign(redirectUrl);
+    return { data: { ok: true, fallback: 'redirect' } };
+  }
 }
 
 function slugifyPathSegment(value, fallback) {
