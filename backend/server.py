@@ -20,7 +20,7 @@ from services.security_headers import SecurityHeadersMiddleware
 from routes.asaas import router as asaas_router
 from routes.license import router as license_router
 from routes.ia import router as ia_router
-from routes.cotacao import router as cotacao_router, init_cotacao, resume_cotacao_jobs
+from routes.cotacao import router as cotacao_router, init_cotacao, resume_cotacao_jobs, start_cotacao_storage_cleanup
 from routes.whatsapp import router as whatsapp_router, init_whatsapp
 from routes.users import router as users_router, init_users
 from routes.vitrine import router as vitrine_router, init_vitrine
@@ -303,6 +303,10 @@ async def startup_event():
         await resume_cotacao_jobs()
     except Exception as e:
         logger.warning(f"⚠️  Retomada de jobs de cotação: {e}")
+    try:
+        start_cotacao_storage_cleanup()
+    except Exception as e:
+        logger.warning(f"⚠️  Limpeza automática de cotação: {e}")
     logger.info("✅ Asaas integrado em /api/asaas")
     logger.info("✅ Cotação integrado em /api/cotacao")
 

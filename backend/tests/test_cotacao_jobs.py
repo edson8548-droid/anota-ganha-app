@@ -57,6 +57,26 @@ def test_aprendizado_key_isola_por_tabela():
     }
 
 
+def test_cleanup_candidate_rules_skip_recent_and_running_jobs(monkeypatch):
+    now = datetime(2026, 5, 28, 12, tzinfo=timezone.utc)
+    monkeypatch.setattr(cotacao, "COTACAO_COMPLETED_JOB_TTL_SECONDS", 3600)
+    monkeypatch.setattr(cotacao, "COTACAO_STALE_ACTIVE_JOB_TTL_SECONDS", 1800)
+
+    recent_done = {"_id": "done-recent", "status": "done", "created_at": now}
+    stale_done = {"_id": "done-old", "status": "done", "created_at": now.replace(hour=0)}
+    stale_processing = {"_id": "processing-old", "status": "processing", "created_at": now.replace(hour=0)}
+    running_processing = {"_id": "running-old", "status": "processing", "created_at": now.replace(hour=0)}
+
+    cotacao._running_job_ids.add("running-old")
+    try:
+        assert not cotacao._should_cleanup_cotacao_job(recent_done, now)
+        assert cotacao._should_cleanup_cotacao_job(stale_done, now)
+        assert cotacao._should_cleanup_cotacao_job(stale_processing, now)
+        assert not cotacao._should_cleanup_cotacao_job(running_processing, now)
+    finally:
+        cotacao._running_job_ids.discard("running-old")
+
+
 def test_confirmar_nao_grava_aprendizado_para_matches_ean():
     itens = [
         {"nome": "ARROZ TESTE 5KG"},

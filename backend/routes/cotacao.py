@@ -9,7 +9,7 @@ import logging
 import uuid
 import asyncio
 import multiprocessing
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from io import BytesIO
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Body
@@ -57,6 +57,13 @@ MAX_COTACAO_PREVIEW_BYTES = 14 * 1024 * 1024
 MAX_TABELA_PRAZOS_BYTES = 25 * 1024 * 1024
 MAX_ACTIVE_PREVIEW_JOBS_PER_USER = int(os.environ.get("MAX_ACTIVE_PREVIEW_JOBS_PER_USER", "1"))
 MAX_RUNNING_COTACAO_JOBS = int(os.environ.get("MAX_RUNNING_COTACAO_JOBS", "3"))
+COTACAO_CLEANUP_INTERVAL_SECONDS = int(os.environ.get("COTACAO_CLEANUP_INTERVAL_SECONDS", "3600"))
+COTACAO_COMPLETED_JOB_TTL_SECONDS = int(os.environ.get("COTACAO_COMPLETED_JOB_TTL_SECONDS", "86400"))
+COTACAO_STALE_ACTIVE_JOB_TTL_SECONDS = int(os.environ.get("COTACAO_STALE_ACTIVE_JOB_TTL_SECONDS", "7200"))
+COTACAO_SESSION_TTL_SECONDS = int(os.environ.get("COTACAO_SESSION_TTL_SECONDS", "86400"))
+COTACAO_ORPHAN_GRIDFS_TTL_SECONDS = int(os.environ.get("COTACAO_ORPHAN_GRIDFS_TTL_SECONDS", "86400"))
+COTACAO_CLEANUP_BATCH_SIZE = int(os.environ.get("COTACAO_CLEANUP_BATCH_SIZE", "500"))
+_storage_cleanup_task = None
 
 
 def _gerar_excel_multiprazos_worker(caminho_base, prazos, queue):
@@ -187,6 +194,125 @@ def _track_background_task(task, job_id=None):
             _running_job_ids.discard(job_id)
 
     task.add_done_callback(_cleanup)
+
+
+async def _delete_grid_file(grid_id) -> bool:
+    if not grid_id:
+        return False
+    try:
+        await _bucket().delete(grid_id)
+        return True
+    except Exception:
+        return False
+
+
+def _job_age_seconds(job: dict, now: datetime) -> float:
+    created_at = _utc_datetime(job.get("created_at", now))
+    return (now - created_at).total_seconds()
+
+
+def _should_cleanup_cotacao_job(job: dict, now: datetime | None = None) -> bool:
+    now = now or datetime.now(timezone.utc)
+    status = str(job.get("status") or "").lower()
+    age = _job_age_seconds(job, now)
+
+    if status in {"done", "error", "canceled"}:
+        return age >= COTACAO_COMPLETED_JOB_TTL_SECONDS
+
+    if status in {"queued", "processing"}:
+        return job.get("_id") not in _running_job_ids and age >= COTACAO_STALE_ACTIVE_JOB_TTL_SECONDS
+
+    return False
+
+
+async def _referenced_cotacao_grid_ids() -> set[str]:
+    referenced: set[str] = set()
+
+    async for doc in db.tabelas_mestre.find({"grid_id": {"$exists": True}}, {"grid_id": 1}):
+        if doc.get("grid_id"):
+            referenced.add(str(doc["grid_id"]))
+
+    async for job in db.cotacao_jobs.find({}, {"input_grid_id": 1, "grid_id": 1}):
+        for field in ("input_grid_id", "grid_id"):
+            if job.get(field):
+                referenced.add(str(job[field]))
+
+    return referenced
+
+
+async def cleanup_cotacao_storage_once(now: datetime | None = None) -> dict:
+    """Remove apenas artefatos temporários antigos da Cotação Pronta."""
+    if db is None:
+        return {"jobs": 0, "sessions": 0, "orphan_files": 0}
+
+    now = now or datetime.now(timezone.utc)
+    completed_cutoff = now - timedelta(seconds=COTACAO_COMPLETED_JOB_TTL_SECONDS)
+    stale_active_cutoff = now - timedelta(seconds=COTACAO_STALE_ACTIVE_JOB_TTL_SECONDS)
+    session_cutoff = now - timedelta(seconds=COTACAO_SESSION_TTL_SECONDS)
+    orphan_cutoff = now - timedelta(seconds=COTACAO_ORPHAN_GRIDFS_TTL_SECONDS)
+
+    stats = {"jobs": 0, "sessions": 0, "orphan_files": 0}
+
+    job_query = {
+        "$or": [
+            {"status": {"$in": ["done", "error", "canceled"]}, "created_at": {"$lt": completed_cutoff}},
+            {"status": {"$in": ["queued", "processing"]}, "created_at": {"$lt": stale_active_cutoff}},
+        ]
+    }
+    async for job in db.cotacao_jobs.find(job_query).sort("created_at", 1).limit(COTACAO_CLEANUP_BATCH_SIZE):
+        if not _should_cleanup_cotacao_job(job, now):
+            continue
+        await _cleanup_job_input(job)
+        await _cleanup_job_output(job)
+        result = await db.cotacao_jobs.delete_one({"_id": job["_id"]})
+        stats["jobs"] += result.deleted_count
+
+    session_result = await db.cotacao_sessoes.delete_many({"created_at": {"$lt": session_cutoff}})
+    stats["sessions"] = session_result.deleted_count
+
+    referenced_ids = await _referenced_cotacao_grid_ids()
+    async for file_doc in db["fs.files"].find(
+        {"uploadDate": {"$lt": orphan_cutoff}},
+        {"_id": 1},
+    ).sort("uploadDate", 1).limit(COTACAO_CLEANUP_BATCH_SIZE):
+        file_id = file_doc.get("_id")
+        if not file_id or str(file_id) in referenced_ids:
+            continue
+        if await _delete_grid_file(file_id):
+            stats["orphan_files"] += 1
+
+    if any(stats.values()):
+        logger.info("[COTACAO_CLEANUP] artefatos temporarios removidos: %s", stats)
+
+    return stats
+
+
+async def _cotacao_storage_cleanup_loop(interval_seconds: int):
+    await asyncio.sleep(30)
+    while True:
+        try:
+            await cleanup_cotacao_storage_once()
+        except Exception:
+            logger.exception("[COTACAO_CLEANUP] falha ao limpar artefatos temporarios")
+        await asyncio.sleep(interval_seconds)
+
+
+def start_cotacao_storage_cleanup():
+    global _storage_cleanup_task
+    if COTACAO_CLEANUP_INTERVAL_SECONDS <= 0:
+        logger.info("[COTACAO_CLEANUP] desativado por configuracao")
+        return None
+    if _storage_cleanup_task and not _storage_cleanup_task.done():
+        return _storage_cleanup_task
+    _storage_cleanup_task = asyncio.create_task(
+        _cotacao_storage_cleanup_loop(COTACAO_CLEANUP_INTERVAL_SECONDS)
+    )
+    _track_background_task(_storage_cleanup_task)
+    logger.info(
+        "[COTACAO_CLEANUP] agendado a cada %s segundos",
+        COTACAO_CLEANUP_INTERVAL_SECONDS,
+    )
+    return _storage_cleanup_task
 
 
 def _can_start_cotacao_job():
@@ -704,20 +830,12 @@ async def preview_cotacao_async_simple(
 
 async def _cleanup_job_input(job):
     input_grid_id = job.get("input_grid_id")
-    if input_grid_id:
-        try:
-            await _bucket().delete(input_grid_id)
-        except Exception:
-            pass
+    await _delete_grid_file(input_grid_id)
 
 
 async def _cleanup_job_output(job):
     grid_id = job.get("grid_id")
-    if grid_id:
-        try:
-            await _bucket().delete(grid_id)
-        except Exception:
-            pass
+    await _delete_grid_file(grid_id)
 
 
 async def _preview_job_foi_cancelado(job_id):
