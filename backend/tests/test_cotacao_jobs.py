@@ -57,6 +57,13 @@ def test_aprendizado_key_isola_por_tabela():
     }
 
 
+def test_cotacao_temp_artifacts_default_to_twelve_hours():
+    assert cotacao.COTACAO_TEMP_ARTIFACT_TTL_SECONDS == 12 * 60 * 60
+    assert cotacao.COTACAO_COMPLETED_JOB_TTL_SECONDS == cotacao.COTACAO_TEMP_ARTIFACT_TTL_SECONDS
+    assert cotacao.COTACAO_SESSION_TTL_SECONDS == cotacao.COTACAO_TEMP_ARTIFACT_TTL_SECONDS
+    assert cotacao.COTACAO_ORPHAN_GRIDFS_TTL_SECONDS == cotacao.COTACAO_TEMP_ARTIFACT_TTL_SECONDS
+
+
 def test_cleanup_candidate_rules_skip_recent_and_running_jobs(monkeypatch):
     now = datetime(2026, 5, 28, 12, tzinfo=timezone.utc)
     monkeypatch.setattr(cotacao, "COTACAO_COMPLETED_JOB_TTL_SECONDS", 3600)
