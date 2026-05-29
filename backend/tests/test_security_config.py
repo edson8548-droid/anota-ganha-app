@@ -7,13 +7,24 @@ from fastapi import HTTPException
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from routes.asaas import ASAAS_PLANS, _find_subscription_user_id, asaas_webhook
+from routes.asaas import ASAAS_PLANS, _asaas_error_detail, _find_subscription_user_id, asaas_webhook
 from services.security_config import LOCAL_CORS_ORIGINS, PRODUCTION_CORS_ORIGINS, parse_cors_origins
 
 
 class FakeRequest:
     async def json(self):
         return {"event": "IGNORED"}
+
+
+class FakeAsaasResponse:
+    status_code = 400
+    text = ""
+
+    def __init__(self, data):
+        self._data = data
+
+    def json(self):
+        return self._data
 
 
 def test_cors_fallback_in_production_does_not_include_localhost(monkeypatch):
@@ -77,3 +88,18 @@ def test_asaas_finds_user_from_monthly_external_reference():
     payment = {"externalReference": "usuario-com-hifen-monthly-69.90"}
 
     assert _find_subscription_user_id(payment=payment) == "usuario-com-hifen"
+
+
+def test_asaas_error_detail_redacts_sensitive_numbers_and_email():
+    response = FakeAsaasResponse({
+        "errors": [{
+            "code": "invalid_customer",
+            "description": "CPF 52998224725 do cliente joao@example.com é inválido",
+        }]
+    })
+
+    detail = _asaas_error_detail(response)
+
+    assert "52998224725" not in detail
+    assert "joao@example.com" not in detail
+    assert "invalid_customer" in detail

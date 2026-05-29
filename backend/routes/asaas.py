@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
@@ -69,6 +70,44 @@ def _only_digits(value: Optional[str]) -> str:
     return "".join(ch for ch in str(value or "") if ch.isdigit())
 
 
+def _redact_asaas_detail(value: str) -> str:
+    detail = str(value or "")
+    detail = re.sub(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", "[email]", detail)
+    detail = re.sub(r"\b\d{8,}\b", "[numero]", detail)
+    detail = re.sub(r"access_token=[^&\s]+", "access_token=[redacted]", detail, flags=re.IGNORECASE)
+    return detail[:500]
+
+
+def _asaas_error_detail(response) -> str:
+    try:
+        data = response.json()
+    except ValueError:
+        return _redact_asaas_detail(response.text[:500])
+
+    errors = data.get("errors") if isinstance(data, dict) else None
+    if isinstance(errors, list) and errors:
+        parts = []
+        for error in errors[:3]:
+            if not isinstance(error, dict):
+                parts.append(str(error))
+                continue
+            code = error.get("code")
+            description = error.get("description") or error.get("message")
+            if code and description:
+                parts.append(f"{code}: {description}")
+            elif description:
+                parts.append(str(description))
+            elif code:
+                parts.append(str(code))
+        return _redact_asaas_detail("; ".join(parts))
+
+    for key in ("description", "message", "error"):
+        if isinstance(data, dict) and data.get(key):
+            return _redact_asaas_detail(data[key])
+
+    return _redact_asaas_detail(str(data)[:500])
+
+
 def _asaas_plan(plan_id: str) -> dict:
     plan = ASAAS_PLANS.get(plan_id)
     if not plan:
@@ -81,18 +120,27 @@ def _period_end_for_plan(plan_id: str) -> datetime:
     return datetime.now(timezone.utc) + timedelta(days=days)
 
 
-def _asaas_request(method: str, path: str, **kwargs) -> dict:
+def _asaas_request(method: str, path: str, allowed_statuses: set[int] | None = None, **kwargs) -> dict:
     url = f"{_asaas_base_url()}{path}"
+    allowed_statuses = allowed_statuses or set()
     response = requests.request(method, url, headers=_asaas_headers(), timeout=30, **kwargs)
+    if response.status_code in allowed_statuses:
+        data = response.json() if response.content else {}
+        if isinstance(data, dict):
+            data["_status_code"] = response.status_code
+        return data
     if response.status_code >= 400:
+        detail = _asaas_error_detail(response)
         logger.error(
-            "[ASAAS] %s %s falhou status=%s body_len=%s",
+            "[ASAAS] %s %s falhou status=%s detail=%s",
             method,
             path,
             response.status_code,
-            len(response.text or ""),
+            detail or "sem detalhe",
         )
-        raise HTTPException(status_code=502, detail="Erro ao comunicar com Asaas")
+        if response.status_code in (401, 403):
+            raise HTTPException(status_code=502, detail="Asaas recusou a autenticação. Verifique a chave API configurada.")
+        raise HTTPException(status_code=502, detail=f"Asaas recusou a cobrança: {detail}" if detail else "Erro ao comunicar com Asaas")
     return response.json() if response.content else {}
 
 
@@ -112,22 +160,36 @@ def _cancel_asaas_subscription(subscription_id: str) -> None:
         raise HTTPException(status_code=502, detail="Erro ao cancelar assinatura no Asaas")
 
 
+def _save_asaas_customer_id(uid: str, customer_id: str) -> None:
+    _fs().collection("users").document(uid).set(
+        {"asaasCustomerId": customer_id, "updated_at": firestore.SERVER_TIMESTAMP},
+        merge=True,
+    )
+
+
+def _find_customer_by_query(uid: str, params: dict) -> Optional[str]:
+    lookup = _asaas_request("GET", "/customers", params={**params, "limit": 1})
+    if lookup.get("data"):
+        customer_id = lookup["data"][0]["id"]
+        _save_asaas_customer_id(uid, customer_id)
+        return customer_id
+    return None
+
+
 def _find_or_create_customer(uid: str, user_data: dict) -> str:
     existing_customer_id = user_data.get("asaasCustomerId")
     if existing_customer_id:
-        return existing_customer_id
-
-    lookup = _asaas_request(
-        "GET",
-        "/customers",
-        params={"externalReference": uid, "limit": 1},
-    )
-    if lookup.get("data"):
-        customer_id = lookup["data"][0]["id"]
-        _fs().collection("users").document(uid).set(
-            {"asaasCustomerId": customer_id, "updated_at": firestore.SERVER_TIMESTAMP},
-            merge=True,
+        customer = _asaas_request(
+            "GET",
+            f"/customers/{existing_customer_id}",
+            allowed_statuses={404},
         )
+        if customer.get("id"):
+            return existing_customer_id
+        logger.warning("[ASAAS] asaasCustomerId salvo não encontrado; buscando por CPF/externalReference uid=%s", uid)
+
+    customer_id = _find_customer_by_query(uid, {"externalReference": uid})
+    if customer_id:
         return customer_id
 
     name = (
@@ -143,6 +205,10 @@ def _find_or_create_customer(uid: str, user_data: dict) -> str:
     if not cpf_cnpj:
         raise HTTPException(status_code=400, detail="CPF obrigatório para gerar cobrança")
 
+    customer_id = _find_customer_by_query(uid, {"cpfCnpj": cpf_cnpj})
+    if customer_id:
+        return customer_id
+
     payload = {
         "name": name,
         "cpfCnpj": cpf_cnpj,
@@ -154,11 +220,7 @@ def _find_or_create_customer(uid: str, user_data: dict) -> str:
     payload = {k: v for k, v in payload.items() if v not in (None, "")}
     customer = _asaas_request("POST", "/customers", json=payload)
     customer_id = customer["id"]
-
-    _fs().collection("users").document(uid).set(
-        {"asaasCustomerId": customer_id, "updated_at": firestore.SERVER_TIMESTAMP},
-        merge=True,
-    )
+    _save_asaas_customer_id(uid, customer_id)
     return customer_id
 
 
