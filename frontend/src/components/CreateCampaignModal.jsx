@@ -2,6 +2,7 @@
 // ADICIONADA LÓGICA PARA EDITAR INDÚSTRIA EXISTENTE
 
 import React, { useState, useEffect } from 'react';
+import { Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import ConfirmDialog from './ConfirmDialog';
 import './CreateCampaignModal.css';
@@ -153,13 +154,27 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
     setCurrentProduct('');
   };
 
+  const handleOverlayClick = (e) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  const handleIndustryEditOverlayClick = (e) => {
+    if (e.target === e.currentTarget) handleCancelEdit();
+  };
+
   const handleRemoveIndustry = (industryId) => {
-    showConfirm('Remover indústria', 'Tem certeza que deseja remover esta indústria?', () => {
-      setFormData(prev => ({
-        ...prev,
-        industries: prev.industries.filter(ind => ind.id !== industryId)
-      }));
-    });
+    const industry = formData.industries.find(ind => ind.id === industryId);
+    showConfirm(
+      'Remover indústria',
+      `Remover "${industry?.name || 'esta indústria'}" da campanha? Depois clique em Salvar Alterações para gravar.`,
+      () => {
+        setFormData(prev => ({
+          ...prev,
+          industries: prev.industries.filter(ind => ind.id !== industryId)
+        }));
+        if (editingIndustry?.id === industryId) handleCancelEdit();
+      }
+    );
   };
 
   // ============================================
@@ -232,12 +247,14 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
   // RENDER (JSX ATUALIZADO COM BOTÕES DE EDITAR)
   // ============================================
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleOverlayClick}>
       <div className="modal-content-campaign" onClick={(e) => e.stopPropagation()}>
         
         <div className="campaign-modal-header">
           <h2>{campaign ? '✏️ Editar Campanha' : '➕ Nova Campanha'}</h2>
-          <button className="btn-close-campaign" onClick={onClose}>×</button>
+          <button type="button" className="btn-close-campaign" onClick={onClose} aria-label="Fechar">
+            <X size={20} strokeWidth={2.4} />
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
@@ -302,11 +319,15 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
                             </button>
                             <button
                               type="button"
-                              className="btn-remove"
-                              onClick={() => handleRemoveIndustry(industry.id)}
+                              className="btn-remove-industry"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveIndustry(industry.id);
+                              }}
                               title="Remover indústria"
+                              aria-label={`Remover indústria ${industry.name}`}
                             >
-                              ×
+                              <Trash2 size={15} strokeWidth={2.4} />
                             </button>
                           </div>
                         </div>
@@ -420,14 +441,16 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
       />
 
       {editingIndustry && (
-        <div className="industry-edit-overlay" onClick={handleCancelEdit}>
+        <div className="industry-edit-overlay" onClick={handleIndustryEditOverlayClick}>
           <div className="industry-edit-modal" onClick={(e) => e.stopPropagation()}>
             <div className="industry-edit-header">
               <div>
                 <h3>Editar indústria</h3>
                 <p>Atualize metas e produtos desta indústria.</p>
               </div>
-              <button type="button" onClick={handleCancelEdit}>×</button>
+              <button type="button" onClick={handleCancelEdit} aria-label="Fechar edição de indústria">
+                <X size={19} strokeWidth={2.4} />
+              </button>
             </div>
 
             <div className="industry-edit-body">

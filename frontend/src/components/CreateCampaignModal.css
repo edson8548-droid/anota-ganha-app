@@ -34,7 +34,7 @@
   margin: 0; font-size: 24px; font-weight: 700; color: #1f2937;
 }
 .btn-close-campaign {
-  background: #f3f4f6; border: none; font-size: 24px;
+  background: #f3f4f6; border: none;
   color: #9ca3af; cursor: pointer; padding: 0;
   width: 40px; height: 40px;
   display: flex; align-items: center; justify-content: center;
@@ -174,20 +174,23 @@
 }
 .btn-edit-industry:hover { background: #e0e7ff; border-color: #818cf8; }
 
-.btn-remove {
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
-  color: #64748b;
+.btn-remove-industry {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #e11d48;
   width: 34px;
   height: 34px;
-  border-radius: 50%;
+  border-radius: 999px;
   cursor: pointer;
-  font-size: 22px;
   transition: all 0.2s;
   display: flex; align-items: center; justify-content: center;
-  line-height: 1;
+  flex: none;
 }
-.btn-remove:hover { background: #e0f2fe; border-color: #3A85A8; color: #3A85A8; }
+.btn-remove-industry:hover {
+  background: #ffe4e6;
+  border-color: #fb7185;
+  color: #be123c;
+}
 
 .industry-metrics {
   display: grid;
@@ -404,8 +407,6 @@
   border: none;
   background: #f3f4f6;
   color: #6b7280;
-  font-size: 22px;
-  line-height: 1;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
