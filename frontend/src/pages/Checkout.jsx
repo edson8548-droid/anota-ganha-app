@@ -294,7 +294,7 @@ const Checkout = () => {
                   <span className="payment-icon">💳</span>
                   <div>
                     <strong>Assinatura recorrente até cancelar</strong>
-                    <p>Pagamento seguro via Asaas. Pague por Pix na próxima tela.</p>
+                    <p>Pagamento seguro via Asaas. Escolha Pix ou cartão de crédito na próxima tela.</p>
                   </div>
                 </div>
               </label>
