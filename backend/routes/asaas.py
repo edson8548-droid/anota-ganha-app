@@ -314,7 +314,7 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
 
     subscription_payload = {
         "customer": customer_id,
-        "billingType": "UNDEFINED",
+        "billingType": "PIX",
         "value": plan["price"],
         "nextDueDate": date.today().isoformat(),
         "cycle": plan["cycle"],
@@ -352,6 +352,7 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
             "externalReference": external_reference,
             "amount": plan["price"],
             "currency": "BRL",
+            "paymentMethod": "PIX",
             "paymentUrl": payment_url,
             "updatedAt": datetime.now(timezone.utc),
             "trialEndsAt": None,
@@ -369,6 +370,7 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
         "provider": "asaas",
         "subscriptionId": subscription_id,
         "paymentId": first_payment.get("id"),
+        "paymentMethod": "PIX",
         "paymentUrl": payment_url,
         "invoiceUrl": payment_url,
     }
