@@ -12,11 +12,11 @@ import multiprocessing
 from datetime import datetime, timezone, timedelta
 from io import BytesIO
 
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Body
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Body, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import Response
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pymongo import UpdateOne
 from pymongo.errors import DuplicateKeyError
 from bson import ObjectId
@@ -34,6 +34,7 @@ from services.excel_processor import (
 from services.matching_engine import normalizar_nome
 from services.subscription_access import ensure_subscription_access
 from services.upload_validation import PDF_CONTENT_TYPES, XLSX_CONTENT_TYPES, validate_upload
+from services.security_audit import audit_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -1534,11 +1535,79 @@ class CotatudoPayload(BaseModel):
     prazo: int = 28
     modo: str = "completo"
     itens: List[CotatudoItem]
+    job_id: str | None = Field(default=None, max_length=80)
+    batch_index: int | None = Field(default=None, ge=0, le=10000)
+    total_batches: int | None = Field(default=None, ge=0, le=10000)
+    site: str | None = Field(default=None, max_length=40)
+
+
+class CotatudoFillReport(BaseModel):
+    event_type: str = Field(default="batch", max_length=20)
+    status: str = Field(default="success", max_length=20)
+    job_id: str | None = Field(default=None, max_length=80)
+    tabela_id: str | None = Field(default=None, max_length=40)
+    prazo: int | None = Field(default=None, ge=0, le=365)
+    modo: str | None = Field(default=None, max_length=30)
+    site: str | None = Field(default=None, max_length=40)
+    batch_index: int | None = Field(default=None, ge=0, le=10000)
+    total_batches: int | None = Field(default=None, ge=0, le=10000)
+    total_itens: int = Field(default=0, ge=0, le=100000)
+    batch_total: int = Field(default=0, ge=0, le=10000)
+    precos_recebidos: int = Field(default=0, ge=0, le=10000)
+    preenchidos: int = Field(default=0, ge=0, le=10000)
+    falhas: int = Field(default=0, ge=0, le=10000)
+    nao_encontrados: int = Field(default=0, ge=0, le=10000)
+
+
+def _cotatudo_base_metadata(payload, tabela_doc=None):
+    return {
+        "jobId": getattr(payload, "job_id", None),
+        "tabelaId": getattr(payload, "tabela_id", None),
+        "tabelaNome": (tabela_doc or {}).get("nome"),
+        "prazo": getattr(payload, "prazo", None),
+        "modo": getattr(payload, "modo", None),
+        "site": getattr(payload, "site", None),
+        "batchIndex": getattr(payload, "batch_index", None),
+        "totalBatches": getattr(payload, "total_batches", None),
+    }
+
+
+@router.post("/match-cotatudo/fill-report")
+async def report_cotatudo_fill(
+    payload: CotatudoFillReport,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """
+    Recebe da extensão Chrome o resultado real do preenchimento feito na página.
+    O endpoint não bloqueia o fluxo da extensão; serve apenas para auditoria operacional.
+    """
+    uid = await get_user_id(credentials)
+    audit_status = "success" if payload.status in {"success", "done"} else "error"
+
+    await audit_event(
+        "cotatudo_extension_fill_reported",
+        uid=uid,
+        status=audit_status,
+        metadata={
+            **_cotatudo_base_metadata(payload),
+            "eventType": payload.event_type,
+            "totalItens": payload.total_itens,
+            "batchTotal": payload.batch_total,
+            "precosRecebidos": payload.precos_recebidos,
+            "preenchidos": payload.preenchidos,
+            "falhas": payload.falhas,
+            "naoEncontrados": payload.nao_encontrados,
+        },
+        request=request,
+    )
+    return {"ok": True}
 
 
 @router.post("/match-cotatudo")
 async def match_cotatudo(
     payload: CotatudoPayload,
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     """
@@ -1554,6 +1623,8 @@ async def match_cotatudo(
     doc = await db.tabelas_mestre.find_one({"_id": oid, "user_id": uid})
     if not doc:
         raise HTTPException(404, "Tabela mestre não encontrada")
+    audit_meta = _cotatudo_base_metadata(payload, doc)
+    audit_meta["itensRecebidos"] = len(payload.itens)
 
     grid_out = await _bucket().open_download_stream(doc["grid_id"])
     conteudo_mestre = await grid_out.read()
@@ -1572,7 +1643,15 @@ async def match_cotatudo(
         ]
 
         if not itens_para_match:
-            return {"precos": [], "stats": {"preenchidos": 0, "total": 0, "nao_encontrados": 0}}
+            stats = {"preenchidos": 0, "total": 0, "nao_encontrados": 0}
+            await audit_event(
+                "cotatudo_extension_match_completed",
+                uid=uid,
+                status="success",
+                metadata={**audit_meta, **stats, "precosRetornados": 0},
+                request=request,
+            )
+            return {"precos": [], "stats": stats}
 
         def _match_sync():
             pd, pl = ler_tabela_mestre(tmp_mestre.name, prazo=prazo_efetivo)
@@ -1605,17 +1684,33 @@ async def match_cotatudo(
             else:
                 nao_encontrados += 1
 
+        stats = {
+            "preenchidos": preenchidos,
+            "total": len(itens_para_match),
+            "nao_encontrados": nao_encontrados,
+        }
+        await audit_event(
+            "cotatudo_extension_match_completed",
+            uid=uid,
+            status="success",
+            metadata={**audit_meta, **stats, "precosRetornados": len(precos)},
+            request=request,
+        )
+
         return {
             "precos": precos,
-            "stats": {
-                "preenchidos": preenchidos,
-                "total": len(itens_para_match),
-                "nao_encontrados": nao_encontrados,
-            }
+            "stats": stats,
         }
 
     except Exception as e:
         logger.error(f"Erro no match-cotatudo: {e}")
+        await audit_event(
+            "cotatudo_extension_match_failed",
+            uid=uid,
+            status="error",
+            metadata={**audit_meta, "error": str(e)[:180], "errorType": type(e).__name__},
+            request=request,
+        )
         raise HTTPException(500, f"Erro ao processar: {str(e)}")
     finally:
         try:

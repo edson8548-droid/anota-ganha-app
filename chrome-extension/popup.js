@@ -209,6 +209,18 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function createJobId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `cotatudo-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function detectSiteFromUrl(url = '') {
+  if (url.includes('cotatudo.com.br')) return 'cotatudo';
+  if (/\/php\/vrcotacao\/cotacao\.php/i.test(url)) return 'vr-cotacao';
+  if (url.includes('fornecedor.rpinfo.com.br') && /\/supplier\/quotations\//i.test(url)) return 'rp-hub';
+  return 'generic';
+}
+
 async function sendToQuotationPage(message) {
   const tab = await getQuotationTab();
   if (!tab) throw new Error('Abra uma cotação no Cotatudo, VR Cotação ou RP HUB primeiro.');
@@ -232,6 +244,18 @@ async function sendToQuotationPage(message) {
   response = await send();
   if (!response) throw new Error('Não consegui conectar com a página da cotação. Atualize a aba e tente novamente.');
   return response;
+}
+
+async function reportFill(token, payload) {
+  try {
+    await fetch(`${API_URL}/cotacao/match-cotatudo/fill-report`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    console.warn('[Venpro] Não foi possível registrar auditoria da extensão:', err?.message || err);
+  }
 }
 
 async function loadTabelas() {
@@ -296,7 +320,7 @@ function syncPrazoOptions() {
   prazoEl.value = prazos.includes(selected) ? String(selected) : String(prazos[0] || 28);
 }
 
-async function matchBatch(token, job, batch) {
+async function matchBatch(token, job, batch, batchIndex, totalBatches) {
   const resp = await fetch(`${API_URL}/cotacao/match-cotatudo`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -305,6 +329,10 @@ async function matchBatch(token, job, batch) {
       prazo: job.prazo,
       modo: job.modo,
       itens: batch,
+      job_id: job.jobId,
+      batch_index: batchIndex,
+      total_batches: totalBatches,
+      site: job.site,
     }),
   });
 
@@ -340,10 +368,11 @@ async function runJob(job, startBatch = 0, initial = {}) {
     }
 
     const batch = job.items.slice(b * BATCH, (b + 1) * BATCH);
-    const data = await matchBatch(token, job, batch);
+    const data = await matchBatch(token, job, batch, b + 1, totalBatches);
     const precos = Array.isArray(data.precos) ? data.precos : [];
 
     let filled = 0;
+    let failedCount = 0;
     if (precos.length > 0) {
       const fillResult = await sendToQuotationPage({
         action: 'fillPrices',
@@ -351,7 +380,25 @@ async function runJob(job, startBatch = 0, initial = {}) {
         empresaColuna: job.empresaColuna || 0,
       });
       filled = fillResult?.filled || 0;
+      failedCount = Array.isArray(fillResult?.failed) ? fillResult.failed.length : 0;
       if (filled === 0) {
+        await reportFill(token, {
+          event_type: 'batch',
+          status: 'error',
+          job_id: job.jobId,
+          tabela_id: job.tabelaId,
+          prazo: job.prazo,
+          modo: job.modo,
+          site: job.site,
+          batch_index: b + 1,
+          total_batches: totalBatches,
+          total_itens: job.items.length,
+          batch_total: batch.length,
+          precos_recebidos: precos.length,
+          preenchidos: filled,
+          falhas: failedCount,
+          nao_encontrados: data.stats?.nao_encontrados || 0,
+        });
         throw new Error('Encontrei preços, mas não consegui preencher os campos da cotação. Atualize a página e tente novamente.');
       }
     }
@@ -360,10 +407,41 @@ async function runJob(job, startBatch = 0, initial = {}) {
     naoEncontrados += data.stats?.nao_encontrados || 0;
     processados += data.stats?.total || batch.length;
 
+    await reportFill(token, {
+      event_type: 'batch',
+      status: 'success',
+      job_id: job.jobId,
+      tabela_id: job.tabelaId,
+      prazo: job.prazo,
+      modo: job.modo,
+      site: job.site,
+      batch_index: b + 1,
+      total_batches: totalBatches,
+      total_itens: job.items.length,
+      batch_total: batch.length,
+      precos_recebidos: precos.length,
+      preenchidos: filled || data.stats?.preenchidos || 0,
+      falhas: failedCount,
+      nao_encontrados: data.stats?.nao_encontrados || 0,
+    });
+
     const pct = Math.round(((b + 1) / totalBatches) * 100);
     await saveState({ status: 'processing', total: job.items.length, processados, preenchidos, naoEncontrados, pct, batchIndex: b + 1, ts: Date.now() });
   }
 
+  await reportFill(token, {
+    event_type: 'job',
+    status: 'done',
+    job_id: job.jobId,
+    tabela_id: job.tabelaId,
+    prazo: job.prazo,
+    modo: job.modo,
+    site: job.site,
+    total_itens: job.items.length,
+    batch_total: job.items.length,
+    preenchidos,
+    nao_encontrados: naoEncontrados,
+  });
   await saveState({ status: 'done', total: job.items.length, processados, preenchidos, naoEncontrados, pct: 100 });
   await storageRemove('processingJob');
 }
@@ -385,6 +463,8 @@ async function startProcessing() {
   setStatus('Lendo itens da cotação...', 'info');
 
   try {
+    const tab = await getQuotationTab();
+    const site = detectSiteFromUrl(tab?.url || '');
     const extractResult = await sendToQuotationPage({ action: 'extractItems', empresaColuna });
     const items = (extractResult.items || []).filter(item => !item.filled && (item.nome || item.ean));
 
@@ -396,7 +476,7 @@ async function startProcessing() {
     }
 
     await storageRemove(['processingState', 'processingJob']);
-    const job = { items, tabelaId, prazo, modo, empresaColuna };
+    const job = { jobId: createJobId(), items, tabelaId, prazo, modo, empresaColuna, site };
     setProgress(0, `0 / ${items.length} itens`);
     showRunning();
     setStatus(`Processando ${items.length} itens...`, 'info');
