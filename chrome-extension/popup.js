@@ -2,6 +2,7 @@ const API_URL = 'https://api.venpro.com.br/api';
 const BATCH = 50;
 const STUCK_MS = 3 * 60 * 1000;
 const BTN_LABEL = 'Preencher Cotação';
+const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB ou Rede de Fornecedores primeiro.';
 
 const statusEl     = document.getElementById('status');
 const siteDetectadoEl = document.getElementById('siteDetectado');
@@ -43,6 +44,9 @@ function setDetectedSite(tab) {
     type = 'ok';
   } else if (url.includes('fornecedor.rpinfo.com.br') && /\/supplier\/quotations\//i.test(url)) {
     label = 'Site detectado: RP HUB';
+    type = 'ok';
+  } else if (isRedeFornecedoresUrl(url)) {
+    label = 'Site detectado: Rede de Fornecedores';
     type = 'ok';
   }
 
@@ -188,7 +192,18 @@ async function getToken() {
 function isSupportedQuotationUrl(url = '') {
   return url.includes('cotatudo.com.br')
     || /\/php\/vrcotacao\/cotacao\.php/i.test(url)
-    || (url.includes('fornecedor.rpinfo.com.br') && /\/supplier\/quotations\//i.test(url));
+    || (url.includes('fornecedor.rpinfo.com.br') && /\/supplier\/quotations\//i.test(url))
+    || isRedeFornecedoresUrl(url);
+}
+
+function isRedeFornecedoresUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /^(www\.)?rfd\.net\.br$/i.test(parsed.hostname)
+      && /\/fornecedores\/[^/]+\/cotacao\/produtos\//i.test(parsed.pathname);
+  } catch {
+    return /^(https?:\/\/)?(www\.)?rfd\.net\.br\/fornecedores\/[^/]+\/cotacao\/produtos\//i.test(url);
+  }
 }
 
 async function getQuotationTab() {
@@ -200,6 +215,10 @@ async function getQuotationTab() {
       'https://cotatudo.com.br/*',
       'https://www.cotatudo.com.br/*',
       'https://fornecedor.rpinfo.com.br/*',
+      'https://rfd.net.br/*',
+      'https://www.rfd.net.br/*',
+      'http://rfd.net.br/*',
+      'http://www.rfd.net.br/*',
     ],
   });
   return tabs.find(tab => tab?.id) || null;
@@ -218,12 +237,13 @@ function detectSiteFromUrl(url = '') {
   if (url.includes('cotatudo.com.br')) return 'cotatudo';
   if (/\/php\/vrcotacao\/cotacao\.php/i.test(url)) return 'vr-cotacao';
   if (url.includes('fornecedor.rpinfo.com.br') && /\/supplier\/quotations\//i.test(url)) return 'rp-hub';
+  if (isRedeFornecedoresUrl(url)) return 'rede-fornecedores';
   return 'generic';
 }
 
 async function sendToQuotationPage(message) {
   const tab = await getQuotationTab();
-  if (!tab) throw new Error('Abra uma cotação no Cotatudo, VR Cotação ou RP HUB primeiro.');
+  if (!tab) throw new Error(SUPPORTED_SITE_MESSAGE);
 
   const send = () => new Promise(resolve => {
     chrome.tabs.sendMessage(tab.id, message, response => {
@@ -544,7 +564,7 @@ async function init() {
   const tab = await getQuotationTab();
   setDetectedSite(tab);
   if (!tab) {
-    setStatus('Abra uma cotação no Cotatudo, VR Cotação ou RP HUB primeiro.', 'err');
+    setStatus(SUPPORTED_SITE_MESSAGE, 'err');
     tabelasEl.innerHTML = '<option value="">Necessário estar na cotação</option>';
     btnEl.disabled = true;
     return;

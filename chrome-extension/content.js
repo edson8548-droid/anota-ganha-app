@@ -24,7 +24,7 @@ function isVisible(el) {
 }
 
 function getEditableInputs(row) {
-  return Array.from(row.querySelectorAll('input[type="text"], input[type="number"], input[type="tel"]'))
+  return Array.from(row.querySelectorAll('input:not([type]), input[type="text"], input[type="number"], input[type="tel"]'))
     .filter(input => !input.disabled && !input.readOnly && isVisible(input));
 }
 
@@ -33,14 +33,32 @@ function isPriceLikeInput(input) {
   return /(preco|preço|valor|vlr|cotacao|cotação|unit)/.test(meta);
 }
 
-function getPriceCandidates(row) {
+function getRedeFornecedoresPriceCandidates(row) {
+  const cells = Array.from(row.querySelectorAll('td, th'));
+  const inputs = getEditableInputs(row).filter(input => {
+    const cell = input.closest('td, th');
+    const cellIndex = cell ? cells.indexOf(cell) : -1;
+    const cellText = cell?.textContent || '';
+    const meta = `${input.name || ''} ${input.id || ''} ${input.className || ''} ${input.placeholder || ''} ${input.getAttribute('aria-label') || ''}`.toLowerCase();
+
+    if (/equivalente|ofertar|pesquisa|search|buscar|codigo|c[oó]d|barras|produto|emb|pedido|qtd/.test(meta)) return false;
+    if (/produto\s+equivalente|ofertar\s+produto|\ba[çc][aã]o\b/i.test(cellText)) return false;
+    if (cellIndex >= 0 && cellIndex <= 4) return false;
+    return true;
+  });
+  const priceLike = inputs.filter(isPriceLikeInput);
+  return priceLike.length ? priceLike : inputs;
+}
+
+function getPriceCandidates(row, site = 'generic') {
+  if (site === 'rede-fornecedores') return getRedeFornecedoresPriceCandidates(row);
   const inputs = getEditableInputs(row);
   const priceLike = inputs.filter(isPriceLikeInput);
   return priceLike.length ? priceLike : inputs;
 }
 
-function getSelectedPriceInput(row, empresaColuna) {
-  const candidates = getPriceCandidates(row);
+function getSelectedPriceInput(row, empresaColuna, site = 'generic') {
+  const candidates = getPriceCandidates(row, site);
   return candidates[normalizeEmpresaColuna(empresaColuna)] || null;
 }
 
@@ -50,6 +68,10 @@ function detectQuotationSite() {
   if (window.location.hostname.includes('cotatudo.com.br')) return 'cotatudo';
   if (window.location.hostname.includes('fornecedor.rpinfo.com.br') && /\/supplier\/quotations\//i.test(path)) return 'rp-hub';
   if (/\bRP\s*HUB\b/i.test(bodyText) && /Valor\s+Unit[aá]rio/i.test(bodyText)) return 'rp-hub';
+  if (/^(www\.)?rfd\.net\.br$/i.test(window.location.hostname)
+    && (/\/fornecedores\/[^/]+\/cotacao\/produtos\//i.test(path)
+      || /\bREDE\s+DE\s+FORNECEDORES\b/i.test(bodyText)
+      || /\bPRODUTOS\s+COTA[ÇC][ÃA]O\b/i.test(bodyText))) return 'rede-fornecedores';
   if (/\/php\/vrcotacao\/cotacao\.php/i.test(path) || /\bVR\s+COTA[ÇC][ÃA]O\b/i.test(bodyText)) return 'vr-cotacao';
   return 'generic';
 }
@@ -69,7 +91,14 @@ function getQuotationRows(site) {
   if (site === 'rp-hub') {
     return Array.from(document.querySelectorAll('tr')).filter(row => {
       const text = row.textContent || '';
-      return getPriceCandidates(row).length > 0 && /\d{8,14}/.test(text) && /[A-Za-zÀ-ú]{3}/.test(text);
+      return getPriceCandidates(row, site).length > 0 && /\d{8,14}/.test(text) && /[A-Za-zÀ-ú]{3}/.test(text);
+    });
+  }
+
+  if (site === 'rede-fornecedores') {
+    return Array.from(document.querySelectorAll('tr')).filter(row => {
+      const text = row.textContent || '';
+      return getPriceCandidates(row, site).length > 0 && /\d{8,14}/.test(text) && /[A-Za-zÀ-ú]{3}/.test(text);
     });
   }
 
@@ -138,7 +167,7 @@ function extractQuotationItems(options = {}) {
     const row = rows[i];
     const priceInput = site === 'vr-cotacao'
       ? getEditableInputs(row)[0]
-      : getSelectedPriceInput(row, empresaColuna);
+      : getSelectedPriceInput(row, empresaColuna, site);
     if (!priceInput) continue;
     const currentVal = (priceInput.value || '').trim();
 
@@ -210,7 +239,7 @@ function fillQuotationPrices(prices, options = {}) {
     }
     const input = site === 'vr-cotacao'
       ? getEditableInputs(row)[0]
-      : getSelectedPriceInput(row, empresaColuna);
+      : getSelectedPriceInput(row, empresaColuna, site);
     if (!input) {
       failed.push(item.idx);
       continue;

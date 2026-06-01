@@ -34,6 +34,7 @@ describe('extensoes Chrome', () => {
     assert.match(manifest.description, /Preenchedor de cotações/);
     assert.match(manifest.description, /VR Cotação/);
     assert.match(manifest.description, /RP HUB/);
+    assert.match(manifest.description, /Rede de Fornecedores/);
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('http://179.0.124.205/*')),
       'manifest precisa carregar content script no VR Cotacao conhecido'
@@ -41,6 +42,10 @@ describe('extensoes Chrome', () => {
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('https://fornecedor.rpinfo.com.br/*')),
       'manifest precisa carregar content script no RP HUB'
+    );
+    assert.ok(
+      manifest.content_scripts.some(script => (script.matches || []).includes('https://rfd.net.br/*')),
+      'manifest precisa carregar content script na Rede de Fornecedores'
     );
   });
 
