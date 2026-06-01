@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { vitrineService } from '../services/vitrine.service';
-import { backendUrl } from '../config/api';
+import { apiUrl, backendUrl } from '../config/api';
 import './VitrinePublica.css';
 
 const INITIAL_PRODUCT_COUNT = 32;
@@ -15,6 +14,55 @@ function imgUrl(path) {
 
 function fmtMoeda(v) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+}
+
+function parseDateOnlyLocal(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || '').trim());
+  if (!match) return null;
+  const [, year, month, day] = match;
+  return new Date(Number(year), Number(month) - 1, Number(day));
+}
+
+function offerExpirationEnd(value) {
+  const localDate = parseDateOnlyLocal(value);
+  if (localDate) {
+    localDate.setHours(23, 59, 59, 999);
+    return localDate;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function fmtDataOferta(value) {
+  const localDate = parseDateOnlyLocal(value);
+  const date = localDate || new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('pt-BR');
+}
+
+async function fetchPublicOffer(slug, attempt = 1) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(apiUrl('/vitrine/publica/' + encodeURIComponent(slug)), {
+      method: 'GET',
+      mode: 'cors',
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`Erro ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    if (attempt < 2) {
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      return fetchPublicOffer(slug, attempt + 1);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function getUnitPrice(item) {
@@ -62,10 +110,24 @@ export default function VitrinePublica() {
   const loadMoreRef = useRef(null);
 
   useEffect(() => {
-    vitrineService.obterPublica(slug)
-      .then(res => setOferta(res.data))
-      .catch(() => setErro('Vitrine não encontrada ou inativa.'))
-      .finally(() => setLoading(false));
+    let active = true;
+    setLoading(true);
+    setErro(null);
+
+    fetchPublicOffer(slug)
+      .then(data => {
+        if (active) setOferta(data);
+      })
+      .catch(() => {
+        if (active) setErro('Vitrine não encontrada ou inativa.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [slug]);
 
   // Restaurar pedido salvo ao carregar
@@ -227,7 +289,8 @@ export default function VitrinePublica() {
     </div>
   );
 
-  const vencida = oferta.expires_at && new Date(oferta.expires_at) < new Date();
+  const vencimento = oferta.expires_at ? offerExpirationEnd(oferta.expires_at) : null;
+  const vencida = vencimento ? vencimento < new Date() : false;
   const abaixoMinimo = oferta.minimum_order_value && totalCarrinho > 0 && totalCarrinho < oferta.minimum_order_value;
   const faltaMinimo = abaixoMinimo ? oferta.minimum_order_value - totalCarrinho : 0;
   const temCarrinho = qtdItens > 0;
@@ -276,7 +339,7 @@ export default function VitrinePublica() {
           )}
           {oferta.expires_at && (
             <span className={`vp-chip ${vencida ? 'warn' : 'info'}`}>
-              {vencida ? '⚠️ Oferta encerrada' : `📅 Válido até ${new Date(oferta.expires_at).toLocaleDateString('pt-BR')}`}
+              {vencida ? '⚠️ Oferta encerrada' : `📅 Válido até ${fmtDataOferta(oferta.expires_at)}`}
             </span>
           )}
           {oferta.minimum_order_value && (

@@ -18,6 +18,7 @@ from datetime import datetime, timezone, time
 from typing import List, Optional, Any
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse, urljoin
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
@@ -53,6 +54,7 @@ TRANSPARENT_GIF = (
     b"\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02"
     b"D\x01\x00;"
 )
+LOCAL_TIMEZONE = ZoneInfo(os.environ.get("VENPRO_LOCAL_TIMEZONE", "America/Sao_Paulo"))
 
 
 def init_vitrine(database):
@@ -355,7 +357,11 @@ def _parse_public_expiration(value: Any) -> Optional[datetime]:
             return None
         try:
             if re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
-                return datetime.combine(datetime.fromisoformat(raw).date(), time.max, tzinfo=timezone.utc)
+                return datetime.combine(
+                    datetime.fromisoformat(raw).date(),
+                    time.max,
+                    tzinfo=LOCAL_TIMEZONE,
+                )
             parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
             return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
         except ValueError:

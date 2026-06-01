@@ -1,8 +1,5 @@
 import React, { Component, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import { SubscriptionProvider } from './contexts/SubscriptionContext';
-import ProtectedRoute from './components/ProtectedRoute';
 
 import './App.css';
 
@@ -100,6 +97,8 @@ const ForgotPassword = lazyWithRetry(() => import('./pages/ForgotPassword'));
 const Vitrine = lazyWithRetry(() => import('./pages/Vitrine'));
 const VitrineEditar = lazyWithRetry(() => import('./pages/VitrineEditar'));
 const VitrinePublica = lazyWithRetry(() => import('./pages/VitrinePublica'));
+const ProtectedRoute = lazyWithRetry(() => import('./components/ProtectedRoute'));
+const AuthenticatedProviders = lazyWithRetry(() => import('./contexts/AuthenticatedProviders'));
 
 const PageFallback = () => (
   <div style={{
@@ -195,15 +194,32 @@ function AppRoutes() {
   );
 }
 
+function isPublicOfferPath(pathname) {
+  return pathname.startsWith('/oferta/') || /^\/[^/]+\/ofertas\/[^/]+/.test(pathname);
+}
+
+function AppShell() {
+  const location = useLocation();
+  const routes = <AppRoutes />;
+
+  if (isPublicOfferPath(location.pathname)) {
+    return routes;
+  }
+
+  return (
+    <Suspense fallback={<PageFallback />}>
+      <AuthenticatedProviders>
+        {routes}
+      </AuthenticatedProviders>
+    </Suspense>
+  );
+}
+
 function App() {
   return (
-    <AuthProvider>
-      <SubscriptionProvider>
-        <Router>
-          <AppRoutes />
-        </Router>
-      </SubscriptionProvider>
-    </AuthProvider>
+    <Router>
+      <AppShell />
+    </Router>
   );
 }
 

@@ -289,12 +289,12 @@ test('obterPublica busca oferta publica sem auth', async () => {
 });
 
 test('gerarLinkPublico usa origem atual', () => {
-  expect(vitrineService.gerarLinkPublico('oferta-teste')).toBe(`${window.location.origin}/abrir/oferta-teste`);
+  expect(vitrineService.gerarLinkPublico('oferta-teste')).toBe(`${window.location.origin}/oferta/oferta-teste`);
 });
 
 test('gerarLinkPublico inclui nome da empresa quando informado', () => {
   expect(vitrineService.gerarLinkPublico('oferta-teste', 'Spani Atacadista')).toBe(
-    `${window.location.origin}/spani-atacadista/abrir/oferta-teste`,
+    `${window.location.origin}/spani-atacadista/ofertas/oferta-teste`,
   );
 });
 
