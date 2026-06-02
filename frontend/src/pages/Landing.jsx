@@ -386,7 +386,7 @@ const Landing = () => {
             <strong>69</strong>
             <span>,90</span>
           </div>
-          <p className="landing-price-period">por mês, recorrente até cancelar</p>
+          <p className="landing-price-period">por mês, pagamento mensal</p>
           <ul className="landing-price-list">
             <li><Check size={17} /> Cotação Pronta ilimitada</li>
             <li><Check size={17} /> Carteira no WhatsApp</li>

@@ -1,13 +1,15 @@
 import asyncio
 import os
 import sys
+from datetime import date
 
 import pytest
 from fastapi import HTTPException
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from routes.asaas import ASAAS_PLANS, _asaas_error_detail, _find_subscription_user_id, asaas_webhook
+from routes import asaas as asaas_routes
+from routes.asaas import ASAAS_PLANS, _asaas_error_detail, _create_single_payment, _find_subscription_user_id, asaas_webhook
 from services.security_config import LOCAL_CORS_ORIGINS, PRODUCTION_CORS_ORIGINS, parse_cors_origins
 
 
@@ -103,3 +105,24 @@ def test_asaas_error_detail_redacts_sensitive_numbers_and_email():
     assert "52998224725" not in detail
     assert "joao@example.com" not in detail
     assert "invalid_customer" in detail
+
+
+def test_asaas_single_payment_payload_uses_undefined_invoice(monkeypatch):
+    captured = {}
+
+    def fake_asaas_request(method, path, **kwargs):
+        captured["method"] = method
+        captured["path"] = path
+        captured["json"] = kwargs["json"]
+        return {"id": "pay_123", "invoiceUrl": "https://asaas.test/invoice/pay_123"}
+
+    monkeypatch.setattr(asaas_routes, "_asaas_request", fake_asaas_request)
+
+    payment = _create_single_payment("cus_123", ASAAS_PLANS["monthly"], "uid-monthly-69.90")
+
+    assert payment["invoiceUrl"] == "https://asaas.test/invoice/pay_123"
+    assert captured["method"] == "POST"
+    assert captured["path"] == "/payments"
+    assert captured["json"]["billingType"] == "UNDEFINED"
+    assert captured["json"]["externalReference"] == "uid-monthly-69.90"
+    assert captured["json"]["dueDate"] >= date.today().isoformat()

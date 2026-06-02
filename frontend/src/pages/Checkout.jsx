@@ -247,7 +247,7 @@ const Checkout = () => {
               <div className="trial-icon-checkout">🎁</div>
               <div>
                 <strong>15 dias grátis sem cartão</strong>
-                <p>Você só paga se concluir a assinatura no Asaas.</p>
+                <p>Você só paga se concluir a cobrança no Asaas.</p>
               </div>
             </div>
           </div>
@@ -293,8 +293,8 @@ const Checkout = () => {
                 <div className="payment-method-content">
                   <span className="payment-icon">💳</span>
                   <div>
-                    <strong>Assinatura recorrente até cancelar</strong>
-                    <p>Pagamento seguro via Asaas. Escolha Pix ou cartão de crédito na próxima tela.</p>
+                    <strong>Pagamento mensal seguro</strong>
+                    <p>Escolha Pix, boleto ou cartão de crédito na próxima tela do Asaas.</p>
                   </div>
                 </div>
               </label>

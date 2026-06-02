@@ -19,6 +19,7 @@ router = APIRouter()
 security = HTTPBearer(auto_error=False)
 
 DEFAULT_ASAAS_PLAN_ID = "monthly"
+ASAAS_PAYMENT_MODE = os.environ.get("ASAAS_PAYMENT_MODE", "single_payment").strip().lower()
 ASAAS_PLANS = {
     "monthly": {
         "id": "monthly",
@@ -118,6 +119,16 @@ def _asaas_plan(plan_id: str) -> dict:
 def _period_end_for_plan(plan_id: str) -> datetime:
     days = 365 if ASAAS_PLANS.get(plan_id, {}).get("cycle") == "YEARLY" else 30
     return datetime.now(timezone.utc) + timedelta(days=days)
+
+
+def _frontend_success_url() -> str:
+    return os.environ.get("FRONTEND_URL", "https://venpro.com.br").rstrip("/") + "/payment-success"
+
+
+def _due_date_for_new_charge() -> str:
+    # Amanhã evita rejeição por diferenças de fuso/virada de dia em boleto,
+    # mas Pix/cartão continuam pagáveis imediatamente pela invoiceUrl.
+    return (date.today() + timedelta(days=1)).isoformat()
 
 
 def _asaas_request(method: str, path: str, allowed_statuses: set[int] | None = None, **kwargs) -> dict:
@@ -232,6 +243,31 @@ def _first_payment_for_subscription(subscription_id: str) -> dict:
     return data[0]
 
 
+def _create_single_payment(customer_id: str, plan: dict, external_reference: str) -> dict:
+    payment_payload = {
+        "customer": customer_id,
+        "billingType": "UNDEFINED",
+        "value": plan["price"],
+        "dueDate": _due_date_for_new_charge(),
+        "description": plan["description"],
+        "externalReference": external_reference,
+        "callback": {
+            "successUrl": _frontend_success_url(),
+            "autoRedirect": False,
+        },
+    }
+    payment = _asaas_request("POST", "/payments", json=payment_payload)
+    payment_url = payment.get("invoiceUrl") or payment.get("bankSlipUrl")
+    if not payment_url:
+        logger.error(
+            "[ASAAS] Cobrança avulsa sem invoiceUrl payment=%s keys=%s",
+            payment.get("id"),
+            sorted(payment.keys()),
+        )
+        raise HTTPException(status_code=502, detail="Asaas não retornou link de pagamento")
+    return payment
+
+
 def _find_subscription_user_id(payment: dict = None, subscription: dict = None) -> Optional[str]:
     payment = payment or {}
     subscription = subscription or {}
@@ -312,23 +348,40 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
     customer_id = _find_or_create_customer(uid, user_data)
     external_reference = f"{uid}-{plan['id']}-{plan['price']:.2f}"
 
-    subscription_payload = {
-        "customer": customer_id,
-        "billingType": "UNDEFINED",
-        "value": plan["price"],
-        "nextDueDate": date.today().isoformat(),
-        "cycle": plan["cycle"],
-        "description": plan["description"],
-        "externalReference": external_reference,
-        "callback": {
-            "successUrl": os.environ.get("FRONTEND_URL", "https://venpro.com.br").rstrip("/") + "/payment-success",
-            "autoRedirect": False,
-        },
-    }
+    subscription_id = None
+    billing_mode = "single_payment"
 
-    subscription = _asaas_request("POST", "/subscriptions", json=subscription_payload)
-    subscription_id = subscription["id"]
-    first_payment = _first_payment_for_subscription(subscription_id)
+    if ASAAS_PAYMENT_MODE == "subscription":
+        subscription_payload = {
+            "customer": customer_id,
+            "billingType": "UNDEFINED",
+            "value": plan["price"],
+            "nextDueDate": _due_date_for_new_charge(),
+            "cycle": plan["cycle"],
+            "description": plan["description"],
+            "externalReference": external_reference,
+            "callback": {
+                "successUrl": _frontend_success_url(),
+                "autoRedirect": False,
+            },
+        }
+        try:
+            subscription = _asaas_request("POST", "/subscriptions", json=subscription_payload)
+            subscription_id = subscription["id"]
+            first_payment = _first_payment_for_subscription(subscription_id)
+            billing_mode = "subscription"
+        except HTTPException as exc:
+            logger.warning(
+                "[ASAAS] Falha ao criar assinatura; tentando cobrança avulsa uid=%s status=%s detail=%s",
+                uid,
+                exc.status_code,
+                exc.detail,
+            )
+            first_payment = _create_single_payment(customer_id, plan, external_reference)
+            billing_mode = "single_payment_fallback"
+    else:
+        first_payment = _create_single_payment(customer_id, plan, external_reference)
+
     payment_url = first_payment.get("invoiceUrl") or first_payment.get("bankSlipUrl")
 
     if not payment_url:
@@ -353,6 +406,7 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
             "amount": plan["price"],
             "currency": "BRL",
             "paymentMethod": "UNDEFINED",
+            "billingMode": billing_mode,
             "paymentUrl": payment_url,
             "updatedAt": datetime.now(timezone.utc),
             "trialEndsAt": None,
@@ -363,7 +417,7 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
         "subscription_created",
         uid=uid,
         status="pending",
-        metadata={"provider": "asaas", "planId": plan["id"], "amount": plan["price"]},
+        metadata={"provider": "asaas", "planId": plan["id"], "amount": plan["price"], "billingMode": billing_mode},
     )
 
     return {
@@ -371,6 +425,7 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
         "subscriptionId": subscription_id,
         "paymentId": first_payment.get("id"),
         "paymentMethod": "UNDEFINED",
+        "billingMode": billing_mode,
         "paymentUrl": payment_url,
         "invoiceUrl": payment_url,
     }

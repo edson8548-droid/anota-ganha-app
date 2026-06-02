@@ -63,7 +63,7 @@ export const PLANS = {
     price: 69.90,
     period: 'monthly',
     duration: 'por mês',
-    billingCycle: 'Recorrente até cancelar. Cancele quando quiser.',
+    billingCycle: 'Pagamento mensal via Asaas. Renove quando vencer.',
     limits: {
       campaigns: 999999,
       clients: 999999,
