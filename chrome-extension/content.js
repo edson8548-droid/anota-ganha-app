@@ -3,11 +3,16 @@
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'extractItems') {
+    const site = detectQuotationSite();
     const items = extractQuotationItems({ empresaColuna: msg.empresaColuna });
-    sendResponse({ items });
+    sendResponse({ items, site });
   } else if (msg.action === 'fillPrices') {
     const result = fillQuotationPrices(msg.prices, { empresaColuna: msg.empresaColuna });
     sendResponse(result);
+  } else if (msg.action === 'detectSite') {
+    const site = detectQuotationSite();
+    const rows = getQuotationRows(site);
+    sendResponse({ site, supported: site !== 'generic' || rows.length > 0, rowCount: rows.length });
   }
   return true; // keep channel open for async
 });
@@ -65,13 +70,18 @@ function getSelectedPriceInput(row, empresaColuna, site = 'generic') {
 function detectQuotationSite() {
   const path = window.location.pathname || '';
   const bodyText = document.body?.innerText || '';
+  const looksRedeFornecedores = /\bREDE\s+DE\s+FORNECEDORES\b/i.test(bodyText)
+    || (/\bPRODUTOS\s+COTA[ÇC][ÃA]O\b/i.test(bodyText)
+      && /Cod\.?\s*Barras/i.test(bodyText)
+      && /Produto\s+Equivalente/i.test(bodyText));
+
   if (window.location.hostname.includes('cotatudo.com.br')) return 'cotatudo';
   if (window.location.hostname.includes('fornecedor.rpinfo.com.br') && /\/supplier\/quotations\//i.test(path)) return 'rp-hub';
   if (/\bRP\s*HUB\b/i.test(bodyText) && /Valor\s+Unit[aá]rio/i.test(bodyText)) return 'rp-hub';
+  if (looksRedeFornecedores) return 'rede-fornecedores';
   if (/(^|\.)rfd\.net\.br$/i.test(window.location.hostname)
     && (/\/cotacao\//i.test(path)
-      || /\bREDE\s+DE\s+FORNECEDORES\b/i.test(bodyText)
-      || /\bPRODUTOS\s+COTA[ÇC][ÃA]O\b/i.test(bodyText))) return 'rede-fornecedores';
+      || looksRedeFornecedores)) return 'rede-fornecedores';
   if (/\/php\/vrcotacao\/cotacao\.php/i.test(path) || /\bVR\s+COTA[ÇC][ÃA]O\b/i.test(bodyText)) return 'vr-cotacao';
   return 'generic';
 }

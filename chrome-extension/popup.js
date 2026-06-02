@@ -3,6 +3,13 @@ const BATCH = 50;
 const STUCK_MS = 3 * 60 * 1000;
 const BTN_LABEL = 'Preencher Cotação';
 const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB ou Rede de Fornecedores primeiro.';
+const SITE_LABELS = {
+  cotatudo: 'Cotatudo',
+  'vr-cotacao': 'VR Cotação',
+  'rp-hub': 'RP HUB',
+  'rede-fornecedores': 'Rede de Fornecedores',
+  generic: 'Cotação compatível',
+};
 
 const statusEl     = document.getElementById('status');
 const siteDetectadoEl = document.getElementById('siteDetectado');
@@ -31,12 +38,15 @@ function setStatus(text, type = 'info') {
   statusEl.className = `status ${type}`;
 }
 
-function setDetectedSite(tab) {
+function setDetectedSite(tab, pageInfo = null) {
   const url = tab?.url || '';
   let label = 'Site detectado: nenhum site de cotação aberto';
   let type = 'err';
 
-  if (url.includes('cotatudo.com.br')) {
+  if (pageInfo?.supported) {
+    label = `Site detectado: ${SITE_LABELS[pageInfo.site] || SITE_LABELS.generic}`;
+    type = 'ok';
+  } else if (url.includes('cotatudo.com.br')) {
     label = 'Site detectado: Cotatudo';
     type = 'ok';
   } else if (/\/php\/vrcotacao\/cotacao\.php/i.test(url)) {
@@ -196,6 +206,18 @@ function isSupportedQuotationUrl(url = '') {
     || isRedeFornecedoresUrl(url);
 }
 
+function isPotentialQuotationUrl(url = '') {
+  return isSupportedQuotationUrl(url)
+    || /\/fornecedores\/.+\/cotacao\//i.test(url)
+    || /\/cotacao\//i.test(url)
+    || /\b(cotacao|cota[cç][aã]o|quotation|quotations|supplier|fornecedor|rfd)\b/i.test(url);
+}
+
+function isInjectableTab(tab) {
+  const url = tab?.url || '';
+  return Boolean(tab?.id) && /^https?:\/\//i.test(url) && !/\/\/([^/]+\.)?venpro\.com\.br\//i.test(url);
+}
+
 function isRedeFornecedoresUrl(url = '') {
   try {
     const parsed = new URL(url);
@@ -205,9 +227,10 @@ function isRedeFornecedoresUrl(url = '') {
   }
 }
 
-async function getQuotationTab() {
+async function getQuotationTab(options = {}) {
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (active?.id && isSupportedQuotationUrl(active.url || '')) return active;
+  if (active?.id && isPotentialQuotationUrl(active.url || '')) return active;
+  if (options.allowActiveFallback && isInjectableTab(active)) return active;
 
   const tabs = await chrome.tabs.query({
     url: [
@@ -220,6 +243,10 @@ async function getQuotationTab() {
       'http://rfd.net.br/*',
       'http://www.rfd.net.br/*',
       'http://*.rfd.net.br/*',
+      'https://*/fornecedores/*/cotacao/*',
+      'http://*/fornecedores/*/cotacao/*',
+      'https://*/cotacao/*',
+      'http://*/cotacao/*',
     ],
   });
   return tabs.find(tab => tab?.id) || null;
@@ -242,11 +269,8 @@ function detectSiteFromUrl(url = '') {
   return 'generic';
 }
 
-async function sendToQuotationPage(message) {
-  const tab = await getQuotationTab();
-  if (!tab) throw new Error(SUPPORTED_SITE_MESSAGE);
-
-  const send = () => new Promise(resolve => {
+function sendMessageToTab(tab, message) {
+  return new Promise(resolve => {
     chrome.tabs.sendMessage(tab.id, message, response => {
       if (chrome.runtime.lastError) {
         resolve(null);
@@ -255,14 +279,37 @@ async function sendToQuotationPage(message) {
       resolve(response || null);
     });
   });
+}
 
-  let response = await send();
-  if (response) return response;
-
+async function ensureContentScript(tab) {
   await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
   await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ['content.css'] });
   await sleep(500);
-  response = await send();
+}
+
+async function detectPageInfo(tab) {
+  if (!tab) return null;
+  let response = await sendMessageToTab(tab, { action: 'detectSite' });
+  if (response) return response;
+
+  try {
+    await ensureContentScript(tab);
+    response = await sendMessageToTab(tab, { action: 'detectSite' });
+    return response || null;
+  } catch {
+    return null;
+  }
+}
+
+async function sendToQuotationPage(message) {
+  const tab = await getQuotationTab({ allowActiveFallback: true });
+  if (!tab) throw new Error(SUPPORTED_SITE_MESSAGE);
+
+  let response = await sendMessageToTab(tab, message);
+  if (response) return response;
+
+  await ensureContentScript(tab);
+  response = await sendMessageToTab(tab, message);
   if (!response) throw new Error('Não consegui conectar com a página da cotação. Atualize a aba e tente novamente.');
   return response;
 }
@@ -484,9 +531,9 @@ async function startProcessing() {
   setStatus('Lendo itens da cotação...', 'info');
 
   try {
-    const tab = await getQuotationTab();
-    const site = detectSiteFromUrl(tab?.url || '');
+    const tab = await getQuotationTab({ allowActiveFallback: true });
     const extractResult = await sendToQuotationPage({ action: 'extractItems', empresaColuna });
+    const site = extractResult.site || detectSiteFromUrl(tab?.url || '');
     const items = (extractResult.items || []).filter(item => !item.filled && (item.nome || item.ean));
 
     if (items.length === 0) {
@@ -562,9 +609,10 @@ async function init() {
     empresaColunaEl.value = String(data.cotatudoEmpresaColuna);
   }
 
-  const tab = await getQuotationTab();
-  setDetectedSite(tab);
-  if (!tab) {
+  const tab = await getQuotationTab({ allowActiveFallback: true });
+  const pageInfo = await detectPageInfo(tab);
+  setDetectedSite(tab, pageInfo);
+  if (!tab || (!isSupportedQuotationUrl(tab.url || '') && !pageInfo?.supported)) {
     setStatus(SUPPORTED_SITE_MESSAGE, 'err');
     tabelasEl.innerHTML = '<option value="">Necessário estar na cotação</option>';
     btnEl.disabled = true;

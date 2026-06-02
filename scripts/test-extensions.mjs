@@ -51,6 +51,10 @@ describe('extensoes Chrome', () => {
       manifest.content_scripts.some(script => (script.matches || []).includes('https://*.rfd.net.br/*')),
       'manifest precisa carregar content script em subdominios da Rede de Fornecedores'
     );
+    assert.ok(
+      manifest.content_scripts.some(script => (script.matches || []).includes('https://*/fornecedores/*/cotacao/*')),
+      'manifest precisa carregar content script em rotas genericas de cotacao'
+    );
   });
 
   it('manifest da extensao WhatsApp referencia arquivos existentes', () => {
@@ -80,6 +84,7 @@ describe('extensoes Chrome', () => {
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.21.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.22.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.23.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-whatsapp-extension.zip')));
   });
 });
