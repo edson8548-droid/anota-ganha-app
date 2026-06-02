@@ -254,6 +254,24 @@ def _first_payment_for_subscription(subscription_id: str) -> dict:
     return data[0]
 
 
+def _payment_url(payment: dict) -> str | None:
+    return payment.get("invoiceUrl") or payment.get("bankSlipUrl")
+
+
+def _find_reusable_pending_payment(customer_id: str, external_reference: str) -> dict | None:
+    payments = _asaas_request("GET", "/payments", params={"customer": customer_id, "limit": 10})
+    for payment in payments.get("data") or []:
+        if payment.get("deleted"):
+            continue
+        if payment.get("status") != "PENDING":
+            continue
+        if payment.get("externalReference") != external_reference:
+            continue
+        if _payment_url(payment):
+            return payment
+    return None
+
+
 def _create_single_payment(customer_id: str, plan: dict, external_reference: str) -> dict:
     payment_payload = {
         "customer": customer_id,
@@ -264,7 +282,7 @@ def _create_single_payment(customer_id: str, plan: dict, external_reference: str
         "externalReference": external_reference,
     }
     payment = _asaas_request("POST", "/payments", json=payment_payload)
-    payment_url = payment.get("invoiceUrl") or payment.get("bankSlipUrl")
+    payment_url = _payment_url(payment)
     if not payment_url:
         logger.error(
             "[ASAAS] Cobrança avulsa sem invoiceUrl payment=%s keys=%s",
@@ -357,8 +375,12 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
 
     subscription_id = None
     billing_mode = "single_payment"
+    reusable_payment = _find_reusable_pending_payment(customer_id, external_reference)
 
-    if ASAAS_PAYMENT_MODE == "subscription":
+    if reusable_payment:
+        first_payment = reusable_payment
+        billing_mode = "single_payment_reuse"
+    elif ASAAS_PAYMENT_MODE == "subscription":
         subscription_payload = {
             "customer": customer_id,
             "billingType": "UNDEFINED",
@@ -385,7 +407,7 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
     else:
         first_payment = _create_single_payment(customer_id, plan, external_reference)
 
-    payment_url = first_payment.get("invoiceUrl") or first_payment.get("bankSlipUrl")
+    payment_url = _payment_url(first_payment)
 
     if not payment_url:
         logger.error(

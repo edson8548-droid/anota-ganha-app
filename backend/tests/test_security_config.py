@@ -14,6 +14,7 @@ from routes.asaas import (
     _asaas_error_detail,
     _create_single_payment,
     _find_customer_by_query,
+    _find_reusable_pending_payment,
     _find_subscription_user_id,
     asaas_webhook,
 )
@@ -156,3 +157,51 @@ def test_asaas_existing_customer_notifications_are_disabled(monkeypatch):
     assert calls[1]["method"] == "PUT"
     assert calls[1]["path"] == "/customers/cus_123"
     assert calls[1]["json"] == {"notificationDisabled": True}
+
+
+def test_asaas_reuses_existing_pending_payment(monkeypatch):
+    def fake_asaas_request(method, path, **kwargs):
+        assert method == "GET"
+        assert path == "/payments"
+        assert kwargs["params"]["customer"] == "cus_123"
+        return {
+            "data": [
+                {
+                    "id": "pay_paid",
+                    "status": "RECEIVED",
+                    "externalReference": "uid-monthly-69.90",
+                    "invoiceUrl": "https://asaas.test/i/paid",
+                },
+                {
+                    "id": "pay_pending",
+                    "status": "PENDING",
+                    "externalReference": "uid-monthly-69.90",
+                    "invoiceUrl": "https://asaas.test/i/pending",
+                },
+            ]
+        }
+
+    monkeypatch.setattr(asaas_routes, "_asaas_request", fake_asaas_request)
+
+    payment = _find_reusable_pending_payment("cus_123", "uid-monthly-69.90")
+
+    assert payment["id"] == "pay_pending"
+
+
+def test_asaas_does_not_reuse_deleted_pending_payment(monkeypatch):
+    def fake_asaas_request(method, path, **kwargs):
+        return {
+            "data": [
+                {
+                    "id": "pay_deleted",
+                    "status": "PENDING",
+                    "deleted": True,
+                    "externalReference": "uid-monthly-69.90",
+                    "invoiceUrl": "https://asaas.test/i/deleted",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(asaas_routes, "_asaas_request", fake_asaas_request)
+
+    assert _find_reusable_pending_payment("cus_123", "uid-monthly-69.90") is None
