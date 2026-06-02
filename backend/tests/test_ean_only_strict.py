@@ -2,11 +2,17 @@ import os
 import sys
 import tempfile
 
+import pandas as pd
 from openpyxl import Workbook
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.excel_processor import gerar_excel_resultado, ler_cotacao, ler_tabela_mestre
+from services.excel_processor import (
+    _append_cotacao_items_from_dataframe,
+    gerar_excel_resultado,
+    ler_cotacao,
+    ler_tabela_mestre,
+)
 from services.matching_engine import processar_cotacao
 
 
@@ -60,6 +66,30 @@ def test_cotacao_codigo_nome_preco_reconhece_ean_e_nome():
     assert itens[0]["ean"] == "7891000379585"
     assert itens[0]["nome"] == "ACHOC. NESCAU 200G"
     assert itens[0]["col_preco"] == 2
+
+
+def test_pandas_fallback_preserva_linha_real_do_excel():
+    df = pd.DataFrame(
+        [["7891000379585", "ACHOC. NESCAU 200G", ""]],
+        columns=["Código Barras", "Descrição", "Vlr.Unitário"],
+    )
+    itens = []
+
+    _append_cotacao_items_from_dataframe(
+        itens,
+        df,
+        header_row=5,
+        col_nome=1,
+        col_ean=0,
+        col_preco=2,
+    )
+
+    assert itens == [{
+        "ean": "7891000379585",
+        "nome": "ACHOC. NESCAU 200G",
+        "linha": 6,
+        "col_preco": 2,
+    }]
 
 
 def test_coluna_cod_produto_nao_e_tratada_como_descricao():

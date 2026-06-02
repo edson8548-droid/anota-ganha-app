@@ -217,6 +217,20 @@ def _xlsx_safe_bytes(caminho_arquivo):
 PREENCHIMENTO_IA = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
 
+def _append_cotacao_items_from_dataframe(itens, df, header_row, col_nome, col_ean, col_preco):
+    """Adiciona itens lidos por pandas preservando a linha real do Excel."""
+    for idx, row in df.iterrows():
+        nome_val = row.iloc[col_nome]
+        ean_val = row.iloc[col_ean] if col_ean is not None and col_ean < len(row) else ""
+        if nome_val and str(nome_val).strip() and str(nome_val).strip() != "nan":
+            itens.append({
+                "ean": str(ean_val) if ean_val and str(ean_val) != "nan" else "",
+                "nome": str(nome_val),
+                "linha": header_row + idx + 1,
+                "col_preco": col_preco,
+            })
+
+
 def detectar_prazos_disponiveis(caminho_arquivo) -> list:
     """Detecta quais colunas de prazo (7, 14, 21, 28 dias) existem no Excel."""
     for header in range(0, 10):
@@ -433,16 +447,14 @@ def ler_cotacao(caminho_arquivo):
 
                 header_row = hdr + 1
 
-                for idx, row in df.iterrows():
-                    nome_val = row.iloc[col_nome]
-                    ean_val  = row.iloc[col_ean] if col_ean is not None and col_ean < len(row) else ""
-                    if nome_val and str(nome_val).strip() and str(nome_val).strip() != "nan":
-                        itens.append({
-                            "ean": str(ean_val) if ean_val and str(ean_val) != "nan" else "",
-                            "nome": str(nome_val),
-                            "linha": header_row + idx + 2,
-                            "col_preco": col_preco,
-                        })
+                _append_cotacao_items_from_dataframe(
+                    itens,
+                    df,
+                    header_row,
+                    col_nome,
+                    col_ean,
+                    col_preco,
+                )
                 if itens:
                     break
             except Exception:
@@ -483,6 +495,81 @@ def _first_empty_price_cell(ws, row_idx: int, preferred_zero_based, fallback_sta
     return ws.cell(row=row_idx, column=col)
 
 
+def _write_resultados_to_worksheet(ws, itens, resultados):
+    fallback_start_col = ws.max_column + 1
+    header_row_idx = max(1, min((item.get("linha", 2) for item in itens), default=2) - 1)
+
+    for item, res in zip(itens, resultados):
+        if res["preco"] is not None:
+            cell = _first_empty_price_cell(
+                ws,
+                row_idx=item["linha"],
+                preferred_zero_based=item.get("col_preco"),
+                fallback_start_col=fallback_start_col,
+            )
+            header_cell = ws.cell(row=header_row_idx, column=cell.column)
+            if _cell_is_empty(header_cell):
+                header_cell.value = "PRECO"
+            cell.value = res["preco"]
+
+            if res["tipo"] and "IA" in res["tipo"]:
+                cell.fill = PREENCHIMENTO_IA
+
+
+def _xlrd_cell_value(cell, datemode):
+    import xlrd
+
+    if cell.ctype in (xlrd.XL_CELL_EMPTY, xlrd.XL_CELL_BLANK):
+        return None
+    if cell.ctype == xlrd.XL_CELL_DATE:
+        try:
+            return xlrd.xldate.xldate_as_datetime(cell.value, datemode)
+        except Exception:
+            return cell.value
+    if cell.ctype == xlrd.XL_CELL_BOOLEAN:
+        return bool(cell.value)
+    if cell.ctype == xlrd.XL_CELL_ERROR:
+        return xlrd.biffh.error_text_from_code.get(cell.value)
+    return cell.value
+
+
+def _safe_sheet_title(title, index, used_titles):
+    base = _re.sub(r"[\[\]\:\*\?\/\\]+", " ", str(title or "").strip())
+    base = _re.sub(r"\s+", " ", base).strip() or f"Planilha {index}"
+    base = base[:31]
+    candidate = base
+    suffix = 2
+    while candidate in used_titles:
+        marker = f" {suffix}"
+        candidate = f"{base[:31 - len(marker)]}{marker}"
+        suffix += 1
+    used_titles.add(candidate)
+    return candidate
+
+
+def _workbook_from_xls_values(caminho_original):
+    """Converte .xls legado para Workbook preservando coordenadas das celulas."""
+    import xlrd
+
+    book = xlrd.open_workbook(caminho_original, formatting_info=False)
+    wb = Workbook()
+    used_titles = set()
+
+    for sheet_idx in range(book.nsheets):
+        sheet = book.sheet_by_index(sheet_idx)
+        title = _safe_sheet_title(sheet.name, sheet_idx + 1, used_titles)
+        ws = wb.active if sheet_idx == 0 else wb.create_sheet(title)
+        ws.title = title
+
+        for row_idx in range(sheet.nrows):
+            for col_idx in range(sheet.ncols):
+                value = _xlrd_cell_value(sheet.cell(row_idx, col_idx), book.datemode)
+                if value is not None:
+                    ws.cell(row=row_idx + 1, column=col_idx + 1).value = value
+
+    return wb
+
+
 def gerar_excel_resultado(caminho_original, itens, resultados):
     """
     Gera Excel preenchido com os precos encontrados.
@@ -494,24 +581,7 @@ def gerar_excel_resultado(caminho_original, itens, resultados):
         buf = _xlsx_safe_bytes(caminho_original)
         wb = openpyxl.load_workbook(buf)
         ws = wb.active
-        fallback_start_col = ws.max_column + 1
-        header_row_idx = max(1, min((item.get("linha", 2) for item in itens), default=2) - 1)
-
-        for item, res in zip(itens, resultados):
-            if res["preco"] is not None:
-                cell = _first_empty_price_cell(
-                    ws,
-                    row_idx=item["linha"],
-                    preferred_zero_based=item.get("col_preco"),
-                    fallback_start_col=fallback_start_col,
-                )
-                header_cell = ws.cell(row=header_row_idx, column=cell.column)
-                if _cell_is_empty(header_cell):
-                    header_cell.value = "PRECO"
-                cell.value = res["preco"]
-
-                if res["tipo"] and "IA" in res["tipo"]:
-                    cell.fill = PREENCHIMENTO_IA
+        _write_resultados_to_worksheet(ws, itens, resultados)
 
         output = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
         wb.save(output.name)
@@ -519,6 +589,18 @@ def gerar_excel_resultado(caminho_original, itens, resultados):
         return output.name
 
     except Exception:
+        try:
+            wb = _workbook_from_xls_values(caminho_original)
+            ws = wb.active
+            _write_resultados_to_worksheet(ws, itens, resultados)
+
+            output = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+            wb.save(output.name)
+            output.close()
+            return output.name
+        except Exception:
+            pass
+
         # Fallback: gerar novo Excel com pandas
         df = pd.read_excel(caminho_original)
         preco_col = None
