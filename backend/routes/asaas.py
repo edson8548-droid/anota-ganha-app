@@ -221,11 +221,11 @@ def _find_or_create_customer(uid: str, user_data: dict) -> str:
         or user_data.get("email")
         or "Cliente Venpro"
     )
-    cpf_cnpj = _only_digits(user_data.get("cpf") or user_data.get("cpfCnpj"))
+    cpf_cnpj = _only_digits(user_data.get("cpfCnpj") or user_data.get("cpf") or user_data.get("cnpj"))
     phone = _only_digits(user_data.get("telefone") or user_data.get("phone"))
 
     if not cpf_cnpj:
-        raise HTTPException(status_code=400, detail="CPF obrigatório para gerar cobrança")
+        raise HTTPException(status_code=400, detail="CPF ou CNPJ obrigatório para gerar cobrança")
 
     customer_id = _find_customer_by_query(uid, {"cpfCnpj": cpf_cnpj})
     if customer_id:

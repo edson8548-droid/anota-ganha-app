@@ -22,3 +22,30 @@ export function isValidCPF(value = '') {
 
   return digit1 === Number(cpf[9]) && digit2 === Number(cpf[10]);
 }
+
+export function isValidCNPJ(value = '') {
+  const cnpj = onlyDigits(value);
+
+  if (cnpj.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(cnpj)) return false;
+
+  const calcDigit = (base, weights) => {
+    const sum = base
+      .split('')
+      .reduce((total, digit, index) => total + Number(digit) * weights[index], 0);
+    const remainder = sum % 11;
+    return remainder < 2 ? 0 : 11 - remainder;
+  };
+
+  const digit1 = calcDigit(cnpj.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const digit2 = calcDigit(cnpj.slice(0, 13), [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+
+  return digit1 === Number(cnpj[12]) && digit2 === Number(cnpj[13]);
+}
+
+export function isValidCpfCnpj(value = '') {
+  const digits = onlyDigits(value);
+  if (digits.length === 11) return isValidCPF(digits);
+  if (digits.length === 14) return isValidCNPJ(digits);
+  return false;
+}

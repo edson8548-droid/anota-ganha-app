@@ -1,4 +1,4 @@
-import { isValidCPF, onlyDigits } from './documentValidators';
+import { isValidCNPJ, isValidCPF, isValidCpfCnpj, onlyDigits } from './documentValidators';
 
 test('onlyDigits remove tudo que nao e numero', () => {
   expect(onlyDigits('CPF 123.456.789-09')).toBe('12345678909');
@@ -14,4 +14,14 @@ test('isValidCPF rejeita sequencia repetida', () => {
 
 test('isValidCPF rejeita digito verificador invalido', () => {
   expect(isValidCPF('529.982.247-24')).toBe(false);
+});
+
+test('isValidCNPJ aceita CNPJ valido com mascara', () => {
+  expect(isValidCNPJ('04.252.011/0001-10')).toBe(true);
+});
+
+test('isValidCpfCnpj aceita CPF ou CNPJ validos', () => {
+  expect(isValidCpfCnpj('529.982.247-25')).toBe(true);
+  expect(isValidCpfCnpj('04.252.011/0001-10')).toBe(true);
+  expect(isValidCpfCnpj('04.252.011/0001-11')).toBe(false);
 });

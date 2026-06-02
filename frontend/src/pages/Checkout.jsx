@@ -7,16 +7,24 @@ import { apiUrl, backendUrl } from '../config/api';
 import { saveBillingProfile } from '../services/api';
 import { auth, db } from '../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
+import { isValidCpfCnpj } from '../utils/documentValidators';
 import './Checkout.css';
 
 const onlyDigits = (value) => String(value || '').replace(/\D/g, '');
 
-const formatCpf = (value) => {
-  const digits = onlyDigits(value).slice(0, 11);
+const formatCpfCnpj = (value) => {
+  const digits = onlyDigits(value).slice(0, 14);
+  if (digits.length <= 11) {
+    return digits
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  }
   return digits
-    .replace(/(\d{3})(\d)/, '$1.$2')
-    .replace(/(\d{3})(\d)/, '$1.$2')
-    .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1/$2')
+    .replace(/(\d{4})(\d{1,2})$/, '$1-$2');
 };
 
 const formatPhone = (value) => {
@@ -35,24 +43,6 @@ const formatMoney = (value) => Number(value || 0).toLocaleString('pt-BR', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
-
-const isValidCpf = (cpf) => {
-  const digits = onlyDigits(cpf);
-  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
-
-  const calcDigit = (base) => {
-    let sum = 0;
-    for (let i = 0; i < base.length; i += 1) {
-      sum += Number(base[i]) * (base.length + 1 - i);
-    }
-    const rest = (sum * 10) % 11;
-    return rest === 10 ? 0 : rest;
-  };
-
-  const d1 = calcDigit(digits.slice(0, 9));
-  const d2 = calcDigit(digits.slice(0, 10));
-  return d1 === Number(digits[9]) && d2 === Number(digits[10]);
-};
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -92,7 +82,7 @@ const Checkout = () => {
         const data = userDoc.exists() ? userDoc.data() : {};
         setPayerData({
           name: data.name || data.displayName || data.nome || user.displayName || user.email || '',
-          cpf: formatCpf(data.cpf || data.cpfCnpj || ''),
+          cpf: formatCpfCnpj(data.cpfCnpj || data.cpf || data.cnpj || ''),
           telefone: formatPhone(data.telefone || data.phone || '')
         });
       } catch (error) {
@@ -115,7 +105,7 @@ const Checkout = () => {
       return;
     }
 
-    const cleanCpf = onlyDigits(payerData.cpf);
+    const cleanCpfCnpj = onlyDigits(payerData.cpf);
     const cleanPhone = onlyDigits(payerData.telefone);
     const payerName = payerData.name.trim();
 
@@ -124,8 +114,8 @@ const Checkout = () => {
       return;
     }
 
-    if (!isValidCpf(cleanCpf)) {
-      toast.warning('Informe um CPF válido antes de continuar.');
+    if (!isValidCpfCnpj(cleanCpfCnpj)) {
+      toast.warning('Informe um CPF ou CNPJ válido antes de continuar.');
       return;
     }
 
@@ -148,7 +138,8 @@ const Checkout = () => {
 
       await saveBillingProfile({
         name: payerName,
-        cpf: cleanCpf,
+        cpf: cleanCpfCnpj,
+        cpfCnpj: cleanCpfCnpj,
         telefone: cleanPhone,
       });
 
@@ -266,11 +257,11 @@ const Checkout = () => {
                 />
               </label>
               <label>
-                <span>CPF</span>
+                <span>CPF ou CNPJ</span>
                 <input
                   value={payerData.cpf}
-                  onChange={(e) => setPayerData((prev) => ({ ...prev, cpf: formatCpf(e.target.value) }))}
-                  placeholder="000.000.000-00"
+                  onChange={(e) => setPayerData((prev) => ({ ...prev, cpf: formatCpfCnpj(e.target.value) }))}
+                  placeholder="000.000.000-00 ou 00.000.000/0000-00"
                   inputMode="numeric"
                   disabled={profileLoading || loading}
                 />

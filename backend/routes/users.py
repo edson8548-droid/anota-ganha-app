@@ -36,7 +36,7 @@ TRANSPARENT_GIF = (
 ALLOWED_REDIRECT_HOSTS = {"venpro.com.br", "www.venpro.com.br", "anota-ganha-app.web.app"}
 
 # ============================================
-# VALIDAÇÃO DE CPF
+# VALIDAÇÃO DE DOCUMENTO FISCAL
 # ============================================
 
 def _remover_caracteres_cpf(cpf: str) -> str:
@@ -85,6 +85,46 @@ def _calcular_digitos_verificadores(cpf: str) -> tuple[int, int]:
     return primeiro_digito, segundo_digito
 
 
+def _calcular_digitos_verificadores_cnpj(cnpj: str) -> tuple[int, int]:
+    cnpj = _remover_caracteres_cpf(cnpj)
+    if len(cnpj) != 14:
+        return 0, 0
+
+    def calcular(base: str, pesos: list[int]) -> int:
+        soma = sum(int(digito) * peso for digito, peso in zip(base, pesos))
+        resto = soma % 11
+        return 0 if resto < 2 else 11 - resto
+
+    primeiro_digito = calcular(cnpj[:12], [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
+    segundo_digito = calcular(cnpj[:13], [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
+    return primeiro_digito, segundo_digito
+
+
+def _validar_documento_fiscal(documento: str) -> tuple[str, str]:
+    doc_limpo = _remover_caracteres_cpf(documento)
+
+    if len(doc_limpo) == 11:
+        cpf_valido, msg_cpf = _validar_formato_cpf(doc_limpo)
+        if not cpf_valido:
+            raise HTTPException(400, f"CPF inválido: {msg_cpf}")
+        if doc_limpo == doc_limpo[0] * 11:
+            raise HTTPException(400, "CPF inválido")
+        dv1_esperado, dv2_esperado = _calcular_digitos_verificadores(doc_limpo)
+        if (dv1_esperado, dv2_esperado) != (int(doc_limpo[9]), int(doc_limpo[10])):
+            raise HTTPException(400, "Dígitos verificadores do CPF incorretos")
+        return "cpf", doc_limpo
+
+    if len(doc_limpo) == 14:
+        if doc_limpo == doc_limpo[0] * 14:
+            raise HTTPException(400, "CNPJ inválido")
+        dv1_esperado, dv2_esperado = _calcular_digitos_verificadores_cnpj(doc_limpo)
+        if (dv1_esperado, dv2_esperado) != (int(doc_limpo[12]), int(doc_limpo[13])):
+            raise HTTPException(400, "Dígitos verificadores do CNPJ incorretos")
+        return "cnpj", doc_limpo
+
+    raise HTTPException(400, "Informe CPF com 11 dígitos ou CNPJ com 14 dígitos")
+
+
 def _verificar_duplicidade_cpf(cpf: str, db, current_uid: str | None = None) -> tuple[bool, str]:
     """
     Verifica se o CPF já está cadastrado.
@@ -124,7 +164,6 @@ def _trial_end(now: datetime | None = None) -> datetime:
 
 def _validar_dados_pagador(nome: str, cpf: str, telefone: str) -> dict:
     nome_limpo = str(nome or "").strip()
-    cpf_limpo = _remover_caracteres_cpf(cpf)
     telefone_limpo = re.sub(r'\D', '', str(telefone or ""))
 
     if not nome_limpo:
@@ -132,20 +171,19 @@ def _validar_dados_pagador(nome: str, cpf: str, telefone: str) -> dict:
     if len(nome_limpo) > 120:
         raise HTTPException(400, "Nome completo é muito longo")
 
-    cpf_valido, msg_cpf = _validar_formato_cpf(cpf_limpo)
-    if not cpf_valido:
-        raise HTTPException(400, f"CPF inválido: {msg_cpf}")
-    if cpf_limpo == cpf_limpo[0] * 11:
-        raise HTTPException(400, "CPF inválido")
-
-    dv1_esperado, dv2_esperado = _calcular_digitos_verificadores(cpf_limpo)
-    if (dv1_esperado, dv2_esperado) != (int(cpf_limpo[9]), int(cpf_limpo[10])):
-        raise HTTPException(400, "Dígitos verificadores do CPF incorretos")
+    documento_tipo, documento = _validar_documento_fiscal(cpf)
 
     if len(telefone_limpo) < 10 or len(telefone_limpo) > 11:
         raise HTTPException(400, "Telefone inválido. Inclua o DDD (mínimo 10 dígitos, máximo 11)")
 
-    return {"nome": nome_limpo, "cpf": cpf_limpo, "telefone": telefone_limpo}
+    return {
+        "nome": nome_limpo,
+        "cpf": documento if documento_tipo == "cpf" else None,
+        "cnpj": documento if documento_tipo == "cnpj" else None,
+        "cpfCnpj": documento,
+        "documentoTipo": documento_tipo,
+        "telefone": telefone_limpo,
+    }
 
 
 def _trial_subscription_data(uid: str, now: datetime | None = None) -> dict:
@@ -433,6 +471,7 @@ class BillingProfileRequest(BaseModel):
     name: str | None = Field(default=None, max_length=120)
     nome: str | None = Field(default=None, max_length=120)
     cpf: str
+    cpfCnpj: str | None = None
     telefone: str
 
 
@@ -700,26 +739,35 @@ async def update_billing_profile(
     payload: BillingProfileRequest,
     uid: str = Depends(get_user_id),
 ):
-    """Atualiza CPF/telefone pelo backend, com validação e proteção contra duplicidade."""
-    dados = _validar_dados_pagador(payload.name or payload.nome or "", payload.cpf, payload.telefone)
-    cpf_duplicado, msg_duplicidade = await asyncio.to_thread(
-        _verificar_duplicidade_cpf,
-        dados["cpf"],
-        _fs(),
-        uid,
-    )
-    if cpf_duplicado:
-        raise HTTPException(400, msg_duplicidade)
+    """Atualiza documento/telefone pelo backend, com validação e proteção contra duplicidade."""
+    documento_bruto = payload.cpfCnpj or payload.cpf
+    dados = _validar_dados_pagador(payload.name or payload.nome or "", documento_bruto, payload.telefone)
+    if dados["documentoTipo"] == "cpf":
+        cpf_duplicado, msg_duplicidade = await asyncio.to_thread(
+            _verificar_duplicidade_cpf,
+            dados["cpf"],
+            _fs(),
+            uid,
+        )
+        if cpf_duplicado:
+            raise HTTPException(400, msg_duplicidade)
+
+    update_data = {
+        "name": dados["nome"],
+        "nome": dados["nome"],
+        "cpfCnpj": dados["cpfCnpj"],
+        "documentoTipo": dados["documentoTipo"],
+        "telefone": dados["telefone"],
+        "updated_at": firestore.SERVER_TIMESTAMP,
+    }
+    if dados["cpf"]:
+        update_data["cpf"] = dados["cpf"]
+    if dados["cnpj"]:
+        update_data["cnpj"] = dados["cnpj"]
 
     await asyncio.to_thread(
         _fs().collection("users").document(uid).set,
-        {
-            "name": dados["nome"],
-            "nome": dados["nome"],
-            "cpf": dados["cpf"],
-            "telefone": dados["telefone"],
-            "updated_at": firestore.SERVER_TIMESTAMP,
-        },
+        update_data,
         merge=True,
     )
     await audit_event("billing_profile_updated", uid=uid, status="success")
@@ -757,6 +805,8 @@ async def register(
         raise HTTPException(400, "A senha deve ter no mínimo 6 caracteres")
 
     dados_pagador = _validar_dados_pagador(nome, payload.cpf, payload.telefone)
+    if dados_pagador["documentoTipo"] != "cpf":
+        raise HTTPException(400, "Cadastro inicial exige CPF. O CNPJ pode ser informado no checkout de pagamento.")
     cpf = dados_pagador["cpf"]
     telefone_clean = dados_pagador["telefone"]
 
@@ -784,12 +834,14 @@ async def register(
             raise HTTPException(400, "A senha é muito fraca. Use no mínimo 6 caracteres")
         raise HTTPException(400, "Erro ao criar usuário")
 
-    # 6. Salva dados adicionais no Firestore (incluindo CPF validado)
+    # 6. Salva dados adicionais no Firestore (incluindo documento validado)
     user_data = {
         "email": email,
         "name": dados_pagador["nome"],
         "nome": dados_pagador["nome"],
         "cpf": cpf,
+        "cpfCnpj": cpf,
+        "documentoTipo": "cpf",
         "telefone": telefone_clean,
         "role": "user",
         "license_type": "trial",

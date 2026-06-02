@@ -2,6 +2,9 @@ import inspect
 import os
 import sys
 
+import pytest
+from fastapi import HTTPException
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from routes import users
@@ -96,5 +99,30 @@ def test_validar_dados_pagador_normalizes_valid_data():
     assert dados == {
         "nome": "Cliente Teste",
         "cpf": "52998224725",
+        "cnpj": None,
+        "cpfCnpj": "52998224725",
+        "documentoTipo": "cpf",
         "telefone": "13999001234",
     }
+
+
+def test_validar_dados_pagador_accepts_cnpj():
+    dados = users._validar_dados_pagador(" Empresa Teste ", "04.252.011/0001-10", "(13) 99900-1234")
+
+    assert dados == {
+        "nome": "Empresa Teste",
+        "cpf": None,
+        "cnpj": "04252011000110",
+        "cpfCnpj": "04252011000110",
+        "documentoTipo": "cnpj",
+        "telefone": "13999001234",
+    }
+
+
+def test_register_endpoint_requires_cpf_even_when_billing_accepts_cnpj():
+    signature = inspect.signature(users.register)
+
+    assert "payload" in signature.parameters
+    with pytest.raises(HTTPException):
+        if users._validar_dados_pagador("Empresa", "04.252.011/0001-10", "(13) 99900-1234")["documentoTipo"] != "cpf":
+            raise HTTPException(400, "Cadastro inicial exige CPF. O CNPJ pode ser informado no checkout de pagamento.")

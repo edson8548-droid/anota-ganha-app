@@ -12,6 +12,7 @@ from routes import asaas as asaas_routes
 from routes.asaas import (
     ASAAS_PLANS,
     _asaas_error_detail,
+    _find_or_create_customer,
     _create_single_payment,
     _find_customer_by_query,
     _find_reusable_pending_payment,
@@ -205,3 +206,33 @@ def test_asaas_does_not_reuse_deleted_pending_payment(monkeypatch):
     monkeypatch.setattr(asaas_routes, "_asaas_request", fake_asaas_request)
 
     assert _find_reusable_pending_payment("cus_123", "uid-monthly-69.90") is None
+
+
+def test_asaas_customer_prefers_cpf_cnpj_over_legacy_cpf(monkeypatch):
+    calls = []
+
+    def fake_asaas_request(method, path, **kwargs):
+        calls.append({"method": method, "path": path, **kwargs})
+        if method == "GET":
+            return {"data": []}
+        if method == "POST":
+            return {"id": "cus_123"}
+        raise AssertionError(f"Unexpected request {method} {path}")
+
+    monkeypatch.setattr(asaas_routes, "_asaas_request", fake_asaas_request)
+    monkeypatch.setattr(asaas_routes, "_save_asaas_customer_id", lambda uid, customer_id: None)
+
+    customer_id = _find_or_create_customer(
+        "uid-123",
+        {
+            "name": "Empresa Teste",
+            "email": "empresa@example.com",
+            "cpf": "52998224725",
+            "cpfCnpj": "04252011000110",
+            "telefone": "13999001234",
+        },
+    )
+
+    assert customer_id == "cus_123"
+    assert calls[-1]["method"] == "POST"
+    assert calls[-1]["json"]["cpfCnpj"] == "04252011000110"
