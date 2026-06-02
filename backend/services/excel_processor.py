@@ -378,21 +378,55 @@ def ler_cotacao(caminho_arquivo):
         col_nome = None
         col_preco = None
         found_header = None
+        best_header = None
+        best_score = -1
+        fallback_col_ean = None
+        fallback_col_nome = None
+        fallback_col_preco = None
+        fallback_header = None
 
         for row_idx in range(1, min(16, ws.max_row + 1)):
+            row_col_ean = None
+            row_col_nome = None
+            row_col_preco = None
             for cell in ws[row_idx]:
                 val = str(cell.value).upper().strip() if cell.value else ""
                 if not val:
                     continue
-                if col_nome is None and _match_nome(val):
-                    col_nome = cell.column - 1
-                    found_header = row_idx
-                elif col_ean is None and _match_ean(val):
-                    col_ean = cell.column - 1
-                    found_header = found_header or row_idx
-                elif col_preco is None and _match_preco(val):
-                    col_preco = cell.column - 1
-                    found_header = found_header or row_idx
+                if row_col_nome is None and _match_nome(val):
+                    row_col_nome = cell.column - 1
+                elif row_col_ean is None and _match_ean(val):
+                    row_col_ean = cell.column - 1
+                elif row_col_preco is None and _match_preco(val):
+                    row_col_preco = cell.column - 1
+
+                if fallback_col_nome is None and _match_nome(val):
+                    fallback_col_nome = cell.column - 1
+                    fallback_header = row_idx
+                elif fallback_col_ean is None and _match_ean(val):
+                    fallback_col_ean = cell.column - 1
+                    fallback_header = fallback_header or row_idx
+                elif fallback_col_preco is None and _match_preco(val):
+                    fallback_col_preco = cell.column - 1
+                    fallback_header = fallback_header or row_idx
+
+            if row_col_nome is not None:
+                score = 4
+                if row_col_ean is not None:
+                    score += 3
+                if row_col_preco is not None:
+                    score += 2
+                if score > best_score:
+                    best_score = score
+                    best_header = (row_idx, row_col_nome, row_col_ean, row_col_preco)
+
+        if best_header:
+            found_header, col_nome, col_ean, col_preco = best_header
+        else:
+            found_header = fallback_header
+            col_nome = fallback_col_nome
+            col_ean = fallback_col_ean
+            col_preco = fallback_col_preco
 
         if found_header:
             header_row = found_header

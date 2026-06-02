@@ -220,3 +220,43 @@ def test_resultado_preenche_coluna_custo_sem_criar_preco_extra():
         os.unlink(path)
         if output:
             os.unlink(output)
+
+
+def test_resultado_ignora_vlr_min_fatur_e_preenche_vlr_unitario():
+    path = _xlsx([
+        ["Data da Entrega:", None, None, None, None, None, None],
+        ["Cond.Pagto:", None, 0, None, None, None, None],
+        ["Vlr.Min.Fatur:", None, 0, None, None, None, None],
+        [None, None, None, None, None, None, None],
+        ["Seq", "Cód.PLU", "Código Barras", "Descrição", "Qt.Emb", "Vlr.Unitário", "%Icms"],
+        ["1", "45251-9", "789600754187-4", "ABS INTIMUS INTERNO SUPER C/8", 0, 0, 0],
+    ])
+    output = None
+    try:
+        itens, header_row = ler_cotacao(path)
+
+        assert header_row == 5
+        assert itens[0]["linha"] == 6
+        assert itens[0]["col_preco"] == 5
+
+        output = gerar_excel_resultado(
+            path,
+            itens,
+            [{"linha": 6, "preco": 14.87, "tipo": "EAN"}],
+        )
+
+        from openpyxl import load_workbook
+
+        wb = load_workbook(output, data_only=True)
+        ws = wb.active
+        try:
+            assert ws.cell(5, 1).value == "Seq"
+            assert ws.cell(6, 1).value == "1"
+            assert ws.cell(5, 6).value == "Vlr.Unitário"
+            assert ws.cell(6, 6).value == 14.87
+        finally:
+            wb.close()
+    finally:
+        os.unlink(path)
+        if output:
+            os.unlink(output)
