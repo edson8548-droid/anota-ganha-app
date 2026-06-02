@@ -93,6 +93,8 @@ def test_asaas_plan_prices_match_public_offer():
     assert ASAAS_PLANS["monthly"]["price"] == 69.90
     assert ASAAS_PLANS["monthly"]["cycle"] == "MONTHLY"
     assert "annual_upfront" not in ASAAS_PLANS
+    assert asaas_routes.ASAAS_PAYMENT_MODE == "subscription"
+    assert asaas_routes.ASAAS_SUBSCRIPTION_FALLBACK_TO_SINGLE is False
 
 
 def test_asaas_finds_user_from_monthly_external_reference():
@@ -187,6 +189,40 @@ def test_asaas_reuses_existing_pending_payment(monkeypatch):
     payment = _find_reusable_pending_payment("cus_123", "uid-monthly-69.90")
 
     assert payment["id"] == "pay_pending"
+
+
+def test_asaas_subscription_mode_reuses_only_subscription_payments(monkeypatch):
+    def fake_asaas_request(method, path, **kwargs):
+        assert method == "GET"
+        assert path == "/payments"
+        return {
+            "data": [
+                {
+                    "id": "pay_detached",
+                    "status": "PENDING",
+                    "externalReference": "uid-monthly-69.90",
+                    "invoiceUrl": "https://asaas.test/i/detached",
+                },
+                {
+                    "id": "pay_subscription",
+                    "status": "PENDING",
+                    "subscription": "sub_123",
+                    "externalReference": "uid-monthly-69.90",
+                    "invoiceUrl": "https://asaas.test/i/subscription",
+                },
+            ]
+        }
+
+    monkeypatch.setattr(asaas_routes, "_asaas_request", fake_asaas_request)
+
+    payment = _find_reusable_pending_payment(
+        "cus_123",
+        "uid-monthly-69.90",
+        require_subscription=True,
+    )
+
+    assert payment["id"] == "pay_subscription"
+    assert payment["subscription"] == "sub_123"
 
 
 def test_asaas_does_not_reuse_deleted_pending_payment(monkeypatch):

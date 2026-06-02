@@ -19,7 +19,11 @@ router = APIRouter()
 security = HTTPBearer(auto_error=False)
 
 DEFAULT_ASAAS_PLAN_ID = "monthly"
-ASAAS_PAYMENT_MODE = os.environ.get("ASAAS_PAYMENT_MODE", "single_payment").strip().lower()
+ASAAS_PAYMENT_MODE = os.environ.get("ASAAS_PAYMENT_MODE", "subscription").strip().lower()
+ASAAS_SUBSCRIPTION_FALLBACK_TO_SINGLE = (
+    os.environ.get("ASAAS_SUBSCRIPTION_FALLBACK_TO_SINGLE", "false").strip().lower()
+    in {"1", "true", "yes"}
+)
 ASAAS_DISABLE_CUSTOMER_NOTIFICATIONS = (
     os.environ.get("ASAAS_DISABLE_CUSTOMER_NOTIFICATIONS", "true").strip().lower()
     not in {"0", "false", "no"}
@@ -258,7 +262,11 @@ def _payment_url(payment: dict) -> str | None:
     return payment.get("invoiceUrl") or payment.get("bankSlipUrl")
 
 
-def _find_reusable_pending_payment(customer_id: str, external_reference: str) -> dict | None:
+def _find_reusable_pending_payment(
+    customer_id: str,
+    external_reference: str,
+    require_subscription: bool = False,
+) -> dict | None:
     payments = _asaas_request("GET", "/payments", params={"customer": customer_id, "limit": 10})
     for payment in payments.get("data") or []:
         if payment.get("deleted"):
@@ -266,6 +274,8 @@ def _find_reusable_pending_payment(customer_id: str, external_reference: str) ->
         if payment.get("status") != "PENDING":
             continue
         if payment.get("externalReference") != external_reference:
+            continue
+        if require_subscription and not payment.get("subscription"):
             continue
         if _payment_url(payment):
             return payment
@@ -373,14 +383,20 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
     customer_id = _find_or_create_customer(uid, user_data)
     external_reference = f"{uid}-{plan['id']}-{plan['price']:.2f}"
 
+    use_subscription_mode = ASAAS_PAYMENT_MODE == "subscription"
     subscription_id = None
-    billing_mode = "single_payment"
-    reusable_payment = _find_reusable_pending_payment(customer_id, external_reference)
+    billing_mode = "subscription" if use_subscription_mode else "single_payment"
+    reusable_payment = _find_reusable_pending_payment(
+        customer_id,
+        external_reference,
+        require_subscription=use_subscription_mode,
+    )
 
     if reusable_payment:
         first_payment = reusable_payment
-        billing_mode = "single_payment_reuse"
-    elif ASAAS_PAYMENT_MODE == "subscription":
+        subscription_id = reusable_payment.get("subscription") if use_subscription_mode else None
+        billing_mode = "subscription_reuse" if use_subscription_mode else "single_payment_reuse"
+    elif use_subscription_mode:
         subscription_payload = {
             "customer": customer_id,
             "billingType": "UNDEFINED",
@@ -402,6 +418,8 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
                 exc.status_code,
                 exc.detail,
             )
+            if not ASAAS_SUBSCRIPTION_FALLBACK_TO_SINGLE:
+                raise
             first_payment = _create_single_payment(customer_id, plan, external_reference)
             billing_mode = "single_payment_fallback"
     else:

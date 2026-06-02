@@ -284,8 +284,8 @@ const Checkout = () => {
                 <div className="payment-method-content">
                   <span className="payment-icon">💳</span>
                   <div>
-                    <strong>Pagamento mensal seguro</strong>
-                    <p>Escolha Pix, boleto ou cartão de crédito na próxima tela do Asaas.</p>
+                    <strong>Assinatura mensal segura</strong>
+                    <p>No cartão, a cobrança fica automática todo mês. Pix e boleto continuam disponíveis pelo Asaas.</p>
                   </div>
                 </div>
               </label>
