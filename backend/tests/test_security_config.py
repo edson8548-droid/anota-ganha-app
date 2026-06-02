@@ -126,3 +126,4 @@ def test_asaas_single_payment_payload_uses_undefined_invoice(monkeypatch):
     assert captured["json"]["billingType"] == "UNDEFINED"
     assert captured["json"]["externalReference"] == "uid-monthly-69.90"
     assert captured["json"]["dueDate"] >= date.today().isoformat()
+    assert "callback" not in captured["json"]

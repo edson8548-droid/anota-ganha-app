@@ -121,10 +121,6 @@ def _period_end_for_plan(plan_id: str) -> datetime:
     return datetime.now(timezone.utc) + timedelta(days=days)
 
 
-def _frontend_success_url() -> str:
-    return os.environ.get("FRONTEND_URL", "https://venpro.com.br").rstrip("/") + "/payment-success"
-
-
 def _due_date_for_new_charge() -> str:
     # Amanhã evita rejeição por diferenças de fuso/virada de dia em boleto,
     # mas Pix/cartão continuam pagáveis imediatamente pela invoiceUrl.
@@ -251,10 +247,6 @@ def _create_single_payment(customer_id: str, plan: dict, external_reference: str
         "dueDate": _due_date_for_new_charge(),
         "description": plan["description"],
         "externalReference": external_reference,
-        "callback": {
-            "successUrl": _frontend_success_url(),
-            "autoRedirect": False,
-        },
     }
     payment = _asaas_request("POST", "/payments", json=payment_payload)
     payment_url = payment.get("invoiceUrl") or payment.get("bankSlipUrl")
@@ -360,10 +352,6 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
             "cycle": plan["cycle"],
             "description": plan["description"],
             "externalReference": external_reference,
-            "callback": {
-                "successUrl": _frontend_success_url(),
-                "autoRedirect": False,
-            },
         }
         try:
             subscription = _asaas_request("POST", "/subscriptions", json=subscription_payload)
