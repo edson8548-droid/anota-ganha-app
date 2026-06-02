@@ -1557,6 +1557,7 @@ class CotatudoFillReport(BaseModel):
     preenchidos: int = Field(default=0, ge=0, le=10000)
     falhas: int = Field(default=0, ge=0, le=10000)
     nao_encontrados: int = Field(default=0, ge=0, le=10000)
+    debug: dict | None = None
 
 
 def _cotatudo_base_metadata(payload, tabela_doc=None):
@@ -1598,6 +1599,7 @@ async def report_cotatudo_fill(
             "preenchidos": payload.preenchidos,
             "falhas": payload.falhas,
             "naoEncontrados": payload.nao_encontrados,
+            "debug": payload.debug,
         },
         request=request,
     )

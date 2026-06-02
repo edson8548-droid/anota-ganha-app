@@ -217,34 +217,102 @@ function fillQuotationPrices(prices, options = {}) {
   const rows = getQuotationRows(site);
   let count = 0;
   const failed = [];
+  const details = [];
   const empresaColuna = normalizeEmpresaColuna(options.empresaColuna);
 
-  function setInputValue(input, value) {
-    input.scrollIntoView({ block: 'center', inline: 'nearest' });
-    input.focus();
+  function parsePriceNumber(value) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return null;
+    let normalized = raw.replace(/[^\d,.-]/g, '');
+    if (normalized.includes(',') && normalized.includes('.')) {
+      normalized = normalized.replace(/\./g, '').replace(',', '.');
+    } else if (normalized.includes(',')) {
+      normalized = normalized.replace(',', '.');
+    }
+    const n = Number(normalized);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
 
+  function priceValueCandidates(value, input) {
+    const raw = String(value ?? '').replace(/^R\$\s*/i, '').trim();
+    const n = parsePriceNumber(raw);
+    if (!n) return raw ? [raw] : [];
+
+    const dot = n.toFixed(2);
+    const comma = dot.replace('.', ',');
+    const noDecimalsDot = String(n);
+    const type = String(input.getAttribute('type') || '').toLowerCase();
+    const candidates = type === 'number'
+      ? [dot, noDecimalsDot, comma, raw]
+      : [comma, dot, raw, noDecimalsDot];
+
+    return candidates.filter((candidate, index) => (
+      candidate && candidates.indexOf(candidate) === index
+    ));
+  }
+
+  function hasPrice(value) {
+    return parsePriceNumber(value) !== null;
+  }
+
+  function dispatchInputEvents(input, value) {
+    try {
+      input.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText', data: value }));
+    } catch {}
+    try {
+      input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }));
+    } catch {
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Tab' }));
+    input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Tab' }));
+    input.dispatchEvent(new Event('blur', { bubbles: true }));
+    input.dispatchEvent(new Event('focusout', { bubbles: true }));
+  }
+
+  function writeNativeValue(input, value) {
     const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
       window.HTMLInputElement.prototype, 'value'
     )?.set;
     if (nativeInputValueSetter) nativeInputValueSetter.call(input, value);
     else input.value = value;
-
-    input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-    input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Tab' }));
-    input.dispatchEvent(new Event('blur', { bubbles: true }));
   }
 
-  function hasPrice(value) {
-    const normalized = String(value || '').replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
-    const n = Number(normalized);
-    return Number.isFinite(n) && n > 0;
+  function setInputValue(input, value) {
+    input.scrollIntoView({ block: 'center', inline: 'nearest' });
+    input.focus();
+
+    for (const candidate of priceValueCandidates(value, input)) {
+      try {
+        input.focus();
+        if (typeof input.select === 'function') input.select();
+        writeNativeValue(input, '');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        writeNativeValue(input, candidate);
+        dispatchInputEvents(input, candidate);
+        if (hasPrice(input.value)) return true;
+      } catch {}
+    }
+
+    const fallback = priceValueCandidates(value, input)[0];
+    if (!fallback) return false;
+
+    try {
+      input.focus();
+      if (typeof input.select === 'function') input.select();
+      document.execCommand?.('insertText', false, fallback);
+      dispatchInputEvents(input, fallback);
+    } catch {}
+
+    return hasPrice(input.value);
   }
 
   for (const item of prices) {
     const row = rows[item.idx];
     if (!row) {
       failed.push(item.idx);
+      details.push({ idx: item.idx, reason: 'row_not_found' });
       continue;
     }
     const input = site === 'vr-cotacao'
@@ -252,12 +320,24 @@ function fillQuotationPrices(prices, options = {}) {
       : getSelectedPriceInput(row, empresaColuna, site);
     if (!input) {
       failed.push(item.idx);
+      details.push({ idx: item.idx, reason: 'input_not_found' });
       continue;
     }
 
-    setInputValue(input, item.price);
-    if (hasPrice(input.value)) count++;
-    else failed.push(item.idx);
+    const before = input.value;
+    const ok = setInputValue(input, item.price);
+    if (ok) count++;
+    else {
+      failed.push(item.idx);
+      details.push({
+        idx: item.idx,
+        reason: 'value_rejected',
+        inputType: input.getAttribute('type') || '',
+        before,
+        after: input.value,
+        attempted: String(item.price ?? ''),
+      });
+    }
   }
-  return { filled: count, failed };
+  return { filled: count, failed, details, site, rowCount: rows.length };
 }

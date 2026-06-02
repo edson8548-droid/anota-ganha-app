@@ -466,6 +466,11 @@ async function runJob(job, startBatch = 0, initial = {}) {
           preenchidos: filled,
           falhas: failedCount,
           nao_encontrados: data.stats?.nao_encontrados || 0,
+          debug: {
+            site_detectado: fillResult?.site || job.site,
+            linhas_detectadas: fillResult?.rowCount || null,
+            detalhes: Array.isArray(fillResult?.details) ? fillResult.details.slice(0, 20) : [],
+          },
         });
         throw new Error('Encontrei preços, mas não consegui preencher os campos da cotação. Atualize a página e tente novamente.');
       }
