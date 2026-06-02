@@ -7,6 +7,8 @@ import { listarTabelas, uploadTabela, excluirTabela, processarCotacao, previewCo
 import ReviewMatches from './ReviewMatches';
 import ConfirmDialog from '../components/ConfirmDialog';
 
+const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.21.zip';
+
 export default function Cotacao() {
   const navigate = useNavigate();
   const { user } = useAuthContext();
@@ -512,7 +514,7 @@ function CotacaoTab({
               <div style={{ marginTop: 16, padding: '12px 16px', background: '#363940', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 20 }}>🧩</span>
                 <a
-                  href="/venpro-cotatudo-extension.zip"
+                  href={COTACAO_EXTENSION_URL}
                   download
                   style={{ color: '#3A85A8', fontSize: 13, textDecoration: 'none', fontWeight: 600 }}
                 >

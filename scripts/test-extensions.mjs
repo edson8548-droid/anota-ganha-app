@@ -74,6 +74,7 @@ describe('extensoes Chrome', () => {
 
   it('ZIPs publicos das extensoes existem para download no site', () => {
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.21.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-whatsapp-extension.zip')));
   });
 });
