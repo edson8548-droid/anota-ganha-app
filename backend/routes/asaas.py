@@ -20,6 +20,10 @@ security = HTTPBearer(auto_error=False)
 
 DEFAULT_ASAAS_PLAN_ID = "monthly"
 ASAAS_PAYMENT_MODE = os.environ.get("ASAAS_PAYMENT_MODE", "single_payment").strip().lower()
+ASAAS_DISABLE_CUSTOMER_NOTIFICATIONS = (
+    os.environ.get("ASAAS_DISABLE_CUSTOMER_NOTIFICATIONS", "true").strip().lower()
+    not in {"0", "false", "no"}
+)
 ASAAS_PLANS = {
     "monthly": {
         "id": "monthly",
@@ -174,10 +178,20 @@ def _save_asaas_customer_id(uid: str, customer_id: str) -> None:
     )
 
 
+def _ensure_customer_notifications_disabled(customer_id: str, customer: dict | None = None) -> None:
+    if not ASAAS_DISABLE_CUSTOMER_NOTIFICATIONS:
+        return
+    if customer and customer.get("notificationDisabled") is True:
+        return
+    _asaas_request("PUT", f"/customers/{customer_id}", json={"notificationDisabled": True})
+
+
 def _find_customer_by_query(uid: str, params: dict) -> Optional[str]:
     lookup = _asaas_request("GET", "/customers", params={**params, "limit": 1})
     if lookup.get("data"):
-        customer_id = lookup["data"][0]["id"]
+        customer = lookup["data"][0]
+        customer_id = customer["id"]
+        _ensure_customer_notifications_disabled(customer_id, customer)
         _save_asaas_customer_id(uid, customer_id)
         return customer_id
     return None
@@ -192,6 +206,7 @@ def _find_or_create_customer(uid: str, user_data: dict) -> str:
             allowed_statuses={404},
         )
         if customer.get("id"):
+            _ensure_customer_notifications_disabled(existing_customer_id, customer)
             return existing_customer_id
         logger.warning("[ASAAS] asaasCustomerId salvo não encontrado; buscando por CPF/externalReference uid=%s", uid)
 
@@ -222,7 +237,7 @@ def _find_or_create_customer(uid: str, user_data: dict) -> str:
         "email": user_data.get("email"),
         "mobilePhone": phone or None,
         "externalReference": uid,
-        "notificationDisabled": False,
+        "notificationDisabled": ASAAS_DISABLE_CUSTOMER_NOTIFICATIONS,
     }
     payload = {k: v for k, v in payload.items() if v not in (None, "")}
     customer = _asaas_request("POST", "/customers", json=payload)

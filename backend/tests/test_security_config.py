@@ -9,7 +9,14 @@ from fastapi import HTTPException
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from routes import asaas as asaas_routes
-from routes.asaas import ASAAS_PLANS, _asaas_error_detail, _create_single_payment, _find_subscription_user_id, asaas_webhook
+from routes.asaas import (
+    ASAAS_PLANS,
+    _asaas_error_detail,
+    _create_single_payment,
+    _find_customer_by_query,
+    _find_subscription_user_id,
+    asaas_webhook,
+)
 from services.security_config import LOCAL_CORS_ORIGINS, PRODUCTION_CORS_ORIGINS, parse_cors_origins
 
 
@@ -127,3 +134,25 @@ def test_asaas_single_payment_payload_uses_undefined_invoice(monkeypatch):
     assert captured["json"]["externalReference"] == "uid-monthly-69.90"
     assert captured["json"]["dueDate"] >= date.today().isoformat()
     assert "callback" not in captured["json"]
+
+
+def test_asaas_existing_customer_notifications_are_disabled(monkeypatch):
+    calls = []
+
+    def fake_asaas_request(method, path, **kwargs):
+        calls.append({"method": method, "path": path, **kwargs})
+        if method == "GET":
+            return {"data": [{"id": "cus_123", "notificationDisabled": False}]}
+        if method == "PUT":
+            return {"id": "cus_123", "notificationDisabled": True}
+        raise AssertionError(f"Unexpected request {method} {path}")
+
+    monkeypatch.setattr(asaas_routes, "_asaas_request", fake_asaas_request)
+    monkeypatch.setattr(asaas_routes, "_save_asaas_customer_id", lambda uid, customer_id: None)
+
+    customer_id = _find_customer_by_query("uid-123", {"externalReference": "uid-123"})
+
+    assert customer_id == "cus_123"
+    assert calls[1]["method"] == "PUT"
+    assert calls[1]["path"] == "/customers/cus_123"
+    assert calls[1]["json"] == {"notificationDisabled": True}
