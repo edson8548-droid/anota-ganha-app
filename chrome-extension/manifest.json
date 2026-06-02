@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Venpro — Preencher Cotação",
-  "version": "1.0.21",
+  "version": "1.0.22",
   "description": "Preenchedor de cotações do Venpro para Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores e novos portais compatíveis.",
   "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel"],
   "host_permissions": [
@@ -12,8 +12,10 @@
     "https://fornecedor.rpinfo.com.br/*",
     "https://rfd.net.br/*",
     "https://www.rfd.net.br/*",
+    "https://*.rfd.net.br/*",
     "http://rfd.net.br/*",
     "http://www.rfd.net.br/*",
+    "http://*.rfd.net.br/*",
     "https://api.venpro.com.br/*"
   ],
   "action": {
@@ -43,8 +45,10 @@
         "https://fornecedor.rpinfo.com.br/*",
         "https://rfd.net.br/*",
         "https://www.rfd.net.br/*",
+        "https://*.rfd.net.br/*",
         "http://rfd.net.br/*",
-        "http://www.rfd.net.br/*"
+        "http://www.rfd.net.br/*",
+        "http://*.rfd.net.br/*"
       ],
       "js": ["content.js"],
       "css": ["content.css"]

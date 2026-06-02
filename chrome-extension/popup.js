@@ -199,10 +199,9 @@ function isSupportedQuotationUrl(url = '') {
 function isRedeFornecedoresUrl(url = '') {
   try {
     const parsed = new URL(url);
-    return /^(www\.)?rfd\.net\.br$/i.test(parsed.hostname)
-      && /\/fornecedores\/[^/]+\/cotacao\/produtos\//i.test(parsed.pathname);
+    return /(^|\.)rfd\.net\.br$/i.test(parsed.hostname);
   } catch {
-    return /^(https?:\/\/)?(www\.)?rfd\.net\.br\/fornecedores\/[^/]+\/cotacao\/produtos\//i.test(url);
+    return /^(https?:\/\/)?([^/]+\.)?rfd\.net\.br\//i.test(url);
   }
 }
 
@@ -217,8 +216,10 @@ async function getQuotationTab() {
       'https://fornecedor.rpinfo.com.br/*',
       'https://rfd.net.br/*',
       'https://www.rfd.net.br/*',
+      'https://*.rfd.net.br/*',
       'http://rfd.net.br/*',
       'http://www.rfd.net.br/*',
+      'http://*.rfd.net.br/*',
     ],
   });
   return tabs.find(tab => tab?.id) || null;

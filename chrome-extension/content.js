@@ -68,8 +68,8 @@ function detectQuotationSite() {
   if (window.location.hostname.includes('cotatudo.com.br')) return 'cotatudo';
   if (window.location.hostname.includes('fornecedor.rpinfo.com.br') && /\/supplier\/quotations\//i.test(path)) return 'rp-hub';
   if (/\bRP\s*HUB\b/i.test(bodyText) && /Valor\s+Unit[aá]rio/i.test(bodyText)) return 'rp-hub';
-  if (/^(www\.)?rfd\.net\.br$/i.test(window.location.hostname)
-    && (/\/fornecedores\/[^/]+\/cotacao\/produtos\//i.test(path)
+  if (/(^|\.)rfd\.net\.br$/i.test(window.location.hostname)
+    && (/\/cotacao\//i.test(path)
       || /\bREDE\s+DE\s+FORNECEDORES\b/i.test(bodyText)
       || /\bPRODUTOS\s+COTA[ÇC][ÃA]O\b/i.test(bodyText))) return 'rede-fornecedores';
   if (/\/php\/vrcotacao\/cotacao\.php/i.test(path) || /\bVR\s+COTA[ÇC][ÃA]O\b/i.test(bodyText)) return 'vr-cotacao';
