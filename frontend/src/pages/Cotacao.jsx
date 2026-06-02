@@ -57,6 +57,13 @@ export default function Cotacao() {
     window.URL.revokeObjectURL(url);
   };
 
+  const limparCotacaoSelecionada = useCallback(() => {
+    setArquivoCotacao(null);
+    if (cotacaoInputRef.current) {
+      cotacaoInputRef.current.value = '';
+    }
+  }, []);
+
   const isStorageQuotaError = (err) => {
     const msg = String(err.response?.data?.detail || err.message || '');
     return /space quota|writes are blocked|erro ao salvar arquivo no servidor/i.test(msg);
@@ -138,6 +145,7 @@ export default function Cotacao() {
           try {
             const { blob, stats, semMatch } = await processarCotacao(arquivoCotacao, tabelaSelecionada, modoMatch);
             baixarCotacaoPreenchida(blob);
+            limparCotacaoSelecionada();
             setResultado({ stats, semMatch });
             toast.warning('Banco no limite: processei em modo direto, sem tela de revisão.');
           } catch (fallbackErr) {
@@ -175,6 +183,7 @@ export default function Cotacao() {
     try {
       const { blob, stats, semMatch } = await confirmarCotacao(reviewData.session_id, aprovacoes, precosEditados);
       baixarCotacaoPreenchida(blob);
+      limparCotacaoSelecionada();
       setResultado({ stats, semMatch });
       setReviewData(null);
     } catch (err) {
@@ -534,7 +543,7 @@ function CotacaoTab({
                    }}>
                 {arquivoCotacao ? arquivoCotacao.name : 'Clique para selecionar ou arraste o arquivo'}
                 <input type="file" accept=".xlsx,.xls" ref={cotacaoInputRef}
-                       onChange={e => { setArquivoCotacao(e.target.files[0]); setReviewData(null); setResultado(null); }}
+                       onChange={e => { setArquivoCotacao(e.target.files?.[0] || null); setReviewData(null); setResultado(null); }}
                        style={{ display: 'none' }} />
               </div>
             </>
@@ -653,8 +662,14 @@ function CotacaoTab({
                 <StatCard label="Sem match" value={resultado.stats.sem_match || 0} color="#ef4444" />
               </div>
               <p style={{ color: '#6B6E74', fontSize: 13 }}>
-                Download iniciado automaticamente. Itens preenchidos por IA ficam em amarelo no Excel.
+                Download iniciado automaticamente. O campo de cotação já está livre para selecionar outro arquivo.
               </p>
+              <button
+                onClick={() => cotacaoInputRef.current?.click()}
+                style={{ ...secondaryBtnStyle, padding: '10px 14px', marginBottom: 12, fontWeight: 700 }}
+              >
+                Escolher outra cotação
+              </button>
               {resultado.semMatch?.length > 0 && (
                 <div style={{ marginTop: 12 }}>
                   <p style={{ color: '#A0A3A8', fontSize: 13, marginBottom: 8 }}>Itens não encontrados:</p>
