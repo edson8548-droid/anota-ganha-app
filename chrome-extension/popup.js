@@ -2,12 +2,13 @@ const API_URL = 'https://api.venpro.com.br/api';
 const BATCH = 50;
 const STUCK_MS = 3 * 60 * 1000;
 const BTN_LABEL = 'Preencher Cotação';
-const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB ou Rede de Fornecedores primeiro.';
+const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores ou Infomag Cotação primeiro.';
 const SITE_LABELS = {
   cotatudo: 'Cotatudo',
   'vr-cotacao': 'VR Cotação',
   'rp-hub': 'RP HUB',
   'rede-fornecedores': 'Rede de Fornecedores',
+  'infomag-cotacao': 'Infomag Cotação',
   generic: 'Cotação compatível',
 };
 
@@ -57,6 +58,9 @@ function setDetectedSite(tab, pageInfo = null) {
     type = 'ok';
   } else if (isRedeFornecedoresUrl(url)) {
     label = 'Site detectado: Rede de Fornecedores';
+    type = 'ok';
+  } else if (isInfomagCotacaoUrl(url)) {
+    label = 'Site detectado: Infomag Cotação';
     type = 'ok';
   }
 
@@ -203,7 +207,8 @@ function isSupportedQuotationUrl(url = '') {
   return url.includes('cotatudo.com.br')
     || /\/php\/vrcotacao\/cotacao\.php/i.test(url)
     || (url.includes('fornecedor.rpinfo.com.br') && /\/supplier\/quotations\//i.test(url))
-    || isRedeFornecedoresUrl(url);
+    || isRedeFornecedoresUrl(url)
+    || isInfomagCotacaoUrl(url);
 }
 
 function isPotentialQuotationUrl(url = '') {
@@ -227,6 +232,15 @@ function isRedeFornecedoresUrl(url = '') {
   }
 }
 
+function isInfomagCotacaoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)infomagcotacao\.com$/i.test(parsed.hostname) && /\/cotacao\/?$/i.test(parsed.pathname);
+  } catch {
+    return /^(https?:\/\/)?([^/]+\.)?infomagcotacao\.com\/cotacao\/?$/i.test(url);
+  }
+}
+
 async function getQuotationTab(options = {}) {
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (active?.id && isPotentialQuotationUrl(active.url || '')) return active;
@@ -243,6 +257,8 @@ async function getQuotationTab(options = {}) {
       'http://rfd.net.br/*',
       'http://www.rfd.net.br/*',
       'http://*.rfd.net.br/*',
+      'https://infomagcotacao.com/*',
+      'https://www.infomagcotacao.com/*',
       'https://*/fornecedores/*/cotacao/*',
       'http://*/fornecedores/*/cotacao/*',
       'https://*/cotacao/*',
@@ -266,6 +282,7 @@ function detectSiteFromUrl(url = '') {
   if (/\/php\/vrcotacao\/cotacao\.php/i.test(url)) return 'vr-cotacao';
   if (url.includes('fornecedor.rpinfo.com.br') && /\/supplier\/quotations\//i.test(url)) return 'rp-hub';
   if (isRedeFornecedoresUrl(url)) return 'rede-fornecedores';
+  if (isInfomagCotacaoUrl(url)) return 'infomag-cotacao';
   return 'generic';
 }
 

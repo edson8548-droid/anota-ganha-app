@@ -35,6 +35,8 @@ describe('extensoes Chrome', () => {
     assert.match(manifest.description, /VR Cotação/);
     assert.match(manifest.description, /RP HUB/);
     assert.match(manifest.description, /Rede de Fornecedores/);
+    assert.match(manifest.description, /Infomag Cotação/);
+    assert.ok(manifest.host_permissions.includes('https://infomagcotacao.com/*'));
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('http://179.0.124.205/*')),
       'manifest precisa carregar content script no VR Cotacao conhecido'
@@ -50,6 +52,10 @@ describe('extensoes Chrome', () => {
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('https://*.rfd.net.br/*')),
       'manifest precisa carregar content script em subdominios da Rede de Fornecedores'
+    );
+    assert.ok(
+      manifest.content_scripts.some(script => (script.matches || []).includes('https://infomagcotacao.com/*')),
+      'manifest precisa carregar content script no Infomag Cotacao'
     );
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('https://*/fornecedores/*/cotacao/*')),
@@ -86,6 +92,7 @@ describe('extensoes Chrome', () => {
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.22.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.23.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.24.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.25.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-whatsapp-extension.zip')));
   });
 });

@@ -69,13 +69,20 @@ function getSelectedPriceInput(row, empresaColuna, site = 'generic') {
 
 function detectQuotationSite() {
   const path = window.location.pathname || '';
+  const hostname = window.location.hostname || '';
   const bodyText = document.body?.innerText || '';
+  const looksInfomagCotacao = /Descri[çc][ãa]o\s+Produto/i.test(bodyText)
+    && /\bEAN\b/i.test(bodyText)
+    && /Valor\s+Coleta/i.test(bodyText);
   const looksRedeFornecedores = /\bREDE\s+DE\s+FORNECEDORES\b/i.test(bodyText)
     || (/\bPRODUTOS\s+COTA[ÇC][ÃA]O\b/i.test(bodyText)
       && /Cod\.?\s*Barras/i.test(bodyText)
       && /Produto\s+Equivalente/i.test(bodyText));
 
   if (window.location.hostname.includes('cotatudo.com.br')) return 'cotatudo';
+  if (/(^|\.)infomagcotacao\.com$/i.test(hostname)
+    && (/\/cotacao\/?$/i.test(path) || looksInfomagCotacao)) return 'infomag-cotacao';
+  if (looksInfomagCotacao) return 'infomag-cotacao';
   if (window.location.hostname.includes('fornecedor.rpinfo.com.br') && /\/supplier\/quotations\//i.test(path)) return 'rp-hub';
   if (/\bRP\s*HUB\b/i.test(bodyText) && /Valor\s+Unit[aá]rio/i.test(bodyText)) return 'rp-hub';
   if (looksRedeFornecedores) return 'rede-fornecedores';
@@ -106,6 +113,13 @@ function getQuotationRows(site) {
   }
 
   if (site === 'rede-fornecedores') {
+    return Array.from(document.querySelectorAll('tr')).filter(row => {
+      const text = row.textContent || '';
+      return getPriceCandidates(row, site).length > 0 && /\d{8,14}/.test(text) && /[A-Za-zÀ-ú]{3}/.test(text);
+    });
+  }
+
+  if (site === 'infomag-cotacao') {
     return Array.from(document.querySelectorAll('tr')).filter(row => {
       const text = row.textContent || '';
       return getPriceCandidates(row, site).length > 0 && /\d{8,14}/.test(text) && /[A-Za-zÀ-ú]{3}/.test(text);

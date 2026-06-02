@@ -7,7 +7,7 @@ import { auth } from '../firebase/config';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { apiUrl } from '../config/api';
 
-const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.24.zip';
+const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.25.zip';
 
 const MinhaLicenca = () => {
   const navigate = useNavigate();
@@ -202,7 +202,7 @@ const MinhaLicenca = () => {
               <div style={s.extIcon}>🧩</div>
               <div style={{ flex: 1 }}>
                 <div style={s.extName}>Preenchedor de Cotação</div>
-                <div style={s.extDesc}>Preenche cotações no Cotatudo, VR Cotação, RP HUB e Rede de Fornecedores com os preços da sua tabela.</div>
+                <div style={s.extDesc}>Preenche cotações no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores e Infomag Cotação com os preços da sua tabela.</div>
               </div>
               <a href={COTACAO_EXTENSION_URL} download style={s.btnDownload}>
                 Baixar →

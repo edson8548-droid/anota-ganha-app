@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Venpro — Preencher Cotação",
-  "version": "1.0.24",
-  "description": "Preenchedor de cotações do Venpro para Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores e novos portais compatíveis.",
+  "version": "1.0.25",
+  "description": "Preenchedor de cotações do Venpro para Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação e novos portais compatíveis.",
   "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel"],
   "host_permissions": [
     "https://cotatudo.com.br/*",
@@ -16,6 +16,8 @@
     "http://rfd.net.br/*",
     "http://www.rfd.net.br/*",
     "http://*.rfd.net.br/*",
+    "https://infomagcotacao.com/*",
+    "https://www.infomagcotacao.com/*",
     "https://api.venpro.com.br/*"
   ],
   "action": {
@@ -49,6 +51,8 @@
         "http://rfd.net.br/*",
         "http://www.rfd.net.br/*",
         "http://*.rfd.net.br/*",
+        "https://infomagcotacao.com/*",
+        "https://www.infomagcotacao.com/*",
         "https://*/fornecedores/*/cotacao/*",
         "http://*/fornecedores/*/cotacao/*",
         "https://*/cotacao/*",

@@ -7,7 +7,7 @@ import { listarTabelas, uploadTabela, excluirTabela, processarCotacao, previewCo
 import ReviewMatches from './ReviewMatches';
 import ConfirmDialog from '../components/ConfirmDialog';
 
-const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.24.zip';
+const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.25.zip';
 
 export default function Cotacao() {
   const navigate = useNavigate();
@@ -483,7 +483,7 @@ function CotacaoTab({
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#E1E1E1', cursor: 'pointer', fontSize: 14 }}>
               <input type="radio" name="canal" value="cotatudo" checked={canalPreenchimento === 'cotatudo'}
                      onChange={() => setCanalPreenchimento('cotatudo')} />
-              Cotatudo (site)
+              Sites de cotação
             </label>
           </div>
 
@@ -509,12 +509,12 @@ function CotacaoTab({
               border: '1px solid #4A4D52', marginBottom: 16,
             }}>
               <h3 style={{ color: '#3A85A8', marginTop: 0, fontSize: 16, marginBottom: 12 }}>
-                Como preencher no Cotatudo
+                Como preencher pelo site de cotação
               </h3>
               <ol style={{ color: '#A0A3A8', fontSize: 14, lineHeight: 1.8, paddingLeft: 20, margin: 0 }}>
                 <li>Instale a <strong style={{ color: '#E1E1E1' }}>Extensão Venpro</strong> (card no Dashboard)</li>
                 <li>Mantenha esta aba do <strong style={{ color: '#E1E1E1' }}>Venpro</strong> aberta e logada</li>
-                <li>Abra o <strong style={{ color: '#E1E1E1' }}>cotatudo.com.br</strong> em outra aba</li>
+                <li>Abra o <strong style={{ color: '#E1E1E1' }}>site da cotação</strong> em outra aba</li>
                 <li>Faça login e <strong style={{ color: '#E1E1E1' }}>abra sua cotação</strong></li>
                 <li>Clique no ícone <strong style={{ color: '#3A85A8' }}>Venpro</strong> na barra do Chrome</li>
                 <li>Na extensão, escolha <strong style={{ color: '#E1E1E1' }}>tabela</strong>, <strong style={{ color: '#E1E1E1' }}>prazo</strong> e <strong style={{ color: '#E1E1E1' }}>modo ({modoMatch === 'ean' ? 'EAN' : 'Completo'})</strong></li>
@@ -527,7 +527,7 @@ function CotacaoTab({
                   download
                   style={{ color: '#3A85A8', fontSize: 13, textDecoration: 'none', fontWeight: 600 }}
                 >
-                  ⬇ Baixar Extensão Cotatudo
+                  ⬇ Baixar Extensão de Cotação
                 </a>
               </div>
             </div>
