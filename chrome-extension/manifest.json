@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Venpro — Preencher Cotação",
-  "version": "1.0.25",
-  "description": "Preenchedor de cotações do Venpro para Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação e novos portais compatíveis.",
+  "version": "1.0.26",
+  "description": "Preenchedor de cotações do Venpro para Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação e novos portais compatíveis.",
   "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel"],
   "host_permissions": [
     "https://cotatudo.com.br/*",
@@ -18,6 +18,10 @@
     "http://*.rfd.net.br/*",
     "https://infomagcotacao.com/*",
     "https://www.infomagcotacao.com/*",
+    "https://cotacaonovo.intersolid.com.br/*",
+    "http://cotacaonovo.intersolid.com.br/*",
+    "https://*.intersolid.com.br/*",
+    "http://*.intersolid.com.br/*",
     "https://api.venpro.com.br/*"
   ],
   "action": {
@@ -53,6 +57,10 @@
         "http://*.rfd.net.br/*",
         "https://infomagcotacao.com/*",
         "https://www.infomagcotacao.com/*",
+        "https://cotacaonovo.intersolid.com.br/*",
+        "http://cotacaonovo.intersolid.com.br/*",
+        "https://*.intersolid.com.br/*",
+        "http://*.intersolid.com.br/*",
         "https://*/fornecedores/*/cotacao/*",
         "http://*/fornecedores/*/cotacao/*",
         "https://*/cotacao/*",

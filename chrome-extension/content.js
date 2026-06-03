@@ -38,6 +38,44 @@ function isPriceLikeInput(input) {
   return /(preco|preço|valor|vlr|cotacao|cotação|unit)/.test(meta);
 }
 
+function normalizeCellText(value) {
+  return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function getDirectCells(row) {
+  return Array.from(row.children).filter(el => /^(td|th)$/i.test(el.tagName));
+}
+
+function findColumnIndexByHeader(row, includePatterns, excludePatterns = []) {
+  const table = row.closest('table');
+  if (!table) return -1;
+
+  const tableRows = Array.from(table.querySelectorAll('tr'));
+  const rowIndex = tableRows.indexOf(row);
+  const headerRows = rowIndex >= 0 ? tableRows.slice(0, rowIndex).reverse() : tableRows.reverse();
+
+  for (const headerRow of headerRows) {
+    const headerCells = getDirectCells(headerRow);
+    if (!headerCells.length) continue;
+
+    for (let i = 0; i < headerCells.length; i++) {
+      const text = normalizeCellText(headerCells[i].textContent);
+      if (!text) continue;
+      if (!includePatterns.some(pattern => pattern.test(text))) continue;
+      if (excludePatterns.some(pattern => pattern.test(text))) continue;
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+function getCellTextByHeader(row, includePatterns, excludePatterns = []) {
+  const index = findColumnIndexByHeader(row, includePatterns, excludePatterns);
+  if (index < 0) return '';
+  return normalizeCellText(getDirectCells(row)[index]?.textContent || '');
+}
+
 function getRedeFornecedoresPriceCandidates(row) {
   const cells = Array.from(row.querySelectorAll('td, th'));
   const inputs = getEditableInputs(row).filter(input => {
@@ -55,8 +93,31 @@ function getRedeFornecedoresPriceCandidates(row) {
   return priceLike.length ? priceLike : inputs;
 }
 
+function getIntersolidPriceCandidates(row) {
+  const cells = getDirectCells(row);
+  const costColumnIndex = findColumnIndexByHeader(
+    row,
+    [/valor\s+de\s+custo/i, /^\s*custo\s*$/i],
+    [/desconto|acr[eé]scimo|acrescimo|ipi|substitui|final/i]
+  );
+
+  if (costColumnIndex >= 0) {
+    const costInputs = getEditableInputs(cells[costColumnIndex] || row);
+    if (costInputs.length) return costInputs;
+  }
+
+  const inputs = getEditableInputs(row).filter(input => {
+    const cellText = normalizeCellText(input.closest('td, th')?.textContent || '');
+    const meta = `${input.name || ''} ${input.id || ''} ${input.className || ''} ${input.placeholder || ''} ${input.getAttribute('aria-label') || ''}`.toLowerCase();
+    return !/desconto|acr[eé]scimo|acrescimo|ipi|substitui|final|data/.test(`${meta} ${cellText}`);
+  });
+
+  return inputs.length ? [inputs[0]] : [];
+}
+
 function getPriceCandidates(row, site = 'generic') {
   if (site === 'rede-fornecedores') return getRedeFornecedoresPriceCandidates(row);
+  if (site === 'intersolid-cotacao') return getIntersolidPriceCandidates(row);
   const inputs = getEditableInputs(row);
   const priceLike = inputs.filter(isPriceLikeInput);
   return priceLike.length ? priceLike : inputs;
@@ -78,8 +139,14 @@ function detectQuotationSite() {
     || (/\bPRODUTOS\s+COTA[ÇC][ÃA]O\b/i.test(bodyText)
       && /Cod\.?\s*Barras/i.test(bodyText)
       && /Produto\s+Equivalente/i.test(bodyText));
+  const looksIntersolidCotacao = /\bINTERSOLID\b/i.test(bodyText)
+    || (/Informa[çc][õo]es\s+sobre\s+a\s+Cota[çc][ãa]o/i.test(bodyText)
+      && /\bEmb\s+Compra\b/i.test(bodyText)
+      && /Valor\s+de\s+Custo/i.test(bodyText));
 
   if (window.location.hostname.includes('cotatudo.com.br')) return 'cotatudo';
+  if (/(^|\.)intersolid\.com\.br$/i.test(hostname) && (/cotacao/i.test(hostname + path) || looksIntersolidCotacao)) return 'intersolid-cotacao';
+  if (looksIntersolidCotacao) return 'intersolid-cotacao';
   if (/(^|\.)infomagcotacao\.com$/i.test(hostname)
     && (/\/cotacao\/?$/i.test(path) || looksInfomagCotacao)) return 'infomag-cotacao';
   if (looksInfomagCotacao) return 'infomag-cotacao';
@@ -126,6 +193,13 @@ function getQuotationRows(site) {
     });
   }
 
+  if (site === 'intersolid-cotacao') {
+    return Array.from(document.querySelectorAll('tr')).filter(row => {
+      const text = row.textContent || '';
+      return getPriceCandidates(row, site).length > 0 && /\d{8,14}/.test(text) && /[A-Za-zÀ-ú]{3}/.test(text);
+    });
+  }
+
   return Array.from(document.querySelectorAll('tr')).filter(row => getEditableInputs(row).length > 0);
 }
 
@@ -155,6 +229,22 @@ function extractQuotationItems(options = {}) {
   }
 
   function extractEAN(row) {
+    const headerEAN = limparEAN(getCellTextByHeader(row, [
+      /^\s*EAN\s*$/i,
+      /\bGTIN\b/i,
+      /cod\.?\s*barras/i,
+      /c[oó]digo\s+(de\s+)?barras/i,
+      /barcode/i,
+    ]));
+    if (headerEAN) return headerEAN;
+
+    if (site === 'intersolid-cotacao') {
+      for (const td of row.querySelectorAll('td')) {
+        const v = limparEAN(td.textContent);
+        if (/^\d{12,14}$/.test(v)) return v;
+      }
+    }
+
     for (const inp of row.querySelectorAll('input[type="hidden"]')) {
       const meta = `${inp.name || ''} ${inp.id || ''} ${inp.className || ''}`.toLowerCase();
       if (!/(ean|gtin|barra|barcode|codbar|cod_barr|codbarra)/.test(meta)) continue;
@@ -254,11 +344,17 @@ function fillQuotationPrices(prices, options = {}) {
 
     const dot = n.toFixed(2);
     const comma = dot.replace('.', ',');
+    const dot3 = n.toFixed(3);
+    const comma3 = dot3.replace('.', ',');
     const noDecimalsDot = String(n);
     const type = String(input.getAttribute('type') || '').toLowerCase();
-    const candidates = type === 'number'
-      ? [dot, noDecimalsDot, comma, raw]
-      : [comma, dot, raw, noDecimalsDot];
+    const candidates = site === 'intersolid-cotacao'
+      ? (type === 'number'
+        ? [dot3, dot, noDecimalsDot, comma3, comma, raw]
+        : [comma3, comma, dot3, dot, raw, noDecimalsDot])
+      : (type === 'number'
+        ? [dot, noDecimalsDot, comma, raw]
+        : [comma, dot, raw, noDecimalsDot]);
 
     return candidates.filter((candidate, index) => (
       candidate && candidates.indexOf(candidate) === index

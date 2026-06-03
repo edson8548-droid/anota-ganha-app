@@ -7,7 +7,7 @@ import { listarTabelas, uploadTabela, excluirTabela, processarCotacao, previewCo
 import ReviewMatches from './ReviewMatches';
 import ConfirmDialog from '../components/ConfirmDialog';
 
-const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.25.zip';
+const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.26.zip';
 
 export default function Cotacao() {
   const navigate = useNavigate();
