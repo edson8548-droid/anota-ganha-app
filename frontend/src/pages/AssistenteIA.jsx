@@ -98,7 +98,46 @@ const PROMPTS_RAPIDOS = [
   {
     label: 'Vitrine: lista organizada',
     sub: 'Transforma pedido, PDF ou Excel em CSV para colar na vitrine',
-    texto: 'Analise a lista, PDF ou Excel fornecido abaixo e transforme em uma lista organizada para eu colar na Vitrine Inteligente.\n\nFormato obrigatório da resposta:\n- Gere a resposta em CSV separado por ponto e vírgula (;).\n- Coloque tudo dentro de um bloco de código para aparecer o botão de copiar.\n- Use exatamente este cabeçalho:\nNome do Produto;Quantidade da Embalagem;Preço Unitário\n- Cada produto deve ficar em uma linha separada.\n- Não coloque nenhum texto antes ou depois do bloco de código.\n\nRegras importantes:\n- Ignore códigos, descrições duplicadas, observações ou qualquer informação irrelevante.\n- Se encontrar preço em formato brasileiro, mantenha com vírgula. Exemplo: 8,54.\n- Se o preço vier como 2.150, interprete como 2,150 apenas se isso estiver claramente no padrão da lista; se for preço com 3 casas, mantenha 2,150.\n- Se a embalagem aparecer como CX 8UN, CX-24, CX 24, FD-20, FARDO 12UN ou similar, coloque essa informação em Quantidade da Embalagem.\n- Se não encontrar a quantidade da embalagem, deixe a coluna vazia.\n- Não invente produtos, preços ou quantidades.\n- Não junte vários produtos na mesma linha.\n\nExemplo do formato final:\n```csv\nNome do Produto;Quantidade da Embalagem;Preço Unitário\nAGUA SANITARIA YPE 2L;CX 8UN;8,54\nLAVA ROUPA PO ASSIM 800G;CX 20UN;119,00\nCOCO RAL MENINA 100G TRAD;CX 24UN;2,05\n```\n\n[COLE SUA LISTA AQUI OU ANEXE O PDF/EXCEL]',
+    texto: `Analise a lista, PDF ou Excel fornecido abaixo e transforme em uma lista organizada para eu colar na Vitrine Inteligente.
+
+Formato obrigatório da resposta:
+- Gere a resposta em CSV separado por ponto e vírgula (;).
+- Coloque tudo dentro de um bloco de código para aparecer o botão de copiar.
+- Use exatamente este cabeçalho:
+Nome do Produto;Quantidade da Embalagem;Preço Unitário
+- Cada produto deve ficar em uma linha separada.
+- Não coloque nenhum texto antes ou depois do bloco de código.
+
+Regras importantes:
+- Ignore códigos, descrições duplicadas, observações ou qualquer informação irrelevante.
+- Ignore totais, subtotal, impostos, frete, validade, CNPJ, vendedor, cliente, observações e linhas sem produto.
+- Não invente produtos, preços ou quantidades.
+- Não junte vários produtos na mesma linha.
+- O nome do produto deve ficar limpo, sem código de barras, código interno, número de item ou quantidade pedida.
+- Se a embalagem aparecer como CX 8UN, CX-24, CX 24, FD-20, FARDO 12UN ou similar, coloque essa informação em Quantidade da Embalagem.
+- Prefira manter a embalagem no padrão curto encontrado na lista, por exemplo CX-6, CX-12, CX-24, FD-20 ou CX 8UN.
+- Se não encontrar a quantidade da embalagem, deixe a coluna vazia.
+- Se encontrar preço em formato brasileiro, mantenha com vírgula. Exemplo: 8,54.
+- Sempre devolva o Preço Unitário com vírgula e duas casas decimais.
+- Se o preço vier com 3 casas decimais no padrão da lista, arredonde sempre para cima e deixe duas casas. Exemplo: 2,153 vira 2,16; 2,154 vira 2,16; 2,150 vira 2,15.
+- Se o preço vier como 2.153 e estiver claramente no padrão da lista como preço com 3 casas decimais, interprete como 2,153, arredonde para cima e devolva 2,16.
+- Se 2.150 estiver claramente no padrão da lista como preço com 3 casas decimais, devolva 2,15.
+- Se o ponto for separador de milhar e não decimal, não trate como preço unitário.
+
+Exemplo do formato ideal para a Vitrine:
+\`\`\`csv
+Nome do Produto;Quantidade da Embalagem;Preço Unitário
+ACHOC TODDY 1.8KG;CX-6;30,83
+ACHOC TODDY 750G TRAD;CX-12;15,25
+ACHOC TODDY 370G TRAD;CX-24;8,14
+CHA LEAO MATTE GRANEL 250G NAT;CX-30;5,62
+CHA LEAO MATTE GRANEL 100G ORIGINAL;CX-60;4,17
+MILHO VERDE QUERO 170G LT;CX-24;2,63
+MOLHO QUERO 240G SACHE MANJERICAO;CX-32;1,59
+MOLHO QUERO 240G SACHE PIZZA;CX-32;1,59
+\`\`\`
+
+[COLE SUA LISTA AQUI OU ANEXE O PDF/EXCEL]`,
   },
   {
     label: 'Transformar PDF em Excel',
