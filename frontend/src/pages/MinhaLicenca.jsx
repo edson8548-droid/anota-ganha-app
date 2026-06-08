@@ -7,7 +7,7 @@ import { auth } from '../firebase/config';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { apiUrl } from '../config/api';
 
-const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.33.zip';
+const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.34.zip';
 
 const MinhaLicenca = () => {
   const navigate = useNavigate();

@@ -40,10 +40,11 @@ function getEditableInputs(row) {
 }
 
 function getEditableControls(root) {
+  const self = isEditableValueControl(root) && !root.disabled && !root.readOnly && isVisible(root) ? [root] : [];
   const inputs = getEditableInputs(root);
   const editable = Array.from(root.querySelectorAll('[contenteditable="true"], [role="textbox"]'))
     .filter(el => isVisible(el));
-  return [...inputs, ...editable].filter((el, index, all) => all.indexOf(el) === index);
+  return [...self, ...inputs, ...editable].filter((el, index, all) => all.indexOf(el) === index);
 }
 
 function isPriceLikeInput(input) {
@@ -77,6 +78,14 @@ function limparEAN(s) {
 function getControlValue(input) {
   if (input && 'value' in input) return String(input.value || '');
   return String(input?.textContent || '');
+}
+
+function isEditableValueControl(el) {
+  return Boolean(el && (
+    'value' in el
+    || el.isContentEditable
+    || el.getAttribute?.('role') === 'textbox'
+  ));
 }
 
 function getDirectCells(row) {
@@ -704,7 +713,8 @@ async function fillQuotationPrices(prices, options = {}) {
     const priceCell = getCotacaoWebSmusPriceCell(row);
     if (!priceCell) return false;
     const cellValue = normalizeCellText(priceCell.textContent || '');
-    return samePriceLike(cellValue, expectedValue);
+    if (samePriceLike(cellValue, expectedValue)) return true;
+    return getEditableControls(priceCell).some(control => samePriceLike(getControlValue(control), expectedValue));
   }
 
   function waitForSmusBridgeResult(requestId, timeoutMs = 1000) {
@@ -814,6 +824,57 @@ async function fillQuotationPrices(prices, options = {}) {
     else input.value = value;
   }
 
+  function selectEditableContents(el) {
+    try {
+      el.focus?.();
+      if (typeof el.select === 'function') {
+        el.select();
+        return;
+      }
+      if (el.isContentEditable || el.getAttribute?.('role') === 'textbox') {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    } catch {}
+  }
+
+  async function commitEditorValue(el, value, delayMs = 45) {
+    try {
+      dispatchInputEvents(el, value);
+      el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', code: 'Enter' }));
+      el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Enter', code: 'Enter' }));
+      el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Tab', code: 'Tab' }));
+      el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Tab', code: 'Tab' }));
+      el.blur?.();
+    } catch {}
+    await waitForGridRender(delayMs);
+  }
+
+  async function writeEditableControlValue(el, value) {
+    for (const candidate of priceValueCandidates(value, el)) {
+      try {
+        selectEditableContents(el);
+
+        if ('value' in el) {
+          writeNativeValue(el, '');
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          writeNativeValue(el, candidate);
+        } else {
+          try { document.execCommand?.('selectAll', false); } catch {}
+          const inserted = document.execCommand?.('insertText', false, candidate);
+          if (!inserted) el.textContent = candidate;
+        }
+
+        await commitEditorValue(el, candidate);
+        if (hasPrice(getControlValue(el))) return true;
+      } catch {}
+    }
+    return false;
+  }
+
   async function tryGridCellTyping(cell, value) {
     const fallback = priceValueCandidates(value, cell)[0];
     if (!fallback) return false;
@@ -824,6 +885,18 @@ async function fillQuotationPrices(prices, options = {}) {
       cell.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
       cell.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'F2', code: 'F2' }));
       cell.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'F2', code: 'F2' }));
+      await waitForGridRender(50);
+
+      const editor = findBestEditorNear(cell);
+      if (editor && editor !== cell && await writeEditableControlValue(editor, value)) return true;
+
+      selectEditableContents(cell);
+      try { document.execCommand?.('selectAll', false); } catch {}
+      if (document.execCommand?.('insertText', false, fallback)) {
+        await commitEditorValue(cell, fallback, 80);
+        return true;
+      }
+
       cell.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'a', code: 'KeyA', ctrlKey: true }));
       cell.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'a', code: 'KeyA', ctrlKey: true }));
       cell.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Backspace', code: 'Backspace' }));
@@ -843,21 +916,11 @@ async function fillQuotationPrices(prices, options = {}) {
         cell.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
       } catch {}
 
-      document.execCommand?.('insertText', false, fallback);
-      dispatchInputEvents(cell, fallback);
-      await waitForGridRender(60);
+      await commitEditorValue(cell, fallback, 60);
       return true;
     } catch {
       return false;
     }
-  }
-
-  function isEditableValueControl(el) {
-    return Boolean(el && (
-      'value' in el
-      || el.isContentEditable
-      || el.getAttribute?.('role') === 'textbox'
-    ));
   }
 
   function editableControlDistance(a, b) {
@@ -875,6 +938,10 @@ async function fillQuotationPrices(prices, options = {}) {
   }
 
   function findBestEditorNear(target, beforeEditors = new Set()) {
+    if (target && isEditableValueControl(target) && isVisible(target)) {
+      return target;
+    }
+
     const active = document.activeElement;
     if (active && active !== target && isEditableValueControl(active) && isVisible(active)) {
       return active;
@@ -933,18 +1000,7 @@ async function fillQuotationPrices(prices, options = {}) {
 
     input.focus?.();
 
-    for (const candidate of priceValueCandidates(value, input)) {
-      try {
-        input.focus?.();
-        if (typeof input.select === 'function') input.select();
-        writeNativeValue(input, '');
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-        writeNativeValue(input, candidate);
-        dispatchInputEvents(input, candidate);
-        await waitForGridRender(20);
-        if (hasPrice(getControlValue(input))) return true;
-      } catch {}
-    }
+    if (await writeEditableControlValue(input, value)) return true;
 
     const fallback = priceValueCandidates(value, input)[0];
     if (!fallback) return false;
