@@ -36,6 +36,20 @@
     return String(value || '').replace(/\D/g, '');
   }
 
+  function comparableDigits(value) {
+    const raw = String(value ?? '').trim();
+    const direct = onlyDigits(raw);
+    if (/^\d{8,14}$/.test(direct)) return direct;
+    if (/^[+-]?\d+(\.\d+)?([eE][+\-]?\d+)?$/.test(raw.replace(',', '.'))) {
+      const parsed = Number(raw.replace(',', '.'));
+      if (Number.isFinite(parsed)) {
+        const expanded = String(Math.trunc(parsed));
+        if (/^\d{8,14}$/.test(expanded)) return expanded;
+      }
+    }
+    return direct;
+  }
+
   function parsePrice(value) {
     let raw = String(value ?? '').replace(/[^\d,.-]/g, '').trim();
     if (!raw) return null;
@@ -78,6 +92,36 @@
     }
   }
 
+  function addScopeTree(scopes, rootScope, maxScopes = 5000) {
+    if (!rootScope) return;
+    const queue = [rootScope];
+    const seen = new Set();
+
+    while (queue.length && scopes.length < maxScopes) {
+      const scope = queue.shift();
+      if (!scope || seen.has(scope)) continue;
+      seen.add(scope);
+      addScope(scopes, scope);
+
+      let child;
+      try { child = scope.$$childHead; } catch { child = null; }
+      let guard = 0;
+      while (child && guard < maxScopes) {
+        if (!seen.has(child)) queue.push(child);
+        try { child = child.$$nextSibling; } catch { child = null; }
+        guard++;
+      }
+    }
+  }
+
+  function addInjectorScope(scopes, angularRef, el) {
+    try {
+      const injector = angularRef.element(el).injector?.();
+      const rootScope = injector?.get?.('$rootScope');
+      addScopeTree(scopes, rootScope);
+    } catch {}
+  }
+
   function collectAngularScopes(rowToken, cellToken) {
     const scopes = [];
     const angularRef = window.angular;
@@ -99,6 +143,7 @@
     for (const el of elements.filter(Boolean)) {
       try { addScope(scopes, angularRef.element(el).scope()); } catch {}
       try { addScope(scopes, angularRef.element(el).isolateScope()); } catch {}
+      addInjectorScope(scopes, angularRef, el);
     }
 
     return scopes;
@@ -146,7 +191,7 @@
       if (isObject(value) || typeof value === 'function') continue;
 
       const keyNorm = normalizeText(key);
-      const digits = onlyDigits(value);
+      const digits = comparableDigits(value);
       if (req.ean && digits === req.ean) score += 320;
       if (req.codigo && /COD|CODIGO|ID|PROD/.test(keyNorm) && digits === req.codigo) score += 220;
       if (req.codigo && digits === req.codigo && String(req.codigo).length >= 4) score += 70;
@@ -157,12 +202,13 @@
 
   function priceKeyScore(key) {
     const text = normalizeText(key);
-    if (!/(PRECO|PREÇO|VALOR|VLR|PRICE)/.test(text)) return 0;
-    if (/(TOTAL|FRETE|DESCONTO|ACRESC|QUANT|QTD|EMBAL|TAMANHO|CUSTO)/.test(text)) return 0;
+    if (!/(PRECO|PREÇO|VALOR|VLR|VL|PRICE|UNITARIO|UNITARIA|COTAC|OFERTA)/.test(text)) return 0;
+    if (/(TOTAL|FRETE|DESCONTO|ACRESC|QUANT|QTD|EMBAL|TAMANHO|CUSTO|CODIGO|COD|EAN|BARRAS|PRODUTO|NOME|DESC|DATA)/.test(text)) return 0;
     let score = 10;
     if (/(UN|UNIT|UNITARIO|UNITARIA)/.test(text)) score += 30;
     if (/(FORNEC|COTAC|OFERTA)/.test(text)) score += 20;
-    if (/^(PRECO|PREÇO|VALOR|VLR)$/.test(text)) score += 15;
+    if (/^(PRECO|PREÇO|VALOR|VLR|VL)$/.test(text)) score += 15;
+    if (/^(PRECOUN|PRECOUNITARIO|PREÇOUNITARIO|VALORUN|VALORUNITARIO|VLUN|VLUNITARIO|VLRUN|VLRUNITARIO)$/.test(text)) score += 25;
     return score;
   }
 
@@ -174,10 +220,36 @@
       .map(item => item.key);
   }
 
+  function collectPriceTargets(root, out, seen, depth, baseScore) {
+    if (depth < 0 || isUnsafeObject(root) || seen.has(root)) return;
+    seen.add(root);
+
+    const priceKeys = findPriceKeys(root);
+    if (priceKeys.length) {
+      const keyScore = priceKeys.reduce((sum, key) => sum + priceKeyScore(key), 0);
+      out.push({ obj: root, priceKeys, score: baseScore + keyScore });
+    }
+
+    if (Array.isArray(root)) {
+      for (let i = 0; i < root.length; i++) {
+        if (isObject(root[i])) collectPriceTargets(root[i], out, seen, depth - 1, baseScore - 4);
+      }
+      return;
+    }
+
+    for (const key of ownKeys(root)) {
+      if (/^(constructor|prototype|__proto__|window|document|location)$/i.test(key)) continue;
+      let value;
+      try { value = root[key]; } catch { continue; }
+      if (typeof value === 'function') continue;
+      if (isObject(value)) collectPriceTargets(value, out, seen, depth - 1, baseScore - 4);
+    }
+  }
+
   function setPriceValue(obj, key, price) {
     let oldValue;
     try { oldValue = obj[key]; } catch {}
-    if (typeof oldValue === 'string') obj[key] = price.toFixed(2).replace('.', ',');
+    if (typeof oldValue === 'string' || oldValue == null) obj[key] = price.toFixed(2).replace('.', ',');
     else obj[key] = price;
   }
 
@@ -213,10 +285,13 @@
     const seen = new WeakSet();
     for (const scope of scopes) collectObjects(scope, objects, seen, 5, 30000);
 
-    const candidates = objects
-      .map(obj => ({ obj, score: objectScore(obj, req), priceKeys: findPriceKeys(obj) }))
-      .filter(item => item.score >= 160 && item.priceKeys.length > 0)
-      .sort((a, b) => b.score - a.score || b.priceKeys.length - a.priceKeys.length);
+    const candidates = [];
+    for (const obj of objects) {
+      const score = objectScore(obj, req);
+      if (score < 160) continue;
+      collectPriceTargets(obj, candidates, new WeakSet(), 4, score);
+    }
+    candidates.sort((a, b) => b.score - a.score || b.priceKeys.length - a.priceKeys.length);
 
     const best = candidates[0];
     if (!best) return { ok: false, reason: 'angular_row_not_found', objects: objects.length };
