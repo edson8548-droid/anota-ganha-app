@@ -108,6 +108,7 @@ describe('extensoes Chrome', () => {
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.26.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.27.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.28.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.29.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-whatsapp-extension.zip')));
   });
 });

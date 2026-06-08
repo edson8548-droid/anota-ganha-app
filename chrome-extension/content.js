@@ -376,9 +376,9 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function waitForGridRender() {
+async function waitForGridRender(delayMs = 35) {
   await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  await sleep(20);
+  await sleep(delayMs);
 }
 
 function dispatchScrollEvent(el) {
@@ -387,11 +387,32 @@ function dispatchScrollEvent(el) {
   } catch {}
 }
 
+function dispatchWheelEvent(el, deltaY) {
+  try {
+    el.dispatchEvent(new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaY,
+      deltaMode: 0,
+      view: window,
+    }));
+  } catch {}
+}
+
+function dispatchPageDown() {
+  try {
+    document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'PageDown', code: 'PageDown' }));
+    document.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'PageDown', code: 'PageDown' }));
+  } catch {}
+}
+
 function isScrollableY(el) {
   if (!el || el === document || el === window) return false;
   const style = window.getComputedStyle(el);
   const overflowY = `${style.overflowY || ''} ${style.overflow || ''}`;
-  return /(auto|scroll|overlay)/i.test(overflowY)
+  const looksScrollable = /(auto|scroll|overlay)/i.test(overflowY)
+    || /\b(scroll|viewport|grid|body|content|panel|table)\b/i.test(`${el.className || ''} ${el.id || ''} ${el.getAttribute('role') || ''}`);
+  return looksScrollable
     && el.scrollHeight > el.clientHeight + 20
     && el.getBoundingClientRect().height > 80;
 }
@@ -405,43 +426,82 @@ function getCotacaoWebSmusVisibleRows() {
   });
 }
 
-function getCotacaoWebSmusScroller() {
+function getCotacaoWebSmusScrollTargets() {
   const rows = getCotacaoWebSmusVisibleRows();
   const candidates = new Map();
+  const scrollingElement = document.scrollingElement || document.documentElement || document.body;
+
+  function makeTarget(el, score) {
+    if (el === window) {
+      const docEl = document.scrollingElement || document.documentElement || document.body;
+      return {
+        el: window,
+        score,
+        getTop: () => window.scrollY || docEl.scrollTop || document.body.scrollTop || 0,
+        setTop: value => window.scrollTo(0, value),
+        getMax: () => Math.max(0, docEl.scrollHeight - window.innerHeight),
+        getHeight: () => window.innerHeight || docEl.clientHeight || 600,
+        restore: value => window.scrollTo(0, value),
+        dispatch: delta => {
+          dispatchScrollEvent(window);
+          dispatchWheelEvent(document.body || docEl, delta);
+        },
+      };
+    }
+
+    return {
+      el,
+      score,
+      getTop: () => el.scrollTop || 0,
+      setTop: value => { el.scrollTop = value; },
+      getMax: () => Math.max(0, el.scrollHeight - el.clientHeight),
+      getHeight: () => el.clientHeight || el.getBoundingClientRect().height || 240,
+      restore: value => { el.scrollTop = value; },
+      dispatch: delta => {
+        dispatchScrollEvent(el);
+        dispatchWheelEvent(el, delta);
+      },
+    };
+  }
 
   function addCandidate(el) {
-    if (!el || el === document.body || el === document.documentElement) return;
-    if (!isScrollableY(el)) return;
+    if (!el || el === document || el === window) return;
+    if (!isScrollableY(el) && el !== document.body && el !== document.documentElement && el !== scrollingElement) return;
     const rowsInside = rows.filter(row => el.contains(row)).length;
-    if (!rowsInside) return;
     const rect = el.getBoundingClientRect();
     const score = rowsInside * 1000
       + Math.min(el.scrollHeight - el.clientHeight, 20000) / 10
       + Math.min(rect.height, 600);
-    candidates.set(el, Math.max(candidates.get(el) || 0, score));
+    candidates.set(el, Math.max(candidates.get(el) || 0, score || 1));
   }
 
   for (const row of rows) {
     let parent = row.parentElement;
-    while (parent && parent !== document.body) {
+    while (parent && parent !== document) {
       addCandidate(parent);
       parent = parent.parentElement;
     }
   }
 
-  for (const el of document.querySelectorAll('div, section, main, article, tbody')) {
+  for (const el of document.querySelectorAll('div, section, main, article, tbody, table')) {
     addCandidate(el);
   }
 
-  const ranked = Array.from(candidates.entries()).sort((a, b) => b[1] - a[1]);
-  return ranked[0]?.[0] || null;
+  addCandidate(scrollingElement);
+  candidates.set(window, Math.max(candidates.get(window) || 0, rows.length ? rows.length * 900 : 1));
+
+  return Array.from(candidates.entries())
+    .map(([el, score]) => makeTarget(el, score))
+    .filter(target => target.getMax() > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 12);
 }
 
 async function scanCotacaoWebSmusRows(onRow, options = {}) {
-  const scroller = getCotacaoWebSmusScroller();
+  const targets = getCotacaoWebSmusScrollTargets();
   const restoreScroll = options.restoreScroll !== false;
   const stopWhen = typeof options.stopWhen === 'function' ? options.stopWhen : null;
-  const originalTop = scroller ? scroller.scrollTop : 0;
+  const originalTops = targets.map(target => [target, target.getTop()]);
   const seen = new Map();
 
   async function visitVisibleRows() {
@@ -451,52 +511,80 @@ async function scanCotacaoWebSmusRows(onRow, options = {}) {
       if (!signature || seen.has(signature)) continue;
       const idx = seen.size;
       seen.set(signature, idx);
-      const shouldStop = await onRow(row, idx, signature, scroller ? scroller.scrollTop : 0);
+      const shouldStop = await onRow(row, idx, signature, targets[0]?.getTop() || 0);
       if (shouldStop) return true;
     }
     return false;
   }
 
-  if (!scroller) {
+  if (!targets.length) {
     await visitVisibleRows();
     return seen.size;
   }
 
-  scroller.scrollTop = 0;
-  dispatchScrollEvent(scroller);
-  await waitForGridRender();
+  for (const target of targets) {
+    target.setTop(0);
+    target.dispatch(-1000);
+  }
+  await waitForGridRender(80);
 
-  let unchangedAtBottom = 0;
-  let lastSeenSize = 0;
+  let stagnant = 0;
   const maxIterations = 2500;
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     if (await visitVisibleRows()) break;
     if (stopWhen && stopWhen()) break;
 
-    const maxTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-    const atBottom = scroller.scrollTop >= maxTop - 2;
-    if (atBottom) {
-      if (seen.size === lastSeenSize) unchangedAtBottom++;
-      else unchangedAtBottom = 0;
-      if (unchangedAtBottom >= 2) break;
+    const beforeSeen = seen.size;
+    const beforePositions = targets.map(target => target.getTop());
+    const visibleRows = getCotacaoWebSmusVisibleRows();
+    const lastVisibleRow = visibleRows[visibleRows.length - 1];
+    let moved = false;
+
+    if (lastVisibleRow) {
+      try {
+        lastVisibleRow.scrollIntoView({ block: 'end', inline: 'nearest' });
+        moved = true;
+      } catch {}
     }
 
-    lastSeenSize = seen.size;
-    const step = Math.max(120, Math.floor((scroller.clientHeight || 240) * 0.75));
-    const nextTop = Math.min(maxTop, scroller.scrollTop + step);
-    if (Math.abs(nextTop - scroller.scrollTop) < 1) break;
+    for (const target of targets) {
+      const top = target.getTop();
+      const maxTop = target.getMax();
+      if (top >= maxTop - 2) continue;
+      const step = Math.max(160, Math.floor(target.getHeight() * 0.92));
+      const nextTop = Math.min(maxTop, top + step);
+      if (Math.abs(nextTop - top) < 1) continue;
 
-    scroller.scrollTop = nextTop;
-    dispatchScrollEvent(scroller);
-    await waitForGridRender();
+      target.setTop(nextTop);
+      target.dispatch(step);
+      moved = true;
+    }
+
+    dispatchPageDown();
+    await waitForGridRender(iteration < 5 ? 120 : 45);
+    await visitVisibleRows();
+
+    const positionsChanged = targets.some((target, index) => Math.abs(target.getTop() - beforePositions[index]) > 1);
+    if (!moved && !positionsChanged && seen.size === beforeSeen) {
+      stagnant++;
+    } else if (seen.size > beforeSeen) {
+      stagnant = 0;
+    } else {
+      stagnant++;
+    }
+
+    if (stagnant >= 8 && targets.every(target => target.getTop() >= target.getMax() - 2)) break;
+    if (stagnant >= 20 && !positionsChanged) break;
   }
 
   await visitVisibleRows();
 
   if (restoreScroll) {
-    scroller.scrollTop = originalTop;
-    dispatchScrollEvent(scroller);
+    for (const [target, top] of originalTops) {
+      target.restore(top);
+      target.dispatch(0);
+    }
   }
 
   return seen.size;
