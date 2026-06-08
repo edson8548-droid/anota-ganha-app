@@ -880,6 +880,7 @@ async function fillQuotationPrices(prices, options = {}) {
     if (!fallback) return false;
 
     try {
+      const beforeEditors = new Set(getEditableControls(document.body));
       cell.focus?.();
       cell.click?.();
       cell.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
@@ -887,12 +888,12 @@ async function fillQuotationPrices(prices, options = {}) {
       cell.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'F2', code: 'F2' }));
       await waitForGridRender(50);
 
-      const editor = findBestEditorNear(cell);
+      const editor = findBestEditorNear(cell, beforeEditors);
       if (editor && editor !== cell && await writeEditableControlValue(editor, value)) return true;
 
       selectEditableContents(cell);
       try { document.execCommand?.('selectAll', false); } catch {}
-      if (document.execCommand?.('insertText', false, fallback)) {
+      if (selectionBelongsToTarget(cell) && document.execCommand?.('insertText', false, fallback)) {
         await commitEditorValue(cell, fallback, 80);
         return true;
       }
@@ -937,27 +938,72 @@ async function fillQuotationPrices(prices, options = {}) {
     }
   }
 
+  function selectionBelongsToTarget(target) {
+    try {
+      const active = document.activeElement;
+      if (active && (active === target || target.contains(active))) return true;
+      const selection = window.getSelection?.();
+      if (!selection?.rangeCount) return false;
+      const node = selection.anchorNode;
+      const el = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+      return Boolean(el && (el === target || target.contains(el)));
+    } catch {
+      return false;
+    }
+  }
+
+  function rectsOverlap(a, b) {
+    try {
+      const ar = a.getBoundingClientRect();
+      const br = b.getBoundingClientRect();
+      const overlapX = Math.max(0, Math.min(ar.right, br.right) - Math.max(ar.left, br.left));
+      const overlapY = Math.max(0, Math.min(ar.bottom, br.bottom) - Math.max(ar.top, br.top));
+      const minWidth = Math.max(1, Math.min(ar.width, br.width));
+      const minHeight = Math.max(1, Math.min(ar.height, br.height));
+      return overlapX >= minWidth * 0.45 && overlapY >= minHeight * 0.45;
+    } catch {
+      return false;
+    }
+  }
+
+  function editorBelongsToTarget(editor, target, beforeEditors = new Set()) {
+    if (!editor || !target || !isEditableValueControl(editor) || !isVisible(editor)) return false;
+    if (editor === target || target.contains(editor) || editor.contains(target)) return true;
+
+    const targetRow = target.closest?.('tr');
+    const editorRow = editor.closest?.('tr');
+    if (targetRow && editorRow) return targetRow === editorRow;
+
+    const targetTable = target.closest?.('table');
+    const editorTable = editor.closest?.('table');
+    if (targetTable && editorTable && targetTable !== editorTable) return false;
+
+    const isNew = !beforeEditors.has(editor);
+    const nearEnough = editableControlDistance(editor, target) < (isNew ? 150 : 90);
+    return rectsOverlap(editor, target) || (isNew && nearEnough);
+  }
+
   function findBestEditorNear(target, beforeEditors = new Set()) {
     if (target && isEditableValueControl(target) && isVisible(target)) {
       return target;
     }
 
     const active = document.activeElement;
-    if (active && active !== target && isEditableValueControl(active) && isVisible(active)) {
+    if (active && active !== target && editorBelongsToTarget(active, target, beforeEditors)) {
       return active;
     }
 
     const nested = getEditableControls(target)[0];
-    if (nested) return nested;
+    if (nested && editorBelongsToTarget(nested, target, beforeEditors)) return nested;
 
     const editors = getEditableControls(document.body)
       .filter(el => el !== target)
+      .filter(el => editorBelongsToTarget(el, target, beforeEditors))
       .map(el => ({
         el,
         isNew: beforeEditors.has(el) ? 0 : 1,
         distance: editableControlDistance(el, target),
       }))
-      .filter(item => item.isNew || item.distance < 260)
       .sort((a, b) => b.isNew - a.isNew || a.distance - b.distance);
 
     return editors[0]?.el || null;
