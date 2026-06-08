@@ -7,6 +7,7 @@ export default defineConfig({
   publicDir: 'public',
   build: {
     outDir: 'build',
+    emptyOutDir: true,
     rolldownOptions: {
       output: {
         manualChunks(id) {
