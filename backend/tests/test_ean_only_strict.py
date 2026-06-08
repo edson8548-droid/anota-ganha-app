@@ -260,3 +260,46 @@ def test_resultado_ignora_vlr_min_fatur_e_preenche_vlr_unitario():
         os.unlink(path)
         if output:
             os.unlink(output)
+
+
+def test_cotacao_sbroggio_usa_coluna_nova_e_inferir_ean_sem_cabecalho():
+    path = _xlsx([
+        [None, None, None, "FECHAMENTO DA COTACAO", None, None, None, None, None, None, None, None, None, None, None, None],
+        [None, None, None, "SEGUNDA FEIRA AS 10HORA", None, None, None, None, None, None, None, None, None, None, None, None],
+        ["BRUNO", "SBROGGIO SUPERMERCADO LTDA  LOJA 02", None, None, "PLANILHA DE COTACAO LOJA 02", None, None, None, None, None, None, None, None, None, None, None],
+        [None, None, None, None, "BETO", "preco", "GABRIEL", "GLALCIO", "IKEDA", "MARCOS", "THIAGO", "CIDINHA", "LUIZ", "JUNIOR", "ATACAD", "preco"],
+        ["DATA", None, None, None, None, None, None, None, None, None, None, None, None, None, None, None],
+        ["2026-06-01", None, None, "PRODUTOS", "PAULIST", "preco", "SERVIMED", "TOP SERV", "IKEDA", "MERC", "FR DISTRI", "CIDINHA", "VAQUEIRO", "V.NOVA", "ATACAD", "preco"],
+        [19.99, "4005900715814", "12 UNIDADES", "ANT NIVEA DEO MILK 150ML", None, None, None, None, None, None, None, None, None, None, None, None],
+        [14.99, "7896004400341", "1 CX", "FLOCOCO SOCOCO 100 G.", None, None, None, None, None, None, None, None, None, None, None, None],
+    ])
+    output = None
+    try:
+        itens, header_row = ler_cotacao(path)
+
+        assert header_row == 6
+        assert itens[0]["ean"] == "4005900715814"
+        assert itens[0]["nome"] == "ANT NIVEA DEO MILK 150ML"
+        assert itens[0]["col_preco"] is None
+
+        output = gerar_excel_resultado(
+            path,
+            itens[:1],
+            [{"linha": 7, "preco": 14.87, "tipo": "EAN"}],
+        )
+
+        from openpyxl import load_workbook
+
+        wb = load_workbook(output, data_only=True)
+        ws = wb.active
+        try:
+            assert ws.cell(6, 6).value == "preco"
+            assert ws.cell(7, 6).value in (None, "")
+            assert ws.cell(6, 17).value == "PRECO"
+            assert ws.cell(7, 17).value == 14.87
+        finally:
+            wb.close()
+    finally:
+        os.unlink(path)
+        if output:
+            os.unlink(output)
