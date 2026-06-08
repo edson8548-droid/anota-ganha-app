@@ -2,18 +2,24 @@
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.action === 'extractItems') {
-    const site = detectQuotationSite();
-    const items = extractQuotationItems({ empresaColuna: msg.empresaColuna });
-    sendResponse({ items, site });
-  } else if (msg.action === 'fillPrices') {
-    const result = fillQuotationPrices(msg.prices, { empresaColuna: msg.empresaColuna });
-    sendResponse(result);
-  } else if (msg.action === 'detectSite') {
-    const site = detectQuotationSite();
-    const rows = getQuotationRows(site);
-    sendResponse({ site, supported: site !== 'generic' || rows.length > 0, rowCount: rows.length });
-  }
+  (async () => {
+    if (msg.action === 'extractItems') {
+      const site = detectQuotationSite();
+      const items = await extractQuotationItems({ empresaColuna: msg.empresaColuna });
+      return { items, site };
+    }
+    if (msg.action === 'fillPrices') {
+      return fillQuotationPrices(msg.prices, { empresaColuna: msg.empresaColuna });
+    }
+    if (msg.action === 'detectSite') {
+      const site = detectQuotationSite();
+      const rows = getQuotationRows(site);
+      return { site, supported: site !== 'generic' || rows.length > 0, rowCount: rows.length };
+    }
+    return null;
+  })()
+    .then(response => sendResponse(response))
+    .catch(err => sendResponse({ ok: false, error: err?.message || String(err || 'Erro na extensão') }));
   return true; // keep channel open for async
 });
 
@@ -47,6 +53,25 @@ function isPriceLikeInput(input) {
 
 function normalizeCellText(value) {
   return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function limparEAN(s) {
+  s = String(s || '').trim().replace(/\u00a0/g, ' ').replace(/^\s*['"]|['"]\s*$/g, '');
+  if (!s || /^(nan|null|undefined)$/i.test(s)) return '';
+
+  const compact = s.replace(/\s+/g, '').replace(',', '.');
+  if (/^[+-]?\d+(\.\d+)?([eE][+\-]?\d+)?$/.test(compact)) {
+    try {
+      const parsed = String(Math.trunc(Number(compact)));
+      if (/^\d{8,14}$/.test(parsed)) return parsed;
+    } catch {}
+  }
+
+  const digits = s.replace(/\D/g, '');
+  if (/^\d{8,14}$/.test(digits)) return digits;
+
+  const match = s.match(/\d{8,14}/);
+  return match ? match[0] : '';
 }
 
 function getControlValue(input) {
@@ -86,6 +111,100 @@ function getCellTextByHeader(row, includePatterns, excludePatterns = []) {
   const index = findColumnIndexByHeader(row, includePatterns, excludePatterns);
   if (index < 0) return '';
   return normalizeCellText(getDirectCells(row)[index]?.textContent || '');
+}
+
+function extractEANFromRow(row, site) {
+  const headerEAN = limparEAN(getCellTextByHeader(row, [
+    /^\s*EAN\s*$/i,
+    /\bGTIN\b/i,
+    /cod\.?\s*barras/i,
+    /c[oó]digo\s+(de\s+)?barras/i,
+    /barcode/i,
+  ]));
+  if (headerEAN) return headerEAN;
+
+  if (site === 'intersolid-cotacao' || site === 'cotacao-web-smus') {
+    for (const td of row.querySelectorAll('td')) {
+      const v = limparEAN(td.textContent);
+      if (/^\d{12,14}$/.test(v)) return v;
+    }
+  }
+
+  for (const inp of row.querySelectorAll('input[type="hidden"]')) {
+    const meta = `${inp.name || ''} ${inp.id || ''} ${inp.className || ''}`.toLowerCase();
+    if (!/(ean|gtin|barra|barcode|codbar|cod_barr|codbarra)/.test(meta)) continue;
+    const v = limparEAN(inp.value);
+    if (v) return v;
+  }
+  const dataAttrs = ['data-ean','data-gtin','data-barcode','data-codbar','data-codbarra','data-cod-barras','data-codigo-barras'];
+  for (const attr of dataAttrs) {
+    const v = limparEAN(row.getAttribute(attr));
+    if (v) return v;
+    for (const td of row.querySelectorAll('td')) {
+      const v2 = limparEAN(td.getAttribute(attr));
+      if (v2) return v2;
+    }
+  }
+  for (const td of row.querySelectorAll('td')) {
+    const txt = limparEAN(td.textContent);
+    if (txt) return txt;
+  }
+  const fullText = row.textContent.trim();
+  const m = fullText.match(/\d{8,14}/);
+  return m ? m[0] : null;
+}
+
+function extractProductNameFromRow(row) {
+  const cells = row.querySelectorAll('td');
+  const cellTexts = [];
+  for (const td of cells) {
+    cellTexts.push(td.textContent.trim());
+  }
+
+  for (const txt of cellTexts) {
+    const t = txt.trim();
+    if (t.length < 4) continue;
+    if (limparEAN(t)) continue;
+    if (/^[\d.,\s]+$/.test(t)) continue;
+    if (/^(FD|CX|R\$|\d+\s*(UN|CX|PC|KG|G|ML|L))$/i.test(t)) continue;
+    if (/[A-Za-zÀ-ú]{3}/.test(t)) {
+      return t.replace(/(CX|FD)\d+R?\$?\s*$/i, '').trim();
+    }
+  }
+  return '';
+}
+
+function isFilledPriceValue(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return false;
+  const normalized = raw.replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
+  const n = Number(normalized);
+  return Number.isFinite(n) && n > 0;
+}
+
+function getCotacaoWebSmusCodigo(row) {
+  const byHeader = normalizeCellText(getCellTextByHeader(row, [/^\s*c[oó]digo\s*$/i, /^\s*c[oó]d\.?\s*$/i]));
+  if (byHeader && /^\d{2,10}$/.test(byHeader.replace(/\D/g, ''))) return byHeader.replace(/\D/g, '');
+
+  const firstCell = normalizeCellText(getDirectCells(row)[0]?.textContent || '');
+  const digits = firstCell.replace(/\D/g, '');
+  return /^\d{2,10}$/.test(digits) ? digits : '';
+}
+
+function normalizeRowKey(value) {
+  return normalizeCellText(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .trim();
+}
+
+function getCotacaoWebSmusRowSignature(row) {
+  const codigo = getCotacaoWebSmusCodigo(row);
+  const ean = extractEANFromRow(row, 'cotacao-web-smus') || '';
+  const nome = normalizeRowKey(extractProductNameFromRow(row));
+  return `${codigo}|${ean}|${nome}`;
 }
 
 function getRedeFornecedoresPriceCandidates(row) {
@@ -253,120 +372,187 @@ function getQuotationRows(site) {
   return Array.from(document.querySelectorAll('tr')).filter(row => getEditableInputs(row).length > 0);
 }
 
-function extractQuotationItems(options = {}) {
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function waitForGridRender() {
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  await sleep(20);
+}
+
+function dispatchScrollEvent(el) {
+  try {
+    el.dispatchEvent(new Event('scroll', { bubbles: true }));
+  } catch {}
+}
+
+function isScrollableY(el) {
+  if (!el || el === document || el === window) return false;
+  const style = window.getComputedStyle(el);
+  const overflowY = `${style.overflowY || ''} ${style.overflow || ''}`;
+  return /(auto|scroll|overlay)/i.test(overflowY)
+    && el.scrollHeight > el.clientHeight + 20
+    && el.getBoundingClientRect().height > 80;
+}
+
+function getCotacaoWebSmusVisibleRows() {
+  return Array.from(document.querySelectorAll('tr')).filter(row => {
+    const text = row.textContent || '';
+    return getPriceCandidates(row, 'cotacao-web-smus').length > 0
+      && /\d{8,14}/.test(text)
+      && /[A-Za-zÀ-ú]{3}/.test(text);
+  });
+}
+
+function getCotacaoWebSmusScroller() {
+  const rows = getCotacaoWebSmusVisibleRows();
+  const candidates = new Map();
+
+  function addCandidate(el) {
+    if (!el || el === document.body || el === document.documentElement) return;
+    if (!isScrollableY(el)) return;
+    const rowsInside = rows.filter(row => el.contains(row)).length;
+    if (!rowsInside) return;
+    const rect = el.getBoundingClientRect();
+    const score = rowsInside * 1000
+      + Math.min(el.scrollHeight - el.clientHeight, 20000) / 10
+      + Math.min(rect.height, 600);
+    candidates.set(el, Math.max(candidates.get(el) || 0, score));
+  }
+
+  for (const row of rows) {
+    let parent = row.parentElement;
+    while (parent && parent !== document.body) {
+      addCandidate(parent);
+      parent = parent.parentElement;
+    }
+  }
+
+  for (const el of document.querySelectorAll('div, section, main, article, tbody')) {
+    addCandidate(el);
+  }
+
+  const ranked = Array.from(candidates.entries()).sort((a, b) => b[1] - a[1]);
+  return ranked[0]?.[0] || null;
+}
+
+async function scanCotacaoWebSmusRows(onRow, options = {}) {
+  const scroller = getCotacaoWebSmusScroller();
+  const restoreScroll = options.restoreScroll !== false;
+  const stopWhen = typeof options.stopWhen === 'function' ? options.stopWhen : null;
+  const originalTop = scroller ? scroller.scrollTop : 0;
+  const seen = new Map();
+
+  async function visitVisibleRows() {
+    const rows = getCotacaoWebSmusVisibleRows();
+    for (const row of rows) {
+      const signature = getCotacaoWebSmusRowSignature(row);
+      if (!signature || seen.has(signature)) continue;
+      const idx = seen.size;
+      seen.set(signature, idx);
+      const shouldStop = await onRow(row, idx, signature, scroller ? scroller.scrollTop : 0);
+      if (shouldStop) return true;
+    }
+    return false;
+  }
+
+  if (!scroller) {
+    await visitVisibleRows();
+    return seen.size;
+  }
+
+  scroller.scrollTop = 0;
+  dispatchScrollEvent(scroller);
+  await waitForGridRender();
+
+  let unchangedAtBottom = 0;
+  let lastSeenSize = 0;
+  const maxIterations = 2500;
+
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
+    if (await visitVisibleRows()) break;
+    if (stopWhen && stopWhen()) break;
+
+    const maxTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+    const atBottom = scroller.scrollTop >= maxTop - 2;
+    if (atBottom) {
+      if (seen.size === lastSeenSize) unchangedAtBottom++;
+      else unchangedAtBottom = 0;
+      if (unchangedAtBottom >= 2) break;
+    }
+
+    lastSeenSize = seen.size;
+    const step = Math.max(120, Math.floor((scroller.clientHeight || 240) * 0.75));
+    const nextTop = Math.min(maxTop, scroller.scrollTop + step);
+    if (Math.abs(nextTop - scroller.scrollTop) < 1) break;
+
+    scroller.scrollTop = nextTop;
+    dispatchScrollEvent(scroller);
+    await waitForGridRender();
+  }
+
+  await visitVisibleRows();
+
+  if (restoreScroll) {
+    scroller.scrollTop = originalTop;
+    dispatchScrollEvent(scroller);
+  }
+
+  return seen.size;
+}
+
+function extractItemFromRow(row, idx, site, empresaColuna) {
+  const priceInput = site === 'vr-cotacao'
+    ? getEditableInputs(row)[0]
+    : getSelectedPriceInput(row, empresaColuna, site);
+  if (!priceInput) return null;
+
+  const ean = extractEANFromRow(row, site);
+  const nome = extractProductNameFromRow(row);
+
+  return {
+    idx,
+    ean,
+    nome,
+    codigo: site === 'cotacao-web-smus' ? getCotacaoWebSmusCodigo(row) : '',
+    signature: site === 'cotacao-web-smus' ? getCotacaoWebSmusRowSignature(row) : '',
+    filled: isFilledPriceValue(getControlValue(priceInput).trim()),
+  };
+}
+
+async function extractCotacaoWebSmusItems(options = {}) {
+  const items = [];
+  const empresaColuna = normalizeEmpresaColuna(options.empresaColuna);
+
+  await scanCotacaoWebSmusRows((row, idx) => {
+    const item = extractItemFromRow(row, idx, 'cotacao-web-smus', empresaColuna);
+    if (item) items.push(item);
+    return false;
+  });
+
+  return items.map((item, idx) => ({ ...item, idx }));
+}
+
+async function extractQuotationItems(options = {}) {
   const site = detectQuotationSite();
+  if (site === 'cotacao-web-smus') {
+    return extractCotacaoWebSmusItems(options);
+  }
+
   const rows = getQuotationRows(site);
   const items = [];
   const empresaColuna = normalizeEmpresaColuna(options.empresaColuna);
 
-  function limparEAN(s) {
-    s = String(s || '').trim().replace(/\u00a0/g, ' ').replace(/^\s*['"]|['"]\s*$/g, '');
-    if (!s || /^(nan|null|undefined)$/i.test(s)) return '';
-
-    const compact = s.replace(/\s+/g, '').replace(',', '.');
-    if (/^[+-]?\d+(\.\d+)?([eE][+\-]?\d+)?$/.test(compact)) {
-      try {
-        const parsed = String(Math.trunc(Number(compact)));
-        if (/^\d{8,14}$/.test(parsed)) return parsed;
-      } catch {}
-    }
-
-    const digits = s.replace(/\D/g, '');
-    if (/^\d{8,14}$/.test(digits)) return digits;
-
-    const match = s.match(/\d{8,14}/);
-    return match ? match[0] : '';
-  }
-
-  function extractEAN(row) {
-    const headerEAN = limparEAN(getCellTextByHeader(row, [
-      /^\s*EAN\s*$/i,
-      /\bGTIN\b/i,
-      /cod\.?\s*barras/i,
-      /c[oó]digo\s+(de\s+)?barras/i,
-      /barcode/i,
-    ]));
-    if (headerEAN) return headerEAN;
-
-    if (site === 'intersolid-cotacao') {
-      for (const td of row.querySelectorAll('td')) {
-        const v = limparEAN(td.textContent);
-        if (/^\d{12,14}$/.test(v)) return v;
-      }
-    }
-
-    for (const inp of row.querySelectorAll('input[type="hidden"]')) {
-      const meta = `${inp.name || ''} ${inp.id || ''} ${inp.className || ''}`.toLowerCase();
-      if (!/(ean|gtin|barra|barcode|codbar|cod_barr|codbarra)/.test(meta)) continue;
-      const v = limparEAN(inp.value);
-      if (v) return v;
-    }
-    const dataAttrs = ['data-ean','data-gtin','data-barcode','data-codbar','data-codbarra','data-cod-barras','data-codigo-barras'];
-    for (const attr of dataAttrs) {
-      const v = limparEAN(row.getAttribute(attr));
-      if (v) return v;
-      for (const td of row.querySelectorAll('td')) {
-        const v2 = limparEAN(td.getAttribute(attr));
-        if (v2) return v2;
-      }
-    }
-    for (const td of row.querySelectorAll('td')) {
-      const txt = limparEAN(td.textContent);
-      if (txt) return txt;
-    }
-    const fullText = row.textContent.trim();
-    const m = fullText.match(/\d{8,14}/);
-    return m ? m[0] : null;
-  }
-
-  function isFilledPrice(value) {
-    const raw = String(value || '').trim();
-    if (!raw) return false;
-    const normalized = raw.replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
-    const n = Number(normalized);
-    return Number.isFinite(n) && n > 0;
-  }
-
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const priceInput = site === 'vr-cotacao'
-      ? getEditableInputs(row)[0]
-      : getSelectedPriceInput(row, empresaColuna, site);
-    if (!priceInput) continue;
-    const currentVal = getControlValue(priceInput).trim();
-
-    const cells = row.querySelectorAll('td');
-    const cellTexts = [];
-    for (const td of cells) {
-      cellTexts.push(td.textContent.trim());
-    }
-    const ean = extractEAN(row);
-
-    // Extract product name — pick first cell with at least 3 letters
-    let nome = '';
-    for (const txt of cellTexts) {
-      const t = txt.trim();
-      if (t.length < 4) continue;
-      if (limparEAN(t)) continue;                                       // EAN
-      if (/^[\d.,\s]+$/.test(t)) continue;                             // pure number/price
-      if (/^(FD|CX|R\$|\d+\s*(UN|CX|PC|KG|G|ML|L))$/i.test(t)) continue; // packaging
-      if (/[A-Za-zÀ-ú]{3}/.test(t)) {
-        nome = t.replace(/(CX|FD)\d+R?\$?\s*$/i, '').trim();
-        break;
-      }
-    }
-
-    items.push({
-      idx: i,
-      ean: ean,
-      nome: nome,
-      filled: isFilledPrice(currentVal),
-    });
+    const item = extractItemFromRow(rows[i], i, site, empresaColuna);
+    if (item) items.push(item);
   }
+
   return items;
 }
 
-function fillQuotationPrices(prices, options = {}) {
+async function fillQuotationPrices(prices, options = {}) {
   const site = detectQuotationSite();
   const rows = getQuotationRows(site);
   let count = 0;
@@ -496,6 +682,65 @@ function fillQuotationPrices(prices, options = {}) {
     } catch {}
 
     return hasPrice(getControlValue(input));
+  }
+
+  async function fillCotacaoWebSmusPrices() {
+    const pendingByIdx = new Map();
+    const pendingBySignature = new Map();
+
+    for (const item of Array.isArray(prices) ? prices : []) {
+      const idx = Number(item?.idx);
+      if (Number.isInteger(idx) && idx >= 0) pendingByIdx.set(idx, item);
+      if (item?.signature) pendingBySignature.set(String(item.signature), item);
+    }
+
+    let scannedRows = 0;
+    await scanCotacaoWebSmusRows((row, idx, signature) => {
+      scannedRows = Math.max(scannedRows, idx + 1);
+      const item = pendingByIdx.get(idx) || pendingBySignature.get(signature);
+      if (!item) return pendingByIdx.size === 0 && pendingBySignature.size === 0;
+
+      const input = getSelectedPriceInput(row, empresaColuna, site);
+      if (!input) {
+        failed.push(item.idx);
+        details.push({ idx: item.idx, reason: 'input_not_found' });
+        pendingByIdx.delete(Number(item.idx));
+        if (item.signature) pendingBySignature.delete(String(item.signature));
+        return pendingByIdx.size === 0 && pendingBySignature.size === 0;
+      }
+
+      const before = getControlValue(input);
+      const ok = setInputValue(input, item.price);
+      if (ok) count++;
+      else {
+        failed.push(item.idx);
+        details.push({
+          idx: item.idx,
+          reason: 'value_rejected',
+          inputType: input.getAttribute('type') || '',
+          before,
+          after: getControlValue(input),
+          attempted: String(item.price ?? ''),
+        });
+      }
+
+      pendingByIdx.delete(Number(item.idx));
+      if (item.signature) pendingBySignature.delete(String(item.signature));
+      return pendingByIdx.size === 0 && pendingBySignature.size === 0;
+    }, {
+      stopWhen: () => pendingByIdx.size === 0 && pendingBySignature.size === 0,
+    });
+
+    for (const item of pendingByIdx.values()) {
+      failed.push(item.idx);
+      details.push({ idx: item.idx, reason: 'row_not_found' });
+    }
+
+    return { filled: count, failed, details, site, rowCount: scannedRows };
+  }
+
+  if (site === 'cotacao-web-smus') {
+    return fillCotacaoWebSmusPrices();
   }
 
   for (const item of prices) {

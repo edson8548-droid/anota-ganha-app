@@ -471,6 +471,21 @@ async function matchBatch(token, job, batch, batchIndex, totalBatches) {
   return resp.json();
 }
 
+function enrichPricesForFill(precos, items) {
+  const itemsByIdx = new Map((items || []).map(item => [Number(item.idx), item]));
+  return (precos || []).map(preco => {
+    const item = itemsByIdx.get(Number(preco.idx));
+    if (!item) return preco;
+    return {
+      ...preco,
+      ean: item.ean || '',
+      nome: item.nome || '',
+      codigo: item.codigo || '',
+      signature: item.signature || '',
+    };
+  });
+}
+
 async function runJob(job, startBatch = 0, initial = {}) {
   running = true;
   cancelRequested = false;
@@ -480,6 +495,8 @@ async function runJob(job, startBatch = 0, initial = {}) {
   if (!token) throw new Error('Login expirado. Abra o painel do Venpro e tente de novo.');
 
   const totalBatches = Math.ceil(job.items.length / BATCH);
+  const deferFillUntilEnd = job.site === 'cotacao-web-smus';
+  const deferredPrices = Array.isArray(job.deferredPrices) ? [...job.deferredPrices] : [];
   let preenchidos = initial.preenchidos || 0;
   let naoEncontrados = initial.naoEncontrados || 0;
   let processados = initial.processados || 0;
@@ -497,37 +514,45 @@ async function runJob(job, startBatch = 0, initial = {}) {
     let filled = 0;
     let failedCount = 0;
     if (precos.length > 0) {
-      const fillResult = await sendToQuotationPage({
-        action: 'fillPrices',
-        prices: precos,
-        empresaColuna: job.empresaColuna || 0,
-      });
-      filled = fillResult?.filled || 0;
-      failedCount = Array.isArray(fillResult?.failed) ? fillResult.failed.length : 0;
-      if (filled === 0) {
-        await reportFill(token, {
-          event_type: 'batch',
-          status: 'error',
-          job_id: job.jobId,
-          tabela_id: job.tabelaId,
-          prazo: job.prazo,
-          modo: job.modo,
-          site: job.site,
-          batch_index: b + 1,
-          total_batches: totalBatches,
-          total_itens: job.items.length,
-          batch_total: batch.length,
-          precos_recebidos: precos.length,
-          preenchidos: filled,
-          falhas: failedCount,
-          nao_encontrados: data.stats?.nao_encontrados || 0,
-          debug: {
-            site_detectado: fillResult?.site || job.site,
-            linhas_detectadas: fillResult?.rowCount || null,
-            detalhes: Array.isArray(fillResult?.details) ? fillResult.details.slice(0, 20) : [],
-          },
+      const pricesToFill = enrichPricesForFill(precos, job.items);
+      if (deferFillUntilEnd) {
+        deferredPrices.push(...pricesToFill);
+        job.deferredPrices = deferredPrices;
+        await storageSet({ processingJob: job });
+        filled = data.stats?.preenchidos || precos.length;
+      } else {
+        const fillResult = await sendToQuotationPage({
+          action: 'fillPrices',
+          prices: pricesToFill,
+          empresaColuna: job.empresaColuna || 0,
         });
-        throw new Error('Encontrei preços, mas não consegui preencher os campos da cotação. Atualize a página e tente novamente.');
+        filled = fillResult?.filled || 0;
+        failedCount = Array.isArray(fillResult?.failed) ? fillResult.failed.length : 0;
+        if (filled === 0) {
+          await reportFill(token, {
+            event_type: 'batch',
+            status: 'error',
+            job_id: job.jobId,
+            tabela_id: job.tabelaId,
+            prazo: job.prazo,
+            modo: job.modo,
+            site: job.site,
+            batch_index: b + 1,
+            total_batches: totalBatches,
+            total_itens: job.items.length,
+            batch_total: batch.length,
+            precos_recebidos: precos.length,
+            preenchidos: filled,
+            falhas: failedCount,
+            nao_encontrados: data.stats?.nao_encontrados || 0,
+            debug: {
+              site_detectado: fillResult?.site || job.site,
+              linhas_detectadas: fillResult?.rowCount || null,
+              detalhes: Array.isArray(fillResult?.details) ? fillResult.details.slice(0, 20) : [],
+            },
+          });
+          throw new Error('Encontrei preços, mas não consegui preencher os campos da cotação. Atualize a página e tente novamente.');
+        }
       }
     }
 
@@ -555,6 +580,43 @@ async function runJob(job, startBatch = 0, initial = {}) {
 
     const pct = Math.round(((b + 1) / totalBatches) * 100);
     await saveState({ status: 'processing', total: job.items.length, processados, preenchidos, naoEncontrados, pct, batchIndex: b + 1, ts: Date.now() });
+  }
+
+  if (deferFillUntilEnd && deferredPrices.length > 0) {
+    setStatus(`Preenchendo ${deferredPrices.length} preços na Cotação Web SMUS...`, 'info');
+    const fillResult = await sendToQuotationPage({
+      action: 'fillPrices',
+      prices: deferredPrices,
+      empresaColuna: job.empresaColuna || 0,
+    });
+    const filled = fillResult?.filled || 0;
+    const failedCount = Array.isArray(fillResult?.failed) ? fillResult.failed.length : 0;
+
+    await reportFill(token, {
+      event_type: 'job_fill',
+      status: filled > 0 ? 'success' : 'error',
+      job_id: job.jobId,
+      tabela_id: job.tabelaId,
+      prazo: job.prazo,
+      modo: job.modo,
+      site: job.site,
+      total_itens: job.items.length,
+      batch_total: deferredPrices.length,
+      precos_recebidos: deferredPrices.length,
+      preenchidos: filled,
+      falhas: failedCount,
+      nao_encontrados: naoEncontrados,
+      debug: {
+        site_detectado: fillResult?.site || job.site,
+        linhas_detectadas: fillResult?.rowCount || null,
+        detalhes: Array.isArray(fillResult?.details) ? fillResult.details.slice(0, 30) : [],
+      },
+    });
+
+    if (filled === 0) {
+      throw new Error('Encontrei preços, mas não consegui preencher os campos da Cotação Web SMUS. Atualize a página e tente novamente.');
+    }
+    preenchidos = filled;
   }
 
   await reportFill(token, {
