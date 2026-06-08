@@ -37,8 +37,10 @@ describe('extensoes Chrome', () => {
     assert.match(manifest.description, /Rede de Fornecedores/);
     assert.match(manifest.description, /Infomag Cotação/);
     assert.match(manifest.description, /Intersolid Cotação/);
+    assert.match(manifest.description, /Cotação Web SMUS/);
     assert.ok(manifest.host_permissions.includes('https://infomagcotacao.com/*'));
     assert.ok(manifest.host_permissions.includes('https://*.intersolid.com.br/*'));
+    assert.ok(manifest.host_permissions.includes('http://cotacaoweb.smus.com.br/*'));
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('http://179.0.124.205/*')),
       'manifest precisa carregar content script no VR Cotacao conhecido'
@@ -62,6 +64,10 @@ describe('extensoes Chrome', () => {
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('https://*.intersolid.com.br/*')),
       'manifest precisa carregar content script na Intersolid Cotacao'
+    );
+    assert.ok(
+      manifest.content_scripts.some(script => (script.matches || []).includes('http://cotacaoweb.smus.com.br/*')),
+      'manifest precisa carregar content script na Cotacao Web SMUS'
     );
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('https://*/fornecedores/*/cotacao/*')),
@@ -100,6 +106,7 @@ describe('extensoes Chrome', () => {
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.24.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.25.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.26.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.27.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-whatsapp-extension.zip')));
   });
 });

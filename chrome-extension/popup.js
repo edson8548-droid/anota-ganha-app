@@ -2,7 +2,7 @@ const API_URL = 'https://api.venpro.com.br/api';
 const BATCH = 50;
 const STUCK_MS = 3 * 60 * 1000;
 const BTN_LABEL = 'Preencher Cotação';
-const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação ou Intersolid Cotação primeiro.';
+const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação ou Cotação Web SMUS primeiro.';
 const SITE_LABELS = {
   cotatudo: 'Cotatudo',
   'vr-cotacao': 'VR Cotação',
@@ -10,6 +10,7 @@ const SITE_LABELS = {
   'rede-fornecedores': 'Rede de Fornecedores',
   'infomag-cotacao': 'Infomag Cotação',
   'intersolid-cotacao': 'Intersolid Cotação',
+  'cotacao-web-smus': 'Cotação Web SMUS',
   generic: 'Cotação compatível',
 };
 
@@ -65,6 +66,9 @@ function setDetectedSite(tab, pageInfo = null) {
     type = 'ok';
   } else if (isIntersolidCotacaoUrl(url)) {
     label = 'Site detectado: Intersolid Cotação';
+    type = 'ok';
+  } else if (isCotacaoWebSmusUrl(url)) {
+    label = 'Site detectado: Cotação Web SMUS';
     type = 'ok';
   }
 
@@ -213,7 +217,8 @@ function isSupportedQuotationUrl(url = '') {
     || (url.includes('fornecedor.rpinfo.com.br') && /\/supplier\/quotations\//i.test(url))
     || isRedeFornecedoresUrl(url)
     || isInfomagCotacaoUrl(url)
-    || isIntersolidCotacaoUrl(url);
+    || isIntersolidCotacaoUrl(url)
+    || isCotacaoWebSmusUrl(url);
 }
 
 function isPotentialQuotationUrl(url = '') {
@@ -256,6 +261,16 @@ function isIntersolidCotacaoUrl(url = '') {
   }
 }
 
+function isCotacaoWebSmusUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)cotacaoweb\.smus\.com\.br$/i.test(parsed.hostname)
+      && /cotacaoweb|ViewCotacaoDetalhe|cotacao/i.test(`${parsed.pathname}${parsed.hash}`);
+  } catch {
+    return /^(https?:\/\/)?cotacaoweb\.smus\.com\.br(?::\d+)?\//i.test(url);
+  }
+}
+
 async function getQuotationTab(options = {}) {
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (active?.id && isPotentialQuotationUrl(active.url || '')) return active;
@@ -278,6 +293,8 @@ async function getQuotationTab(options = {}) {
       'http://cotacaonovo.intersolid.com.br/*',
       'https://*.intersolid.com.br/*',
       'http://*.intersolid.com.br/*',
+      'https://cotacaoweb.smus.com.br/*',
+      'http://cotacaoweb.smus.com.br/*',
       'https://*/fornecedores/*/cotacao/*',
       'http://*/fornecedores/*/cotacao/*',
       'https://*/cotacao/*',
@@ -303,6 +320,7 @@ function detectSiteFromUrl(url = '') {
   if (isRedeFornecedoresUrl(url)) return 'rede-fornecedores';
   if (isInfomagCotacaoUrl(url)) return 'infomag-cotacao';
   if (isIntersolidCotacaoUrl(url)) return 'intersolid-cotacao';
+  if (isCotacaoWebSmusUrl(url)) return 'cotacao-web-smus';
   return 'generic';
 }
 

@@ -20,6 +20,7 @@ frontend/.firebase/
 .superpowers/**/state/server-stopped
 .claude/settings.local.json
 *.zip
+!frontend/public/venpro-cotatudo-extension-*.zip
 !frontend/public/venpro-cotatudo-extension.zip
 !frontend/public/venpro-whatsapp-extension.zip
 docs/private/

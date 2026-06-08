@@ -33,6 +33,13 @@ function getEditableInputs(row) {
     .filter(input => !input.disabled && !input.readOnly && isVisible(input));
 }
 
+function getEditableControls(root) {
+  const inputs = getEditableInputs(root);
+  const editable = Array.from(root.querySelectorAll('[contenteditable="true"], [role="textbox"]'))
+    .filter(el => isVisible(el));
+  return [...inputs, ...editable].filter((el, index, all) => all.indexOf(el) === index);
+}
+
 function isPriceLikeInput(input) {
   const meta = `${input.name || ''} ${input.id || ''} ${input.className || ''} ${input.placeholder || ''}`.toLowerCase();
   return /(preco|preço|valor|vlr|cotacao|cotação|unit)/.test(meta);
@@ -40,6 +47,11 @@ function isPriceLikeInput(input) {
 
 function normalizeCellText(value) {
   return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function getControlValue(input) {
+  if (input && 'value' in input) return String(input.value || '');
+  return String(input?.textContent || '');
 }
 
 function getDirectCells(row) {
@@ -115,9 +127,34 @@ function getIntersolidPriceCandidates(row) {
   return inputs.length ? [inputs[0]] : [];
 }
 
+function getCotacaoWebSmusPriceCandidates(row) {
+  const cells = getDirectCells(row);
+  const priceColumnIndex = findColumnIndexByHeader(
+    row,
+    [/pre[çc]o\s*un\b/i, /pre[çc]o\s+unit/i, /^\s*pre[çc]o\s*$/i],
+    [/total|frete|embalagem|quantidade|tamanho/i]
+  );
+
+  if (priceColumnIndex >= 0) {
+    const priceCell = cells[priceColumnIndex];
+    const controls = getEditableControls(priceCell || row);
+    if (controls.length) return controls;
+    if (priceCell && isVisible(priceCell)) return [priceCell];
+  }
+
+  const controls = getEditableControls(row).filter(input => {
+    const meta = `${input.name || ''} ${input.id || ''} ${input.className || ''} ${input.placeholder || ''} ${input.getAttribute('aria-label') || ''}`.toLowerCase();
+    const cellText = normalizeCellText(input.closest('td, th')?.textContent || '');
+    return !/codigo|c[oó]d|ean|produto|nome|quant|qtd|embalagem|tamanho|frete|data/.test(`${meta} ${cellText}`);
+  });
+  const priceLike = controls.filter(isPriceLikeInput);
+  return priceLike.length ? priceLike : controls;
+}
+
 function getPriceCandidates(row, site = 'generic') {
   if (site === 'rede-fornecedores') return getRedeFornecedoresPriceCandidates(row);
   if (site === 'intersolid-cotacao') return getIntersolidPriceCandidates(row);
+  if (site === 'cotacao-web-smus') return getCotacaoWebSmusPriceCandidates(row);
   const inputs = getEditableInputs(row);
   const priceLike = inputs.filter(isPriceLikeInput);
   return priceLike.length ? priceLike : inputs;
@@ -143,8 +180,14 @@ function detectQuotationSite() {
     || (/Informa[çc][õo]es\s+sobre\s+a\s+Cota[çc][ãa]o/i.test(bodyText)
       && /\bEmb\s+Compra\b/i.test(bodyText)
       && /Valor\s+de\s+Custo/i.test(bodyText));
+  const looksCotacaoWebSmus = /\bCota[çc][ãa]o\s+Web\b/i.test(bodyText)
+    && /\bPre[çc]o\s*UN\b/i.test(bodyText)
+    && /\bMensagem\s+Fornecedor\b/i.test(bodyText);
 
   if (window.location.hostname.includes('cotatudo.com.br')) return 'cotatudo';
+  if (/(^|\.)cotacaoweb\.smus\.com\.br$/i.test(hostname)
+    && (/cotacaoweb/i.test(`${hostname}${path}${window.location.hash || ''}`) || looksCotacaoWebSmus)) return 'cotacao-web-smus';
+  if (looksCotacaoWebSmus) return 'cotacao-web-smus';
   if (/(^|\.)intersolid\.com\.br$/i.test(hostname) && (/cotacao/i.test(hostname + path) || looksIntersolidCotacao)) return 'intersolid-cotacao';
   if (looksIntersolidCotacao) return 'intersolid-cotacao';
   if (/(^|\.)infomagcotacao\.com$/i.test(hostname)
@@ -194,6 +237,13 @@ function getQuotationRows(site) {
   }
 
   if (site === 'intersolid-cotacao') {
+    return Array.from(document.querySelectorAll('tr')).filter(row => {
+      const text = row.textContent || '';
+      return getPriceCandidates(row, site).length > 0 && /\d{8,14}/.test(text) && /[A-Za-zÀ-ú]{3}/.test(text);
+    });
+  }
+
+  if (site === 'cotacao-web-smus') {
     return Array.from(document.querySelectorAll('tr')).filter(row => {
       const text = row.textContent || '';
       return getPriceCandidates(row, site).length > 0 && /\d{8,14}/.test(text) && /[A-Za-zÀ-ú]{3}/.test(text);
@@ -283,7 +333,7 @@ function extractQuotationItems(options = {}) {
       ? getEditableInputs(row)[0]
       : getSelectedPriceInput(row, empresaColuna, site);
     if (!priceInput) continue;
-    const currentVal = (priceInput.value || '').trim();
+    const currentVal = getControlValue(priceInput).trim();
 
     const cells = row.querySelectorAll('td');
     const cellTexts = [];
@@ -382,6 +432,11 @@ function fillQuotationPrices(prices, options = {}) {
   }
 
   function writeNativeValue(input, value) {
+    if (!input || !('value' in input)) {
+      if (input) input.textContent = value;
+      return;
+    }
+
     const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
       window.HTMLInputElement.prototype, 'value'
     )?.set;
@@ -389,19 +444,44 @@ function fillQuotationPrices(prices, options = {}) {
     else input.value = value;
   }
 
+  function activateNestedEditor(input) {
+    if (!input || 'value' in input || input.isContentEditable || input.getAttribute('role') === 'textbox') {
+      return null;
+    }
+
+    try {
+      input.click();
+      input.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
+    } catch {}
+
+    const nested = getEditableControls(input)[0];
+    if (nested) return nested;
+
+    const active = document.activeElement;
+    if (active && active !== input && input.contains(active)) {
+      if ('value' in active || active.isContentEditable || active.getAttribute('role') === 'textbox') {
+        return active;
+      }
+    }
+    return null;
+  }
+
   function setInputValue(input, value) {
     input.scrollIntoView({ block: 'center', inline: 'nearest' });
-    input.focus();
+    const nestedEditor = activateNestedEditor(input);
+    if (nestedEditor) return setInputValue(nestedEditor, value);
+
+    input.focus?.();
 
     for (const candidate of priceValueCandidates(value, input)) {
       try {
-        input.focus();
+        input.focus?.();
         if (typeof input.select === 'function') input.select();
         writeNativeValue(input, '');
         input.dispatchEvent(new Event('input', { bubbles: true }));
         writeNativeValue(input, candidate);
         dispatchInputEvents(input, candidate);
-        if (hasPrice(input.value)) return true;
+        if (hasPrice(getControlValue(input))) return true;
       } catch {}
     }
 
@@ -409,13 +489,13 @@ function fillQuotationPrices(prices, options = {}) {
     if (!fallback) return false;
 
     try {
-      input.focus();
+      input.focus?.();
       if (typeof input.select === 'function') input.select();
       document.execCommand?.('insertText', false, fallback);
       dispatchInputEvents(input, fallback);
     } catch {}
 
-    return hasPrice(input.value);
+    return hasPrice(getControlValue(input));
   }
 
   for (const item of prices) {
@@ -434,7 +514,7 @@ function fillQuotationPrices(prices, options = {}) {
       continue;
     }
 
-    const before = input.value;
+    const before = getControlValue(input);
     const ok = setInputValue(input, item.price);
     if (ok) count++;
     else {
@@ -444,7 +524,7 @@ function fillQuotationPrices(prices, options = {}) {
         reason: 'value_rejected',
         inputType: input.getAttribute('type') || '',
         before,
-        after: input.value,
+        after: getControlValue(input),
         attempted: String(item.price ?? ''),
       });
     }
