@@ -225,6 +225,15 @@
         ]
       },
       {
+        "source": "/venpro-cotatudo-extension-1.0.30.zip",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
         "source": "/venpro-whatsapp-extension.zip",
         "headers": [
           {

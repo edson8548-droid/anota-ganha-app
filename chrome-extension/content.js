@@ -247,15 +247,8 @@ function getIntersolidPriceCandidates(row) {
 }
 
 function getCotacaoWebSmusPriceCandidates(row) {
-  const cells = getDirectCells(row);
-  const priceColumnIndex = findColumnIndexByHeader(
-    row,
-    [/pre[çc]o\s*un\b/i, /pre[çc]o\s+unit/i, /^\s*pre[çc]o\s*$/i],
-    [/total|frete|embalagem|quantidade|tamanho/i]
-  );
-
-  if (priceColumnIndex >= 0) {
-    const priceCell = cells[priceColumnIndex];
+  const priceCell = getCotacaoWebSmusPriceCell(row);
+  if (priceCell) {
     const controls = getEditableControls(priceCell || row);
     if (controls.length) return controls;
     if (priceCell && isVisible(priceCell)) return [priceCell];
@@ -268,6 +261,18 @@ function getCotacaoWebSmusPriceCandidates(row) {
   });
   const priceLike = controls.filter(isPriceLikeInput);
   return priceLike.length ? priceLike : controls;
+}
+
+function getCotacaoWebSmusPriceCell(row) {
+  const cells = getDirectCells(row);
+  const priceColumnIndex = findColumnIndexByHeader(
+    row,
+    [/pre[çc]o\s*un\b/i, /pre[çc]o\s+unit/i, /^\s*pre[çc]o\s*$/i],
+    [/total|frete|embalagem|quantidade|tamanho/i]
+  );
+
+  if (priceColumnIndex >= 0) return cells[priceColumnIndex] || null;
+  return cells[cells.length - 1] || null;
 }
 
 function getPriceCandidates(row, site = 'generic') {
@@ -689,6 +694,19 @@ async function fillQuotationPrices(prices, options = {}) {
     return parsePriceNumber(value) !== null;
   }
 
+  function samePriceLike(a, b) {
+    const priceA = parsePriceNumber(a);
+    const priceB = parsePriceNumber(b);
+    return priceA !== null && priceB !== null && Math.abs(priceA - priceB) < 0.01;
+  }
+
+  function cotacaoWebSmusRowShowsPrice(row, expectedValue) {
+    const priceCell = getCotacaoWebSmusPriceCell(row);
+    if (!priceCell) return false;
+    const cellValue = normalizeCellText(priceCell.textContent || '');
+    return samePriceLike(cellValue, expectedValue);
+  }
+
   function dispatchInputEvents(input, value) {
     try {
       input.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText', data: value }));
@@ -699,6 +717,8 @@ async function fillQuotationPrices(prices, options = {}) {
       input.dispatchEvent(new Event('input', { bubbles: true }));
     }
     input.dispatchEvent(new Event('change', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', code: 'Enter' }));
+    input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Enter', code: 'Enter' }));
     input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Tab' }));
     input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Tab' }));
     input.dispatchEvent(new Event('blur', { bubbles: true }));
@@ -718,32 +738,122 @@ async function fillQuotationPrices(prices, options = {}) {
     else input.value = value;
   }
 
-  function activateNestedEditor(input) {
+  async function tryGridCellTyping(cell, value) {
+    const fallback = priceValueCandidates(value, cell)[0];
+    if (!fallback) return false;
+
+    try {
+      cell.focus?.();
+      cell.click?.();
+      cell.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
+      cell.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'F2', code: 'F2' }));
+      cell.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'F2', code: 'F2' }));
+      cell.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'a', code: 'KeyA', ctrlKey: true }));
+      cell.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'a', code: 'KeyA', ctrlKey: true }));
+      cell.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Backspace', code: 'Backspace' }));
+      cell.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Backspace', code: 'Backspace' }));
+
+      for (const ch of fallback) {
+        cell.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: ch }));
+        cell.dispatchEvent(new KeyboardEvent('keypress', { bubbles: true, cancelable: true, key: ch, charCode: ch.charCodeAt(0), keyCode: ch.charCodeAt(0) }));
+        cell.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText', data: ch }));
+        cell.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: ch }));
+        cell.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: ch }));
+      }
+
+      try {
+        const data = new DataTransfer();
+        data.setData('text/plain', fallback);
+        cell.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+      } catch {}
+
+      document.execCommand?.('insertText', false, fallback);
+      dispatchInputEvents(cell, fallback);
+      await waitForGridRender(60);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function isEditableValueControl(el) {
+    return Boolean(el && (
+      'value' in el
+      || el.isContentEditable
+      || el.getAttribute?.('role') === 'textbox'
+    ));
+  }
+
+  function editableControlDistance(a, b) {
+    try {
+      const ar = a.getBoundingClientRect();
+      const br = b.getBoundingClientRect();
+      const ax = ar.left + ar.width / 2;
+      const ay = ar.top + ar.height / 2;
+      const bx = br.left + br.width / 2;
+      const by = br.top + br.height / 2;
+      return Math.abs(ax - bx) + Math.abs(ay - by);
+    } catch {
+      return Number.MAX_SAFE_INTEGER;
+    }
+  }
+
+  function findBestEditorNear(target, beforeEditors = new Set()) {
+    const active = document.activeElement;
+    if (active && active !== target && isEditableValueControl(active) && isVisible(active)) {
+      return active;
+    }
+
+    const nested = getEditableControls(target)[0];
+    if (nested) return nested;
+
+    const editors = getEditableControls(document.body)
+      .filter(el => el !== target)
+      .map(el => ({
+        el,
+        isNew: beforeEditors.has(el) ? 0 : 1,
+        distance: editableControlDistance(el, target),
+      }))
+      .filter(item => item.isNew || item.distance < 260)
+      .sort((a, b) => b.isNew - a.isNew || a.distance - b.distance);
+
+    return editors[0]?.el || null;
+  }
+
+  async function activateNestedEditor(input) {
     if (!input || 'value' in input || input.isContentEditable || input.getAttribute('role') === 'textbox') {
       return null;
     }
 
+    const beforeEditors = new Set(getEditableControls(document.body));
+
     try {
+      input.focus?.();
       input.click();
+      input.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+      input.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+      input.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
       input.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
+      input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'F2', code: 'F2' }));
+      input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'F2', code: 'F2' }));
+      input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', code: 'Enter' }));
+      input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Enter', code: 'Enter' }));
     } catch {}
 
-    const nested = getEditableControls(input)[0];
-    if (nested) return nested;
+    await waitForGridRender(90);
 
-    const active = document.activeElement;
-    if (active && active !== input && input.contains(active)) {
-      if ('value' in active || active.isContentEditable || active.getAttribute('role') === 'textbox') {
-        return active;
-      }
-    }
-    return null;
+    return findBestEditorNear(input, beforeEditors);
   }
 
-  function setInputValue(input, value) {
+  async function setInputValue(input, value) {
     input.scrollIntoView({ block: 'center', inline: 'nearest' });
-    const nestedEditor = activateNestedEditor(input);
+    const nestedEditor = await activateNestedEditor(input);
     if (nestedEditor) return setInputValue(nestedEditor, value);
+
+    if (!isEditableValueControl(input)) {
+      if (site === 'cotacao-web-smus') return tryGridCellTyping(input, value);
+      return false;
+    }
 
     input.focus?.();
 
@@ -755,6 +865,7 @@ async function fillQuotationPrices(prices, options = {}) {
         input.dispatchEvent(new Event('input', { bubbles: true }));
         writeNativeValue(input, candidate);
         dispatchInputEvents(input, candidate);
+        await waitForGridRender(20);
         if (hasPrice(getControlValue(input))) return true;
       } catch {}
     }
@@ -767,6 +878,7 @@ async function fillQuotationPrices(prices, options = {}) {
       if (typeof input.select === 'function') input.select();
       document.execCommand?.('insertText', false, fallback);
       dispatchInputEvents(input, fallback);
+      await waitForGridRender(20);
     } catch {}
 
     return hasPrice(getControlValue(input));
@@ -783,7 +895,7 @@ async function fillQuotationPrices(prices, options = {}) {
     }
 
     let scannedRows = 0;
-    await scanCotacaoWebSmusRows((row, idx, signature) => {
+    await scanCotacaoWebSmusRows(async (row, idx, signature) => {
       scannedRows = Math.max(scannedRows, idx + 1);
       const item = pendingByIdx.get(idx) || pendingBySignature.get(signature);
       if (!item) return pendingByIdx.size === 0 && pendingBySignature.size === 0;
@@ -798,16 +910,19 @@ async function fillQuotationPrices(prices, options = {}) {
       }
 
       const before = getControlValue(input);
-      const ok = setInputValue(input, item.price);
-      if (ok) count++;
+      const ok = await setInputValue(input, item.price);
+      await waitForGridRender(40);
+      const persisted = ok && cotacaoWebSmusRowShowsPrice(row, item.price);
+      if (persisted) count++;
       else {
         failed.push(item.idx);
         details.push({
           idx: item.idx,
-          reason: 'value_rejected',
+          reason: ok ? 'value_not_persisted' : 'value_rejected',
           inputType: input.getAttribute('type') || '',
           before,
           after: getControlValue(input),
+          cellAfter: normalizeCellText(getCotacaoWebSmusPriceCell(row)?.textContent || ''),
           attempted: String(item.price ?? ''),
         });
       }
@@ -848,7 +963,7 @@ async function fillQuotationPrices(prices, options = {}) {
     }
 
     const before = getControlValue(input);
-    const ok = setInputValue(input, item.price);
+    const ok = await setInputValue(input, item.price);
     if (ok) count++;
     else {
       failed.push(item.idx);
