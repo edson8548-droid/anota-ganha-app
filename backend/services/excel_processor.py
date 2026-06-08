@@ -192,40 +192,6 @@ def _melhor_coluna_preco(colunas, prazo=None):
     return melhor_col if melhor_score >= 55 else None
 
 
-def _cabecalho_preco_generico(valor) -> bool:
-    return _normalizar_cabecalho(valor) in {"PRECO", "PRE O", "VALOR", "R", "RS"}
-
-
-def _parece_matriz_fornecedores(colunas, col_nome, col_preco) -> bool:
-    """
-    Detecta modelos onde as colunas apos PRODUTOS sao fornecedores da cotacao.
-
-    Nesses layouts um cabeçalho generico "preco" aparece dentro da grade de
-    fornecedores, mas nao deve ser usado como coluna-alvo do Venpro.
-    """
-    if col_nome is None or col_preco is None:
-        return False
-    if col_preco >= len(colunas) or not _cabecalho_preco_generico(colunas[col_preco]):
-        return False
-
-    labels_fornecedores = 0
-    ignorados = {"PRECO", "PRE O", "VALOR", "R", "RS", "DATA"}
-    for col in colunas[col_nome + 1:]:
-        c_norm = _normalizar_cabecalho(col)
-        if not c_norm or c_norm in ignorados or c_norm.startswith("UNNAMED "):
-            continue
-        if _score_coluna_nome(col) >= 80 or _score_coluna_ean(col) >= 80:
-            continue
-        labels_fornecedores += 1
-
-    return labels_fornecedores >= 8
-
-
-def _parece_matriz_fornecedores_openpyxl(ws, header_row, col_nome, col_preco) -> bool:
-    colunas = [ws.cell(row=header_row, column=col_idx).value for col_idx in range(1, ws.max_column + 1)]
-    return _parece_matriz_fornecedores(colunas, col_nome, col_preco)
-
-
 def _xlsx_safe_bytes(caminho_arquivo):
     """
     Retorna BytesIO do xlsx com styles.xml corrigido.
@@ -472,8 +438,6 @@ def ler_cotacao(caminho_arquivo):
 
         if found_header:
             header_row = found_header
-        if _parece_matriz_fornecedores_openpyxl(ws, header_row, col_nome, col_preco):
-            col_preco = None
         if col_ean is None:
             col_ean = _inferir_coluna_ean_openpyxl(
                 ws,
@@ -520,8 +484,6 @@ def ler_cotacao(caminho_arquivo):
 
                 if col_nome is None:
                     continue
-                if _parece_matriz_fornecedores(df.columns, col_nome, col_preco):
-                    col_preco = None
                 if col_ean is None:
                     col_ean = _inferir_coluna_ean_dataframe(df, ignorar_cols={col_nome, col_preco})
 
