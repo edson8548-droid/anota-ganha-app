@@ -707,6 +707,82 @@ async function fillQuotationPrices(prices, options = {}) {
     return samePriceLike(cellValue, expectedValue);
   }
 
+  function waitForSmusBridgeResult(requestId, timeoutMs = 1000) {
+    return new Promise(resolve => {
+      const timer = setTimeout(() => {
+        document.removeEventListener('venpro-smus-fill-result', onResult);
+        resolve({ ok: false, reason: 'bridge_timeout' });
+      }, timeoutMs);
+
+      function onResult(event) {
+        let data = {};
+        try { data = JSON.parse(event.detail || '{}'); } catch {}
+        if (data.requestId !== requestId) return;
+        clearTimeout(timer);
+        document.removeEventListener('venpro-smus-fill-result', onResult);
+        resolve(data);
+      }
+
+      document.addEventListener('venpro-smus-fill-result', onResult);
+    });
+  }
+
+  let smusBridgeLoadPromise = null;
+
+  async function ensureSmusPageBridge() {
+    if (document.documentElement.getAttribute('data-venpro-smus-bridge') === 'ready') return true;
+    if (smusBridgeLoadPromise) return smusBridgeLoadPromise;
+
+    smusBridgeLoadPromise = new Promise(resolve => {
+      const script = document.createElement('script');
+      script.id = 'venpro-smus-page-bridge';
+      script.src = chrome.runtime.getURL('smus-page-bridge.js');
+      script.onload = () => resolve(true);
+      script.onerror = () => {
+        script.remove();
+        smusBridgeLoadPromise = null;
+        resolve(false);
+      };
+      (document.head || document.documentElement).appendChild(script);
+    });
+
+    return smusBridgeLoadPromise;
+  }
+
+  async function fillCotacaoWebSmusViaBridge(row, input, item) {
+    const bridgeReady = await ensureSmusPageBridge();
+    if (!bridgeReady) return { ok: false, reason: 'bridge_injection_failed' };
+
+    const rowToken = `r${Date.now()}${Math.random().toString(16).slice(2)}`;
+    const cellToken = `c${Date.now()}${Math.random().toString(16).slice(2)}`;
+    const priceCell = getCotacaoWebSmusPriceCell(row) || input;
+
+    row.setAttribute('data-venpro-smus-row', rowToken);
+    priceCell?.setAttribute?.('data-venpro-smus-cell', cellToken);
+
+    const requestId = `q${Date.now()}${Math.random().toString(16).slice(2)}`;
+    const resultPromise = waitForSmusBridgeResult(requestId, 1200);
+
+    document.dispatchEvent(new CustomEvent('venpro-smus-fill-request', {
+      detail: JSON.stringify({
+        requestId,
+        rowToken,
+        cellToken,
+        price: item.price,
+        ean: item.ean || '',
+        codigo: item.codigo || '',
+        nome: item.nome || '',
+        signature: item.signature || '',
+      }),
+    }));
+
+    const result = await resultPromise;
+    await waitForGridRender(120);
+    row.removeAttribute('data-venpro-smus-row');
+    priceCell?.removeAttribute?.('data-venpro-smus-cell');
+    return result;
+  }
+
   function dispatchInputEvents(input, value) {
     try {
       input.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText', data: value }));
@@ -912,17 +988,23 @@ async function fillQuotationPrices(prices, options = {}) {
       const before = getControlValue(input);
       const ok = await setInputValue(input, item.price);
       await waitForGridRender(40);
-      const persisted = ok && cotacaoWebSmusRowShowsPrice(row, item.price);
+      let persisted = ok && cotacaoWebSmusRowShowsPrice(row, item.price);
+      let bridgeResult = null;
+      if (!persisted) {
+        bridgeResult = await fillCotacaoWebSmusViaBridge(row, input, item);
+        persisted = Boolean(bridgeResult?.ok && cotacaoWebSmusRowShowsPrice(row, item.price));
+      }
       if (persisted) count++;
       else {
         failed.push(item.idx);
         details.push({
           idx: item.idx,
-          reason: ok ? 'value_not_persisted' : 'value_rejected',
+          reason: bridgeResult?.reason || (ok ? 'value_not_persisted' : 'value_rejected'),
           inputType: input.getAttribute('type') || '',
           before,
           after: getControlValue(input),
           cellAfter: normalizeCellText(getCotacaoWebSmusPriceCell(row)?.textContent || ''),
+          bridge: bridgeResult || null,
           attempted: String(item.price ?? ''),
         });
       }

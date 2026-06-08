@@ -141,6 +141,13 @@ function renderResults(state) {
     resultsEl.appendChild(naoEncontrados);
   }
 
+  if ((state.falhas || 0) > 0) {
+    const falhas = document.createElement('div');
+    falhas.className = 'warn';
+    falhas.textContent = `Com preço, mas não preenchidos: ${state.falhas}`;
+    resultsEl.appendChild(falhas);
+  }
+
   const total = document.createElement('div');
   total.style.marginTop = '4px';
   total.style.color = '#A0A3A8';
@@ -499,11 +506,12 @@ async function runJob(job, startBatch = 0, initial = {}) {
   const deferredPrices = Array.isArray(job.deferredPrices) ? [...job.deferredPrices] : [];
   let preenchidos = initial.preenchidos || 0;
   let naoEncontrados = initial.naoEncontrados || 0;
+  let falhasPreenchimento = initial.falhas || 0;
   let processados = initial.processados || 0;
 
   for (let b = startBatch; b < totalBatches; b++) {
     if (cancelRequested) {
-      await saveState({ status: 'paused', total: job.items.length, processados, preenchidos, naoEncontrados, pct: Math.round((b / totalBatches) * 100), batchIndex: b, ts: Date.now() });
+      await saveState({ status: 'paused', total: job.items.length, processados, preenchidos, naoEncontrados, falhas: falhasPreenchimento, pct: Math.round((b / totalBatches) * 100), batchIndex: b, ts: Date.now() });
       return;
     }
 
@@ -558,6 +566,7 @@ async function runJob(job, startBatch = 0, initial = {}) {
 
     preenchidos += filled || data.stats?.preenchidos || 0;
     naoEncontrados += data.stats?.nao_encontrados || 0;
+    if (!deferFillUntilEnd) falhasPreenchimento += failedCount;
     processados += data.stats?.total || batch.length;
 
     await reportFill(token, {
@@ -579,7 +588,7 @@ async function runJob(job, startBatch = 0, initial = {}) {
     });
 
     const pct = Math.round(((b + 1) / totalBatches) * 100);
-    await saveState({ status: 'processing', total: job.items.length, processados, preenchidos, naoEncontrados, pct, batchIndex: b + 1, ts: Date.now() });
+    await saveState({ status: 'processing', total: job.items.length, processados, preenchidos, naoEncontrados, falhas: falhasPreenchimento, pct, batchIndex: b + 1, ts: Date.now() });
   }
 
   if (deferFillUntilEnd && deferredPrices.length > 0) {
@@ -617,6 +626,7 @@ async function runJob(job, startBatch = 0, initial = {}) {
       throw new Error('Encontrei preços, mas não consegui preencher os campos da Cotação Web SMUS. Atualize a página e tente novamente.');
     }
     preenchidos = filled;
+    falhasPreenchimento = failedCount;
   }
 
   await reportFill(token, {
@@ -630,9 +640,10 @@ async function runJob(job, startBatch = 0, initial = {}) {
     total_itens: job.items.length,
     batch_total: job.items.length,
     preenchidos,
+    falhas: falhasPreenchimento,
     nao_encontrados: naoEncontrados,
   });
-  await saveState({ status: 'done', total: job.items.length, processados, preenchidos, naoEncontrados, pct: 100 });
+  await saveState({ status: 'done', total: job.items.length, processados, preenchidos, naoEncontrados, falhas: falhasPreenchimento, pct: 100 });
   await storageRemove('processingJob');
 }
 
@@ -672,7 +683,7 @@ async function startProcessing() {
     setStatus(`Processando ${items.length} itens...`, 'info');
     await runJob(job);
   } catch (err) {
-    await saveState({ status: 'error', msg: err.message || 'Erro ao preencher cotação', total: 0, processados: 0, preenchidos: 0, naoEncontrados: 0, pct: 0, ts: Date.now() });
+    await saveState({ status: 'error', msg: err.message || 'Erro ao preencher cotação', total: 0, processados: 0, preenchidos: 0, naoEncontrados: 0, falhas: 0, pct: 0, ts: Date.now() });
   }
 }
 
@@ -696,6 +707,7 @@ async function resumeProcessing() {
     await runJob(job, state.batchIndex || 0, {
       preenchidos: state.preenchidos || 0,
       naoEncontrados: state.naoEncontrados || 0,
+      falhas: state.falhas || 0,
       processados: state.processados || 0,
     });
   } catch (err) {
