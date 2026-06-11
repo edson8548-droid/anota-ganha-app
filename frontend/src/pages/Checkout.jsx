@@ -158,6 +158,12 @@ const Checkout = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 25000);
 
+      const healthResponse = await fetch(backendUrl('/health'), { method: 'GET', mode: 'cors' });
+      const health = await healthResponse.json().catch(() => ({}));
+      if (health?.build !== 'partner-coupon-v1') {
+        throw new Error('Pagamento em atualização. Aguarde o backend publicar a nova versão antes de assinar.');
+      }
+
       await saveBillingProfile({
         name: payerName,
         cpf: cleanCpfCnpj,
