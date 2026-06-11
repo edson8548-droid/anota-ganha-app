@@ -384,7 +384,7 @@ const Landing = () => {
           <div className="landing-price-value">
             <small>R$</small>
             <strong>139</strong>
-            <span>,90</span>
+            <span>,00</span>
           </div>
           <p className="landing-price-period">por mês, pagamento mensal</p>
           <ul className="landing-price-list">

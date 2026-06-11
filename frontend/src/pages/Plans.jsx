@@ -23,7 +23,7 @@ const Plans = () => {
   });
   const [checkoutCoupon, setCheckoutCoupon] = useState(() => normalizePartnerCode(couponCode));
   const [couponLoading, setCouponLoading] = useState(false);
-  const monthlyPlanPrice = 139.90;
+  const monthlyPlanPrice = 139.00;
   const activePartnerDiscount = useMemo(
     () => getPartnerCouponDiscount(monthlyPlanPrice, checkoutCoupon),
     [checkoutCoupon]
@@ -136,7 +136,7 @@ const Plans = () => {
             <div style={{ fontSize: 14, color: '#A0A3A8', marginTop: 4 }}>pagamento mensal via Asaas</div>
             <div style={{ margin: '14px auto 0', padding: '9px 12px', border: '1px solid rgba(58,133,168,.45)', borderRadius: 10, color: '#DDEFF7', background: 'rgba(58,133,168,.14)', fontSize: 13, fontWeight: 700 }}>
               {activePartnerDiscount
-                ? `Cupom ${activePartnerDiscount.code} aplicado: de R$ 139,90 por R$ 120,00.`
+                ? `Cupom ${activePartnerDiscount.code} aplicado: de R$ 139,00 por R$ 120,00.`
                 : 'Use um cupom de parceiro para liberar o valor combinado.'}
             </div>
           </div>

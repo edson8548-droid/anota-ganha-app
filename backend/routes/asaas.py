@@ -31,7 +31,7 @@ ASAAS_DISABLE_CUSTOMER_NOTIFICATIONS = (
 ASAAS_PLANS = {
     "monthly": {
         "id": "monthly",
-        "price": 139.90,
+        "price": 139.00,
         "cycle": "MONTHLY",
         "description": "Assinatura mensal Venpro",
     },
