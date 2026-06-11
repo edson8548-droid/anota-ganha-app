@@ -88,6 +88,27 @@
   margin: 0;
 }
 
+.register-referral-note {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(46, 204, 138, .28);
+  border-radius: 10px;
+  background: rgba(46, 204, 138, .08);
+  color: #B7F2D8;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.register-referral-note strong {
+  color: #ffffff;
+}
+
+.register-referral-note span {
+  display: block;
+  color: #A0A3A8;
+  margin-top: 2px;
+}
+
 .register-form {
   display: flex;
   flex-direction: column;

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { sendWelcomeEmail } from '../services/api';
 import { isValidCPF, onlyDigits } from '../utils/documentValidators';
+import { CARLOS_PARTNER_CODE, normalizePartnerCode } from '../utils/partnerProgram';
 import './Register.css';
 
 // ⭐️ INÍCIO: Funções de Máscara (para formatar os campos) ⭐️
@@ -61,6 +62,7 @@ const Register = () => {
   const [touched, setTouched] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [referralCode, setReferralCode] = useState('');
 
   const touch = (field) => setTouched(t => ({ ...t, [field]: true }));
 
@@ -84,6 +86,31 @@ const Register = () => {
   
   const { register } = useAuthContext();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const fromUrl = normalizePartnerCode(params.get('ref'));
+    if (fromUrl) {
+      setReferralCode(fromUrl);
+      try {
+        localStorage.setItem('venpro:referral-code', fromUrl);
+        if (fromUrl === CARLOS_PARTNER_CODE) {
+          localStorage.setItem('venpro:checkout-coupon', fromUrl);
+        }
+      } catch {
+        // Ignore storage restrictions.
+      }
+      return;
+    }
+
+    try {
+      const stored = normalizePartnerCode(localStorage.getItem('venpro:referral-code'));
+      if (stored) setReferralCode(stored);
+    } catch {
+      // Ignore storage restrictions.
+    }
+  }, [location.search]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -125,7 +152,8 @@ const Register = () => {
       const additionalData = {
         name: name,
         cpf: cpfDigits,
-        telefone: telDigits
+        telefone: telDigits,
+        ...(referralCode ? { referralCode } : {})
       };
       
       // ⭐️ A chamada 'register' agora envia os dados adicionais
@@ -176,6 +204,12 @@ const Register = () => {
           </div>
           <h1>Crie sua conta grátis</h1>
           <p>15 dias grátis, sem cartão de crédito</p>
+          {referralCode && (
+            <div className="register-referral-note">
+              Cadastro com codigo de parceiro: <strong>{referralCode}</strong>
+              {referralCode === CARLOS_PARTNER_CODE ? <span>Parceiro Carlos Vinicios</span> : null}
+            </div>
+          )}
         </div>
         
         <form onSubmit={handleSubmit} className="register-form">

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, FileSpreadsheet, Send, ClipboardList, Puzzle, BarChart3, MessageCircle } from 'lucide-react';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import api from '../services/api';
+import { CARLOS_PARTNER_CODE, getPartnerCouponDiscount, normalizePartnerCode } from '../utils/partnerProgram';
 import './Plans.css';
 
 const Plans = () => {
@@ -13,8 +14,20 @@ const Plans = () => {
   const authData = useAuthContext();
 
   const [loading, setLoading] = useState(false);
-  const [couponCode, setCouponCode] = useState('');
+  const [couponCode, setCouponCode] = useState(() => {
+    try {
+      return normalizePartnerCode(localStorage.getItem('venpro:checkout-coupon'));
+    } catch {
+      return '';
+    }
+  });
+  const [checkoutCoupon, setCheckoutCoupon] = useState(() => normalizePartnerCode(couponCode));
   const [couponLoading, setCouponLoading] = useState(false);
+  const monthlyPlanPrice = 139.90;
+  const activePartnerDiscount = useMemo(
+    () => getPartnerCouponDiscount(monthlyPlanPrice, checkoutCoupon),
+    [checkoutCoupon]
+  );
 
   const getTrialDaysLeft = () => {
     if (!isTrialActive || !trialEndsAt) return 0;
@@ -23,6 +36,18 @@ const Plans = () => {
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
+    const normalized = normalizePartnerCode(couponCode);
+    if (normalized === CARLOS_PARTNER_CODE) {
+      setCheckoutCoupon(normalized);
+      try {
+        localStorage.setItem('venpro:checkout-coupon', normalized);
+      } catch {
+        // Ignore storage restrictions.
+      }
+      toast.success('Cupom de parceiro aplicado para a assinatura.');
+      return;
+    }
+
     setCouponLoading(true);
     try {
       const res = await api.post('/license/apply-coupon', { coupon_code: couponCode.trim() });
@@ -38,7 +63,7 @@ const Plans = () => {
 
   const handleAssinar = () => {
     setLoading(true);
-    navigate('/checkout', { state: { planId: 'monthly' } });
+    navigate('/checkout', { state: { planId: 'monthly', couponCode: checkoutCoupon || undefined } });
   };
 
   const features = [
@@ -97,16 +122,22 @@ const Plans = () => {
               Preço de lançamento por tempo limitado
             </div>
             <div style={{ fontSize: 15, color: '#A0A3A8', marginBottom: 6 }}>
-              Plano normal <span style={{ textDecoration: 'line-through', color: '#8C9098' }}>R$ 139,90</span> por
+              Plano mensal
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 4 }}>
               <span style={{ fontSize: 18, fontWeight: 700, color: '#A0A3A8', alignSelf: 'flex-start', marginTop: 8 }}>R$</span>
-              <span style={{ fontSize: 64, fontWeight: 800, color: '#ffffff', lineHeight: 1 }}>69</span>
-              <span style={{ fontSize: 28, fontWeight: 700, color: '#ffffff', alignSelf: 'flex-end', marginBottom: 6 }}>,90</span>
+              <span style={{ fontSize: 64, fontWeight: 800, color: '#ffffff', lineHeight: 1 }}>
+                {Math.floor(activePartnerDiscount?.finalPrice || monthlyPlanPrice)}
+              </span>
+              <span style={{ fontSize: 28, fontWeight: 700, color: '#ffffff', alignSelf: 'flex-end', marginBottom: 6 }}>
+                ,{String(Math.round(((activePartnerDiscount?.finalPrice || monthlyPlanPrice) % 1) * 100)).padStart(2, '0')}
+              </span>
             </div>
             <div style={{ fontSize: 14, color: '#A0A3A8', marginTop: 4 }}>pagamento mensal via Asaas</div>
             <div style={{ margin: '14px auto 0', padding: '9px 12px', border: '1px solid rgba(58,133,168,.45)', borderRadius: 10, color: '#DDEFF7', background: 'rgba(58,133,168,.14)', fontSize: 13, fontWeight: 700 }}>
-              Garanta o valor de lançamento enquanto a oferta estiver ativa.
+              {activePartnerDiscount
+                ? `Cupom ${activePartnerDiscount.code} aplicado: de R$ 139,90 por R$ 120,00.`
+                : 'Use um cupom de parceiro para liberar o valor combinado.'}
             </div>
           </div>
 
@@ -140,7 +171,7 @@ const Plans = () => {
         <span style={{ color: '#A0A3A8', fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap' }}>Tem um cupom?</span>
         <input
           value={couponCode}
-          onChange={e => setCouponCode(e.target.value.toUpperCase())}
+          onChange={e => setCouponCode(e.target.value)}
           placeholder="Digite o código"
           onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
           style={couponInput}

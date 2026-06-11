@@ -8,6 +8,7 @@ import { saveBillingProfile } from '../services/api';
 import { auth, db } from '../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 import { isValidCpfCnpj } from '../utils/documentValidators';
+import { getPartnerCouponDiscount, normalizePartnerCode } from '../utils/partnerProgram';
 import './Checkout.css';
 
 const onlyDigits = (value) => String(value || '').replace(/\D/g, '');
@@ -55,6 +56,7 @@ const Checkout = () => {
   const [loading, setLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
   const [payerData, setPayerData] = useState({ name: '', cpf: '', telefone: '' });
+  const [couponCode, setCouponCode] = useState('');
 
   // Carregar plano selecionado (Mantido)
   useEffect(() => {
@@ -80,6 +82,20 @@ const Checkout = () => {
       try {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         const data = userDoc.exists() ? userDoc.data() : {};
+        const storedCoupon = (() => {
+          try {
+            return normalizePartnerCode(localStorage.getItem('venpro:checkout-coupon'));
+          } catch {
+            return '';
+          }
+        })();
+        const profileCoupon = normalizePartnerCode(
+          location.state?.couponCode
+          || storedCoupon
+          || data.referredByCode
+          || data.referralCode
+        );
+        if (profileCoupon) setCouponCode(profileCoupon);
         setPayerData({
           name: data.name || data.displayName || data.nome || user.displayName || user.email || '',
           cpf: formatCpfCnpj(data.cpfCnpj || data.cpf || data.cnpj || ''),
@@ -93,7 +109,13 @@ const Checkout = () => {
     };
 
     loadProfile();
-  }, [user]);
+  }, [user, location.state?.couponCode]);
+
+  const normalizedCouponCode = normalizePartnerCode(couponCode);
+  const partnerDiscount = selectedPlan
+    ? getPartnerCouponDiscount(selectedPlan.price, normalizedCouponCode)
+    : null;
+  const finalPrice = partnerDiscount?.finalPrice || selectedPlan?.price || 0;
   
 
   // ============================================
@@ -151,7 +173,8 @@ const Checkout = () => {
         },
         signal: controller.signal,
         body: JSON.stringify({
-          planId: selectedPlan.id
+          planId: selectedPlan.id,
+          ...(normalizedCouponCode ? { couponCode: normalizedCouponCode } : {})
         })
       });
       clearTimeout(timeoutId);
@@ -211,11 +234,18 @@ const Checkout = () => {
             <h2>Resumo do Pedido</h2>
             <p className="plan-summary-name">{selectedPlan.name}</p>
             <div className="plan-summary-price-block">
-              <div className="price-total-checkout" style={{ textDecoration: 'line-through', opacity: .7 }}>
-                Plano normal R$ 139,90/mês
-              </div>
+              {partnerDiscount ? (
+                <>
+                  <div className="price-total-checkout" style={{ textDecoration: 'line-through', opacity: .7 }}>
+                    Plano normal R$ {formatMoney(selectedPlan.price)}/mês
+                  </div>
+                  <div className="checkout-discount-line">
+                    Cupom {partnerDiscount.code}: -R$ {formatMoney(partnerDiscount.discountAmount)}
+                  </div>
+                </>
+              ) : null}
               <div className="price-main-checkout">
-                R$ {formatMoney(selectedPlan.price)}
+                R$ {formatMoney(finalPrice)}
                 <span className="price-period-checkout">/mês</span>
               </div>
               <div className="trial-info-checkout" style={{ marginTop: 12 }}>
@@ -277,6 +307,22 @@ const Checkout = () => {
                 />
               </label>
               <p>Esses dados são usados apenas para gerar a cobrança segura no Asaas.</p>
+            </div>
+            <div className="payer-form checkout-coupon-form">
+              <label>
+                <span>Cupom de parceiro</span>
+                <input
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value)}
+                  placeholder="Ex: carlos14off"
+                  disabled={loading}
+                />
+              </label>
+              {partnerDiscount ? (
+                <p>Cupom aplicado. A cobrança no Asaas será de R$ {formatMoney(partnerDiscount.finalPrice)} por mês.</p>
+              ) : (
+                <p>Se entrou por indicação, o cupom pode aparecer preenchido automaticamente.</p>
+              )}
             </div>
             <div className="payment-methods">
               <label className="payment-method-option selected">

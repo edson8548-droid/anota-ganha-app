@@ -616,12 +616,12 @@ async def excluir_tabela(
 async def processar_cotacao(
     arquivo: UploadFile = File(...),
     tabela_id: str = Form(...),
-    modo: str = Form("completo"),
+    modo: str = Form("ean"),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     uid = await get_user_id(credentials)
     oid = _object_id_or_400(tabela_id)
-    modo = str(modo or "completo").strip().lower()
+    modo = str(modo or "ean").strip().lower()
 
     job_ativo = await _preview_ativo_do_usuario(uid)
     if job_ativo:
@@ -694,7 +694,7 @@ async def processar_cotacao(
 async def preview_cotacao(
     arquivo: UploadFile = File(...),
     tabela_id: str = Form(...),
-    modo: str = Form("completo"),
+    modo: str = Form("ean"),
     prazo: int = Form(0),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
@@ -707,7 +707,7 @@ async def preview_cotacao(
 
     uid = await get_user_id(credentials)
     oid = _object_id_or_400(tabela_id)
-    modo = str(modo or "completo").strip().lower()
+    modo = str(modo or "ean").strip().lower()
 
     job_ativo = await _preview_ativo_do_usuario(uid)
     if job_ativo:
@@ -803,7 +803,7 @@ async def _criar_preview_job(
 ):
     """Cria um job de preview já com usuário autenticado."""
     oid = _object_id_or_400(tabela_id)
-    modo = str(modo or "completo").strip().lower()
+    modo = str(modo or "ean").strip().lower()
 
     doc = await db.tabelas_mestre.find_one({"_id": oid, "user_id": uid})
     if not doc:
@@ -861,7 +861,7 @@ async def _criar_preview_job(
 async def preview_cotacao_async(
     arquivo: UploadFile = File(...),
     tabela_id: str = Form(...),
-    modo: str = Form("completo"),
+    modo: str = Form("ean"),
     prazo: int = Form(0),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
@@ -874,7 +874,7 @@ async def preview_cotacao_async(
 async def preview_cotacao_async_simple(
     arquivo: UploadFile = File(...),
     tabela_id: str = Form(...),
-    modo: str = Form("completo"),
+    modo: str = Form("ean"),
     prazo: int = Form(0),
     auth_token: str = Form(...),
 ):
@@ -936,7 +936,7 @@ async def _processar_preview_job(job_id):
         tmp_cotacao.close()
 
         prazo_efetivo = job.get("prazo") if job.get("prazo", 0) > 0 else doc.get("prazo", 28)
-        modo = str(job.get("modo", "completo") or "completo").strip().lower()
+        modo = str(job.get("modo", "ean") or "ean").strip().lower()
 
         def _processar_sync():
             pd, pl = ler_tabela_mestre(tmp_mestre.name, prazo=prazo_efetivo)
@@ -1533,7 +1533,7 @@ class CotatudoItem(BaseModel):
 class CotatudoPayload(BaseModel):
     tabela_id: str
     prazo: int = 28
-    modo: str = "completo"
+    modo: str = "ean"
     itens: List[CotatudoItem]
     job_id: str | None = Field(default=None, max_length=80)
     batch_index: int | None = Field(default=None, ge=0, le=10000)
@@ -1620,7 +1620,7 @@ async def match_cotatudo(
 
     uid = await get_user_id(credentials)
     oid = _object_id_or_400(payload.tabela_id)
-    modo = str(payload.modo or "completo").strip().lower()
+    modo = str(payload.modo or "ean").strip().lower()
 
     doc = await db.tabelas_mestre.find_one({"_id": oid, "user_id": uid})
     if not doc:

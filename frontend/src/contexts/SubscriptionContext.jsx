@@ -60,10 +60,10 @@ export const PLANS = {
     id: 'monthly',
     name: 'Venpro',
     displayName: 'Venpro',
-    price: 69.90,
+    price: 139.90,
     period: 'monthly',
     duration: 'por mês',
-    billingCycle: 'Pagamento mensal via Asaas. Renove quando vencer.',
+    billingCycle: 'Pagamento mensal via Asaas.',
     limits: {
       campaigns: 999999,
       clients: 999999,

@@ -90,7 +90,7 @@ def test_asaas_webhook_rejects_invalid_token(monkeypatch):
 
 
 def test_asaas_plan_prices_match_public_offer():
-    assert ASAAS_PLANS["monthly"]["price"] == 69.90
+    assert ASAAS_PLANS["monthly"]["price"] == 139.90
     assert ASAAS_PLANS["monthly"]["cycle"] == "MONTHLY"
     assert "annual_upfront" not in ASAAS_PLANS
     assert asaas_routes.ASAAS_PAYMENT_MODE == "subscription"
@@ -98,7 +98,7 @@ def test_asaas_plan_prices_match_public_offer():
 
 
 def test_asaas_finds_user_from_monthly_external_reference():
-    payment = {"externalReference": "usuario-com-hifen-monthly-69.90"}
+    payment = {"externalReference": "usuario-com-hifen-monthly-120.00-carlos14off"}
 
     assert _find_subscription_user_id(payment=payment) == "usuario-com-hifen"
 

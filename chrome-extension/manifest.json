@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Venpro — Preencher Cotação",
-  "version": "1.0.35",
+  "version": "1.0.39",
   "description": "Preenchedor de cotações do Venpro para Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS e novos portais compatíveis.",
   "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel"],
   "host_permissions": [
@@ -9,6 +9,9 @@
     "https://www.cotatudo.com.br/*",
     "https://venpro.com.br/*",
     "https://www.venpro.com.br/*",
+    "https://*.venpro.com.br/*",
+    "https://anota-ganha-app.web.app/*",
+    "https://anota-ganha-app.firebaseapp.com/*",
     "https://fornecedor.rpinfo.com.br/*",
     "https://rfd.net.br/*",
     "https://www.rfd.net.br/*",
@@ -85,7 +88,10 @@
     {
       "matches": [
         "https://venpro.com.br/*",
-        "https://www.venpro.com.br/*"
+        "https://www.venpro.com.br/*",
+        "https://*.venpro.com.br/*",
+        "https://anota-ganha-app.web.app/*",
+        "https://anota-ganha-app.firebaseapp.com/*"
       ],
       "js": ["venpro-content.js"],
       "run_at": "document_idle"

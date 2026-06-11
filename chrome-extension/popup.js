@@ -1,6 +1,7 @@
 const API_URL = 'https://api.venpro.com.br/api';
 const BATCH = 50;
 const STUCK_MS = 3 * 60 * 1000;
+const MAX_RESULT_DETAILS = 12;
 const BTN_LABEL = 'Preencher Cotação';
 const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação ou Cotação Web SMUS primeiro.';
 const SITE_LABELS = {
@@ -35,6 +36,8 @@ const btnParar     = document.getElementById('btnParar');
 let tabelasCache = [];
 let running = false;
 let cancelRequested = false;
+
+modoEl.value = 'ean';
 
 function setStatus(text, type = 'info') {
   statusEl.textContent = text;
@@ -125,6 +128,117 @@ function resetUI() {
   setStatus('Pronto.', 'ok');
 }
 
+function compactText(value, max = 88) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 3)}...`;
+}
+
+function makeItemDetail(item = {}, reason = '') {
+  return {
+    idx: Number.isInteger(Number(item.idx)) ? Number(item.idx) : null,
+    nome: compactText(item.nome || item.name || item.produto || 'Item sem nome'),
+    ean: item.ean || '',
+    codigo: item.codigo || '',
+    reason: reason || item.reason || '',
+    attempted: item.attempted || item.price || '',
+    cellAfter: compactText(item.cellAfter || '', 60),
+  };
+}
+
+function detailKey(detail) {
+  return [
+    detail.idx ?? '',
+    detail.ean || '',
+    detail.codigo || '',
+    detail.nome || '',
+    detail.reason || '',
+  ].join('|');
+}
+
+function mergeResultDetails(existing = [], additions = [], limit = 40) {
+  const merged = [];
+  const seen = new Set();
+  for (const detail of [...existing, ...additions]) {
+    if (!detail) continue;
+    const normalized = makeItemDetail(detail, detail.reason);
+    const key = detailKey(normalized);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(normalized);
+    if (merged.length >= limit) break;
+  }
+  return merged;
+}
+
+function missingDetailsForBatch(batch = [], precos = []) {
+  const pricedIdx = new Set((precos || []).map(preco => Number(preco.idx)));
+  return (batch || [])
+    .filter(item => !pricedIdx.has(Number(item.idx)))
+    .map(item => makeItemDetail(item, 'sem_preco_na_tabela'));
+}
+
+function failureDetailsFromFill(fillResult, prices = []) {
+  const details = Array.isArray(fillResult?.details) ? fillResult.details : [];
+  const failed = Array.isArray(fillResult?.failed) ? fillResult.failed : [];
+  const pricesByIdx = new Map((prices || []).map(item => [Number(item.idx), item]));
+
+  if (details.length) {
+    return details.map(detail => {
+      const item = pricesByIdx.get(Number(detail.idx)) || {};
+      return makeItemDetail({
+        ...item,
+        ...detail,
+        reason: detail.reason || detail.bridge?.reason || 'falha_preenchimento',
+      });
+    });
+  }
+
+  return failed.map(idx => makeItemDetail(pricesByIdx.get(Number(idx)) || { idx }, 'falha_preenchimento'));
+}
+
+function renderResultDetails(title, details) {
+  if (!Array.isArray(details) || details.length === 0) return;
+
+  const wrap = document.createElement('details');
+  wrap.className = 'result-details';
+
+  const summary = document.createElement('summary');
+  summary.textContent = `${title}: ${details.length} item(ns)`;
+  wrap.appendChild(summary);
+
+  const list = document.createElement('ul');
+  details.slice(0, MAX_RESULT_DETAILS).forEach(detail => {
+    const li = document.createElement('li');
+    const titleLine = document.createElement('div');
+    titleLine.textContent = detail.nome || 'Item sem nome';
+    li.appendChild(titleLine);
+
+    const meta = [];
+    if (detail.idx !== null && detail.idx !== undefined) meta.push(`linha ${detail.idx + 1}`);
+    if (detail.ean) meta.push(`EAN ${detail.ean}`);
+    if (detail.codigo) meta.push(`cód. ${detail.codigo}`);
+    if (detail.reason) meta.push(detail.reason);
+    if (detail.attempted) meta.push(`preço ${detail.attempted}`);
+    if (detail.cellAfter) meta.push(`célula: ${detail.cellAfter}`);
+    if (meta.length) {
+      const small = document.createElement('small');
+      small.textContent = meta.join(' · ');
+      li.appendChild(small);
+    }
+    list.appendChild(li);
+  });
+
+  if (details.length > MAX_RESULT_DETAILS) {
+    const li = document.createElement('li');
+    li.textContent = `+ ${details.length - MAX_RESULT_DETAILS} item(ns) ocultos`;
+    list.appendChild(li);
+  }
+
+  wrap.appendChild(list);
+  resultsEl.appendChild(wrap);
+}
+
 function renderResults(state) {
   resultsEl.style.display = 'block';
   resultsEl.replaceChildren();
@@ -153,6 +267,9 @@ function renderResults(state) {
   total.style.color = '#A0A3A8';
   total.textContent = `Total processado: ${state.processados || 0} itens`;
   resultsEl.appendChild(total);
+
+  renderResultDetails('Amostra dos não encontrados', state.naoEncontradosDetalhes);
+  renderResultDetails('Com preço, mas falharam', state.falhasDetalhes);
 }
 
 function applyState(state) {
@@ -395,7 +512,7 @@ async function loadTabelas() {
 
     const token = await getToken();
     if (!token) {
-      setStatus('Faça login no venpro.com.br e deixe uma aba do painel aberta.', 'err');
+      setStatus('Faça login no Venpro e deixe uma aba do painel aberta. Também reconheço o endereço antigo anota-ganha-app.web.app.', 'err');
       return;
     }
 
@@ -508,16 +625,25 @@ async function runJob(job, startBatch = 0, initial = {}) {
   let naoEncontrados = initial.naoEncontrados || 0;
   let falhasPreenchimento = initial.falhas || 0;
   let processados = initial.processados || 0;
+  let naoEncontradosDetalhes = Array.isArray(initial.naoEncontradosDetalhes)
+    ? [...initial.naoEncontradosDetalhes]
+    : Array.isArray(job.naoEncontradosDetalhes) ? [...job.naoEncontradosDetalhes] : [];
+  let falhasDetalhes = Array.isArray(initial.falhasDetalhes)
+    ? [...initial.falhasDetalhes]
+    : Array.isArray(job.falhasDetalhes) ? [...job.falhasDetalhes] : [];
 
   for (let b = startBatch; b < totalBatches; b++) {
     if (cancelRequested) {
-      await saveState({ status: 'paused', total: job.items.length, processados, preenchidos, naoEncontrados, falhas: falhasPreenchimento, pct: Math.round((b / totalBatches) * 100), batchIndex: b, ts: Date.now() });
+      await saveState({ status: 'paused', total: job.items.length, processados, preenchidos, naoEncontrados, falhas: falhasPreenchimento, naoEncontradosDetalhes, falhasDetalhes, pct: Math.round((b / totalBatches) * 100), batchIndex: b, ts: Date.now() });
       return;
     }
 
     const batch = job.items.slice(b * BATCH, (b + 1) * BATCH);
     const data = await matchBatch(token, job, batch, b + 1, totalBatches);
     const precos = Array.isArray(data.precos) ? data.precos : [];
+    const batchMissingDetails = missingDetailsForBatch(batch, precos);
+    naoEncontradosDetalhes = mergeResultDetails(naoEncontradosDetalhes, batchMissingDetails);
+    job.naoEncontradosDetalhes = naoEncontradosDetalhes;
 
     let filled = 0;
     let failedCount = 0;
@@ -536,6 +662,9 @@ async function runJob(job, startBatch = 0, initial = {}) {
         });
         filled = fillResult?.filled || 0;
         failedCount = Array.isArray(fillResult?.failed) ? fillResult.failed.length : 0;
+        const batchFailureDetails = failureDetailsFromFill(fillResult, pricesToFill);
+        falhasDetalhes = mergeResultDetails(falhasDetalhes, batchFailureDetails);
+        job.falhasDetalhes = falhasDetalhes;
         if (filled === 0) {
           await reportFill(token, {
             event_type: 'batch',
@@ -557,6 +686,8 @@ async function runJob(job, startBatch = 0, initial = {}) {
               site_detectado: fillResult?.site || job.site,
               linhas_detectadas: fillResult?.rowCount || null,
               detalhes: Array.isArray(fillResult?.details) ? fillResult.details.slice(0, 20) : [],
+              nao_encontrados_detalhes: batchMissingDetails.slice(0, 20),
+              falhas_detalhes: batchFailureDetails.slice(0, 20),
             },
           });
           throw new Error('Encontrei preços, mas não consegui preencher os campos da cotação. Atualize a página e tente novamente.');
@@ -585,10 +716,13 @@ async function runJob(job, startBatch = 0, initial = {}) {
       preenchidos: filled || data.stats?.preenchidos || 0,
       falhas: failedCount,
       nao_encontrados: data.stats?.nao_encontrados || 0,
+      debug: {
+        nao_encontrados_detalhes: batchMissingDetails.slice(0, 20),
+      },
     });
 
     const pct = Math.round(((b + 1) / totalBatches) * 100);
-    await saveState({ status: 'processing', total: job.items.length, processados, preenchidos, naoEncontrados, falhas: falhasPreenchimento, pct, batchIndex: b + 1, ts: Date.now() });
+    await saveState({ status: 'processing', total: job.items.length, processados, preenchidos, naoEncontrados, falhas: falhasPreenchimento, naoEncontradosDetalhes, falhasDetalhes, pct, batchIndex: b + 1, ts: Date.now() });
   }
 
   if (deferFillUntilEnd && deferredPrices.length > 0) {
@@ -600,6 +734,9 @@ async function runJob(job, startBatch = 0, initial = {}) {
     });
     const filled = fillResult?.filled || 0;
     const failedCount = Array.isArray(fillResult?.failed) ? fillResult.failed.length : 0;
+    const smusFailureDetails = failureDetailsFromFill(fillResult, deferredPrices);
+    falhasDetalhes = mergeResultDetails(falhasDetalhes, smusFailureDetails);
+    job.falhasDetalhes = falhasDetalhes;
 
     await reportFill(token, {
       event_type: 'job_fill',
@@ -619,6 +756,8 @@ async function runJob(job, startBatch = 0, initial = {}) {
         site_detectado: fillResult?.site || job.site,
         linhas_detectadas: fillResult?.rowCount || null,
         detalhes: Array.isArray(fillResult?.details) ? fillResult.details.slice(0, 30) : [],
+        nao_encontrados_detalhes: naoEncontradosDetalhes.slice(0, 30),
+        falhas_detalhes: smusFailureDetails.slice(0, 30),
       },
     });
 
@@ -642,8 +781,12 @@ async function runJob(job, startBatch = 0, initial = {}) {
     preenchidos,
     falhas: falhasPreenchimento,
     nao_encontrados: naoEncontrados,
+    debug: {
+      nao_encontrados_detalhes: naoEncontradosDetalhes.slice(0, 30),
+      falhas_detalhes: falhasDetalhes.slice(0, 30),
+    },
   });
-  await saveState({ status: 'done', total: job.items.length, processados, preenchidos, naoEncontrados, falhas: falhasPreenchimento, pct: 100 });
+  await saveState({ status: 'done', total: job.items.length, processados, preenchidos, naoEncontrados, falhas: falhasPreenchimento, naoEncontradosDetalhes, falhasDetalhes, pct: 100 });
   await storageRemove('processingJob');
 }
 
@@ -709,6 +852,8 @@ async function resumeProcessing() {
       naoEncontrados: state.naoEncontrados || 0,
       falhas: state.falhas || 0,
       processados: state.processados || 0,
+      naoEncontradosDetalhes: state.naoEncontradosDetalhes || [],
+      falhasDetalhes: state.falhasDetalhes || [],
     });
   } catch (err) {
     await saveState({ ...state, status: 'error', msg: err.message || 'Erro ao retomar processamento', ts: Date.now() });

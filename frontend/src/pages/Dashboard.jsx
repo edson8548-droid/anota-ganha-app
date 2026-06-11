@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileSpreadsheet, ClipboardList, BarChart3, Store, Plus, RotateCcw, Trash2, Copy, MessageCircle, Pencil, LifeBuoy, LogOut, CalendarDays, Bell, CheckCircle2, Clock, StickyNote, Printer } from 'lucide-react';
+import { ArrowLeft, FileSpreadsheet, ClipboardList, BarChart3, Store, Plus, RotateCcw, Trash2, Copy, MessageCircle, Pencil, LifeBuoy, LogOut, CalendarDays, Bell, CheckCircle2, Clock, StickyNote, Printer, Handshake } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useCampaigns } from '../hooks/useCampaigns';
 import { useClients } from '../hooks/useClients';
@@ -16,6 +16,7 @@ import { campaignsService } from '../services/campaigns.service';
 import { uploadAvatar } from '../services/api';
 import { getDailyMotivationMessage } from '../data/dailyMotivationMessages';
 import { backendUrl } from '../config/api';
+import { getPartnerConfig } from '../utils/partnerProgram';
 import './Dashboard.css';
 
 const INDUSTRY_META_FIELDS = ['targetValue', 'alreadySoldValue'];
@@ -1550,6 +1551,7 @@ const Dashboard = () => {
     const greeting = currentHour < 12 ? 'Bom dia' : currentHour < 18 ? 'Boa tarde' : 'Boa noite';
     const dailyMessage = getDailyMotivationMessage();
     const showAdvancedRcaBlocks = false;
+    const partnerConfig = getPartnerConfig(user);
     const toolsSection = (
       <section className="tools-section tools-section-priority">
         <div className="tools-section-title">Ferramentas principais</div>
@@ -1579,6 +1581,13 @@ const Dashboard = () => {
             <div className="tool-card-title">Vitrine Inteligente</div>
             <div className="tool-card-desc">Monte sua oferta com produtos e preços, gere um link exclusivo e envie para seus clientes. Eles escolhem as quantidades e mandam o pedido direto no seu WhatsApp — sem ligação, sem digitação.</div>
           </div>
+          {partnerConfig && (
+            <div className="tool-card" onClick={() => navigate('/parceiro')}>
+              <div className="tool-card-icon"><Handshake size={32} /></div>
+              <div className="tool-card-title">Programa Parceiro</div>
+              <div className="tool-card-desc">Copie seu codigo {partnerConfig.code}, envie o link de cadastro e acompanhe a regra inicial da parceria Venpro.</div>
+            </div>
+          )}
         </div>
       </section>
     );
@@ -1595,6 +1604,7 @@ const Dashboard = () => {
               </a>
             </div>
             <div className="header-actions">
+              {partnerConfig && <button className="btn-nav" onClick={() => navigate('/parceiro')}>Parceiro</button>}
               <button className="btn-nav" onClick={() => navigate('/plans')}>Planos</button>
               <button className="btn-nav" onClick={() => navigate('/minha-licenca')}>Licença</button>
               <button className="btn-nav" onClick={handleWhatsAppSupport}>Suporte</button>

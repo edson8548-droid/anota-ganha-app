@@ -108,6 +108,7 @@ export const useAuth = () => {
         name: additionalData.name,
         cpf,
         telefone,
+        ...(additionalData?.referralCode ? { referral_code: additionalData.referralCode } : {}),
       });
 
       const userCredential = await signInWithEmailAndPassword(auth, email, password);

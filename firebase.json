@@ -279,6 +279,42 @@
         ]
       },
       {
+        "source": "/venpro-cotatudo-extension-1.0.36.zip",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/venpro-cotatudo-extension-1.0.37.zip",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/venpro-cotatudo-extension-1.0.38.zip",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/venpro-cotatudo-extension-1.0.39.zip",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
         "source": "/venpro-whatsapp-extension.zip",
         "headers": [
           {

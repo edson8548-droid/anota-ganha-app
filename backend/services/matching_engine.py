@@ -2287,7 +2287,7 @@ def encontrar_preco(ean, nome_original, precos_dict, precos_nome_lista, norms_ca
         return None, None
 
 
-def processar_cotacao(itens_cotacao, precos_dict, precos_nome_lista, modo="completo"):
+def processar_cotacao(itens_cotacao, precos_dict, precos_nome_lista, modo="ean"):
     """
     Processa matching para uma lista de itens de cotacao.
 
@@ -2301,7 +2301,7 @@ def processar_cotacao(itens_cotacao, precos_dict, precos_nome_lista, modo="compl
         lista de {"linha": int, "preco": float|None, "tipo": str|None}
     """
     results = []
-    modo = str(modo or "completo").strip().lower()
+    modo = str(modo or "ean").strip().lower()
     norms_cache = [item['norm'] for item in precos_nome_lista]
 
     for item in itens_cotacao:
@@ -2320,7 +2320,7 @@ def processar_cotacao(itens_cotacao, precos_dict, precos_nome_lista, modo="compl
     return results
 
 
-def processar_cotacao_com_ia(itens_cotacao, precos_dict, precos_nome_lista, modo="completo"):
+def processar_cotacao_com_ia(itens_cotacao, precos_dict, precos_nome_lista, modo="ean"):
     """
     Compatibilidade com chamadas antigas: executa somente o matching por codigo.
     A camada Gemini foi desativada para evitar custo de IA no processamento.

@@ -31,6 +31,9 @@ describe('extensoes Chrome', () => {
       ...manifest.content_scripts.flatMap(script => script.js || []),
     ]);
     assert.ok(manifest.host_permissions.includes('https://api.venpro.com.br/*'));
+    assert.ok(manifest.host_permissions.includes('https://*.venpro.com.br/*'));
+    assert.ok(manifest.host_permissions.includes('https://anota-ganha-app.web.app/*'));
+    assert.ok(manifest.host_permissions.includes('https://anota-ganha-app.firebaseapp.com/*'));
     assert.match(manifest.description, /Preenchedor de cotações/);
     assert.match(manifest.description, /VR Cotação/);
     assert.match(manifest.description, /RP HUB/);
@@ -72,6 +75,10 @@ describe('extensoes Chrome', () => {
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('https://*/fornecedores/*/cotacao/*')),
       'manifest precisa carregar content script em rotas genericas de cotacao'
+    );
+    assert.ok(
+      manifest.content_scripts.some(script => (script.matches || []).includes('https://anota-ganha-app.web.app/*')),
+      'manifest precisa carregar venpro-content no endereco antigo do Firebase'
     );
   });
 
@@ -115,6 +122,10 @@ describe('extensoes Chrome', () => {
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.33.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.34.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.35.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.36.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.37.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.38.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.39.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-whatsapp-extension.zip')));
   });
 });

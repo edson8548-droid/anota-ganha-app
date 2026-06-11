@@ -6,8 +6,9 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { auth } from '../firebase/config';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { apiUrl } from '../config/api';
+import { CARLOS_PARTNER_CODE, normalizePartnerCode } from '../utils/partnerProgram';
 
-const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.35.zip';
+const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.39.zip';
 
 const MinhaLicenca = () => {
   const navigate = useNavigate();
@@ -33,6 +34,18 @@ const MinhaLicenca = () => {
 
   const aplicarCupom = async () => {
     if (!cupomCodigo.trim()) return;
+    const normalized = normalizePartnerCode(cupomCodigo);
+    if (normalized === CARLOS_PARTNER_CODE) {
+      try {
+        localStorage.setItem('venpro:checkout-coupon', normalized);
+      } catch {
+        // Ignore storage restrictions.
+      }
+      setCupomMsg({ tipo: 'ok', texto: 'Cupom de parceiro salvo. Continue para a assinatura com desconto.' });
+      navigate('/checkout', { state: { planId: 'monthly', couponCode: normalized } });
+      return;
+    }
+
     setCupomLoading(true);
     setCupomMsg(null);
     try {

@@ -2,6 +2,13 @@
 
 const API_URL = 'https://api.venpro.com.br/api';
 const BATCH   = 50;
+const VENPRO_APP_URL_PATTERNS = [
+  'https://venpro.com.br/*',
+  'https://www.venpro.com.br/*',
+  'https://*.venpro.com.br/*',
+  'https://anota-ganha-app.web.app/*',
+  'https://anota-ganha-app.firebaseapp.com/*',
+];
 
 chrome.action.onClicked.addListener((tab) => {
   chrome.sidePanel.open({ tabId: tab.id });
@@ -131,12 +138,7 @@ function getStoredToken() {
 }
 
 async function requestTokenFromOpenVenproTab() {
-  const tabs = await chrome.tabs.query({
-    url: [
-      'https://venpro.com.br/*',
-      'https://www.venpro.com.br/*',
-    ],
-  });
+  const tabs = await getOpenVenproTabs();
 
   for (const tab of tabs) {
     const token = await requestTokenFromTab(tab.id);
@@ -144,6 +146,30 @@ async function requestTokenFromOpenVenproTab() {
   }
 
   return null;
+}
+
+async function getOpenVenproTabs() {
+  const byPattern = await chrome.tabs.query({ url: VENPRO_APP_URL_PATTERNS });
+  const candidates = byPattern.filter(tab => tab?.id && isVenproAppUrl(tab.url || ''));
+  if (candidates.length) return candidates;
+
+  const allTabs = await chrome.tabs.query({});
+  return allTabs.filter(tab => tab?.id && isVenproAppUrl(tab.url || ''));
+}
+
+function isVenproAppUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    if (host === 'api.venpro.com.br') return false;
+    return host === 'venpro.com.br'
+      || host.endsWith('.venpro.com.br')
+      || host === 'anota-ganha-app.web.app'
+      || host === 'anota-ganha-app.firebaseapp.com';
+  } catch {
+    return /^https:\/\/(?!(api)\.)([^/]+\.)?venpro\.com\.br(?:\/|$)/i.test(url)
+      || /^https:\/\/anota-ganha-app\.(web\.app|firebaseapp\.com)(?:\/|$)/i.test(url);
+  }
 }
 
 async function requestTokenFromTab(tabId) {

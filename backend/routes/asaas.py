@@ -31,15 +31,24 @@ ASAAS_DISABLE_CUSTOMER_NOTIFICATIONS = (
 ASAAS_PLANS = {
     "monthly": {
         "id": "monthly",
-        "price": 69.90,
+        "price": 139.90,
         "cycle": "MONTHLY",
-        "description": "Assinatura mensal Venpro - preco de lancamento",
+        "description": "Assinatura mensal Venpro",
     },
+}
+PARTNER_COUPONS = {
+    "carlos14off": {
+        "partnerName": "Carlos Vinicios",
+        "finalPrice": 120.00,
+        "discountLabel": "14% OFF",
+        "commissionMonthly": 40.00,
+    }
 }
 
 
 class CreateSubscriptionRequest(BaseModel):
     planId: str = DEFAULT_ASAAS_PLAN_ID
+    couponCode: str | None = None
 
 
 def _fs():
@@ -121,7 +130,48 @@ def _asaas_plan(plan_id: str) -> dict:
     plan = ASAAS_PLANS.get(plan_id)
     if not plan:
         raise HTTPException(status_code=400, detail="Plano inválido")
-    return plan
+    return dict(plan)
+
+
+def _normalize_coupon_code(value: str | None) -> str:
+    return re.sub(r"[^a-z0-9_-]", "", str(value or "").strip().lower())[:40]
+
+
+def _coupon_candidate(payload_code: str | None, user_data: dict) -> str:
+    return _normalize_coupon_code(
+        payload_code
+        or user_data.get("referredByCode")
+        or user_data.get("referralCode")
+        or user_data.get("referredByPartnerCode")
+    )
+
+
+def _apply_subscription_coupon(plan: dict, code: str) -> tuple[dict, dict | None]:
+    normalized = _normalize_coupon_code(code)
+    config = PARTNER_COUPONS.get(normalized)
+    if not config or plan.get("id") != "monthly":
+        return plan, None
+
+    original_price = float(plan["price"])
+    final_price = min(original_price, float(config["finalPrice"]))
+    if final_price >= original_price:
+        return plan, None
+
+    discounted_plan = {
+        **plan,
+        "price": round(final_price, 2),
+        "description": f"{plan['description']} - cupom {normalized}",
+    }
+    coupon_data = {
+        "couponCode": normalized,
+        "couponType": "partner_subscription_discount",
+        "partnerName": config["partnerName"],
+        "originalAmount": round(original_price, 2),
+        "discountAmount": round(original_price - final_price, 2),
+        "discountLabel": config["discountLabel"],
+        "partnerCommissionMonthly": config["commissionMonthly"],
+    }
+    return discounted_plan, coupon_data
 
 
 def _period_end_for_plan(plan_id: str) -> datetime:
@@ -380,8 +430,12 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
     user_data = user_doc.to_dict() or {}
+    requested_coupon = _coupon_candidate(payload.couponCode, user_data)
+    plan, coupon_data = _apply_subscription_coupon(plan, requested_coupon)
     customer_id = _find_or_create_customer(uid, user_data)
     external_reference = f"{uid}-{plan['id']}-{plan['price']:.2f}"
+    if coupon_data:
+        external_reference = f"{external_reference}-{coupon_data['couponCode']}"
 
     use_subscription_mode = ASAAS_PAYMENT_MODE == "subscription"
     subscription_id = None
@@ -446,6 +500,7 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
             "asaasSubscriptionId": subscription_id,
             "asaasPaymentId": first_payment.get("id"),
             "externalReference": external_reference,
+            "baseAmount": coupon_data["originalAmount"] if coupon_data else plan["price"],
             "amount": plan["price"],
             "currency": "BRL",
             "paymentMethod": "UNDEFINED",
@@ -453,6 +508,7 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
             "paymentUrl": payment_url,
             "updatedAt": datetime.now(timezone.utc),
             "trialEndsAt": None,
+            **(coupon_data or {}),
         },
         merge=True,
     )
@@ -460,10 +516,16 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
         "subscription_created",
         uid=uid,
         status="pending",
-        metadata={"provider": "asaas", "planId": plan["id"], "amount": plan["price"], "billingMode": billing_mode},
+        metadata={
+            "provider": "asaas",
+            "planId": plan["id"],
+            "amount": plan["price"],
+            "billingMode": billing_mode,
+            "couponCode": coupon_data.get("couponCode") if coupon_data else None,
+        },
     )
 
-    return {
+    response = {
         "provider": "asaas",
         "subscriptionId": subscription_id,
         "paymentId": first_payment.get("id"),
@@ -472,6 +534,14 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
         "paymentUrl": payment_url,
         "invoiceUrl": payment_url,
     }
+    if coupon_data:
+        response["coupon"] = {
+            "code": coupon_data["couponCode"],
+            "originalAmount": coupon_data["originalAmount"],
+            "discountAmount": coupon_data["discountAmount"],
+            "amount": plan["price"],
+        }
+    return response
 
 
 @router.post("/cancel-subscription")
@@ -576,7 +646,7 @@ async def asaas_webhook(
                 "asaasSubscriptionId": payment.get("subscription") or subscription.get("id"),
                 "lastPaymentDate": datetime.now(timezone.utc),
                 "currentPeriodEnd": _period_end_for_plan(plan_id),
-                "amount": ASAAS_PLANS.get(plan_id, ASAAS_PLANS[DEFAULT_ASAAS_PLAN_ID])["price"],
+                "amount": payment.get("value") or existing_data.get("amount") or ASAAS_PLANS.get(plan_id, ASAAS_PLANS[DEFAULT_ASAAS_PLAN_ID])["price"],
                 "nextDueDate": payment.get("dueDate"),
                 "trialEndsAt": None,
             }

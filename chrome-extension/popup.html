@@ -101,6 +101,41 @@
     .results .ok { color: #2ECC8A; }
     .results .warn { color: #E8A830; }
     .results .err { color: #ff6b7a; }
+    .result-details {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid #4A4D52;
+      color: #A0A3A8;
+    }
+    .result-details summary {
+      cursor: pointer;
+      color: #E8A830;
+      font-weight: 700;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .result-details ul {
+      list-style: none;
+      margin-top: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .result-details li {
+      background: #2B2D31;
+      border: 1px solid #4A4D52;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 11px;
+      line-height: 1.35;
+      color: #D5DBE3;
+      word-break: break-word;
+    }
+    .result-details small {
+      display: block;
+      color: #6B6E74;
+      margin-top: 2px;
+    }
   </style>
 </head>
 <body>
@@ -128,8 +163,8 @@
 
   <label>Modo de preenchimento</label>
   <select id="modo">
+    <option value="ean" selected>EAN 100% certeza</option>
     <option value="completo">Completo (EAN + descrição + IA)</option>
-    <option value="ean">EAN apenas (100% certeza)</option>
   </select>
 
   <label>Atacado/coluna de preço</label>

@@ -7,7 +7,7 @@ import { listarTabelas, uploadTabela, excluirTabela, processarCotacao, previewCo
 import ReviewMatches from './ReviewMatches';
 import ConfirmDialog from '../components/ConfirmDialog';
 
-const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.35.zip';
+const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.39.zip';
 
 export default function Cotacao() {
   const navigate = useNavigate();
@@ -29,7 +29,7 @@ export default function Cotacao() {
 
   // Cotação state
   const [tabelaSelecionada, setTabelaSelecionada] = useState('');
-  const [modoMatch, setModoMatch] = useState('completo');
+  const [modoMatch, setModoMatch] = useState('ean');
   const [canalPreenchimento, setCanalPreenchimento] = useState('excel');
   const [arquivoCotacao, setArquivoCotacao] = useState(null);
 
@@ -493,7 +493,7 @@ function CotacaoTab({
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#E1E1E1', cursor: 'pointer', fontSize: 14 }}>
               <input type="radio" name="modo" value="ean" checked={modoMatch === 'ean'}
                      onChange={e => setModoMatch(e.target.value)} />
-              EAN apenas (100% certeza)
+              EAN 100% certeza
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#E1E1E1', cursor: 'pointer', fontSize: 14 }}>
               <input type="radio" name="modo" value="completo" checked={modoMatch === 'completo'}

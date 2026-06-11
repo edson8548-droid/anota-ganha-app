@@ -124,6 +124,19 @@
   margin-top: 4px;
 }
 
+.checkout-discount-line {
+  display: inline-flex;
+  align-items: center;
+  margin: 8px 0 10px;
+  padding: 7px 10px;
+  border: 1px solid rgba(46, 204, 138, .35);
+  border-radius: 8px;
+  background: rgba(46, 204, 138, .1);
+  color: #B7F2D8;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .savings-checkout {
   background: rgba(46,204,138,.12);
   border: 1px solid rgba(46,204,138,.3);
@@ -264,6 +277,10 @@
   color: #A0A3A8;
   font-size: 12px;
   line-height: 1.45;
+}
+
+.checkout-coupon-form {
+  margin-top: 12px;
 }
 
 .payment-methods {

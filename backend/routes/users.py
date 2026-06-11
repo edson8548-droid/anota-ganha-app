@@ -34,6 +34,13 @@ TRANSPARENT_GIF = (
     b"D\x01\x00;"
 )
 ALLOWED_REDIRECT_HOSTS = {"venpro.com.br", "www.venpro.com.br", "anota-ganha-app.web.app"}
+PARTNER_CODES = {
+    "carlos14off": {
+        "name": "Carlos Vinicios",
+        "commissionMonthly": 40,
+        "discountPercent": 14,
+    }
+}
 
 # ============================================
 # VALIDAÇÃO DE DOCUMENTO FISCAL
@@ -184,6 +191,105 @@ def _validar_dados_pagador(nome: str, cpf: str, telefone: str) -> dict:
         "documentoTipo": documento_tipo,
         "telefone": telefone_limpo,
     }
+
+
+def _normalize_referral_code(value: str | None) -> str:
+    code = re.sub(r"[^a-z0-9_-]", "", str(value or "").strip().lower())
+    return code[:40]
+
+
+def _referral_user_data(code: str) -> dict:
+    if not code:
+        return {}
+    data = {
+        "referralCode": code,
+        "referredByCode": code,
+        "referralCapturedAt": firestore.SERVER_TIMESTAMP,
+    }
+    partner = PARTNER_CODES.get(code)
+    if partner:
+        data.update({
+            "referredByPartnerName": partner["name"],
+            "referredByPartnerCode": code,
+            "referralDiscountPercent": partner["discountPercent"],
+        })
+    return data
+
+
+def _normalize_person_name(value: str | None) -> str:
+    text = str(value or "").strip().lower()
+    replacements = {
+        "á": "a", "à": "a", "â": "a", "ã": "a",
+        "é": "e", "ê": "e",
+        "í": "i",
+        "ó": "o", "ô": "o", "õ": "o",
+        "ú": "u",
+        "ç": "c",
+    }
+    for source, target in replacements.items():
+        text = text.replace(source, target)
+    return re.sub(r"\s+", " ", text)
+
+
+def _partner_profile_for_user_sync(uid: str, db) -> dict:
+    user_ref = db.collection("users").document(uid)
+    user_doc = user_ref.get()
+    if not user_doc.exists:
+        raise HTTPException(404, "Usuário não encontrado")
+
+    user_data = user_doc.to_dict() or {}
+    partner = user_data.get("partner") if isinstance(user_data.get("partner"), dict) else {}
+    partner_code = _normalize_referral_code(
+        partner.get("code")
+        or user_data.get("partnerCode")
+        or user_data.get("referralOwnerCode")
+        or user_data.get("referralCodeOwner")
+        or user_data.get("affiliateCode")
+    )
+
+    if (partner.get("enabled") or user_data.get("partnerEnabled")) and partner_code in PARTNER_CODES:
+        config = PARTNER_CODES[partner_code]
+        return {"code": partner_code, "name": config["name"], **config}
+
+    name = _normalize_person_name(user_data.get("name") or user_data.get("nome") or user_data.get("displayName"))
+    if "carlos" in name and ("vinicios" in name or "vinicius" in name):
+        code = "carlos14off"
+        config = PARTNER_CODES[code]
+        user_ref.set(
+            {
+                "partner": {
+                    "enabled": True,
+                    "code": code,
+                    "name": config["name"],
+                    "commissionMonthly": config["commissionMonthly"],
+                    "discountPercent": config["discountPercent"],
+                },
+                "partnerEnabled": True,
+                "partnerCode": code,
+                "updated_at": firestore.SERVER_TIMESTAMP,
+            },
+            merge=True,
+        )
+        return {"code": code, "name": config["name"], **config}
+
+    raise HTTPException(403, "Acesso restrito ao programa de parceiros")
+
+
+def _subscription_status_label(subscription: dict) -> str:
+    status = str(subscription.get("status") or "").lower()
+    if status == "active":
+        return "Assinando ativo"
+    if status == "trialing":
+        return "Teste gratis"
+    if status == "pending":
+        return "Pagamento pendente"
+    if status == "canceling":
+        return "Cancelamento agendado"
+    if status == "canceled":
+        return "Cancelado"
+    if status == "trial_expired":
+        return "Teste encerrado"
+    return "Sem assinatura ativa"
 
 
 def _trial_subscription_data(uid: str, now: datetime | None = None) -> dict:
@@ -465,6 +571,8 @@ class RegisterRequest(BaseModel):
     name: str | None = None
     cpf: str
     telefone: str
+    referral_code: str | None = Field(default=None, max_length=40)
+    referralCode: str | None = Field(default=None, max_length=40)
 
 
 class BillingProfileRequest(BaseModel):
@@ -549,6 +657,55 @@ async def send_welcome_email(
         )
 
     return result
+
+
+@router.get("/partner/referrals")
+async def get_partner_referrals(uid: str = Depends(get_user_id)):
+    """Lista indicados do parceiro com dados mínimos: apenas nome e status."""
+    db = _fs()
+
+    def _load():
+        partner = _partner_profile_for_user_sync(uid, db)
+        code = partner["code"]
+        docs_by_id = {}
+
+        for field in ("referredByCode", "referralCode"):
+            query = db.collection("users").where(field, "==", code).limit(300)
+            for doc_snap in query.stream():
+                docs_by_id[doc_snap.id] = doc_snap.to_dict() or {}
+
+        referrals = []
+        active_count = 0
+        for referred_uid, data in docs_by_id.items():
+            subscription_doc = db.collection("subscriptions").document(referred_uid).get()
+            subscription = subscription_doc.to_dict() if subscription_doc.exists else {}
+            status = str(subscription.get("status") or "").lower()
+            if status == "active":
+                active_count += 1
+
+            referrals.append({
+                "name": data.get("name") or data.get("nome") or data.get("displayName") or "RCA indicado",
+                "status": status or "none",
+                "statusLabel": _subscription_status_label(subscription),
+            })
+
+        referrals.sort(key=lambda item: (item["status"] != "active", item["name"].lower()))
+        return {
+            "partner": {
+                "name": partner["name"],
+                "code": code,
+                "commissionMonthly": partner["commissionMonthly"],
+                "discountPercent": partner["discountPercent"],
+            },
+            "metrics": {
+                "totalReferrals": len(referrals),
+                "activeSubscriptions": active_count,
+                "estimatedMonthlyCommission": active_count * partner["commissionMonthly"],
+            },
+            "referrals": referrals,
+        }
+
+    return await asyncio.to_thread(_load)
 
 
 @router.post("/device-session")
@@ -809,6 +966,7 @@ async def register(
         raise HTTPException(400, "Cadastro inicial exige CPF. O CNPJ pode ser informado no checkout de pagamento.")
     cpf = dados_pagador["cpf"]
     telefone_clean = dados_pagador["telefone"]
+    referral_code = _normalize_referral_code(payload.referral_code or payload.referralCode)
 
     # 3. Verificação de duplicidade de CPF
     cpf_duplicado, msg_duplicidade = await asyncio.to_thread(_verificar_duplicidade_cpf, cpf, _fs())
@@ -849,6 +1007,7 @@ async def register(
         "created_at": firestore.SERVER_TIMESTAMP,
         "updated_at": firestore.SERVER_TIMESTAMP,
     }
+    user_data.update(_referral_user_data(referral_code))
 
     try:
         await asyncio.to_thread(_create_user_and_trial, uid, user_data, _fs())

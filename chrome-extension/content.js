@@ -1,5 +1,7 @@
 // Content script — runs on supported quotation pages.
 
+const cotacaoWebSmusPriceCellMeta = new WeakMap();
+
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
@@ -116,6 +118,60 @@ function findColumnIndexByHeader(row, includePatterns, excludePatterns = []) {
   return -1;
 }
 
+function getCellColSpan(cell) {
+  const span = Number.parseInt(cell?.getAttribute?.('colspan') || '1', 10);
+  return Number.isInteger(span) && span > 0 ? span : 1;
+}
+
+function getCellAtVisualColumn(row, visualIndex) {
+  if (!Number.isInteger(visualIndex) || visualIndex < 0) return null;
+  let current = 0;
+  for (const cell of getDirectCells(row)) {
+    const span = getCellColSpan(cell);
+    if (visualIndex >= current && visualIndex < current + span) return cell;
+    current += span;
+  }
+  return null;
+}
+
+function findVisualColumnIndexByHeader(row, includePatterns, excludePatterns = []) {
+  const table = row.closest('table');
+  if (!table) return -1;
+
+  const tableRows = Array.from(table.querySelectorAll('tr'));
+  const rowIndex = tableRows.indexOf(row);
+  const headerRows = rowIndex >= 0 ? tableRows.slice(0, rowIndex).reverse() : tableRows.reverse();
+
+  for (const headerRow of headerRows) {
+    const headerCells = getDirectCells(headerRow);
+    if (!headerCells.length) continue;
+
+    let visualIndex = 0;
+    for (const cell of headerCells) {
+      const text = normalizeCellText(cell.textContent);
+      const span = getCellColSpan(cell);
+      if (text
+        && includePatterns.some(pattern => pattern.test(text))
+        && !excludePatterns.some(pattern => pattern.test(text))) {
+        return visualIndex;
+      }
+      visualIndex += span;
+    }
+  }
+
+  return -1;
+}
+
+function markCotacaoWebSmusPriceCell(cell, confidence, reason) {
+  if (cell) cotacaoWebSmusPriceCellMeta.set(cell, { confidence, reason });
+  return cell;
+}
+
+function isSafeCotacaoWebSmusRawTarget(cell) {
+  const meta = cotacaoWebSmusPriceCellMeta.get(cell);
+  return Boolean(meta && meta.confidence >= 80);
+}
+
 function getCellTextByHeader(row, includePatterns, excludePatterns = []) {
   const index = findColumnIndexByHeader(row, includePatterns, excludePatterns);
   if (index < 0) return '';
@@ -216,6 +272,14 @@ function getCotacaoWebSmusRowSignature(row) {
   return `${codigo}|${ean}|${nome}`;
 }
 
+function isCotacaoWebSmusProductRow(row) {
+  const text = row.textContent || '';
+  const signature = getCotacaoWebSmusRowSignature(row);
+  return Boolean(signature && signature !== '||')
+    && /\d{8,14}/.test(text)
+    && /[A-Za-zÀ-ú]{3}/.test(text);
+}
+
 function getRedeFornecedoresPriceCandidates(row) {
   const cells = Array.from(row.querySelectorAll('td, th'));
   const inputs = getEditableInputs(row).filter(input => {
@@ -266,7 +330,7 @@ function getCotacaoWebSmusPriceCandidates(row) {
   const controls = getEditableControls(row).filter(input => {
     const meta = `${input.name || ''} ${input.id || ''} ${input.className || ''} ${input.placeholder || ''} ${input.getAttribute('aria-label') || ''}`.toLowerCase();
     const cellText = normalizeCellText(input.closest('td, th')?.textContent || '');
-    return !/codigo|c[oó]d|ean|produto|nome|quant|qtd|embalagem|tamanho|frete|data/.test(`${meta} ${cellText}`);
+    return !/codigo|c[oó]d|ean|produto|nome|quant|qtd|embalagem|tamanho|frete|data|total|mensagem|observa|fornecedor/.test(`${meta} ${cellText}`);
   });
   const priceLike = controls.filter(isPriceLikeInput);
   return priceLike.length ? priceLike : controls;
@@ -274,14 +338,28 @@ function getCotacaoWebSmusPriceCandidates(row) {
 
 function getCotacaoWebSmusPriceCell(row) {
   const cells = getDirectCells(row);
-  const priceColumnIndex = findColumnIndexByHeader(
+  const priceColumnIndex = findVisualColumnIndexByHeader(
     row,
     [/pre[çc]o\s*un\b/i, /pre[çc]o\s+unit/i, /^\s*pre[çc]o\s*$/i],
-    [/total|frete|embalagem|quantidade|tamanho/i]
+    [/total|frete|embalagem|quantidade|tamanho|mensagem|observa/i]
   );
 
-  if (priceColumnIndex >= 0) return cells[priceColumnIndex] || null;
-  return cells[cells.length - 1] || null;
+  if (priceColumnIndex >= 0) {
+    return markCotacaoWebSmusPriceCell(getCellAtVisualColumn(row, priceColumnIndex), 100, 'header_preco_un');
+  }
+
+  const priceControls = getEditableControls(row).filter(input => {
+    const meta = `${input.name || ''} ${input.id || ''} ${input.className || ''} ${input.placeholder || ''} ${input.getAttribute('aria-label') || ''}`.toLowerCase();
+    const cellText = normalizeCellText(input.closest('td, th')?.textContent || '').toLowerCase();
+    const context = `${meta} ${cellText}`;
+    return /(preco|preço|valor|vlr|unit)/.test(context)
+      && !/(total|mensagem|observa|fornecedor|produto|ean|c[oó]d|codigo|quant|qtd|embalagem|tamanho|frete|data)/i.test(context);
+  });
+
+  const controlCell = priceControls[0]?.closest?.('td, th');
+  if (controlCell) return markCotacaoWebSmusPriceCell(controlCell, 90, 'price_control_meta');
+
+  return null;
 }
 
 function getPriceCandidates(row, site = 'generic') {
@@ -377,10 +455,7 @@ function getQuotationRows(site) {
   }
 
   if (site === 'cotacao-web-smus') {
-    return Array.from(document.querySelectorAll('tr')).filter(row => {
-      const text = row.textContent || '';
-      return getPriceCandidates(row, site).length > 0 && /\d{8,14}/.test(text) && /[A-Za-zÀ-ú]{3}/.test(text);
-    });
+    return Array.from(document.querySelectorAll('tr')).filter(isCotacaoWebSmusProductRow);
   }
 
   return Array.from(document.querySelectorAll('tr')).filter(row => getEditableInputs(row).length > 0);
@@ -432,12 +507,7 @@ function isScrollableY(el) {
 }
 
 function getCotacaoWebSmusVisibleRows() {
-  return Array.from(document.querySelectorAll('tr')).filter(row => {
-    const text = row.textContent || '';
-    return getPriceCandidates(row, 'cotacao-web-smus').length > 0
-      && /\d{8,14}/.test(text)
-      && /[A-Za-zÀ-ú]{3}/.test(text);
-  });
+  return Array.from(document.querySelectorAll('tr')).filter(isCotacaoWebSmusProductRow);
 }
 
 function getCotacaoWebSmusScrollTargets() {
@@ -608,7 +678,7 @@ function extractItemFromRow(row, idx, site, empresaColuna) {
   const priceInput = site === 'vr-cotacao'
     ? getEditableInputs(row)[0]
     : getSelectedPriceInput(row, empresaColuna, site);
-  if (!priceInput) return null;
+  if (!priceInput && site !== 'cotacao-web-smus') return null;
 
   const ean = extractEANFromRow(row, site);
   const nome = extractProductNameFromRow(row);
@@ -619,7 +689,7 @@ function extractItemFromRow(row, idx, site, empresaColuna) {
     nome,
     codigo: site === 'cotacao-web-smus' ? getCotacaoWebSmusCodigo(row) : '',
     signature: site === 'cotacao-web-smus' ? getCotacaoWebSmusRowSignature(row) : '',
-    filled: isFilledPriceValue(getControlValue(priceInput).trim()),
+    filled: priceInput ? isFilledPriceValue(getControlValue(priceInput).trim()) : false,
   };
 }
 
@@ -1036,13 +1106,18 @@ async function fillQuotationPrices(prices, options = {}) {
 
   async function setInputValue(input, value) {
     input.scrollIntoView({ block: 'center', inline: 'nearest' });
-    const nestedEditor = await activateNestedEditor(input);
-    if (nestedEditor) return setInputValue(nestedEditor, value);
 
     if (!isEditableValueControl(input)) {
-      if (site === 'cotacao-web-smus') return tryGridCellTyping(input, value);
+      if (site === 'cotacao-web-smus') {
+        return isSafeCotacaoWebSmusRawTarget(input) ? tryGridCellTyping(input, value) : false;
+      }
+      const nestedEditor = await activateNestedEditor(input);
+      if (nestedEditor) return setInputValue(nestedEditor, value);
       return false;
     }
+
+    const nestedEditor = await activateNestedEditor(input);
+    if (nestedEditor) return setInputValue(nestedEditor, value);
 
     input.focus?.();
 
@@ -1075,36 +1150,43 @@ async function fillQuotationPrices(prices, options = {}) {
     let scannedRows = 0;
     await scanCotacaoWebSmusRows(async (row, idx, signature) => {
       scannedRows = Math.max(scannedRows, idx + 1);
-      const item = pendingByIdx.get(idx) || pendingBySignature.get(signature);
+      const item = pendingBySignature.get(signature) || pendingByIdx.get(idx);
       if (!item) return pendingByIdx.size === 0 && pendingBySignature.size === 0;
 
       const input = getSelectedPriceInput(row, empresaColuna, site);
-      if (!input) {
-        failed.push(item.idx);
-        details.push({ idx: item.idx, reason: 'input_not_found' });
-        pendingByIdx.delete(Number(item.idx));
-        if (item.signature) pendingBySignature.delete(String(item.signature));
-        return pendingByIdx.size === 0 && pendingBySignature.size === 0;
+      const priceCell = getCotacaoWebSmusPriceCell(row);
+      const target = input || priceCell || row;
+      const directTarget = input || priceCell;
+      const before = input ? getControlValue(input) : '';
+      let bridgeResult = await fillCotacaoWebSmusViaBridge(row, target, item);
+      await waitForGridRender(80);
+      let ok = false;
+      let persisted = Boolean(bridgeResult?.ok && (
+        cotacaoWebSmusRowShowsPrice(row, item.price)
+        || bridgeResult.reason === 'angular_model_set'
+      ));
+
+      if (!persisted) {
+        if (directTarget && isEditableValueControl(directTarget)) {
+          ok = await setInputValue(directTarget, item.price);
+          await waitForGridRender(40);
+          persisted = ok && cotacaoWebSmusRowShowsPrice(row, item.price);
+        } else if (directTarget && isSafeCotacaoWebSmusRawTarget(directTarget)) {
+          ok = await setInputValue(directTarget, item.price);
+          await waitForGridRender(40);
+          persisted = ok && cotacaoWebSmusRowShowsPrice(row, item.price);
+        }
       }
 
-      const before = getControlValue(input);
-      const ok = await setInputValue(input, item.price);
-      await waitForGridRender(40);
-      let persisted = ok && cotacaoWebSmusRowShowsPrice(row, item.price);
-      let bridgeResult = null;
-      if (!persisted) {
-        bridgeResult = await fillCotacaoWebSmusViaBridge(row, input, item);
-        persisted = Boolean(bridgeResult?.ok && cotacaoWebSmusRowShowsPrice(row, item.price));
-      }
       if (persisted) count++;
       else {
         failed.push(item.idx);
         details.push({
           idx: item.idx,
           reason: bridgeResult?.reason || (ok ? 'value_not_persisted' : 'value_rejected'),
-          inputType: input.getAttribute('type') || '',
+          inputType: input?.getAttribute?.('type') || '',
           before,
-          after: getControlValue(input),
+          after: input ? getControlValue(input) : '',
           cellAfter: normalizeCellText(getCotacaoWebSmusPriceCell(row)?.textContent || ''),
           bridge: bridgeResult || null,
           attempted: String(item.price ?? ''),

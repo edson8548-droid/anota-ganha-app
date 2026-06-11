@@ -97,6 +97,7 @@ const ForgotPassword = lazyWithRetry(() => import('./pages/ForgotPassword'));
 const Vitrine = lazyWithRetry(() => import('./pages/Vitrine'));
 const VitrineEditar = lazyWithRetry(() => import('./pages/VitrineEditar'));
 const VitrinePublica = lazyWithRetry(() => import('./pages/VitrinePublica'));
+const Parceiro = lazyWithRetry(() => import('./pages/Parceiro'));
 const ProtectedRoute = lazyWithRetry(() => import('./components/ProtectedRoute'));
 const AuthenticatedProviders = lazyWithRetry(() => import('./contexts/AuthenticatedProviders'));
 
@@ -178,6 +179,7 @@ function AppRoutes() {
           <Route path="/disparador-whatsapp" element={<ProtectedRoute requireSubscription><Disparador /></ProtectedRoute>} />
           <Route path="/vitrine" element={<ProtectedRoute requireSubscription><Vitrine /></ProtectedRoute>} />
           <Route path="/vitrine/:id/editar" element={<ProtectedRoute requireSubscription><VitrineEditar /></ProtectedRoute>} />
+          <Route path="/parceiro" element={<ProtectedRoute><Parceiro /></ProtectedRoute>} />
           <Route path="/oferta/:slug" element={<VitrinePublica />} />
           <Route path="/:empresa/ofertas/:slug" element={<VitrinePublica />} />
           <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
