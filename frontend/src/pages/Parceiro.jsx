@@ -66,7 +66,7 @@ const Parceiro = () => {
 
   const whatsappMessage = [
     'Estou usando o Venpro para transformar tabela de fornecedor em cotacao pronta.',
-    'Meu codigo de parceiro da desconto para entrar:',
+    'Meu codigo de parceiro para entrar no Venpro:',
     partner.code,
     '',
     signupLink

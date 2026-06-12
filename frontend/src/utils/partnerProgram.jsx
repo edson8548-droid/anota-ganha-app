@@ -1,12 +1,13 @@
 export const CARLOS_PARTNER_CODE = 'carlos14off';
+export const PARTNER_COUPON_ENABLED = false;
 
 const PARTNER_CONFIGS = {
   [CARLOS_PARTNER_CODE]: {
     code: CARLOS_PARTNER_CODE,
     name: 'Carlos Vinicios',
-    discountLabel: 'R$ 120,00/mês com cupom',
-    discountPercentLabel: '14% OFF',
-    checkoutFinalPrice: 120,
+    discountLabel: 'Cupom pausado por enquanto',
+    discountPercentLabel: 'Pausado',
+    checkoutFinalPrice: null,
     commissionLabel: 'R$ 40 por assinatura ativa',
     status: 'Piloto ativo'
   }
@@ -65,6 +66,8 @@ export const buildPartnerSignupLink = (code) => {
 };
 
 export const getPartnerCouponDiscount = (planPrice, code) => {
+  if (!PARTNER_COUPON_ENABLED) return null;
+
   const normalized = normalizePartnerCode(code);
   const config = PARTNER_CONFIGS[normalized];
   const price = Number(planPrice || 0);

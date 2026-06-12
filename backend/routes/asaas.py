@@ -31,19 +31,12 @@ ASAAS_DISABLE_CUSTOMER_NOTIFICATIONS = (
 ASAAS_PLANS = {
     "monthly": {
         "id": "monthly",
-        "price": 139.00,
+        "price": 99.90,
         "cycle": "MONTHLY",
         "description": "Assinatura mensal Venpro",
     },
 }
-PARTNER_COUPONS = {
-    "carlos14off": {
-        "partnerName": "Carlos Vinicios",
-        "finalPrice": 120.00,
-        "discountLabel": "14% OFF",
-        "commissionMonthly": 40.00,
-    }
-}
+PARTNER_COUPONS = {}
 
 
 class CreateSubscriptionRequest(BaseModel):

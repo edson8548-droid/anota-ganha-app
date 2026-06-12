@@ -8,7 +8,7 @@ import { saveBillingProfile } from '../services/api';
 import { auth, db } from '../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 import { isValidCpfCnpj } from '../utils/documentValidators';
-import { getPartnerCouponDiscount, normalizePartnerCode } from '../utils/partnerProgram';
+import { CARLOS_PARTNER_CODE, PARTNER_COUPON_ENABLED, getPartnerCouponDiscount, normalizePartnerCode } from '../utils/partnerProgram';
 import './Checkout.css';
 
 const onlyDigits = (value) => String(value || '').replace(/\D/g, '');
@@ -84,7 +84,12 @@ const Checkout = () => {
         const data = userDoc.exists() ? userDoc.data() : {};
         const storedCoupon = (() => {
           try {
-            return normalizePartnerCode(localStorage.getItem('venpro:checkout-coupon'));
+            const value = normalizePartnerCode(localStorage.getItem('venpro:checkout-coupon'));
+            if (!PARTNER_COUPON_ENABLED && value === CARLOS_PARTNER_CODE) {
+              localStorage.removeItem('venpro:checkout-coupon');
+              return '';
+            }
+            return value;
           } catch {
             return '';
           }
@@ -95,7 +100,9 @@ const Checkout = () => {
           || data.referredByCode
           || data.referralCode
         );
-        if (profileCoupon) setCouponCode(profileCoupon);
+        if (profileCoupon && (PARTNER_COUPON_ENABLED || profileCoupon !== CARLOS_PARTNER_CODE)) {
+          setCouponCode(profileCoupon);
+        }
         setPayerData({
           name: data.name || data.displayName || data.nome || user.displayName || user.email || '',
           cpf: formatCpfCnpj(data.cpfCnpj || data.cpf || data.cnpj || ''),
@@ -111,7 +118,10 @@ const Checkout = () => {
     loadProfile();
   }, [user, location.state?.couponCode]);
 
-  const normalizedCouponCode = normalizePartnerCode(couponCode);
+  const rawCouponCode = normalizePartnerCode(couponCode);
+  const normalizedCouponCode = !PARTNER_COUPON_ENABLED && rawCouponCode === CARLOS_PARTNER_CODE
+    ? ''
+    : rawCouponCode;
   const partnerDiscount = selectedPlan
     ? getPartnerCouponDiscount(selectedPlan.price, normalizedCouponCode)
     : null;
@@ -320,7 +330,7 @@ const Checkout = () => {
                 <input
                   value={couponCode}
                   onChange={(e) => setCouponCode(e.target.value)}
-                  placeholder="Ex: carlos14off"
+                  placeholder="Digite seu cupom"
                   disabled={loading}
                 />
               </label>

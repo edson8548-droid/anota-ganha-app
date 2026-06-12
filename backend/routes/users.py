@@ -38,7 +38,7 @@ PARTNER_CODES = {
     "carlos14off": {
         "name": "Carlos Vinicios",
         "commissionMonthly": 40,
-        "discountPercent": 14,
+        "discountPercent": 0,
     }
 }
 

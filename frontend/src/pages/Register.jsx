@@ -4,7 +4,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { sendWelcomeEmail } from '../services/api';
 import { isValidCPF, onlyDigits } from '../utils/documentValidators';
-import { CARLOS_PARTNER_CODE, normalizePartnerCode } from '../utils/partnerProgram';
+import { CARLOS_PARTNER_CODE, PARTNER_COUPON_ENABLED, normalizePartnerCode } from '../utils/partnerProgram';
 import './Register.css';
 
 // ⭐️ INÍCIO: Funções de Máscara (para formatar os campos) ⭐️
@@ -95,7 +95,7 @@ const Register = () => {
       setReferralCode(fromUrl);
       try {
         localStorage.setItem('venpro:referral-code', fromUrl);
-        if (fromUrl === CARLOS_PARTNER_CODE) {
+        if (PARTNER_COUPON_ENABLED && fromUrl === CARLOS_PARTNER_CODE) {
           localStorage.setItem('venpro:checkout-coupon', fromUrl);
         }
       } catch {

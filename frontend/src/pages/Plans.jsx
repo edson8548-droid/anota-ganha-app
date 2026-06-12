@@ -5,7 +5,7 @@ import { ArrowLeft, FileSpreadsheet, Send, ClipboardList, Puzzle, BarChart3, Mes
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import api from '../services/api';
-import { CARLOS_PARTNER_CODE, getPartnerCouponDiscount, normalizePartnerCode } from '../utils/partnerProgram';
+import { CARLOS_PARTNER_CODE, PARTNER_COUPON_ENABLED, getPartnerCouponDiscount, normalizePartnerCode } from '../utils/partnerProgram';
 import './Plans.css';
 
 const Plans = () => {
@@ -16,14 +16,19 @@ const Plans = () => {
   const [loading, setLoading] = useState(false);
   const [couponCode, setCouponCode] = useState(() => {
     try {
-      return normalizePartnerCode(localStorage.getItem('venpro:checkout-coupon'));
+      const storedCoupon = normalizePartnerCode(localStorage.getItem('venpro:checkout-coupon'));
+      if (!PARTNER_COUPON_ENABLED && storedCoupon === CARLOS_PARTNER_CODE) {
+        localStorage.removeItem('venpro:checkout-coupon');
+        return '';
+      }
+      return storedCoupon;
     } catch {
       return '';
     }
   });
   const [checkoutCoupon, setCheckoutCoupon] = useState(() => normalizePartnerCode(couponCode));
   const [couponLoading, setCouponLoading] = useState(false);
-  const monthlyPlanPrice = 139.00;
+  const monthlyPlanPrice = 99.90;
   const activePartnerDiscount = useMemo(
     () => getPartnerCouponDiscount(monthlyPlanPrice, checkoutCoupon),
     [checkoutCoupon]
@@ -37,6 +42,17 @@ const Plans = () => {
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
     const normalized = normalizePartnerCode(couponCode);
+    if (!PARTNER_COUPON_ENABLED && normalized === CARLOS_PARTNER_CODE) {
+      setCheckoutCoupon('');
+      try {
+        localStorage.removeItem('venpro:checkout-coupon');
+      } catch {
+        // Ignore storage restrictions.
+      }
+      toast.warning('Cupom de parceiro pausado por enquanto.');
+      return;
+    }
+
     if (normalized === CARLOS_PARTNER_CODE) {
       setCheckoutCoupon(normalized);
       try {
@@ -63,7 +79,8 @@ const Plans = () => {
 
   const handleAssinar = () => {
     setLoading(true);
-    navigate('/checkout', { state: { planId: 'monthly', couponCode: checkoutCoupon || undefined } });
+    const activeCoupon = PARTNER_COUPON_ENABLED ? checkoutCoupon : '';
+    navigate('/checkout', { state: { planId: 'monthly', couponCode: activeCoupon || undefined } });
   };
 
   const features = [
@@ -136,8 +153,8 @@ const Plans = () => {
             <div style={{ fontSize: 14, color: '#A0A3A8', marginTop: 4 }}>pagamento mensal via Asaas</div>
             <div style={{ margin: '14px auto 0', padding: '9px 12px', border: '1px solid rgba(58,133,168,.45)', borderRadius: 10, color: '#DDEFF7', background: 'rgba(58,133,168,.14)', fontSize: 13, fontWeight: 700 }}>
               {activePartnerDiscount
-                ? `Cupom ${activePartnerDiscount.code} aplicado: de R$ 139,00 por R$ 120,00.`
-                : 'Use um cupom de parceiro para liberar o valor combinado.'}
+                ? `Cupom ${activePartnerDiscount.code} aplicado. Plano atual: R$ 99,90.`
+                : 'Plano mensal Venpro por R$ 99,90.'}
             </div>
           </div>
 
