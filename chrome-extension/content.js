@@ -457,6 +457,7 @@ function buildBubbleCatalogTextRows(headers) {
       nome,
       rowTop,
       rowBottom,
+      fractionInput: null,
       priceInput: null,
       signature: `${code.ean}|${normalizeRowKey(nome)}|${Math.round(rowTop)}`,
     };
@@ -486,6 +487,20 @@ function isBubbleValorControl(control, headers) {
 
   if (fractionRect && cx <= rectCenterX(fractionRect) + 32) return false;
   return true;
+}
+
+function isBubbleFracionamentoControl(control, headers) {
+  const rect = control.getBoundingClientRect();
+  const fractionRect = headers.fracionamento?.rect || null;
+  if (!fractionRect) return false;
+
+  const valueRect = headers.valor?.rect || null;
+  const cx = rectCenterX(rect);
+  if (valueRect && cx >= valueRect.left - 12) return false;
+
+  const fractionCx = rectCenterX(fractionRect);
+  return Math.abs(cx - fractionCx) <= Math.max(130, fractionRect.width + 110)
+    || (cx >= fractionRect.left - 16 && (!valueRect || cx < valueRect.left - 12));
 }
 
 function buildBubbleCatalogRowMeta(priceInput, headers) {
@@ -521,6 +536,7 @@ function buildBubbleCatalogRowMeta(priceInput, headers) {
   return {
     ean,
     nome,
+    fractionInput: null,
     priceInput,
     rowTop: inputRect.top - 8,
     rowBottom: inputRect.bottom + 8,
@@ -528,8 +544,30 @@ function buildBubbleCatalogRowMeta(priceInput, headers) {
   };
 }
 
+function findBubbleCatalogFractionTarget(meta, headers) {
+  if (meta?.fractionInput && isVisible(meta.fractionInput)) return meta.fractionInput;
+
+  const controls = getBubbleCatalogEditableControls(document.body)
+    .filter(control => isBubbleFracionamentoControl(control, headers))
+    .map(control => ({ el: control, rect: control.getBoundingClientRect() }))
+    .filter(item => isBubbleRectInRowBand(item.rect, meta))
+    .sort((a, b) => (
+      Math.abs(rectCenterY(a.rect) - ((meta.rowTop + meta.rowBottom) / 2))
+      - Math.abs(rectCenterY(b.rect) - ((meta.rowTop + meta.rowBottom) / 2))
+    ));
+
+  if (controls[0]?.el) {
+    meta.fractionInput = controls[0].el;
+    return controls[0].el;
+  }
+
+  return null;
+}
+
 function findBubbleCatalogPriceTarget(meta, headers) {
-  if (meta?.priceInput && isVisible(meta.priceInput)) return meta.priceInput;
+  if (meta?.priceInput && isVisible(meta.priceInput) && isEditableValueControl(meta.priceInput)) {
+    return meta.priceInput;
+  }
 
   const controls = getBubbleCatalogEditableControls(document.body)
     .filter(control => isBubbleValorControl(control, headers))
@@ -1282,6 +1320,42 @@ async function fillQuotationPrices(prices, options = {}) {
     return false;
   }
 
+  async function setPlainControlValue(input, value) {
+    input.scrollIntoView({ block: 'center', inline: 'nearest' });
+
+    if (!isEditableValueControl(input)) {
+      const nestedEditor = await activateNestedEditor(input);
+      if (nestedEditor) return setPlainControlValue(nestedEditor, value);
+      return false;
+    }
+
+    const nestedEditor = await activateNestedEditor(input);
+    if (nestedEditor) return setPlainControlValue(nestedEditor, value);
+
+    const plain = String(value ?? '').trim();
+    if (!plain) return false;
+
+    try {
+      input.focus?.();
+      selectEditableContents(input);
+
+      if ('value' in input) {
+        writeNativeValue(input, '');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        writeNativeValue(input, plain);
+      } else {
+        try { document.execCommand?.('selectAll', false); } catch {}
+        const inserted = document.execCommand?.('insertText', false, plain);
+        if (!inserted) input.textContent = plain;
+      }
+
+      await commitEditorValue(input, plain, 80);
+      return parsePriceNumber(getControlValue(input)) !== null;
+    } catch {}
+
+    return false;
+  }
+
   async function tryGridCellTyping(cell, value) {
     const fallback = priceValueCandidates(value, cell)[0];
     if (!fallback) return false;
@@ -1474,6 +1548,26 @@ async function fillQuotationPrices(prices, options = {}) {
     return hasPrice(getControlValue(input));
   }
 
+  async function ensureBubbleCatalogFraction(row) {
+    const meta = bubbleCatalogRowMeta.get(row);
+    if (!meta) return { ok: false, changed: false, reason: 'row_meta_not_found' };
+
+    const target = findBubbleCatalogFractionTarget(meta, getBubbleCatalogHeaders());
+    if (!target) return { ok: false, changed: false, reason: 'fraction_input_not_found' };
+
+    if (parsePriceNumber(getControlValue(target)) !== null) {
+      return { ok: true, changed: false, reason: 'fraction_already_filled' };
+    }
+
+    const ok = await setPlainControlValue(target, '1');
+    await waitForGridRender(140);
+    if (ok && meta.priceInput && !isEditableValueControl(meta.priceInput)) {
+      meta.priceInput = null;
+    }
+
+    return { ok, changed: ok, reason: ok ? 'fraction_filled' : 'fraction_rejected' };
+  }
+
   async function fillCotacaoWebSmusPrices() {
     const pendingByIdx = new Map();
     const pendingBySignature = new Map();
@@ -1556,12 +1650,27 @@ async function fillQuotationPrices(prices, options = {}) {
       details.push({ idx: item.idx, reason: 'row_not_found' });
       continue;
     }
-    const input = site === 'vr-cotacao'
+    let input = site === 'vr-cotacao'
       ? getEditableInputs(row)[0]
       : getSelectedPriceInput(row, empresaColuna, site);
+
+    let fractionResult = null;
+    if (site === 'bubble-catalog-fornecedor') {
+      fractionResult = await ensureBubbleCatalogFraction(row);
+      if (fractionResult.ok || !input) {
+        await waitForGridRender(fractionResult.changed ? 160 : 60);
+        input = getSelectedPriceInput(row, empresaColuna, site);
+      }
+    }
+
     if (!input) {
       failed.push(item.idx);
-      details.push({ idx: item.idx, reason: 'input_not_found' });
+      details.push({
+        idx: item.idx,
+        reason: site === 'bubble-catalog-fornecedor'
+          ? (fractionResult?.reason || 'input_not_found')
+          : 'input_not_found',
+      });
       continue;
     }
 

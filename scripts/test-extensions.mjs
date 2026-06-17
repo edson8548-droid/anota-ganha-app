@@ -135,6 +135,7 @@ describe('extensoes Chrome', () => {
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.40.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.41.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.42.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.43.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-whatsapp-extension.zip')));
   });
 
@@ -145,5 +146,9 @@ describe('extensoes Chrome', () => {
     assert.match(contentJs, /getBubbleCatalogEditableControls\(document\.body\)/);
     assert.match(contentJs, /input,\s*textarea/);
     assert.match(contentJs, /if \(!meta \|\| \(!meta\.ean && !meta\.nome\)\) return null/);
+    assert.match(contentJs, /function findBubbleCatalogFractionTarget/);
+    assert.match(contentJs, /async function ensureBubbleCatalogFraction/);
+    assert.match(contentJs, /site === 'bubble-catalog-fornecedor'/);
+    assert.match(contentJs, /setPlainControlValue\(target, '1'\)/);
   });
 });
