@@ -47,6 +47,7 @@ def _score_coluna_ean(nome_coluna) -> int:
 
     if not c_norm:
         return 0
+    embalagem_penalty = 10 if _re.search(r"\b(CAIXA|CX|EMB|EMBALAGEM|DUN|MASTER|PACK)\b", c_norm) else 0
     if (
         "COD PROD" in c_norm
         or "CODIGO PROD" in c_norm
@@ -56,13 +57,13 @@ def _score_coluna_ean(nome_coluna) -> int:
     ):
         return 0
     if "EAN" in c_norm or "GTIN" in c_norm:
-        return 100
+        return 100 - embalagem_penalty
     if "CODIGO DE BARRAS" in c_norm or "COD BARRAS" in c_norm or "COD BARRA" in c_norm:
-        return 95
+        return 95 - embalagem_penalty
     if "COD BARR" in c_norm or "CODBAR" in c_norm or "COD BARRA" in c_norm:
-        return 92
+        return 92 - embalagem_penalty
     if "BARRAS" in c_norm or "BARRA" in c_norm or "BARCODE" in c_norm:
-        return 90
+        return 90 - embalagem_penalty
     return 0
 
 
@@ -392,28 +393,37 @@ def ler_cotacao(caminho_arquivo):
         fallback_col_nome = None
         fallback_col_preco = None
         fallback_header = None
+        fallback_col_ean_score = 0
 
         for row_idx in range(1, min(16, ws.max_row + 1)):
             row_col_ean = None
             row_col_nome = None
             row_col_preco = None
+            row_col_ean_score = 0
             for cell in ws[row_idx]:
                 val = str(cell.value).upper().strip() if cell.value else ""
                 if not val:
                     continue
+
+                ean_score = _score_coluna_ean(val)
+                if ean_score >= 80:
+                    if ean_score > row_col_ean_score:
+                        row_col_ean = cell.column - 1
+                        row_col_ean_score = ean_score
+                    if ean_score > fallback_col_ean_score:
+                        fallback_col_ean = cell.column - 1
+                        fallback_col_ean_score = ean_score
+                        fallback_header = fallback_header or row_idx
+                    continue
+
                 if row_col_nome is None and _match_nome(val):
                     row_col_nome = cell.column - 1
-                elif row_col_ean is None and _match_ean(val):
-                    row_col_ean = cell.column - 1
                 elif row_col_preco is None and _match_preco(val):
                     row_col_preco = cell.column - 1
 
                 if fallback_col_nome is None and _match_nome(val):
                     fallback_col_nome = cell.column - 1
                     fallback_header = row_idx
-                elif fallback_col_ean is None and _match_ean(val):
-                    fallback_col_ean = cell.column - 1
-                    fallback_header = fallback_header or row_idx
                 elif fallback_col_preco is None and _match_preco(val):
                     fallback_col_preco = cell.column - 1
                     fallback_header = fallback_header or row_idx
@@ -474,11 +484,16 @@ def ler_cotacao(caminho_arquivo):
                 cols_upper = [str(c).upper().strip() for c in df.columns]
 
                 col_nome = col_ean = col_preco = None
+                col_ean_score = 0
                 for i, c in enumerate(cols_upper):
+                    ean_score = _score_coluna_ean(c)
+                    if ean_score >= 80:
+                        if ean_score > col_ean_score:
+                            col_ean = i
+                            col_ean_score = ean_score
+                        continue
                     if col_nome is None and _match_nome(c):
                         col_nome = i
-                    elif col_ean is None and _match_ean(c):
-                        col_ean = i
                     elif col_preco is None and _match_preco(c):
                         col_preco = i
 

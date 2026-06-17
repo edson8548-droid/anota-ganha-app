@@ -68,6 +68,42 @@ def test_cotacao_codigo_nome_preco_reconhece_ean_e_nome():
     assert itens[0]["col_preco"] == 2
 
 
+def test_cotacao_prefere_gtin_produto_a_gtin_caixa_e_preenche_preco():
+    path = _xlsx([
+        ["UNILEVER PERFUMARIA", None, None, None, None],
+        ["Referência", "GTIN/PLU Caixa", "GTIN/PLU", "Descrição", "preco"],
+        [116183, 27891150071807, 7891150071803, "ANT-SEP BUC CLOSE-UP ICE S/ALCOOL LEV500PG350ML", None],
+    ])
+    output = None
+    try:
+        itens, header_row = ler_cotacao(path)
+
+        assert header_row == 2
+        assert itens[0]["ean"] == "7891150071803"
+        assert itens[0]["nome"] == "ANT-SEP BUC CLOSE-UP ICE S/ALCOOL LEV500PG350ML"
+        assert itens[0]["col_preco"] == 4
+
+        output = gerar_excel_resultado(
+            path,
+            itens,
+            [{"linha": 3, "preco": 12.34, "tipo": "EAN"}],
+        )
+
+        from openpyxl import load_workbook
+
+        wb = load_workbook(output, data_only=True)
+        ws = wb.active
+        try:
+            assert ws.cell(2, 5).value == "preco"
+            assert ws.cell(3, 5).value == 12.34
+        finally:
+            wb.close()
+    finally:
+        os.unlink(path)
+        if output:
+            os.unlink(output)
+
+
 def test_pandas_fallback_preserva_linha_real_do_excel():
     df = pd.DataFrame(
         [["7891000379585", "ACHOC. NESCAU 200G", ""]],
