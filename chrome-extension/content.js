@@ -635,6 +635,132 @@ function getBubbleCatalogRows() {
   return rows;
 }
 
+function getBubbleCatalogRowMeta(row) {
+  return bubbleCatalogRowMeta.get(row)
+    || (row && typeof row === 'object' && ('rowTop' in row || 'ean' in row || 'nome' in row) ? row : null);
+}
+
+function getBubbleCatalogSignatureParts(signature) {
+  const parts = String(signature || '').split('|');
+  return {
+    ean: limparEAN(parts[0] || ''),
+    nomeKey: normalizeRowKey(parts[1] || ''),
+    rowTop: Number(parts[parts.length - 1]),
+  };
+}
+
+function getBubbleCatalogItemIdentity(item = {}, fallbackMeta = null) {
+  const signature = getBubbleCatalogSignatureParts(item.signature);
+  return {
+    ean: limparEAN(item.ean || fallbackMeta?.ean || signature.ean || ''),
+    nomeKey: normalizeRowKey(item.nome || fallbackMeta?.nome || signature.nomeKey || ''),
+    rowTop: Number.isFinite(signature.rowTop) ? signature.rowTop : Number(fallbackMeta?.rowTop),
+  };
+}
+
+function bubbleCatalogNameMatchScore(wantedName, candidateName) {
+  if (!wantedName || !candidateName) return 0;
+  if (wantedName === candidateName) return 80;
+  if (wantedName.length >= 10 && candidateName.includes(wantedName)) return 56;
+  if (candidateName.length >= 10 && wantedName.includes(candidateName)) return 48;
+  return 0;
+}
+
+function scoreBubbleCatalogMetaForItem(meta, identity) {
+  if (!meta) return 0;
+  let score = 0;
+  let identityMatched = false;
+  const metaEan = limparEAN(meta.ean || '');
+  const metaName = normalizeRowKey(meta.nome || '');
+
+  if (identity.ean && metaEan && identity.ean === metaEan) {
+    score += 120;
+    identityMatched = true;
+  }
+
+  const nameScore = bubbleCatalogNameMatchScore(identity.nomeKey, metaName);
+  if (nameScore > 0) {
+    score += nameScore;
+    identityMatched = true;
+  }
+
+  if (!identityMatched) return 0;
+
+  if (Number.isFinite(identity.rowTop) && Number.isFinite(Number(meta.rowTop))) {
+    const distance = Math.abs(Number(meta.rowTop) - identity.rowTop);
+    score += Math.max(0, 30 - distance / 4);
+  }
+
+  return score;
+}
+
+function findBubbleCatalogCurrentRowForItem(item, fallbackRow) {
+  const fallbackMeta = getBubbleCatalogRowMeta(fallbackRow);
+  const identity = getBubbleCatalogItemIdentity(item, fallbackMeta);
+  const candidates = getBubbleCatalogRows()
+    .map(row => ({ row, meta: getBubbleCatalogRowMeta(row) }))
+    .filter(candidate => candidate.meta)
+    .map(candidate => ({ ...candidate, score: scoreBubbleCatalogMetaForItem(candidate.meta, identity) }))
+    .filter(candidate => candidate.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  return candidates[0]?.row || fallbackRow || null;
+}
+
+function findBubbleCatalogVisualMetaForItem(item, fallbackMeta = null, headers = getBubbleCatalogHeaders()) {
+  const identity = getBubbleCatalogItemIdentity(item, fallbackMeta);
+  const matches = headers.items
+    .filter(textItem => !isBubbleIgnoredRowText(textItem.text))
+    .map(textItem => {
+      const ean = limparEAN(textItem.text);
+      const nameKey = normalizeRowKey(textItem.text);
+      let score = 0;
+      if (identity.ean && ean && identity.ean === ean) score += 120;
+      score += bubbleCatalogNameMatchScore(identity.nomeKey, nameKey);
+      if (Number.isFinite(identity.rowTop)) {
+        const distance = Math.abs(textItem.rect.top - identity.rowTop);
+        score += Math.max(0, 20 - distance / 5);
+      }
+      return { textItem, score };
+    })
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  const best = matches[0]?.textItem;
+  if (!best) return fallbackMeta;
+
+  return {
+    ean: identity.ean,
+    nome: item.nome || fallbackMeta?.nome || best.text,
+    rowTop: Math.max(bubbleCatalogHeaderBottom(headers), best.rect.top - 14),
+    rowBottom: best.rect.bottom + 32,
+    fractionInput: fallbackMeta?.fractionInput || null,
+    priceInput: fallbackMeta?.priceInput || null,
+    signature: item.signature || fallbackMeta?.signature || '',
+  };
+}
+
+function bubbleCatalogValueLeft(headers) {
+  return (headers.valor?.rect?.left || headers.fracionamento?.rect?.right || 0) - 24;
+}
+
+function bubbleCatalogRowShowsPrice(row, expectedPrice, samePriceLike, item = null) {
+  const headers = getBubbleCatalogHeaders();
+  const meta = getBubbleCatalogRowMeta(row);
+  const visualMeta = findBubbleCatalogVisualMetaForItem(item || {}, meta, headers);
+  const activeMeta = visualMeta || meta;
+  if (!activeMeta) return false;
+
+  const target = findBubbleCatalogPriceTarget(activeMeta, headers);
+  if (target && samePriceLike(getControlValue(target), expectedPrice)) return true;
+
+  const valueLeft = bubbleCatalogValueLeft(headers);
+  return headers.items
+    .filter(textItem => isBubbleRectInRowBand(textItem.rect, activeMeta, 18))
+    .filter(textItem => textItem.rect.left >= valueLeft)
+    .some(textItem => samePriceLike(textItem.text, expectedPrice));
+}
+
 function getRedeFornecedoresPriceCandidates(row) {
   const cells = Array.from(row.querySelectorAll('td, th'));
   const inputs = getEditableInputs(row).filter(input => {
@@ -1644,12 +1770,22 @@ async function fillQuotationPrices(prices, options = {}) {
   }
 
   for (const item of prices) {
-    const row = rows[item.idx];
+    let row = rows[item.idx];
+    if (site === 'bubble-catalog-fornecedor') {
+      row = findBubbleCatalogCurrentRowForItem(item, row);
+    }
+
     if (!row) {
       failed.push(item.idx);
       details.push({ idx: item.idx, reason: 'row_not_found' });
       continue;
     }
+
+    if (site === 'bubble-catalog-fornecedor' && bubbleCatalogRowShowsPrice(row, item.price, samePriceLike, item)) {
+      count++;
+      continue;
+    }
+
     let input = site === 'vr-cotacao'
       ? getEditableInputs(row)[0]
       : getSelectedPriceInput(row, empresaColuna, site);
@@ -1659,11 +1795,16 @@ async function fillQuotationPrices(prices, options = {}) {
       fractionResult = await ensureBubbleCatalogFraction(row);
       if (fractionResult.ok || !input) {
         await waitForGridRender(fractionResult.changed ? 160 : 60);
+        row = findBubbleCatalogCurrentRowForItem(item, row) || row;
         input = getSelectedPriceInput(row, empresaColuna, site);
       }
     }
 
     if (!input) {
+      if (site === 'bubble-catalog-fornecedor' && bubbleCatalogRowShowsPrice(row, item.price, samePriceLike, item)) {
+        count++;
+        continue;
+      }
       failed.push(item.idx);
       details.push({
         idx: item.idx,
@@ -1676,7 +1817,14 @@ async function fillQuotationPrices(prices, options = {}) {
 
     const before = getControlValue(input);
     const ok = await setInputValue(input, item.price);
-    if (ok) count++;
+    let persisted = ok;
+    if (site === 'bubble-catalog-fornecedor') {
+      await waitForGridRender(140);
+      row = findBubbleCatalogCurrentRowForItem(item, row) || row;
+      persisted = bubbleCatalogRowShowsPrice(row, item.price, samePriceLike, item) || ok;
+    }
+
+    if (persisted) count++;
     else {
       failed.push(item.idx);
       details.push({
