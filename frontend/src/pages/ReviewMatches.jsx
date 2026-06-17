@@ -40,6 +40,32 @@ function parsePercent(value) {
   return Number.isFinite(numero) && numero > -100 && numero < 100 ? numero : null;
 }
 
+function formatPercent(value) {
+  if (!Number.isFinite(value)) return '0%';
+  return `${value.toLocaleString('pt-BR', {
+    minimumFractionDigits: value < 10 ? 1 : 0,
+    maximumFractionDigits: 1,
+  })}%`;
+}
+
+function formatMoney(value) {
+  if (!Number.isFinite(value)) return 'R$ 0,00';
+  return `R$ ${value.toFixed(2).replace('.', ',')}`;
+}
+
+function getPriceAdjustment(original, current) {
+  if (!Number.isFinite(original) || original <= 0 || !Number.isFinite(current) || current <= 0) {
+    return null;
+  }
+  const diff = current - original;
+  if (Math.abs(diff) < 0.005) return null;
+  return {
+    type: diff < 0 ? 'desconto' : 'aumento',
+    percent: Math.abs(diff) / original * 100,
+    amount: Math.abs(diff),
+  };
+}
+
 export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
   const [aprovacoes, setAprovacoes] = useState(() =>
     itens.map(it => it.status === 'aprovado')
@@ -120,6 +146,27 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
   const temPrecoInvalido = itens.some((item, idx) =>
     aprovacoes[idx] && precosEditados[idx] == null
   );
+  const confirmarDisabled = confirmando || aprovados === 0 || temPrecoInvalido;
+  const confirmarLabel = confirmando ? 'Gerando Excel...' : `Confirmar e salvar como (${aprovados})`;
+  const renderConfirmarButton = (fullWidth = false) => (
+    <button
+      onClick={() => onConfirmar(aprovacoes, precosEditados)}
+      disabled={confirmarDisabled}
+      style={{
+        background: confirmarDisabled ? '#374151' : '#e8412a',
+        color: '#fff',
+        border: 'none',
+        borderRadius: 8,
+        padding: fullWidth ? '12px 20px' : '10px 20px',
+        fontWeight: 700,
+        fontSize: 14,
+        cursor: confirmarDisabled ? 'not-allowed' : 'pointer',
+        width: fullWidth ? '100%' : undefined,
+      }}
+    >
+      {confirmarLabel}
+    </button>
+  );
 
   return (
     <div style={{ marginTop: 24 }}>
@@ -135,22 +182,7 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
             {aprovados} de {total} itens aprovados
           </div>
         </div>
-        <button
-          onClick={() => onConfirmar(aprovacoes, precosEditados)}
-          disabled={confirmando || aprovados === 0 || temPrecoInvalido}
-          style={{
-            background: (confirmando || temPrecoInvalido) ? '#374151' : '#e8412a',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 8,
-            padding: '10px 20px',
-            fontWeight: 700,
-            fontSize: 14,
-            cursor: (confirmando || temPrecoInvalido) ? 'not-allowed' : 'pointer',
-          }}
-        >
-          {confirmando ? 'Gerando Excel...' : `Confirmar e Baixar (${aprovados})`}
-        </button>
+        {renderConfirmarButton()}
       </div>
 
       <div style={{
@@ -213,6 +245,7 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
           const precoAlterado = precoEditavel && precoAtual != null && (
             item.preco == null || Math.abs(precoAtual - precoOriginal) >= 0.005
           );
+          const ajustePreco = getPriceAdjustment(precoOriginal, precoAtual);
           const precoInvalido = aprovado && precoEditavel && precoAtual == null;
           const badgeAtual = semMatchComPrecoManual ? BADGE.manual : badge;
 
@@ -325,6 +358,21 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
                       }}
                     />
                   </label>
+
+                  {precoAlterado && ajustePreco && (
+                    <span style={{
+                      color: ajustePreco.type === 'desconto' ? '#fca5a5' : '#86efac',
+                      background: ajustePreco.type === 'desconto' ? '#451a1a' : '#052e16',
+                      border: `1px solid ${ajustePreco.type === 'desconto' ? '#7f1d1d' : '#166534'}`,
+                      borderRadius: 6,
+                      padding: '4px 7px',
+                      fontSize: 11,
+                      fontWeight: 900,
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {ajustePreco.type === 'desconto' ? 'Desconto' : 'Aumento'} {formatPercent(ajustePreco.percent)} ({formatMoney(ajustePreco.amount)})
+                    </span>
+                  )}
 
                   <label style={{
                     display: 'flex',
@@ -452,6 +500,15 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
           );
         })}
       </div>
+      </div>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'flex-end',
+        marginTop: 16,
+        paddingTop: 16,
+        borderTop: '1px solid #334155',
+      }}>
+        {renderConfirmarButton(true)}
       </div>
     </div>
   );

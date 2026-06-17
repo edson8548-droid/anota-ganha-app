@@ -3,7 +3,7 @@ const BATCH = 50;
 const STUCK_MS = 3 * 60 * 1000;
 const MAX_RESULT_DETAILS = 12;
 const BTN_LABEL = 'Preencher Cotação';
-const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação ou Cotação Web SMUS primeiro.';
+const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS ou Catalog Fornecedor primeiro.';
 const SITE_LABELS = {
   cotatudo: 'Cotatudo',
   'vr-cotacao': 'VR Cotação',
@@ -12,6 +12,7 @@ const SITE_LABELS = {
   'infomag-cotacao': 'Infomag Cotação',
   'intersolid-cotacao': 'Intersolid Cotação',
   'cotacao-web-smus': 'Cotação Web SMUS',
+  'bubble-catalog-fornecedor': 'Catalog Fornecedor',
   generic: 'Cotação compatível',
 };
 
@@ -72,6 +73,9 @@ function setDetectedSite(tab, pageInfo = null) {
     type = 'ok';
   } else if (isCotacaoWebSmusUrl(url)) {
     label = 'Site detectado: Cotação Web SMUS';
+    type = 'ok';
+  } else if (isBubbleCatalogFornecedorUrl(url)) {
+    label = 'Site detectado: Catalog Fornecedor';
     type = 'ok';
   }
 
@@ -342,7 +346,8 @@ function isSupportedQuotationUrl(url = '') {
     || isRedeFornecedoresUrl(url)
     || isInfomagCotacaoUrl(url)
     || isIntersolidCotacaoUrl(url)
-    || isCotacaoWebSmusUrl(url);
+    || isCotacaoWebSmusUrl(url)
+    || isBubbleCatalogFornecedorUrl(url);
 }
 
 function isPotentialQuotationUrl(url = '') {
@@ -395,6 +400,16 @@ function isCotacaoWebSmusUrl(url = '') {
   }
 }
 
+function isBubbleCatalogFornecedorUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /^catalog-32594\.bubbleapps\.io$/i.test(parsed.hostname)
+      && /(^|\/)fornecedor\/?$/i.test(parsed.pathname);
+  } catch {
+    return /^(https?:\/\/)?catalog-32594\.bubbleapps\.io\/.*fornecedor\/?$/i.test(url);
+  }
+}
+
 async function getQuotationTab(options = {}) {
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (active?.id && isPotentialQuotationUrl(active.url || '')) return active;
@@ -419,6 +434,7 @@ async function getQuotationTab(options = {}) {
       'http://*.intersolid.com.br/*',
       'https://cotacaoweb.smus.com.br/*',
       'http://cotacaoweb.smus.com.br/*',
+      'https://catalog-32594.bubbleapps.io/*',
       'https://*/fornecedores/*/cotacao/*',
       'http://*/fornecedores/*/cotacao/*',
       'https://*/cotacao/*',
@@ -445,6 +461,7 @@ function detectSiteFromUrl(url = '') {
   if (isInfomagCotacaoUrl(url)) return 'infomag-cotacao';
   if (isIntersolidCotacaoUrl(url)) return 'intersolid-cotacao';
   if (isCotacaoWebSmusUrl(url)) return 'cotacao-web-smus';
+  if (isBubbleCatalogFornecedorUrl(url)) return 'bubble-catalog-fornecedor';
   return 'generic';
 }
 

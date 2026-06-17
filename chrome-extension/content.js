@@ -1,6 +1,7 @@
 // Content script — runs on supported quotation pages.
 
 const cotacaoWebSmusPriceCellMeta = new WeakMap();
+const bubbleCatalogRowMeta = new WeakMap();
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -56,6 +57,28 @@ function isPriceLikeInput(input) {
 
 function normalizeCellText(value) {
   return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function normalizeLooseText(value) {
+  return normalizeCellText(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function elementDirectText(el) {
+  return Array.from(el?.childNodes || [])
+    .filter(node => node.nodeType === Node.TEXT_NODE)
+    .map(node => node.textContent || '')
+    .join(' ');
+}
+
+function rectCenterX(rect) {
+  return rect.left + rect.width / 2;
+}
+
+function rectCenterY(rect) {
+  return rect.top + rect.height / 2;
 }
 
 function limparEAN(s) {
@@ -280,6 +303,167 @@ function isCotacaoWebSmusProductRow(row) {
     && /[A-Za-zÀ-ú]{3}/.test(text);
 }
 
+function isBubbleCatalogFornecedorPage(hostname = window.location.hostname || '', path = window.location.pathname || '', bodyText = document.body?.innerText || '') {
+  if (!/^catalog-32594\.bubbleapps\.io$/i.test(hostname)) return false;
+  const loose = normalizeLooseText(bodyText);
+  return /(^|\/)fornecedor\/?$/i.test(path)
+    || (loose.includes('itens para cotacao')
+      && /\bcod\b/.test(loose)
+      && loose.includes('produto')
+      && loose.includes('fracionamento')
+      && loose.includes('valor'));
+}
+
+function bubbleCatalogTextItems() {
+  return Array.from(document.querySelectorAll('div,span,p,label,td,th'))
+    .filter(isVisible)
+    .map(el => {
+      const text = normalizeCellText(elementDirectText(el));
+      const rect = el.getBoundingClientRect();
+      return { el, text, loose: normalizeLooseText(text), rect };
+    })
+    .filter(item => item.text && item.text.length <= 180 && item.rect.width > 0 && item.rect.height > 0);
+}
+
+function findBubbleCatalogHeader(items, labels) {
+  const wanted = labels.map(normalizeLooseText);
+  return items
+    .filter(item => wanted.includes(item.loose))
+    .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left)[0] || null;
+}
+
+function getBubbleCatalogHeaders() {
+  const items = bubbleCatalogTextItems();
+  return {
+    cod: findBubbleCatalogHeader(items, ['Cod', 'Codigo', 'Código']),
+    produto: findBubbleCatalogHeader(items, ['Produto']),
+    fracionamento: findBubbleCatalogHeader(items, ['Fracionamento']),
+    valor: findBubbleCatalogHeader(items, ['Valor']),
+    items,
+  };
+}
+
+function isBubbleIgnoredRowText(text) {
+  const loose = normalizeLooseText(text);
+  return !loose
+    || loose === 'r$'
+    || loose === 'cod'
+    || loose === 'codigo'
+    || loose === 'produto'
+    || loose === 'fracionamento'
+    || loose === 'valor'
+    || loose === 'a vista'
+    || loose.includes('observacoes do cliente')
+    || loose.includes('observacoes cliente')
+    || loose.includes('itens para cotacao');
+}
+
+function isBubbleSameVisualRow(inputRect, textRect) {
+  const tolerance = Math.max(24, Math.min(56, (inputRect.height + textRect.height) / 2 + 18));
+  return Math.abs(rectCenterY(inputRect) - rectCenterY(textRect)) <= tolerance
+    || (textRect.top <= inputRect.bottom + 6 && textRect.bottom >= inputRect.top - 6);
+}
+
+function isBubbleValorControl(control, headers) {
+  const rect = control.getBoundingClientRect();
+  const valueRect = headers.valor?.rect || null;
+  const fractionRect = headers.fracionamento?.rect || null;
+  const cx = rectCenterX(rect);
+
+  if (valueRect) {
+    const valueCx = rectCenterX(valueRect);
+    const valueDistance = Math.abs(cx - valueCx);
+    if (fractionRect) {
+      const fractionDistance = Math.abs(cx - rectCenterX(fractionRect));
+      if (fractionDistance <= valueDistance || cx <= fractionRect.right + 12) return false;
+    }
+    return valueDistance <= Math.max(130, valueRect.width + 110) || cx >= valueRect.left - 16;
+  }
+
+  if (fractionRect && cx <= rectCenterX(fractionRect) + 32) return false;
+  return true;
+}
+
+function buildBubbleCatalogRowMeta(priceInput, headers) {
+  const inputRect = priceInput.getBoundingClientRect();
+  const headerBottom = Math.max(
+    headers.cod?.rect?.bottom || 0,
+    headers.produto?.rect?.bottom || 0,
+    headers.fracionamento?.rect?.bottom || 0,
+    headers.valor?.rect?.bottom || 0
+  );
+  const productLeft = Math.max(0, (headers.produto?.rect?.left || 0) - 24);
+  const productRight = (headers.fracionamento?.rect?.left || inputRect.left) - 4;
+
+  const rowTexts = headers.items
+    .filter(item => item.rect.top >= headerBottom - 8)
+    .filter(item => item.rect.left < inputRect.left - 6)
+    .filter(item => isBubbleSameVisualRow(inputRect, item.rect))
+    .filter(item => !isBubbleIgnoredRowText(item.text))
+    .sort((a, b) => a.rect.left - b.rect.left || a.rect.top - b.rect.top);
+
+  const eanSource = rowTexts.find(item => limparEAN(item.text))?.text || '';
+  const ean = limparEAN(eanSource);
+  const productParts = rowTexts
+    .filter(item => /[A-Za-zÀ-ú]{3}/.test(item.text))
+    .filter(item => !limparEAN(item.text))
+    .filter(item => item.rect.left >= productLeft && item.rect.left < productRight)
+    .map(item => item.text.trim())
+    .filter((text, index, all) => text && all.indexOf(text) === index);
+
+  const fallbackProductParts = rowTexts
+    .filter(item => /[A-Za-zÀ-ú]{3}/.test(item.text))
+    .filter(item => !limparEAN(item.text))
+    .map(item => item.text.trim())
+    .filter((text, index, all) => text && all.indexOf(text) === index);
+
+  const nome = (productParts.length ? productParts : fallbackProductParts).join(' ').trim();
+  if (!ean && !nome) return null;
+
+  return {
+    ean,
+    nome,
+    priceInput,
+    signature: `${ean}|${normalizeRowKey(nome)}|${Math.round(inputRect.top)}`,
+  };
+}
+
+function getBubbleCatalogPriceCandidates(row) {
+  const meta = bubbleCatalogRowMeta.get(row);
+  if (meta?.priceInput) return [meta.priceInput];
+
+  const headers = getBubbleCatalogHeaders();
+  const controls = getEditableControls(row || document.body)
+    .filter(control => isBubbleValorControl(control, headers));
+  return controls.length ? [controls[0]] : [];
+}
+
+function getBubbleCatalogRows() {
+  const headers = getBubbleCatalogHeaders();
+  const headerBottom = Math.max(
+    headers.cod?.rect?.bottom || 0,
+    headers.produto?.rect?.bottom || 0,
+    headers.fracionamento?.rect?.bottom || 0,
+    headers.valor?.rect?.bottom || 0
+  );
+  const controls = getEditableControls(document.body)
+    .filter(control => {
+      const rect = control.getBoundingClientRect();
+      return rect.top >= headerBottom - 8 && isBubbleValorControl(control, headers);
+    });
+
+  const rows = [];
+  const seen = new Set();
+  for (const control of controls) {
+    const meta = buildBubbleCatalogRowMeta(control, headers);
+    if (!meta || seen.has(meta.signature)) continue;
+    bubbleCatalogRowMeta.set(control, meta);
+    rows.push(control);
+    seen.add(meta.signature);
+  }
+  return rows;
+}
+
 function getRedeFornecedoresPriceCandidates(row) {
   const cells = Array.from(row.querySelectorAll('td, th'));
   const inputs = getEditableInputs(row).filter(input => {
@@ -366,6 +550,7 @@ function getPriceCandidates(row, site = 'generic') {
   if (site === 'rede-fornecedores') return getRedeFornecedoresPriceCandidates(row);
   if (site === 'intersolid-cotacao') return getIntersolidPriceCandidates(row);
   if (site === 'cotacao-web-smus') return getCotacaoWebSmusPriceCandidates(row);
+  if (site === 'bubble-catalog-fornecedor') return getBubbleCatalogPriceCandidates(row);
   const inputs = getEditableInputs(row);
   const priceLike = inputs.filter(isPriceLikeInput);
   return priceLike.length ? priceLike : inputs;
@@ -396,6 +581,7 @@ function detectQuotationSite() {
     && /\bMensagem\s+Fornecedor\b/i.test(bodyText);
 
   if (window.location.hostname.includes('cotatudo.com.br')) return 'cotatudo';
+  if (isBubbleCatalogFornecedorPage(hostname, path, bodyText)) return 'bubble-catalog-fornecedor';
   if (/(^|\.)cotacaoweb\.smus\.com\.br$/i.test(hostname)
     && (/cotacaoweb/i.test(`${hostname}${path}${window.location.hash || ''}`) || looksCotacaoWebSmus)) return 'cotacao-web-smus';
   if (looksCotacaoWebSmus) return 'cotacao-web-smus';
@@ -456,6 +642,10 @@ function getQuotationRows(site) {
 
   if (site === 'cotacao-web-smus') {
     return Array.from(document.querySelectorAll('tr')).filter(isCotacaoWebSmusProductRow);
+  }
+
+  if (site === 'bubble-catalog-fornecedor') {
+    return getBubbleCatalogRows();
   }
 
   return Array.from(document.querySelectorAll('tr')).filter(row => getEditableInputs(row).length > 0);
@@ -675,6 +865,19 @@ async function scanCotacaoWebSmusRows(onRow, options = {}) {
 }
 
 function extractItemFromRow(row, idx, site, empresaColuna) {
+  if (site === 'bubble-catalog-fornecedor') {
+    const meta = bubbleCatalogRowMeta.get(row);
+    if (!meta?.priceInput) return null;
+    return {
+      idx,
+      ean: meta.ean || '',
+      nome: meta.nome || '',
+      codigo: '',
+      signature: meta.signature || '',
+      filled: isFilledPriceValue(getControlValue(meta.priceInput).trim()),
+    };
+  }
+
   const priceInput = site === 'vr-cotacao'
     ? getEditableInputs(row)[0]
     : getSelectedPriceInput(row, empresaColuna, site);

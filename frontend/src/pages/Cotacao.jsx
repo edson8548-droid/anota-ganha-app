@@ -7,7 +7,25 @@ import { listarTabelas, uploadTabela, excluirTabela, processarCotacao, previewCo
 import ReviewMatches from './ReviewMatches';
 import ConfirmDialog from '../components/ConfirmDialog';
 
-const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.39.zip';
+const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.40.zip';
+const DEFAULT_COTACAO_FILENAME = 'cotacao_preenchida.xlsx';
+
+function ensureXlsxFilename(value) {
+  const cleaned = String(value || '')
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
+    .replace(/[. ]+$/g, '')
+    .trim();
+  const filename = cleaned || DEFAULT_COTACAO_FILENAME;
+  return /\.xlsx$/i.test(filename) ? filename : `${filename.replace(/\.(xls|csv)$/i, '')}.xlsx`;
+}
+
+function defaultCotacaoFilename(file) {
+  const base = String(file?.name || '')
+    .replace(/\.[^.]+$/g, '')
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
+    .trim();
+  return ensureXlsxFilename(base ? `${base}_preenchida.xlsx` : DEFAULT_COTACAO_FILENAME);
+}
 
 export default function Cotacao() {
   const navigate = useNavigate();
@@ -48,13 +66,49 @@ export default function Cotacao() {
     setConfirmDialog({ open: true, title, description, onConfirm });
   const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false }));
 
-  const baixarCotacaoPreenchida = (blob) => {
+  const criarDestinoCotacao = async (defaultName, options = {}) => {
+    const suggestedName = ensureXlsxFilename(defaultName);
+
+    if (options.native !== false && window.isSecureContext && typeof window.showSaveFilePicker === 'function') {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName,
+          types: [
+            {
+              description: 'Planilha Excel',
+              accept: {
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+              },
+            },
+          ],
+        });
+        return { type: 'file-handle', handle, filename: handle.name || suggestedName };
+      } catch (err) {
+        if (err?.name === 'AbortError') return null;
+        console.warn('Nao foi possivel abrir Salvar como:', err);
+      }
+    }
+
+    const escolhido = window.prompt('Nome do arquivo preenchido:', suggestedName);
+    if (escolhido == null) return null;
+    return { type: 'download', filename: ensureXlsxFilename(escolhido) };
+  };
+
+  const salvarCotacaoPreenchida = async (blob, destino) => {
+    if (destino?.type === 'file-handle' && destino.handle?.createWritable) {
+      const writable = await destino.handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return destino.filename || DEFAULT_COTACAO_FILENAME;
+    }
+
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'cotacao_preenchida.xlsx';
+    a.download = ensureXlsxFilename(destino?.filename || DEFAULT_COTACAO_FILENAME);
     a.click();
     window.URL.revokeObjectURL(url);
+    return a.download;
   };
 
   const limparCotacaoSelecionada = useCallback(() => {
@@ -143,11 +197,16 @@ export default function Cotacao() {
       } else if (err.name !== 'AbortError') {
         if (isStorageQuotaError(err)) {
           try {
+            const destino = await criarDestinoCotacao(defaultCotacaoFilename(arquivoCotacao), { native: false });
+            if (!destino) {
+              toast.info('Download cancelado.');
+              return;
+            }
             const { blob, stats, semMatch } = await processarCotacao(arquivoCotacao, tabelaSelecionada, modoMatch);
-            baixarCotacaoPreenchida(blob);
+            const filename = await salvarCotacaoPreenchida(blob, destino);
             limparCotacaoSelecionada();
-            setResultado({ stats, semMatch });
-            toast.warning('Banco no limite: processei em modo direto, sem tela de revisão.');
+            setResultado({ stats, semMatch, filename });
+            toast.warning(`Banco no limite: processei em modo direto, sem tela de revisão. Arquivo gerado: ${filename}.`);
           } catch (fallbackErr) {
             toast.error('Erro ao processar: ' + (fallbackErr.response?.data?.detail || fallbackErr.message));
           }
@@ -179,17 +238,25 @@ export default function Cotacao() {
 
   const handleConfirmar = async (aprovacoes, precosEditados) => {
     if (!reviewData) return;
+    const destino = await criarDestinoCotacao(defaultCotacaoFilename(arquivoCotacao));
+    if (!destino) {
+      toast.info('Salvamento cancelado.');
+      return;
+    }
+
     setConfirmando(true);
     try {
       const { blob, stats, semMatch } = await confirmarCotacao(reviewData.session_id, aprovacoes, precosEditados);
-      baixarCotacaoPreenchida(blob);
+      const filename = await salvarCotacaoPreenchida(blob, destino);
       limparCotacaoSelecionada();
-      setResultado({ stats, semMatch });
+      setResultado({ stats, semMatch, filename });
       setReviewData(null);
+      toast.success(`Arquivo gerado: ${filename}`);
     } catch (err) {
       toast.error('Erro ao confirmar: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setConfirmando(false);
     }
-    setConfirmando(false);
   };
 
   const handleLogout = () => {
@@ -662,7 +729,7 @@ function CotacaoTab({
                 <StatCard label="Sem match" value={resultado.stats.sem_match || 0} color="#ef4444" />
               </div>
               <p style={{ color: '#6B6E74', fontSize: 13 }}>
-                Download iniciado automaticamente. O campo de cotação já está livre para selecionar outro arquivo.
+                Arquivo gerado: <strong style={{ color: '#E1E1E1' }}>{resultado.filename || DEFAULT_COTACAO_FILENAME}</strong>. O campo de cotação já está livre para selecionar outro arquivo.
               </p>
               <button
                 onClick={() => cotacaoInputRef.current?.click()}
