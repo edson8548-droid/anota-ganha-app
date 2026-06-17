@@ -90,6 +90,14 @@ function elementDirectText(el) {
     .join(' ');
 }
 
+function elementLeafText(el) {
+  const direct = normalizeCellText(elementDirectText(el));
+  if (direct) return direct;
+  const visibleChildren = Array.from(el?.children || []).filter(isVisible);
+  if (visibleChildren.length > 0) return '';
+  return normalizeCellText(el?.textContent || '');
+}
+
 function rectCenterX(rect) {
   return rect.left + rect.width / 2;
 }
@@ -335,7 +343,7 @@ function bubbleCatalogTextItems() {
   return Array.from(document.querySelectorAll('div,span,p,label,td,th'))
     .filter(isVisible)
     .map(el => {
-      const text = normalizeCellText(elementDirectText(el));
+      const text = elementLeafText(el);
       const rect = el.getBoundingClientRect();
       return { el, text, loose: normalizeLooseText(text), rect };
     })
@@ -381,6 +389,85 @@ function isBubbleSameVisualRow(inputRect, textRect) {
     || (textRect.top <= inputRect.bottom + 6 && textRect.bottom >= inputRect.top - 6);
 }
 
+function bubbleCatalogHeaderBottom(headers) {
+  return Math.max(
+    headers.cod?.rect?.bottom || 0,
+    headers.produto?.rect?.bottom || 0,
+    headers.fracionamento?.rect?.bottom || 0,
+    headers.valor?.rect?.bottom || 0
+  );
+}
+
+function isBubbleRectInRowBand(rect, meta, tolerance = 8) {
+  const top = meta?.rowTop ?? meta?.priceInput?.getBoundingClientRect?.().top ?? 0;
+  const bottom = meta?.rowBottom ?? meta?.priceInput?.getBoundingClientRect?.().bottom ?? 0;
+  return rect.bottom >= top - tolerance && rect.top <= bottom + tolerance;
+}
+
+function getBubbleCatalogProductBounds(headers, fallbackRight = window.innerWidth || 99999) {
+  return {
+    left: Math.max(0, (headers.produto?.rect?.left || 0) - 24),
+    right: (headers.fracionamento?.rect?.left || fallbackRight) - 4,
+  };
+}
+
+function buildBubbleCatalogTextRows(headers) {
+  const headerBottom = bubbleCatalogHeaderBottom(headers);
+  const productBounds = getBubbleCatalogProductBounds(headers);
+  const codeRight = headers.produto?.rect?.left
+    ? headers.produto.rect.left - 8
+    : Math.max(headers.cod?.rect?.right || 0, 220);
+  const codeItems = headers.items
+    .filter(item => item.rect.top >= headerBottom - 8)
+    .filter(item => item.rect.left <= codeRight)
+    .map(item => ({ ...item, ean: limparEAN(item.text) }))
+    .filter(item => item.ean)
+    .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left);
+
+  const rows = [];
+  const seen = new Set();
+  for (let i = 0; i < codeItems.length; i++) {
+    const code = codeItems[i];
+    const nextCode = codeItems.slice(i + 1).find(item => item.rect.top > code.rect.top + 10);
+    const rowTop = Math.max(headerBottom, code.rect.top - 8);
+    const rowBottom = nextCode
+      ? Math.max(rowTop + 22, nextCode.rect.top - 7)
+      : Math.max(code.rect.bottom + 44, code.rect.bottom + code.rect.height + 20);
+    const rowTexts = headers.items
+      .filter(item => item.rect.top >= rowTop - 3 && item.rect.top < rowBottom + 3)
+      .filter(item => !isBubbleIgnoredRowText(item.text));
+    const productParts = rowTexts
+      .filter(item => /[A-Za-zÀ-ú]{3}/.test(item.text))
+      .filter(item => !limparEAN(item.text))
+      .filter(item => item.rect.left >= productBounds.left && item.rect.left < productBounds.right)
+      .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left)
+      .map(item => item.text.trim())
+      .filter((text, index, all) => text && all.indexOf(text) === index);
+    const fallbackProductParts = rowTexts
+      .filter(item => /[A-Za-zÀ-ú]{3}/.test(item.text))
+      .filter(item => !limparEAN(item.text))
+      .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left)
+      .map(item => item.text.trim())
+      .filter((text, index, all) => text && all.indexOf(text) === index);
+    const nome = (productParts.length ? productParts : fallbackProductParts).join(' ').trim();
+    if (!nome) continue;
+
+    const meta = {
+      ean: code.ean,
+      nome,
+      rowTop,
+      rowBottom,
+      priceInput: null,
+      signature: `${code.ean}|${normalizeRowKey(nome)}|${Math.round(rowTop)}`,
+    };
+    if (seen.has(meta.signature)) continue;
+    bubbleCatalogRowMeta.set(meta, meta);
+    rows.push(meta);
+    seen.add(meta.signature);
+  }
+  return rows;
+}
+
 function isBubbleValorControl(control, headers) {
   const rect = control.getBoundingClientRect();
   const valueRect = headers.valor?.rect || null;
@@ -403,14 +490,8 @@ function isBubbleValorControl(control, headers) {
 
 function buildBubbleCatalogRowMeta(priceInput, headers) {
   const inputRect = priceInput.getBoundingClientRect();
-  const headerBottom = Math.max(
-    headers.cod?.rect?.bottom || 0,
-    headers.produto?.rect?.bottom || 0,
-    headers.fracionamento?.rect?.bottom || 0,
-    headers.valor?.rect?.bottom || 0
-  );
-  const productLeft = Math.max(0, (headers.produto?.rect?.left || 0) - 24);
-  const productRight = (headers.fracionamento?.rect?.left || inputRect.left) - 4;
+  const headerBottom = bubbleCatalogHeaderBottom(headers);
+  const productBounds = getBubbleCatalogProductBounds(headers, inputRect.left);
 
   const rowTexts = headers.items
     .filter(item => item.rect.top >= headerBottom - 8)
@@ -424,7 +505,7 @@ function buildBubbleCatalogRowMeta(priceInput, headers) {
   const productParts = rowTexts
     .filter(item => /[A-Za-zÀ-ú]{3}/.test(item.text))
     .filter(item => !limparEAN(item.text))
-    .filter(item => item.rect.left >= productLeft && item.rect.left < productRight)
+    .filter(item => item.rect.left >= productBounds.left && item.rect.left < productBounds.right)
     .map(item => item.text.trim())
     .filter((text, index, all) => text && all.indexOf(text) === index);
 
@@ -441,28 +522,63 @@ function buildBubbleCatalogRowMeta(priceInput, headers) {
     ean,
     nome,
     priceInput,
+    rowTop: inputRect.top - 8,
+    rowBottom: inputRect.bottom + 8,
     signature: `${ean}|${normalizeRowKey(nome)}|${Math.round(inputRect.top)}`,
   };
 }
 
-function getBubbleCatalogPriceCandidates(row) {
-  const meta = bubbleCatalogRowMeta.get(row);
-  if (meta?.priceInput) return [meta.priceInput];
+function findBubbleCatalogPriceTarget(meta, headers) {
+  if (meta?.priceInput && isVisible(meta.priceInput)) return meta.priceInput;
 
+  const controls = getBubbleCatalogEditableControls(document.body)
+    .filter(control => isBubbleValorControl(control, headers))
+    .map(control => ({ el: control, rect: control.getBoundingClientRect() }))
+    .filter(item => isBubbleRectInRowBand(item.rect, meta))
+    .sort((a, b) => (
+      Math.abs(rectCenterY(a.rect) - ((meta.rowTop + meta.rowBottom) / 2))
+      - Math.abs(rectCenterY(b.rect) - ((meta.rowTop + meta.rowBottom) / 2))
+    ));
+  if (controls[0]?.el) {
+    meta.priceInput = controls[0].el;
+    return controls[0].el;
+  }
+
+  const valueLeft = (headers.valor?.rect?.left || headers.fracionamento?.rect?.right || 0) - 24;
+  const valueCenter = headers.valor?.rect ? rectCenterX(headers.valor.rect) : valueLeft;
+  const valueTargets = headers.items
+    .filter(item => isBubbleRectInRowBand(item.rect, meta, 12))
+    .filter(item => item.rect.left >= valueLeft)
+    .filter(item => item.loose === 'r$' || item.loose === 'rs' || /r\$/i.test(item.text))
+    .sort((a, b) => Math.abs(rectCenterX(a.rect) - valueCenter) - Math.abs(rectCenterX(b.rect) - valueCenter));
+  if (valueTargets[0]?.el) {
+    meta.priceInput = valueTargets[0].el;
+    return valueTargets[0].el;
+  }
+
+  return null;
+}
+
+function getBubbleCatalogPriceCandidates(row) {
   const headers = getBubbleCatalogHeaders();
-  const controls = getBubbleCatalogEditableControls(row || document.body)
+  const meta = bubbleCatalogRowMeta.get(row);
+  if (meta) {
+    const target = findBubbleCatalogPriceTarget(meta, headers);
+    return target ? [target] : [];
+  }
+
+  const root = row?.querySelectorAll ? row : document.body;
+  const controls = getBubbleCatalogEditableControls(root)
     .filter(control => isBubbleValorControl(control, headers));
   return controls.length ? [controls[0]] : [];
 }
 
 function getBubbleCatalogRows() {
   const headers = getBubbleCatalogHeaders();
-  const headerBottom = Math.max(
-    headers.cod?.rect?.bottom || 0,
-    headers.produto?.rect?.bottom || 0,
-    headers.fracionamento?.rect?.bottom || 0,
-    headers.valor?.rect?.bottom || 0
-  );
+  const textRows = buildBubbleCatalogTextRows(headers);
+  if (textRows.length) return textRows;
+
+  const headerBottom = bubbleCatalogHeaderBottom(headers);
   const controls = getBubbleCatalogEditableControls(document.body)
     .filter(control => {
       const rect = control.getBoundingClientRect();
@@ -884,14 +1000,15 @@ async function scanCotacaoWebSmusRows(onRow, options = {}) {
 function extractItemFromRow(row, idx, site, empresaColuna) {
   if (site === 'bubble-catalog-fornecedor') {
     const meta = bubbleCatalogRowMeta.get(row);
-    if (!meta?.priceInput) return null;
+    if (!meta || (!meta.ean && !meta.nome)) return null;
+    const priceTarget = getSelectedPriceInput(row, empresaColuna, site);
     return {
       idx,
       ean: meta.ean || '',
       nome: meta.nome || '',
       codigo: '',
       signature: meta.signature || '',
-      filled: isFilledPriceValue(getControlValue(meta.priceInput).trim()),
+      filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
     };
   }
 
