@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Venpro — Preencher Cotação",
-  "version": "1.0.40",
+  "version": "1.0.41",
   "description": "Preenchedor de cotações do Venpro para Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor e novos portais compatíveis.",
   "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel"],
   "host_permissions": [

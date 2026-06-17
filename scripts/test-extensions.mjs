@@ -133,6 +133,14 @@ describe('extensoes Chrome', () => {
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.38.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.39.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.40.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.41.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-whatsapp-extension.zip')));
+  });
+
+  it('Catalog Fornecedor usa captura isolada para inputs Bubble', () => {
+    const contentJs = readText('chrome-extension/content.js');
+    assert.match(contentJs, /function getBubbleCatalogEditableControls/);
+    assert.match(contentJs, /getBubbleCatalogEditableControls\(document\.body\)/);
+    assert.match(contentJs, /input,\s*textarea/);
   });
 });

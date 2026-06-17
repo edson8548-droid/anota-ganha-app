@@ -50,6 +50,23 @@ function getEditableControls(root) {
   return [...self, ...inputs, ...editable].filter((el, index, all) => all.indexOf(el) === index);
 }
 
+function getBubbleCatalogEditableControls(root) {
+  const unsafeTypes = /^(hidden|button|submit|reset|checkbox|radio|file|image|password)$/i;
+  const self = isEditableValueControl(root)
+    && !(root.tagName === 'INPUT' && unsafeTypes.test(String(root.getAttribute('type') || '').toLowerCase()))
+    && !root.disabled
+    && !root.readOnly
+    && isVisible(root)
+    ? [root]
+    : [];
+  const inputs = Array.from(root.querySelectorAll('input, textarea'))
+    .filter(input => !input.disabled && !input.readOnly && isVisible(input))
+    .filter(input => !unsafeTypes.test(String(input.getAttribute('type') || '').toLowerCase()));
+  const editable = Array.from(root.querySelectorAll('[contenteditable="true"], [role="textbox"]'))
+    .filter(el => isVisible(el));
+  return [...self, ...inputs, ...editable].filter((el, index, all) => all.indexOf(el) === index);
+}
+
 function isPriceLikeInput(input) {
   const meta = `${input.name || ''} ${input.id || ''} ${input.className || ''} ${input.placeholder || ''}`.toLowerCase();
   return /(preco|preço|valor|vlr|cotacao|cotação|unit)/.test(meta);
@@ -433,7 +450,7 @@ function getBubbleCatalogPriceCandidates(row) {
   if (meta?.priceInput) return [meta.priceInput];
 
   const headers = getBubbleCatalogHeaders();
-  const controls = getEditableControls(row || document.body)
+  const controls = getBubbleCatalogEditableControls(row || document.body)
     .filter(control => isBubbleValorControl(control, headers));
   return controls.length ? [controls[0]] : [];
 }
@@ -446,7 +463,7 @@ function getBubbleCatalogRows() {
     headers.fracionamento?.rect?.bottom || 0,
     headers.valor?.rect?.bottom || 0
   );
-  const controls = getEditableControls(document.body)
+  const controls = getBubbleCatalogEditableControls(document.body)
     .filter(control => {
       const rect = control.getBoundingClientRect();
       return rect.top >= headerBottom - 8 && isBubbleValorControl(control, headers);
