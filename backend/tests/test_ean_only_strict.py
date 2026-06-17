@@ -104,6 +104,66 @@ def test_cotacao_prefere_gtin_produto_a_gtin_caixa_e_preenche_preco():
             os.unlink(output)
 
 
+def test_cotacao_extrai_ean_do_inicio_da_descricao_sem_coluna_ean():
+    path = _xlsx([
+        ["COTACAO ENVIO", "preco"],
+        [None, None],
+        ["7891200234257 – SUPERBONDER 5G + 1G GRATIS", None],
+        ["7891065000141 -CADEADO PADO 20MM", None],
+        ["070330709485 – APARELHO BIC COMFORT 2 SENSITIVE C/2", None],
+        ["RAYOVAC PILHA AMARELINHA AAA C/4UN BILISTER", None],
+    ])
+    output = None
+    try:
+        itens, header_row = ler_cotacao(path)
+
+        assert header_row == 1
+        assert itens[0]["ean"] == "7891200234257"
+        assert itens[0]["nome"] == "SUPERBONDER 5G + 1G GRATIS"
+        assert itens[0]["col_preco"] == 1
+        assert itens[1]["ean"] == "7891065000141"
+        assert itens[1]["nome"] == "CADEADO PADO 20MM"
+        assert itens[2]["ean"] == "070330709485"
+        assert itens[2]["nome"] == "APARELHO BIC COMFORT 2 SENSITIVE C/2"
+        assert itens[3]["ean"] == ""
+        assert itens[3]["nome"] == "RAYOVAC PILHA AMARELINHA AAA C/4UN BILISTER"
+
+        output = gerar_excel_resultado(
+            path,
+            itens[:1],
+            [{"linha": 3, "preco": 9.99, "tipo": "EAN"}],
+        )
+
+        from openpyxl import load_workbook
+
+        wb = load_workbook(output, data_only=True)
+        ws = wb.active
+        try:
+            assert ws.cell(1, 2).value == "preco"
+            assert ws.cell(3, 2).value == 9.99
+        finally:
+            wb.close()
+    finally:
+        os.unlink(path)
+        if output:
+            os.unlink(output)
+
+
+def test_cotacao_nao_substitui_ean_quando_coluna_ean_existe():
+    path = _xlsx([
+        ["EAN", "Produto", "preco"],
+        ["7891000379585", "7899999999999 – ACHOC. NESCAU 200G", ""],
+    ])
+    try:
+        itens, _ = ler_cotacao(path)
+    finally:
+        os.unlink(path)
+
+    assert itens[0]["ean"] == "7891000379585"
+    assert itens[0]["nome"] == "7899999999999 – ACHOC. NESCAU 200G"
+    assert itens[0]["col_preco"] == 2
+
+
 def test_pandas_fallback_preserva_linha_real_do_excel():
     df = pd.DataFrame(
         [["7891000379585", "ACHOC. NESCAU 200G", ""]],

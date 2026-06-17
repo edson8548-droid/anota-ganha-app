@@ -224,6 +224,46 @@ def _xlsx_safe_bytes(caminho_arquivo):
             return io.BytesIO(f.read())
 
 PREENCHIMENTO_IA = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+MAX_BLANK_ROWS_AFTER_COTACAO_ITEMS = 200
+
+
+def _extrair_ean_prefixo_nome(nome_val):
+    """Extrai EAN/GTIN no início da descrição sem pegar números do meio do texto."""
+    texto = str(nome_val or "").strip()
+    if not texto:
+        return "", texto
+
+    match = _re.match(
+        r"^\s*['\"]?((?:\d[\s.-]?){8,14})\s*(?:[-–—:|]\s*)+(.+?)\s*$",
+        texto,
+    )
+    if not match:
+        return "", texto
+
+    ean = _re.sub(r"\D", "", match.group(1))
+    nome_sem_ean = str(match.group(2) or "").strip()
+    if not (8 <= len(ean) <= 14) or not nome_sem_ean:
+        return "", texto
+
+    return ean, nome_sem_ean
+
+
+def _cotacao_item(ean_val, nome_val, linha, col_preco):
+    nome_texto = str(nome_val).strip()
+    ean_texto = str(ean_val) if ean_val and str(ean_val) != "nan" else ""
+
+    if not ean_texto:
+        ean_prefixo, nome_sem_ean = _extrair_ean_prefixo_nome(nome_texto)
+        if ean_prefixo:
+            ean_texto = ean_prefixo
+            nome_texto = nome_sem_ean
+
+    return {
+        "ean": ean_texto,
+        "nome": nome_texto,
+        "linha": linha,
+        "col_preco": col_preco,
+    }
 
 
 def _append_cotacao_items_from_dataframe(itens, df, header_row, col_nome, col_ean, col_preco):
@@ -232,12 +272,12 @@ def _append_cotacao_items_from_dataframe(itens, df, header_row, col_nome, col_ea
         nome_val = row.iloc[col_nome]
         ean_val = row.iloc[col_ean] if col_ean is not None and col_ean < len(row) else ""
         if nome_val and str(nome_val).strip() and str(nome_val).strip() != "nan":
-            itens.append({
-                "ean": str(ean_val) if ean_val and str(ean_val) != "nan" else "",
-                "nome": str(nome_val),
-                "linha": header_row + idx + 1,
-                "col_preco": col_preco,
-            })
+            itens.append(_cotacao_item(
+                ean_val,
+                nome_val,
+                header_row + idx + 1,
+                col_preco,
+            ))
 
 
 def detectar_prazos_disponiveis(caminho_arquivo) -> list:
@@ -456,17 +496,25 @@ def ler_cotacao(caminho_arquivo):
             )
         if col_nome is None:
             col_nome = 0
+        blank_rows_after_items = 0
         for row_idx in range(header_row + 1, ws.max_row + 1):
             row = ws[row_idx]
             ean_val  = row[col_ean].value  if col_ean is not None and col_ean < len(row) else None
             nome_val = row[col_nome].value if col_nome < len(row) else None
             if nome_val and str(nome_val).strip() and str(nome_val).strip().upper() not in ("NONE", "NAN"):
-                itens.append({
-                    "ean": str(ean_val) if ean_val else "",
-                    "nome": str(nome_val),
-                    "linha": row_idx,
-                    "col_preco": col_preco,
-                })
+                itens.append(_cotacao_item(ean_val, nome_val, row_idx, col_preco))
+                blank_rows_after_items = 0
+            elif itens:
+                row_has_value = any(
+                    cell.value is not None and str(cell.value).strip() != ""
+                    for cell in row
+                )
+                if row_has_value:
+                    blank_rows_after_items = 0
+                else:
+                    blank_rows_after_items += 1
+                    if blank_rows_after_items >= MAX_BLANK_ROWS_AFTER_COTACAO_ITEMS:
+                        break
 
         wb.close()
         if itens:
