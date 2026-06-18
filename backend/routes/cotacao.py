@@ -31,7 +31,7 @@ from services.excel_processor import (
     gerar_excel_multiprazos,
     detectar_prazos_disponiveis,
 )
-from services.matching_engine import normalizar_nome
+from services.matching_engine import limpar_ean, normalizar_nome
 from services.subscription_access import ensure_subscription_access
 from services.upload_validation import PDF_CONTENT_TYPES, XLSX_CONTENT_TYPES, validate_upload
 from services.security_audit import audit_event
@@ -1637,6 +1637,7 @@ async def match_cotatudo(
 
     try:
         prazo_efetivo = payload.prazo if payload.prazo > 0 else doc.get("prazo", 28)
+        is_bubble_catalog = payload.site == "bubble-catalog-fornecedor"
 
         itens_para_match = [
             {"nome": it.nome, "ean": it.ean or "", "linha": it.idx}
@@ -1656,10 +1657,14 @@ async def match_cotatudo(
             return {"precos": [], "stats": stats}
 
         def _match_sync():
-            pd, pl = ler_tabela_mestre(tmp_mestre.name, prazo=prazo_efetivo)
-            return pd, pl, processar_cotacao_com_ia(itens_para_match, pd, pl, modo=modo)
+            if is_bubble_catalog:
+                pd, pl, meta_por_ean = ler_tabela_mestre(tmp_mestre.name, prazo=prazo_efetivo, incluir_meta=True)
+            else:
+                pd, pl = ler_tabela_mestre(tmp_mestre.name, prazo=prazo_efetivo)
+                meta_por_ean = {}
+            return pd, pl, meta_por_ean, processar_cotacao_com_ia(itens_para_match, pd, pl, modo=modo)
 
-        precos_dict, precos_lista, resultados = await asyncio.to_thread(_match_sync)
+        precos_dict, precos_lista, meta_por_ean, resultados = await asyncio.to_thread(_match_sync)
 
         aprendizado_map = {}
         if modo != "ean":
@@ -1681,7 +1686,12 @@ async def match_cotatudo(
 
             if res.get("preco") is not None:
                 preco_str = f"{res['preco']:.2f}".replace(".", ",")
-                precos.append({"idx": item["linha"], "price": preco_str})
+                preco_item = {"idx": item["linha"], "price": preco_str}
+                if is_bubble_catalog:
+                    fracionamento = (meta_por_ean.get(limpar_ean(item.get("ean", ""))) or {}).get("fracionamento")
+                    if fracionamento:
+                        preco_item["fracionamento"] = fracionamento
+                precos.append(preco_item)
                 preenchidos += 1
             else:
                 nao_encontrados += 1

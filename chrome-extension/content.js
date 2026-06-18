@@ -694,17 +694,21 @@ function scoreBubbleCatalogMetaForItem(meta, identity) {
   return score;
 }
 
-function findBubbleCatalogCurrentRowForItem(item, fallbackRow) {
+function findBubbleCatalogCurrentRowForItem(item, fallbackRow, options = {}) {
   const fallbackMeta = getBubbleCatalogRowMeta(fallbackRow);
   const identity = getBubbleCatalogItemIdentity(item, fallbackMeta);
+  const requireExactEan = Boolean(options.requireExactEan);
+  if (requireExactEan && !identity.ean) return null;
+
   const candidates = getBubbleCatalogRows()
     .map(row => ({ row, meta: getBubbleCatalogRowMeta(row) }))
     .filter(candidate => candidate.meta)
     .map(candidate => ({ ...candidate, score: scoreBubbleCatalogMetaForItem(candidate.meta, identity) }))
+    .filter(candidate => !requireExactEan || limparEAN(candidate.meta.ean || '') === identity.ean)
     .filter(candidate => candidate.score > 0)
     .sort((a, b) => b.score - a.score);
 
-  return candidates[0]?.row || fallbackRow || null;
+  return candidates[0]?.row || (requireExactEan ? null : fallbackRow || null);
 }
 
 function findBubbleCatalogVisualMetaForItem(item, fallbackMeta = null, headers = getBubbleCatalogHeaders()) {
@@ -1674,24 +1678,54 @@ async function fillQuotationPrices(prices, options = {}) {
     return hasPrice(getControlValue(input));
   }
 
-  async function ensureBubbleCatalogFraction(row) {
+  function normalizeBubbleCatalogFraction(value) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+    const match = raw.replace(/\s+/g, ' ').match(/\d+(?:[.,]\d+)?/);
+    if (!match) return '';
+    const n = Number(match[0].replace(',', '.'));
+    if (!Number.isFinite(n) || n <= 0 || n > 9999) return '';
+    if (Math.abs(n - Math.round(n)) < 0.0001) return String(Math.round(n));
+    return String(n).replace('.', ',');
+  }
+
+  function getBubbleCatalogFractionValue(item = {}) {
+    return normalizeBubbleCatalogFraction(
+      item.fracionamento
+      ?? item.fraction
+      ?? item.quantidade_caixa
+      ?? item.quantidadeCaixa
+      ?? item.qtd_caixa
+      ?? ''
+    ) || '1';
+  }
+
+  function sameBubbleCatalogFraction(current, desired) {
+    const a = parsePriceNumber(current);
+    const b = parsePriceNumber(desired);
+    return a !== null && b !== null && Math.abs(a - b) < 0.0001;
+  }
+
+  async function ensureBubbleCatalogFraction(row, item = {}) {
     const meta = bubbleCatalogRowMeta.get(row);
     if (!meta) return { ok: false, changed: false, reason: 'row_meta_not_found' };
 
     const target = findBubbleCatalogFractionTarget(meta, getBubbleCatalogHeaders());
     if (!target) return { ok: false, changed: false, reason: 'fraction_input_not_found' };
 
-    if (parsePriceNumber(getControlValue(target)) !== null) {
-      return { ok: true, changed: false, reason: 'fraction_already_filled' };
+    const fracionamento = getBubbleCatalogFractionValue(item);
+    const current = getControlValue(target);
+    if (sameBubbleCatalogFraction(current, fracionamento)) {
+      return { ok: true, changed: false, reason: 'fraction_already_filled', fracionamento };
     }
 
-    const ok = await setPlainControlValue(target, '1');
+    const ok = await setPlainControlValue(target, fracionamento);
     await waitForGridRender(140);
     if (ok && meta.priceInput && !isEditableValueControl(meta.priceInput)) {
       meta.priceInput = null;
     }
 
-    return { ok, changed: ok, reason: ok ? 'fraction_filled' : 'fraction_rejected' };
+    return { ok, changed: ok, reason: ok ? 'fraction_filled' : 'fraction_rejected', fracionamento };
   }
 
   async function fillCotacaoWebSmusPrices() {
@@ -1769,19 +1803,21 @@ async function fillQuotationPrices(prices, options = {}) {
     return fillCotacaoWebSmusPrices();
   }
 
+  const isBubbleCatalogFornecedor = site === 'bubble-catalog-fornecedor';
+
   for (const item of prices) {
     let row = rows[item.idx];
-    if (site === 'bubble-catalog-fornecedor') {
-      row = findBubbleCatalogCurrentRowForItem(item, row);
+    if (isBubbleCatalogFornecedor) {
+      row = findBubbleCatalogCurrentRowForItem(item, row, { requireExactEan: true });
     }
 
     if (!row) {
       failed.push(item.idx);
-      details.push({ idx: item.idx, reason: 'row_not_found' });
+      details.push({ idx: item.idx, reason: isBubbleCatalogFornecedor ? 'ean_row_not_found' : 'row_not_found' });
       continue;
     }
 
-    if (site === 'bubble-catalog-fornecedor' && bubbleCatalogRowShowsPrice(row, item.price, samePriceLike, item)) {
+    if (isBubbleCatalogFornecedor && bubbleCatalogRowShowsPrice(row, item.price, samePriceLike, item)) {
       count++;
       continue;
     }
@@ -1791,26 +1827,36 @@ async function fillQuotationPrices(prices, options = {}) {
       : getSelectedPriceInput(row, empresaColuna, site);
 
     let fractionResult = null;
-    if (site === 'bubble-catalog-fornecedor') {
-      fractionResult = await ensureBubbleCatalogFraction(row);
+    if (isBubbleCatalogFornecedor) {
+      fractionResult = await ensureBubbleCatalogFraction(row, item);
       if (fractionResult.ok || !input) {
         await waitForGridRender(fractionResult.changed ? 160 : 60);
-        row = findBubbleCatalogCurrentRowForItem(item, row) || row;
+        row = findBubbleCatalogCurrentRowForItem(item, row, { requireExactEan: true });
+        if (!row) {
+          failed.push(item.idx);
+          details.push({
+            idx: item.idx,
+            reason: 'ean_row_not_found_after_fraction',
+            fracionamento: fractionResult.fracionamento || '',
+          });
+          continue;
+        }
         input = getSelectedPriceInput(row, empresaColuna, site);
       }
     }
 
     if (!input) {
-      if (site === 'bubble-catalog-fornecedor' && bubbleCatalogRowShowsPrice(row, item.price, samePriceLike, item)) {
+      if (isBubbleCatalogFornecedor && bubbleCatalogRowShowsPrice(row, item.price, samePriceLike, item)) {
         count++;
         continue;
       }
       failed.push(item.idx);
       details.push({
         idx: item.idx,
-        reason: site === 'bubble-catalog-fornecedor'
+        reason: isBubbleCatalogFornecedor
           ? (fractionResult?.reason || 'input_not_found')
           : 'input_not_found',
+        fracionamento: fractionResult?.fracionamento || '',
       });
       continue;
     }
@@ -1818,10 +1864,10 @@ async function fillQuotationPrices(prices, options = {}) {
     const before = getControlValue(input);
     const ok = await setInputValue(input, item.price);
     let persisted = ok;
-    if (site === 'bubble-catalog-fornecedor') {
+    if (isBubbleCatalogFornecedor) {
       await waitForGridRender(140);
-      row = findBubbleCatalogCurrentRowForItem(item, row) || row;
-      persisted = bubbleCatalogRowShowsPrice(row, item.price, samePriceLike, item) || ok;
+      row = findBubbleCatalogCurrentRowForItem(item, row, { requireExactEan: true });
+      persisted = Boolean(row && bubbleCatalogRowShowsPrice(row, item.price, samePriceLike, item));
     }
 
     if (persisted) count++;
@@ -1834,6 +1880,7 @@ async function fillQuotationPrices(prices, options = {}) {
         before,
         after: getControlValue(input),
         attempted: String(item.price ?? ''),
+        fracionamento: fractionResult?.fracionamento || '',
       });
     }
   }

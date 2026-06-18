@@ -193,6 +193,77 @@ def _melhor_coluna_preco(colunas, prazo=None):
     return melhor_col if melhor_score >= 55 else None
 
 
+def _score_coluna_fracionamento(nome_coluna) -> int:
+    c_norm = _normalizar_cabecalho(nome_coluna)
+    if not c_norm:
+        return 0
+
+    if any(k in c_norm for k in ("PRECO", "VALOR", "TOTAL", "R ", "RS ", "EAN", "GTIN", "BARRA")):
+        return 0
+    if any(k in c_norm for k in ("COD PROD", "CODIGO PROD", "COD INTERNO", "CODIGO INTERNO")):
+        return 0
+
+    if "FRACION" in c_norm:
+        return 100
+    if any(k in c_norm for k in ("QTD CAIXA", "QTDE CAIXA", "QUANTIDADE CAIXA", "QUANT CAIXA")):
+        return 98
+    if any(k in c_norm for k in ("QTD CX", "QTDE CX", "QUANT CX", "QTE CX")):
+        return 96
+    if any(k in c_norm for k in ("UN CAIXA", "UND CAIXA", "UN POR CAIXA", "UND POR CAIXA")):
+        return 94
+    if "MULTIPLO" in c_norm:
+        return 90
+    if c_norm in {"CX", "CAIXA", "QTD", "QTDE", "QUANTIDADE", "EMB", "EMBALAGEM"}:
+        return 84
+    if any(k in c_norm for k in ("QTD EMB", "QTDE EMB", "QUANT EMB", "QTD EMBALAGEM")):
+        return 88
+    return 0
+
+
+def _melhor_coluna_fracionamento(colunas, ignorar_cols=None):
+    ignorar_cols = {c for c in (ignorar_cols or set()) if c is not None}
+    melhor_col = None
+    melhor_score = 0
+    for col in colunas:
+        if col in ignorar_cols:
+            continue
+        score = _score_coluna_fracionamento(col)
+        if score > melhor_score:
+            melhor_col = col
+            melhor_score = score
+    return melhor_col if melhor_score >= 84 else None
+
+
+def _parse_fracionamento(valor):
+    if valor is None:
+        return None
+    try:
+        if pd.isna(valor):
+            return None
+    except Exception:
+        pass
+
+    raw = str(valor).strip()
+    if not raw or raw.upper() in {"NONE", "NAN", "NULL"}:
+        return None
+
+    match = _re.search(r"\d+(?:[.,]\d+)?", raw)
+    if not match:
+        return None
+
+    try:
+        numero = float(match.group(0).replace(",", "."))
+    except ValueError:
+        return None
+
+    if not numero or numero <= 0 or numero > 9999:
+        return None
+
+    if abs(numero - round(numero)) < 0.0001:
+        return str(int(round(numero)))
+    return (f"{numero:.3f}".rstrip("0").rstrip(".")).replace(".", ",")
+
+
 def _xlsx_safe_bytes(caminho_arquivo):
     """
     Retorna BytesIO do xlsx com styles.xml corrigido.
@@ -299,10 +370,11 @@ def detectar_prazos_disponiveis(caminho_arquivo) -> list:
     return [28]
 
 
-def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, prazo=28):
+def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, prazo=28, incluir_meta=False):
     """
     Lê Excel de tabela de preços mestre. Auto-detecta linha de cabeçalho e coluna do prazo.
-    Retorna: (precos_dict, precos_nome_lista)
+    Retorna: (precos_dict, precos_nome_lista) ou, com incluir_meta=True,
+    (precos_dict, precos_nome_lista, meta_por_ean).
     """
     buf = _xlsx_safe_bytes(caminho_arquivo)
 
@@ -310,6 +382,7 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
     col_nome_final = None
     col_ean_final = None
     col_preco_final = None
+    col_fracionamento_final = None
 
     for hdr in range(0, 12):
         try:
@@ -343,10 +416,13 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
                     c_ean = cols[idx_ean]
 
             if c_nome is not None and c_preco is not None:
+                ignorar_fracionamento = {c_nome, c_ean, c_preco}
+                c_fracionamento = _melhor_coluna_fracionamento(cols, ignorar_cols=ignorar_fracionamento)
                 df_final = df
                 col_nome_final = c_nome
                 col_ean_final = c_ean
                 col_preco_final = c_preco
+                col_fracionamento_final = c_fracionamento
                 break
         except Exception:
             continue
@@ -359,11 +435,16 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
             col_nome_final = df_final.columns[0]
             col_ean_final = _melhor_coluna_ean(df_final.columns)
             col_preco_final = df_final.columns[-1]
+            col_fracionamento_final = _melhor_coluna_fracionamento(
+                df_final.columns,
+                ignorar_cols={col_nome_final, col_ean_final, col_preco_final},
+            )
         except Exception:
-            return {}, []
+            return ({}, [], {}) if incluir_meta else ({}, [])
 
     precos = {}
     precos_nome_lista = []
+    meta_por_ean = {}
 
     for _, row in df_final.iterrows():
         nome_bruto = str(row[col_nome_final]) if col_nome_final is not None else ""
@@ -372,6 +453,7 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
 
         ean_raw = row[col_ean_final] if col_ean_final is not None else None
         ean = limpar_ean(ean_raw)
+        fracionamento = _parse_fracionamento(row[col_fracionamento_final]) if col_fracionamento_final is not None else None
 
         try:
             preco = float(str(row[col_preco_final]).replace(",", ".").replace("R$", "").replace(" ", "").strip())
@@ -382,14 +464,21 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
 
         if ean:
             precos[ean] = preco
+            if fracionamento:
+                meta_por_ean[ean] = {"fracionamento": fracionamento}
         nome_norm = normalizar_nome(nome_bruto)
-        precos_nome_lista.append({
+        item_nome = {
             'norm': nome_norm,
             'ord': ordenar_palavras(nome_norm),
             'preco': preco,
             'orig': nome_bruto,
-        })
+        }
+        if fracionamento:
+            item_nome['fracionamento'] = fracionamento
+        precos_nome_lista.append(item_nome)
 
+    if incluir_meta:
+        return precos, precos_nome_lista, meta_por_ean
     return precos, precos_nome_lista
 
 
