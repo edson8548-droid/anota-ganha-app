@@ -296,6 +296,11 @@ def _xlsx_safe_bytes(caminho_arquivo):
 
 PREENCHIMENTO_IA = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 MAX_BLANK_ROWS_AFTER_COTACAO_ITEMS = 200
+_PRECO_COTACAO_KW = (
+    "PREÇO", "PRECO", "VALOR UNIT", "VALOR UNI", "VALOR", "R$",
+    "PRECO UNIT", "PREÇO UNIT", "UNIT", "CUSTO", "VLR",
+    "VLR. CUSTO", "VLR CUSTO",
+)
 
 
 def _extrair_ean_prefixo_nome(nome_val):
@@ -319,7 +324,7 @@ def _extrair_ean_prefixo_nome(nome_val):
     return ean, nome_sem_ean
 
 
-def _cotacao_item(ean_val, nome_val, linha, col_preco):
+def _cotacao_item(ean_val, nome_val, linha, col_preco, sheet_name=None):
     nome_texto = str(nome_val).strip()
     ean_texto = str(ean_val) if ean_val and str(ean_val) != "nan" else ""
 
@@ -329,12 +334,15 @@ def _cotacao_item(ean_val, nome_val, linha, col_preco):
             ean_texto = ean_prefixo
             nome_texto = nome_sem_ean
 
-    return {
+    item = {
         "ean": ean_texto,
         "nome": nome_texto,
         "linha": linha,
         "col_preco": col_preco,
     }
+    if sheet_name:
+        item["sheet_name"] = sheet_name
+    return item
 
 
 def _append_cotacao_items_from_dataframe(itens, df, header_row, col_nome, col_ean, col_preco):
@@ -349,6 +357,125 @@ def _append_cotacao_items_from_dataframe(itens, df, header_row, col_nome, col_ea
                 header_row + idx + 1,
                 col_preco,
             ))
+
+
+def _match_cotacao_nome(val):
+    return _score_coluna_nome(val) >= 80
+
+
+def _match_cotacao_preco(val):
+    if any(k in val for k in _PRECO_COTACAO_KW):
+        return True
+    return bool(_re.search(r"\bVLR\b.*\bCUSTO\b", val))
+
+
+def _ler_cotacao_worksheet(ws, sheet_name=None, exigir_indicio_cotacao=False):
+    """Lê itens de uma aba de cotação preservando linha, coluna de preço e aba."""
+    col_ean = None
+    col_nome = None
+    col_preco = None
+    found_header = None
+    best_header = None
+    best_score = -1
+    fallback_col_ean = None
+    fallback_col_nome = None
+    fallback_col_preco = None
+    fallback_header = None
+    fallback_col_ean_score = 0
+
+    for row_idx in range(1, min(16, ws.max_row + 1)):
+        row_col_ean = None
+        row_col_nome = None
+        row_col_preco = None
+        row_col_ean_score = 0
+        for cell in ws[row_idx]:
+            val = str(cell.value).upper().strip() if cell.value else ""
+            if not val:
+                continue
+
+            ean_score = _score_coluna_ean(val)
+            if ean_score >= 80:
+                if ean_score > row_col_ean_score:
+                    row_col_ean = cell.column - 1
+                    row_col_ean_score = ean_score
+                if ean_score > fallback_col_ean_score:
+                    fallback_col_ean = cell.column - 1
+                    fallback_col_ean_score = ean_score
+                    fallback_header = fallback_header or row_idx
+                continue
+
+            if row_col_nome is None and _match_cotacao_nome(val):
+                row_col_nome = cell.column - 1
+            elif row_col_preco is None and _match_cotacao_preco(val):
+                row_col_preco = cell.column - 1
+
+            if fallback_col_nome is None and _match_cotacao_nome(val):
+                fallback_col_nome = cell.column - 1
+                fallback_header = row_idx
+            elif fallback_col_preco is None and _match_cotacao_preco(val):
+                fallback_col_preco = cell.column - 1
+                fallback_header = fallback_header or row_idx
+
+        if row_col_nome is not None:
+            score = 4
+            if row_col_ean is not None:
+                score += 3
+            if row_col_preco is not None:
+                score += 2
+            if score > best_score:
+                best_score = score
+                best_header = (row_idx, row_col_nome, row_col_ean, row_col_preco)
+
+    if best_header:
+        found_header, col_nome, col_ean, col_preco = best_header
+    else:
+        found_header = fallback_header
+        col_nome = fallback_col_nome
+        col_ean = fallback_col_ean
+        col_preco = fallback_col_preco
+
+    if exigir_indicio_cotacao and found_header is None:
+        return [], 1
+
+    header_row = found_header or 1
+    if col_ean is None:
+        col_ean = _inferir_coluna_ean_openpyxl(
+            ws,
+            header_row,
+            ignorar_cols={col_nome, col_preco},
+        )
+    if col_nome is None:
+        col_nome = 0
+
+    itens = []
+    blank_rows_after_items = 0
+    scan_col_limit = max(
+        20,
+        (col_nome or 0) + 1,
+        (col_ean or 0) + 1,
+        (col_preco or 0) + 1,
+    )
+
+    for row_idx in range(header_row + 1, ws.max_row + 1):
+        row = ws[row_idx]
+        ean_val = row[col_ean].value if col_ean is not None and col_ean < len(row) else None
+        nome_val = row[col_nome].value if col_nome < len(row) else None
+        if nome_val and str(nome_val).strip() and str(nome_val).strip().upper() not in ("NONE", "NAN"):
+            itens.append(_cotacao_item(ean_val, nome_val, row_idx, col_preco, sheet_name=sheet_name))
+            blank_rows_after_items = 0
+        elif itens:
+            row_has_value = any(
+                cell.value is not None and str(cell.value).strip() != ""
+                for cell in row[:scan_col_limit]
+            )
+            if row_has_value:
+                blank_rows_after_items = 0
+            else:
+                blank_rows_after_items += 1
+                if blank_rows_after_items >= MAX_BLANK_ROWS_AFTER_COTACAO_ITEMS:
+                    break
+
+    return itens, header_row
 
 
 def detectar_prazos_disponiveis(caminho_arquivo) -> list:
@@ -489,20 +616,6 @@ def ler_cotacao(caminho_arquivo):
     Usa detecção parcial de cabeçalhos para tolerar variações de nome.
     Retorna: (itens, header_row)
     """
-    _PRECO_KW = ("PREÇO", "PRECO", "VALOR UNIT", "VALOR UNI", "VALOR", "R$",
-                 "PRECO UNIT", "PREÇO UNIT", "UNIT", "CUSTO", "VLR", "VLR. CUSTO", "VLR CUSTO")
-
-    def _match_nome(val):
-        return _score_coluna_nome(val) >= 80
-
-    def _match_ean(val):
-        return _score_coluna_ean(val) >= 80
-
-    def _match_preco(val):
-        if any(k in val for k in _PRECO_KW):
-            return True
-        return bool(_re.search(r"\bVLR\b.*\bCUSTO\b", val))
-
     itens = []
     header_row = 1
 
@@ -510,101 +623,21 @@ def ler_cotacao(caminho_arquivo):
     try:
         buf = _xlsx_safe_bytes(caminho_arquivo)
         wb = openpyxl.load_workbook(buf, data_only=True)
-        ws = wb.active
-
-        col_ean = None
-        col_nome = None
-        col_preco = None
-        found_header = None
-        best_header = None
-        best_score = -1
-        fallback_col_ean = None
-        fallback_col_nome = None
-        fallback_col_preco = None
-        fallback_header = None
-        fallback_col_ean_score = 0
-
-        for row_idx in range(1, min(16, ws.max_row + 1)):
-            row_col_ean = None
-            row_col_nome = None
-            row_col_preco = None
-            row_col_ean_score = 0
-            for cell in ws[row_idx]:
-                val = str(cell.value).upper().strip() if cell.value else ""
-                if not val:
-                    continue
-
-                ean_score = _score_coluna_ean(val)
-                if ean_score >= 80:
-                    if ean_score > row_col_ean_score:
-                        row_col_ean = cell.column - 1
-                        row_col_ean_score = ean_score
-                    if ean_score > fallback_col_ean_score:
-                        fallback_col_ean = cell.column - 1
-                        fallback_col_ean_score = ean_score
-                        fallback_header = fallback_header or row_idx
-                    continue
-
-                if row_col_nome is None and _match_nome(val):
-                    row_col_nome = cell.column - 1
-                elif row_col_preco is None and _match_preco(val):
-                    row_col_preco = cell.column - 1
-
-                if fallback_col_nome is None and _match_nome(val):
-                    fallback_col_nome = cell.column - 1
-                    fallback_header = row_idx
-                elif fallback_col_preco is None and _match_preco(val):
-                    fallback_col_preco = cell.column - 1
-                    fallback_header = fallback_header or row_idx
-
-            if row_col_nome is not None:
-                score = 4
-                if row_col_ean is not None:
-                    score += 3
-                if row_col_preco is not None:
-                    score += 2
-                if score > best_score:
-                    best_score = score
-                    best_header = (row_idx, row_col_nome, row_col_ean, row_col_preco)
-
-        if best_header:
-            found_header, col_nome, col_ean, col_preco = best_header
-        else:
-            found_header = fallback_header
-            col_nome = fallback_col_nome
-            col_ean = fallback_col_ean
-            col_preco = fallback_col_preco
-
-        if found_header:
-            header_row = found_header
-        if col_ean is None:
-            col_ean = _inferir_coluna_ean_openpyxl(
+        varias_abas = len(wb.worksheets) > 1
+        first_header_row = None
+        for ws in wb.worksheets:
+            sheet_items, sheet_header_row = _ler_cotacao_worksheet(
                 ws,
-                header_row,
-                ignorar_cols={col_nome, col_preco},
+                sheet_name=ws.title if varias_abas else None,
+                exigir_indicio_cotacao=varias_abas,
             )
-        if col_nome is None:
-            col_nome = 0
-        blank_rows_after_items = 0
-        for row_idx in range(header_row + 1, ws.max_row + 1):
-            row = ws[row_idx]
-            ean_val  = row[col_ean].value  if col_ean is not None and col_ean < len(row) else None
-            nome_val = row[col_nome].value if col_nome < len(row) else None
-            if nome_val and str(nome_val).strip() and str(nome_val).strip().upper() not in ("NONE", "NAN"):
-                itens.append(_cotacao_item(ean_val, nome_val, row_idx, col_preco))
-                blank_rows_after_items = 0
-            elif itens:
-                row_has_value = any(
-                    cell.value is not None and str(cell.value).strip() != ""
-                    for cell in row
-                )
-                if row_has_value:
-                    blank_rows_after_items = 0
-                else:
-                    blank_rows_after_items += 1
-                    if blank_rows_after_items >= MAX_BLANK_ROWS_AFTER_COTACAO_ITEMS:
-                        break
+            if sheet_items:
+                itens.extend(sheet_items)
+                if first_header_row is None:
+                    first_header_row = sheet_header_row
 
+        if first_header_row is not None:
+            header_row = first_header_row
         wb.close()
         if itens:
             return itens, header_row
@@ -629,9 +662,9 @@ def ler_cotacao(caminho_arquivo):
                             col_ean = i
                             col_ean_score = ean_score
                         continue
-                    if col_nome is None and _match_nome(c):
+                    if col_nome is None and _match_cotacao_nome(c):
                         col_nome = i
-                    elif col_preco is None and _match_preco(c):
+                    elif col_preco is None and _match_cotacao_preco(c):
                         col_preco = i
 
                 if col_nome is None:
@@ -764,6 +797,25 @@ def _workbook_from_xls_values(caminho_original):
     return wb
 
 
+def _write_resultados_to_workbook(wb, itens, resultados):
+    active_sheet = wb.active.title
+    grupos = {}
+    ordem = []
+
+    for item, res in zip(itens, resultados):
+        sheet_name = item.get("sheet_name") or active_sheet
+        if sheet_name not in grupos:
+            grupos[sheet_name] = ([], [])
+            ordem.append(sheet_name)
+        grupos[sheet_name][0].append(item)
+        grupos[sheet_name][1].append(res)
+
+    for sheet_name in ordem:
+        ws = wb[sheet_name] if sheet_name in wb.sheetnames else wb.active
+        sheet_items, sheet_results = grupos[sheet_name]
+        _write_resultados_to_worksheet(ws, sheet_items, sheet_results)
+
+
 def gerar_excel_resultado(caminho_original, itens, resultados):
     """
     Gera Excel preenchido com os precos encontrados.
@@ -774,8 +826,7 @@ def gerar_excel_resultado(caminho_original, itens, resultados):
     try:
         buf = _xlsx_safe_bytes(caminho_original)
         wb = openpyxl.load_workbook(buf)
-        ws = wb.active
-        _write_resultados_to_worksheet(ws, itens, resultados)
+        _write_resultados_to_workbook(wb, itens, resultados)
 
         output = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
         wb.save(output.name)
@@ -785,8 +836,7 @@ def gerar_excel_resultado(caminho_original, itens, resultados):
     except Exception:
         try:
             wb = _workbook_from_xls_values(caminho_original)
-            ws = wb.active
-            _write_resultados_to_worksheet(ws, itens, resultados)
+            _write_resultados_to_workbook(wb, itens, resultados)
 
             output = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
             wb.save(output.name)

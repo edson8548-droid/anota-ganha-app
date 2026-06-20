@@ -28,6 +28,20 @@ def _xlsx(rows):
     return tmp.name
 
 
+def _xlsx_sheets(sheets):
+    wb = Workbook()
+    for idx, (sheet_name, rows) in enumerate(sheets.items()):
+        ws = wb.active if idx == 0 else wb.create_sheet()
+        ws.title = sheet_name
+        for row in rows:
+            ws.append(row)
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    wb.save(tmp.name)
+    wb.close()
+    tmp.close()
+    return tmp.name
+
+
 def test_modo_ean_nao_usa_descricao_quando_ean_nao_bate():
     itens = [{"linha": 2, "ean": "", "nome": "ARROZ CAMIL 5KG"}]
     precos = {"7891234567890": 25.9}
@@ -277,6 +291,56 @@ def test_resultado_nao_sobrescreve_coluna_embalagem_quando_nao_ha_preco():
             assert ws.cell(2, 4).value == 12
             assert ws.cell(1, 5).value == "PRECO"
             assert ws.cell(2, 5).value == 14.87
+        finally:
+            wb.close()
+    finally:
+        os.unlink(path)
+        if output:
+            os.unlink(output)
+
+
+def test_cotacao_multiplas_abas_preenche_cada_loja_na_aba_correta():
+    path = _xlsx_sheets({
+        "MATRIZ": [
+            ["FALTAS", "EAN", "PREÇO", "OBS"],
+            ["ARROZ TESTE 5KG", "7891234567890", None, None],
+        ],
+        "PRAÇA": [
+            ["FALTAS", "EAN", "PREÇO", "OBS"],
+            ["FEIJAO TESTE 1KG", "7891234567891", None, None],
+        ],
+        "RESUMO": [
+            ["TOTAL", "OBS"],
+            [2, "nao deve virar produto"],
+        ],
+    })
+    output = None
+    try:
+        itens, header_row = ler_cotacao(path)
+
+        assert header_row == 1
+        assert [(i["sheet_name"], i["nome"], i["ean"], i["col_preco"]) for i in itens] == [
+            ("MATRIZ", "ARROZ TESTE 5KG", "7891234567890", 2),
+            ("PRAÇA", "FEIJAO TESTE 1KG", "7891234567891", 2),
+        ]
+
+        output = gerar_excel_resultado(
+            path,
+            itens,
+            [
+                {"linha": 2, "preco": 21.5, "tipo": "EAN"},
+                {"linha": 2, "preco": 7.25, "tipo": "EAN"},
+            ],
+        )
+
+        from openpyxl import load_workbook
+
+        wb = load_workbook(output, data_only=True)
+        try:
+            assert wb["MATRIZ"].cell(2, 3).value == 21.5
+            assert wb["PRAÇA"].cell(2, 3).value == 7.25
+            assert wb["RESUMO"].cell(1, 3).value in (None, "")
+            assert wb["RESUMO"].cell(2, 3).value in (None, "")
         finally:
             wb.close()
     finally:
