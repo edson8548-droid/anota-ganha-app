@@ -422,6 +422,71 @@ def test_resultado_ignora_vlr_min_fatur_e_preenche_vlr_unitario():
             os.unlink(output)
 
 
+def test_cotacao_nao_preenche_quantidade_unitaria_quando_existe_valor_unitario():
+    path = _xlsx([
+        [
+            "Codigo de Barras",
+            "Codigo do Produto",
+            "Codigo Produto do Fornecedor",
+            "Descricao",
+            "Complemento",
+            "Marca",
+            "Departamento",
+            "Disponível para venda",
+            "Possui Substituição Tributária",
+            "Quantidade Unitaria",
+            "Valor Unitario",
+            "Valor Embalagem",
+            "Quantidade por Embalagem",
+        ],
+        [
+            "7896273100881",
+            "123",
+            None,
+            "Aguardente Pirassununga 21 900ml",
+            None,
+            None,
+            None,
+            "Sim",
+            "Nao",
+            None,
+            None,
+            None,
+            1,
+        ],
+    ])
+    output = None
+    try:
+        itens, header_row = ler_cotacao(path)
+
+        assert header_row == 1
+        assert itens[0]["ean"] == "7896273100881"
+        assert itens[0]["nome"] == "Aguardente Pirassununga 21 900ml"
+        assert itens[0]["col_preco"] == 10
+
+        output = gerar_excel_resultado(
+            path,
+            itens,
+            [{"linha": 2, "preco": 8.63, "tipo": "EAN"}],
+        )
+
+        from openpyxl import load_workbook
+
+        wb = load_workbook(output, data_only=True)
+        ws = wb.active
+        try:
+            assert ws.cell(1, 10).value == "Quantidade Unitaria"
+            assert ws.cell(2, 10).value in (None, "")
+            assert ws.cell(1, 11).value == "Valor Unitario"
+            assert ws.cell(2, 11).value == 8.63
+        finally:
+            wb.close()
+    finally:
+        os.unlink(path)
+        if output:
+            os.unlink(output)
+
+
 def test_cotacao_sbroggio_preenche_coluna_preco_e_inferir_ean_sem_cabecalho():
     path = _xlsx([
         [None, None, None, "FECHAMENTO DA COTACAO", None, None, None, None, None, None, None, None, None, None, None, None],

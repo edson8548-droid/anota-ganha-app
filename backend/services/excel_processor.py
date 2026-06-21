@@ -364,9 +364,10 @@ def _match_cotacao_nome(val):
 
 
 def _match_cotacao_preco(val):
-    if any(k in val for k in _PRECO_COTACAO_KW):
+    if _score_coluna_preco(val) >= 55:
         return True
-    return bool(_re.search(r"\bVLR\b.*\bCUSTO\b", val))
+    c_norm = _normalizar_cabecalho(val)
+    return bool(_re.search(r"\bVLR\b.*\bCUSTO\b", c_norm))
 
 
 def _ler_cotacao_worksheet(ws, sheet_name=None, exigir_indicio_cotacao=False):
