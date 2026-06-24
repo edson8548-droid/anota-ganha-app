@@ -382,6 +382,81 @@ def test_resultado_preenche_coluna_custo_sem_criar_preco_extra():
             os.unlink(output)
 
 
+def test_cotacao_doutor_farma_preenche_vl_liquido_sem_criar_preco_extra():
+    path = _xlsx([
+        ["17/06/2025 - 15:24:29"],
+        ["03671469000140", "DOUTOR FARMA - CUBATAO"],
+        [None],
+        [None],
+        [
+            "Código",
+            "EAN",
+            "Produto",
+            "Fabricante",
+            "Qtde",
+            "Embalagem",
+            "Qtde Caixa",
+            "Vl. Líquido",
+            "Desc.(%) Informado",
+        ],
+        [
+            None,
+            "7896213305437",
+            "ACETONA BEIRA ALTA 450ML",
+            None,
+            1,
+            "UN",
+            None,
+            "0,00",
+            "NÃO PREENCHER, PRODUTO LIBERADO.",
+        ],
+        [
+            71649,
+            "7899706126335",
+            "AGUA MICELAR LOREAL 200ML",
+            "LOREAL",
+            1,
+            "UN",
+            None,
+            "0,00",
+            None,
+        ],
+    ])
+    output = None
+    try:
+        itens, header_row = ler_cotacao(path)
+
+        assert header_row == 5
+        assert itens[0]["linha"] == 6
+        assert itens[0]["ean"] == "7896213305437"
+        assert itens[0]["nome"] == "ACETONA BEIRA ALTA 450ML"
+        assert itens[0]["col_preco"] == 7
+        assert itens[1]["linha"] == 7
+        assert itens[1]["col_preco"] == 7
+
+        output = gerar_excel_resultado(
+            path,
+            itens[:1],
+            [{"linha": 6, "preco": 12.34, "tipo": "EAN"}],
+        )
+
+        from openpyxl import load_workbook
+
+        wb = load_workbook(output, data_only=True)
+        ws = wb.active
+        try:
+            assert ws.cell(5, 8).value == "Vl. Líquido"
+            assert ws.cell(6, 8).value == 12.34
+            assert ws.cell(5, 10).value in (None, "")
+            assert ws.cell(6, 10).value in (None, "")
+        finally:
+            wb.close()
+    finally:
+        os.unlink(path)
+        if output:
+            os.unlink(output)
+
+
 def test_resultado_ignora_vlr_min_fatur_e_preenche_vlr_unitario():
     path = _xlsx([
         ["Data da Entrega:", None, None, None, None, None, None],

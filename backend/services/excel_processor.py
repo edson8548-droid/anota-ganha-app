@@ -169,6 +169,8 @@ def _score_coluna_preco(nome_coluna, prazo=None) -> int:
         if str(prazo) in nums:
             return 100
 
+    if _re.search(r"\b(VL|VLR|VALOR|VAL)\b.*\bLIQUIDO\b", c_norm):
+        return 90
     if "UNIT" in c_norm or "UNITARIO" in c_norm or "UNITARIA" in c_norm:
         return 95
     if "PRECO UNIT" in c_norm or "VALOR UNIT" in c_norm:
@@ -850,8 +852,7 @@ def gerar_excel_resultado(caminho_original, itens, resultados):
         df = pd.read_excel(caminho_original)
         preco_col = None
         for c in df.columns:
-            cu = str(c).upper().strip()
-            if cu in ("PREÇO", "PRECO", "VALOR", "R$"):
+            if _score_coluna_preco(c) >= 55:
                 preco_col = c
                 break
         if preco_col is None:
