@@ -39,7 +39,7 @@ router = APIRouter()
 security = HTTPBearer(auto_error=False)
 
 _db = None
-MAX_VITRINES = 2
+MAX_VITRINES = 4
 MAX_REMOTE_IMAGE_BYTES = 5 * 1024 * 1024
 REMOTE_IMAGE_CONTENT_TYPES = {
     "image/jpeg": ".jpg",
@@ -998,7 +998,7 @@ async def listar_ofertas(uid: str = Depends(get_user_id)):
 async def criar_oferta(req: CreateOfferRequest, uid: str = Depends(get_user_id)):
     count = await _db.vitrine_offers.count_documents({"created_by": uid, "status": {"$ne": "deleted"}})
     if count >= MAX_VITRINES:
-        raise HTTPException(400, f"Limite de {MAX_VITRINES} vitrines ativas atingido. Exclua uma para criar outra.")
+        raise HTTPException(400, f"Limite de {MAX_VITRINES} vitrines criadas atingido. Exclua uma para criar outra.")
 
     slug = gerar_slug(req.title, uid)
     # Garantir slug único

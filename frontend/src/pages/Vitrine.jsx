@@ -6,6 +6,7 @@ import { vitrineService } from '../services/vitrine.service';
 import './Vitrine.css';
 
 const UNIDADES = ['UN', 'CX', 'FD', 'PC', 'PCT', 'KG', 'L', 'ML', 'G', 'FRD', 'BAG'];
+const MAX_VITRINES = 4;
 
 const toNumber = (value) => {
   if (value === null || value === undefined || value === '') return 0;
@@ -352,21 +353,21 @@ export default function Vitrine() {
         <div className="vt-list-header">
           <div>
             <div className="vt-list-title">Minhas Vitrines</div>
-            <div className="vt-list-sub">{ofertas.length}/2 vitrines criadas</div>
+            <div className="vt-list-sub">{ofertas.length}/{MAX_VITRINES} vitrines criadas</div>
           </div>
           <button
             className="vt-btn-new"
             onClick={() => setView('nova')}
-            disabled={ofertas.length >= 2}
+            disabled={ofertas.length >= MAX_VITRINES}
           >
             <Plus size={16} style={{ verticalAlign: 'middle', marginRight: 4 }} />
             Nova Vitrine
           </button>
         </div>
 
-        {ofertas.length >= 2 && (
+        {ofertas.length >= MAX_VITRINES && (
           <div className="vt-limit-info">
-            ℹ️ Você atingiu o limite de 2 vitrines. Exclua uma para criar outra.
+            ℹ️ Você atingiu o limite de {MAX_VITRINES} vitrines. Exclua uma para criar outra.
           </div>
         )}
 
