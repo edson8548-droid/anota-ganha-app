@@ -77,47 +77,6 @@ def test_tabela_mestre_cleanup_rules_keep_one_week(monkeypatch):
     assert not cotacao._should_cleanup_tabela_mestre(missing_date, now)
 
 
-def test_tabela_mestre_cleanup_preserva_tabela_hospedada(monkeypatch):
-    now = datetime(2026, 5, 28, 12, tzinfo=timezone.utc)
-    monkeypatch.setattr(cotacao, "COTACAO_TABELA_MESTRE_TTL_SECONDS", 8 * 24 * 60 * 60)
-
-    shared = {"scope": cotacao.SHARED_TABLE_SCOPE, "data_upload": now.replace(day=1)}
-    protected = {"protected": True, "data_upload": now.replace(day=1)}
-
-    assert not cotacao._should_cleanup_tabela_mestre(shared, now)
-    assert not cotacao._should_cleanup_tabela_mestre(protected, now)
-
-
-def test_allowed_company_slugs_aceita_formatos_de_cadastro():
-    data = {
-        "allowedPriceDatabases": ["Destro", {"slug": "Spani", "enabled": True}, {"slug": "Muffato", "enabled": False}],
-        "empresasLiberadas": {"Master Mix": True, "Bate Forte": False},
-        "tabelasLiberadas": "Atacado Goiás; Compre Fácil",
-    }
-
-    assert cotacao._extract_allowed_company_slugs(data) == {
-        "destro",
-        "spani",
-        "master-mix",
-        "atacado-goias",
-        "compre-facil",
-    }
-
-
-def test_acesso_tabela_hospedada_depende_do_atacado_liberado():
-    tabela = {"scope": cotacao.SHARED_TABLE_SCOPE, "company_slug": "destro"}
-
-    assert cotacao._user_can_access_table("user-1", tabela, {"destro"})
-    assert not cotacao._user_can_access_table("user-1", tabela, {"spani"})
-
-
-def test_tabela_pessoal_antiga_continua_como_fallback_de_migracao():
-    tabela = {"user_id": "user-1", "nome": "Tabela antiga"}
-
-    assert cotacao._user_can_access_table("user-1", tabela, set())
-    assert not cotacao._user_can_access_table("user-2", tabela, set())
-
-
 def test_cleanup_candidate_rules_skip_recent_and_running_jobs(monkeypatch):
     now = datetime(2026, 5, 28, 12, tzinfo=timezone.utc)
     monkeypatch.setattr(cotacao, "COTACAO_COMPLETED_JOB_TTL_SECONDS", 3600)

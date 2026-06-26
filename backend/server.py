@@ -295,9 +295,6 @@ async def startup_event():
         await db.tabelas_mestre.create_index(
             [("user_id", 1)]
         )
-        await db.tabelas_mestre.create_index(
-            [("scope", 1), ("company_slug", 1)]
-        )
         logger.info("✅ Índices MongoDB criados")
     except Exception as e:
         logger.warning(f"⚠️  Índices MongoDB: {e}")
