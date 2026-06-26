@@ -9,6 +9,8 @@ import logging
 import uuid
 import asyncio
 import multiprocessing
+import re as _re
+import unicodedata
 from datetime import datetime, timezone, timedelta
 from io import BytesIO
 
@@ -22,7 +24,7 @@ from pymongo.errors import DuplicateKeyError
 from bson import ObjectId
 from typing import List
 import firebase_admin
-from firebase_admin import auth as firebase_auth
+from firebase_admin import auth as firebase_auth, firestore
 
 from services.excel_processor import (
     ler_tabela_mestre,
@@ -53,6 +55,13 @@ def _utc_datetime(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 MAX_TABELAS = 5
+SHARED_TABLE_SCOPE = "shared"
+ALLOW_USER_TABLE_UPLOADS = os.environ.get("COTACAO_ALLOW_USER_TABLE_UPLOADS", "true").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "sim",
+}
 MAX_EXCEL_BYTES = 20 * 1024 * 1024
 MAX_COTACAO_PREVIEW_BYTES = 14 * 1024 * 1024
 MAX_TABELA_PRAZOS_BYTES = 25 * 1024 * 1024
@@ -75,6 +84,154 @@ COTACAO_ORPHAN_GRIDFS_TTL_SECONDS = int(
 )
 COTACAO_CLEANUP_BATCH_SIZE = int(os.environ.get("COTACAO_CLEANUP_BATCH_SIZE", "500"))
 _storage_cleanup_task = None
+
+
+def _slugify_company(value) -> str:
+    text = str(value or "").strip().lower()
+    text = "".join(
+        ch for ch in unicodedata.normalize("NFKD", text)
+        if not unicodedata.combining(ch)
+    )
+    text = _re.sub(r"[^a-z0-9]+", "-", text)
+    return text.strip("-")
+
+
+def _is_shared_table(tabela: dict | None) -> bool:
+    if not tabela:
+        return False
+    return tabela.get("scope") == SHARED_TABLE_SCOPE or tabela.get("shared") is True
+
+
+def _table_company_slug(tabela: dict | None) -> str:
+    if not tabela:
+        return ""
+    return _slugify_company(
+        tabela.get("company_slug")
+        or tabela.get("companySlug")
+        or tabela.get("atacado_slug")
+        or tabela.get("atacadoSlug")
+        or tabela.get("price_database")
+        or tabela.get("priceDatabase")
+        or tabela.get("slug")
+        or tabela.get("nome")
+    )
+
+
+def _table_company_name(tabela: dict | None) -> str:
+    if not tabela:
+        return ""
+    return str(
+        tabela.get("company_name")
+        or tabela.get("companyName")
+        or tabela.get("atacado")
+        or tabela.get("nome")
+        or ""
+    ).strip()
+
+
+def _iter_allowed_values(value):
+    if value is None:
+        return
+    if isinstance(value, str):
+        for part in _re.split(r"[,;\n]+", value):
+            if part.strip():
+                yield part.strip()
+        return
+    if isinstance(value, dict):
+        for key, enabled in value.items():
+            if enabled:
+                yield key
+        return
+    if isinstance(value, (list, tuple, set)):
+        for item in value:
+            if isinstance(item, dict):
+                enabled = item.get("enabled", item.get("liberado", item.get("active", True)))
+                if enabled:
+                    yield (
+                        item.get("slug")
+                        or item.get("company_slug")
+                        or item.get("companySlug")
+                        or item.get("id")
+                        or item.get("name")
+                        or item.get("nome")
+                    )
+            else:
+                yield item
+
+
+def _extract_allowed_company_slugs(user_data: dict | None) -> set[str]:
+    data = user_data or {}
+    fields = (
+        "allowedPriceDatabases",
+        "allowed_price_databases",
+        "allowedPriceTables",
+        "allowed_price_tables",
+        "allowedCompanies",
+        "allowed_companies",
+        "allowedAtacados",
+        "allowed_atacados",
+        "empresasLiberadas",
+        "empresas_liberadas",
+        "tabelasLiberadas",
+        "tabelas_liberadas",
+        "priceTableAccess",
+        "price_table_access",
+    )
+    slugs: set[str] = set()
+    for field in fields:
+        for value in _iter_allowed_values(data.get(field)):
+            slug = _slugify_company(value)
+            if slug:
+                slugs.add(slug)
+    return slugs
+
+
+async def _allowed_company_slugs_for_user(uid: str) -> set[str]:
+    try:
+        snap = await asyncio.to_thread(
+            firestore.client().collection("users").document(uid).get
+        )
+        if not snap.exists:
+            return set()
+        return _extract_allowed_company_slugs(snap.to_dict() or {})
+    except Exception:
+        logger.exception("[COTACAO] Falha ao ler atacados liberados no Firestore uid=%s", uid)
+        return set()
+
+
+def _user_can_access_table(uid: str, tabela: dict | None, allowed_slugs: set[str] | None = None) -> bool:
+    if not tabela:
+        return False
+    if _is_shared_table(tabela):
+        return _table_company_slug(tabela) in (allowed_slugs or set())
+    return tabela.get("user_id") == uid
+
+
+async def _find_tabela_for_user(uid: str, oid: ObjectId) -> dict | None:
+    tabela = await db.tabelas_mestre.find_one({"_id": oid})
+    if not tabela:
+        return None
+    allowed_slugs = await _allowed_company_slugs_for_user(uid) if _is_shared_table(tabela) else set()
+    if not _user_can_access_table(uid, tabela, allowed_slugs):
+        return None
+    return tabela
+
+
+def _serialize_tabela(tabela: dict, prazo, prazos_disponiveis):
+    shared = _is_shared_table(tabela)
+    return {
+        "id": str(tabela["_id"]),
+        "nome": tabela["nome"],
+        "filename": tabela.get("filename", ""),
+        "qtd_produtos": tabela.get("qtd_produtos", 0),
+        "prazo": prazo,
+        "prazos_disponiveis": prazos_disponiveis,
+        "data_upload": tabela.get("data_upload").isoformat() if tabela.get("data_upload") else None,
+        "scope": SHARED_TABLE_SCOPE if shared else "user",
+        "hosted": shared,
+        "company_slug": _table_company_slug(tabela) if shared else "",
+        "company_name": _table_company_name(tabela) if shared else "",
+    }
 
 
 def _gerar_excel_multiprazos_worker(caminho_base, prazos, queue):
@@ -245,6 +402,8 @@ def _tabela_mestre_age_seconds(tabela: dict, now: datetime) -> float:
 
 
 def _should_cleanup_tabela_mestre(tabela: dict, now: datetime | None = None) -> bool:
+    if _is_shared_table(tabela) or tabela.get("protected") is True:
+        return False
     now = now or datetime.now(timezone.utc)
     return _tabela_mestre_age_seconds(tabela, now) >= COTACAO_TABELA_MESTRE_TTL_SECONDS
 
@@ -477,6 +636,11 @@ async def upload_tabela(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     uid = await get_user_id(credentials)
+    if not ALLOW_USER_TABLE_UPLOADS:
+        raise HTTPException(
+            403,
+            "As tabelas agora são hospedadas pela Venpro e liberadas por atacado. Escolha uma tabela disponível para sua conta.",
+        )
     collection = db.tabelas_mestre
 
     count = await collection.count_documents({"user_id": uid})
@@ -548,7 +712,38 @@ async def listar_tabelas(credentials: HTTPAuthorizationCredentials = Depends(sec
     uid = await get_user_id(credentials)
     collection = db.tabelas_mestre
     tabelas = []
+    allowed_slugs = await _allowed_company_slugs_for_user(uid)
+
+    # Fallback de migração: tabelas próprias antigas continuam disponíveis.
+    # A UI nova não permite subir novas tabelas, mas isso evita deixar RCA ativo sem cotar
+    # enquanto as tabelas hospedadas e liberações por atacado estão sendo cadastradas.
     async for doc in collection.find({"user_id": uid}).sort("data_upload", -1):
+        if _is_shared_table(doc):
+            continue
+        prazo = doc.get("prazo", 28)
+        prazos_disponiveis = doc.get("prazos_disponiveis")
+
+        if not prazos_disponiveis:
+            try:
+                grid_out = await _bucket().open_download_stream(doc["grid_id"])
+                conteudo = await grid_out.read()
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=_tabela_suffix(doc))
+                tmp.write(conteudo)
+                tmp.close()
+                prazos_disponiveis = await asyncio.to_thread(detectar_prazos_disponiveis, tmp.name)
+                os.unlink(tmp.name)
+                await collection.update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": {"prazos_disponiveis": prazos_disponiveis}},
+                )
+            except Exception:
+                prazos_disponiveis = [prazo]
+
+        tabelas.append(_serialize_tabela(doc, prazo, prazos_disponiveis))
+
+    async for doc in collection.find({"scope": SHARED_TABLE_SCOPE}).sort("nome", 1):
+        if _table_company_slug(doc) not in allowed_slugs:
+            continue
         prazo = doc.get("prazo", 28)
         prazos_disponiveis = doc.get("prazos_disponiveis")
 
@@ -569,15 +764,7 @@ async def listar_tabelas(credentials: HTTPAuthorizationCredentials = Depends(sec
             except Exception:
                 prazos_disponiveis = [prazo]
 
-        tabelas.append({
-            "id": str(doc["_id"]),
-            "nome": doc["nome"],
-            "filename": doc["filename"],
-            "qtd_produtos": doc["qtd_produtos"],
-            "prazo": prazo,
-            "prazos_disponiveis": prazos_disponiveis,
-            "data_upload": doc["data_upload"].isoformat(),
-        })
+        tabelas.append(_serialize_tabela(doc, prazo, prazos_disponiveis))
     return tabelas
 
 
@@ -617,6 +804,7 @@ async def processar_cotacao(
     arquivo: UploadFile = File(...),
     tabela_id: str = Form(...),
     modo: str = Form("ean"),
+    prazo: int = Form(0),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     uid = await get_user_id(credentials)
@@ -630,7 +818,7 @@ async def processar_cotacao(
             "Você já tem uma cotação em processamento. Aguarde finalizar ou cancele antes de enviar outra.",
         )
 
-    doc = await db.tabelas_mestre.find_one({"_id": oid, "user_id": uid})
+    doc = await _find_tabela_for_user(uid, oid)
     if not doc:
         raise HTTPException(404, "Tabela mestre não encontrada")
 
@@ -658,9 +846,10 @@ async def processar_cotacao(
     tmp_cotacao.close()
 
     try:
+        prazo_efetivo = prazo if prazo > 0 else doc.get("prazo", 28)
         caminho_resultado, stats, sem_match = processar_arquivo_cotacao(
             tmp_cotacao.name, tmp_mestre.name,
-            prazo=doc.get("prazo", 28),
+            prazo=prazo_efetivo,
             modo=modo,
         )
 
@@ -716,7 +905,7 @@ async def preview_cotacao(
             "Você já tem uma cotação em processamento. Aguarde finalizar ou cancele antes de enviar outra.",
         )
 
-    doc = await db.tabelas_mestre.find_one({"_id": oid, "user_id": uid})
+    doc = await _find_tabela_for_user(uid, oid)
     if not doc:
         raise HTTPException(404, "Tabela mestre não encontrada")
 
@@ -805,7 +994,7 @@ async def _criar_preview_job(
     oid = _object_id_or_400(tabela_id)
     modo = str(modo or "ean").strip().lower()
 
-    doc = await db.tabelas_mestre.find_one({"_id": oid, "user_id": uid})
+    doc = await _find_tabela_for_user(uid, oid)
     if not doc:
         raise HTTPException(404, "Tabela mestre não encontrada")
 
@@ -914,10 +1103,7 @@ async def _processar_preview_job(job_id):
             {"$set": {"status": "processing", "started_at": datetime.now(timezone.utc)}},
         )
 
-        doc = await db.tabelas_mestre.find_one({
-            "_id": ObjectId(job["tabela_id"]),
-            "user_id": job["user_id"],
-        })
+        doc = await _find_tabela_for_user(job["user_id"], ObjectId(job["tabela_id"]))
         if not doc:
             raise ValueError("Tabela mestre não encontrada")
 
@@ -1622,7 +1808,7 @@ async def match_cotatudo(
     oid = _object_id_or_400(payload.tabela_id)
     modo = str(payload.modo or "ean").strip().lower()
 
-    doc = await db.tabelas_mestre.find_one({"_id": oid, "user_id": uid})
+    doc = await _find_tabela_for_user(uid, oid)
     if not doc:
         raise HTTPException(404, "Tabela mestre não encontrada")
     audit_meta = _cotatudo_base_metadata(payload, doc)
