@@ -111,17 +111,6 @@ def test_acesso_tabela_hospedada_depende_do_atacado_liberado():
     assert not cotacao._user_can_access_table("user-1", tabela, {"spani"})
 
 
-def test_acesso_tabela_hospedada_aceita_usuario_liberado_diretamente():
-    tabela = {
-        "scope": cotacao.SHARED_TABLE_SCOPE,
-        "company_slug": "destro",
-        "allowed_user_ids": ["user-1"],
-    }
-
-    assert cotacao._user_can_access_table("user-1", tabela, set())
-    assert not cotacao._user_can_access_table("user-2", tabela, set())
-
-
 def test_tabela_pessoal_antiga_continua_como_fallback_de_migracao():
     tabela = {"user_id": "user-1", "nome": "Tabela antiga"}
 

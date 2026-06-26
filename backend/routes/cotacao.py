@@ -129,23 +129,6 @@ def _table_company_name(tabela: dict | None) -> str:
     ).strip()
 
 
-def _table_allowed_user_ids(tabela: dict | None) -> set[str]:
-    if not tabela:
-        return set()
-    values = (
-        tabela.get("allowed_user_ids")
-        or tabela.get("allowedUserIds")
-        or tabela.get("allowed_users")
-        or tabela.get("allowedUsers")
-        or []
-    )
-    if isinstance(values, str):
-        values = _re.split(r"[,;\n]+", values)
-    if not isinstance(values, (list, tuple, set)):
-        return set()
-    return {str(value).strip() for value in values if str(value or "").strip()}
-
-
 def _iter_allowed_values(value):
     if value is None:
         return
@@ -220,10 +203,7 @@ def _user_can_access_table(uid: str, tabela: dict | None, allowed_slugs: set[str
     if not tabela:
         return False
     if _is_shared_table(tabela):
-        return (
-            _table_company_slug(tabela) in (allowed_slugs or set())
-            or uid in _table_allowed_user_ids(tabela)
-        )
+        return _table_company_slug(tabela) in (allowed_slugs or set())
     return tabela.get("user_id") == uid
 
 
