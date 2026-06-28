@@ -3,6 +3,7 @@ import logging
 import os
 import re
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
 import firebase_admin
@@ -10,6 +11,7 @@ import requests
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from firebase_admin import auth as firebase_auth, firestore
+from google.api_core.exceptions import AlreadyExists, Conflict
 from pydantic import BaseModel
 from services.security_audit import audit_event
 from services.security_config import is_production_environment
@@ -36,7 +38,19 @@ ASAAS_PLANS = {
         "description": "Assinatura mensal Venpro",
     },
 }
-PARTNER_COUPONS = {}
+PARCEIRO25_COUPON_CODE = "parceiro25off"
+PARCEIRO25_COUPON_DISPLAY_CODE = "parceiro25%off"
+PARTNER_COUPON_USES_COLLECTION = "subscription_coupon_uses"
+PARTNER_COUPONS = {
+    PARCEIRO25_COUPON_CODE: {
+        "displayCode": PARCEIRO25_COUPON_DISPLAY_CODE,
+        "partnerName": "Parceiro",
+        "discountPercent": Decimal("25"),
+        "discountLabel": "25% off",
+        "commissionMonthly": 0,
+        "oneTime": True,
+    }
+}
 
 
 class CreateSubscriptionRequest(BaseModel):
@@ -145,26 +159,102 @@ def _apply_subscription_coupon(plan: dict, code: str) -> tuple[dict, dict | None
     if not config or plan.get("id") != "monthly":
         return plan, None
 
-    original_price = float(plan["price"])
-    final_price = min(original_price, float(config["finalPrice"]))
+    original_price = _money(plan["price"])
+    final_price = _discounted_subscription_price(original_price, config)
     if final_price >= original_price:
         return plan, None
 
     discounted_plan = {
         **plan,
-        "price": round(final_price, 2),
-        "description": f"{plan['description']} - cupom {normalized}",
+        "price": final_price,
+        "description": f"{plan['description']} - cupom {config['displayCode']}",
     }
     coupon_data = {
         "couponCode": normalized,
+        "couponDisplayCode": config["displayCode"],
         "couponType": "partner_subscription_discount",
         "partnerName": config["partnerName"],
-        "originalAmount": round(original_price, 2),
-        "discountAmount": round(original_price - final_price, 2),
+        "originalAmount": original_price,
+        "discountAmount": _money(Decimal(str(original_price)) - Decimal(str(final_price))),
         "discountLabel": config["discountLabel"],
         "partnerCommissionMonthly": config["commissionMonthly"],
+        "oneTime": bool(config.get("oneTime")),
     }
     return discounted_plan, coupon_data
+
+
+def _money(value) -> float:
+    return float(Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _discounted_subscription_price(original_price: float, config: dict) -> float:
+    final_price = Decimal(str(original_price)) * (Decimal("100") - Decimal(str(config["discountPercent"]))) / Decimal("100")
+    return _money(final_price)
+
+
+def _subscription_coupon_used_detail(coupon_data: dict) -> str:
+    return f"Cupom {coupon_data.get('couponDisplayCode') or coupon_data.get('couponCode')} já foi usado."
+
+
+def _reserve_subscription_coupon_usage(uid: str, coupon_data: dict | None) -> dict | None:
+    if not coupon_data or not coupon_data.get("oneTime"):
+        return None
+
+    code = coupon_data["couponCode"]
+    display_code = coupon_data.get("couponDisplayCode") or code
+    usage_ref = _fs().collection(PARTNER_COUPON_USES_COLLECTION).document(code)
+    usage_data = {
+        "code": code,
+        "displayCode": display_code,
+        "uid": uid,
+        "couponType": coupon_data.get("couponType"),
+        "discountAmount": coupon_data.get("discountAmount"),
+        "originalAmount": coupon_data.get("originalAmount"),
+        "createdAt": firestore.SERVER_TIMESTAMP,
+        "status": "reserved",
+    }
+
+    try:
+        usage_ref.create(usage_data)
+        return {"code": code, "created": True, "reusedBySameUser": False}
+    except (AlreadyExists, Conflict):
+        usage_doc = usage_ref.get()
+        existing = usage_doc.to_dict() if usage_doc.exists else {}
+        if existing.get("uid") == uid:
+            return {"code": code, "created": False, "reusedBySameUser": True}
+        raise HTTPException(status_code=400, detail=_subscription_coupon_used_detail(coupon_data))
+
+
+def _release_subscription_coupon_usage(coupon_usage: dict | None) -> None:
+    if not coupon_usage or not coupon_usage.get("created"):
+        return
+    try:
+        _fs().collection(PARTNER_COUPON_USES_COLLECTION).document(coupon_usage["code"]).delete()
+    except Exception:
+        logger.warning("[ASAAS] Não foi possível liberar reserva de cupom code=%s", coupon_usage.get("code"))
+
+
+def _mark_subscription_coupon_payment_created(
+    coupon_usage: dict | None,
+    external_reference: str,
+    first_payment: dict,
+    subscription_id: str | None,
+) -> None:
+    if not coupon_usage:
+        return
+    try:
+        _fs().collection(PARTNER_COUPON_USES_COLLECTION).document(coupon_usage["code"]).set(
+            {
+                "status": "payment_created",
+                "externalReference": external_reference,
+                "asaasPaymentId": first_payment.get("id"),
+                "asaasSubscriptionId": subscription_id,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            },
+            merge=True,
+        )
+    except Exception:
+        logger.warning("[ASAAS] Não foi possível atualizar auditoria de cupom code=%s", coupon_usage.get("code"))
 
 
 def _period_end_for_plan(plan_id: str) -> datetime:
@@ -426,6 +516,7 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
     requested_coupon = _coupon_candidate(payload.couponCode, user_data)
     plan, coupon_data = _apply_subscription_coupon(plan, requested_coupon)
     customer_id = _find_or_create_customer(uid, user_data)
+    coupon_usage = _reserve_subscription_coupon_usage(uid, coupon_data)
     external_reference = f"{uid}-{plan['id']}-{plan['price']:.2f}"
     if coupon_data:
         external_reference = f"{external_reference}-{coupon_data['couponCode']}"
@@ -433,44 +524,58 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
     use_subscription_mode = ASAAS_PAYMENT_MODE == "subscription"
     subscription_id = None
     billing_mode = "subscription" if use_subscription_mode else "single_payment"
-    reusable_payment = _find_reusable_pending_payment(
-        customer_id,
-        external_reference,
-        require_subscription=use_subscription_mode,
-    )
+    payment_created = False
 
-    if reusable_payment:
-        first_payment = reusable_payment
-        subscription_id = reusable_payment.get("subscription") if use_subscription_mode else None
-        billing_mode = "subscription_reuse" if use_subscription_mode else "single_payment_reuse"
-    elif use_subscription_mode:
-        subscription_payload = {
-            "customer": customer_id,
-            "billingType": "UNDEFINED",
-            "value": plan["price"],
-            "nextDueDate": _due_date_for_new_charge(),
-            "cycle": plan["cycle"],
-            "description": plan["description"],
-            "externalReference": external_reference,
-        }
-        try:
-            subscription = _asaas_request("POST", "/subscriptions", json=subscription_payload)
-            subscription_id = subscription["id"]
-            first_payment = _first_payment_for_subscription(subscription_id)
-            billing_mode = "subscription"
-        except HTTPException as exc:
-            logger.warning(
-                "[ASAAS] Falha ao criar assinatura; tentando cobrança avulsa uid=%s status=%s detail=%s",
-                uid,
-                exc.status_code,
-                exc.detail,
-            )
-            if not ASAAS_SUBSCRIPTION_FALLBACK_TO_SINGLE:
-                raise
+    try:
+        reusable_payment = _find_reusable_pending_payment(
+            customer_id,
+            external_reference,
+            require_subscription=use_subscription_mode,
+        )
+
+        if coupon_usage and coupon_usage.get("reusedBySameUser") and not reusable_payment:
+            raise HTTPException(status_code=400, detail=_subscription_coupon_used_detail(coupon_data))
+
+        if reusable_payment:
+            first_payment = reusable_payment
+            payment_created = True
+            subscription_id = reusable_payment.get("subscription") if use_subscription_mode else None
+            billing_mode = "subscription_reuse" if use_subscription_mode else "single_payment_reuse"
+        elif use_subscription_mode:
+            subscription_payload = {
+                "customer": customer_id,
+                "billingType": "UNDEFINED",
+                "value": plan["price"],
+                "nextDueDate": _due_date_for_new_charge(),
+                "cycle": plan["cycle"],
+                "description": plan["description"],
+                "externalReference": external_reference,
+            }
+            try:
+                subscription = _asaas_request("POST", "/subscriptions", json=subscription_payload)
+                subscription_id = subscription["id"]
+                first_payment = _first_payment_for_subscription(subscription_id)
+                payment_created = True
+                billing_mode = "subscription"
+            except HTTPException as exc:
+                logger.warning(
+                    "[ASAAS] Falha ao criar assinatura; tentando cobrança avulsa uid=%s status=%s detail=%s",
+                    uid,
+                    exc.status_code,
+                    exc.detail,
+                )
+                if not ASAAS_SUBSCRIPTION_FALLBACK_TO_SINGLE:
+                    raise
+                first_payment = _create_single_payment(customer_id, plan, external_reference)
+                payment_created = True
+                billing_mode = "single_payment_fallback"
+        else:
             first_payment = _create_single_payment(customer_id, plan, external_reference)
-            billing_mode = "single_payment_fallback"
-    else:
-        first_payment = _create_single_payment(customer_id, plan, external_reference)
+            payment_created = True
+    except Exception:
+        if not payment_created:
+            _release_subscription_coupon_usage(coupon_usage)
+        raise
 
     payment_url = _payment_url(first_payment)
 
@@ -482,6 +587,8 @@ async def create_subscription(payload: CreateSubscriptionRequest, uid: str = Dep
             sorted(first_payment.keys()),
         )
         raise HTTPException(status_code=502, detail="Asaas não retornou link de pagamento")
+
+    _mark_subscription_coupon_payment_created(coupon_usage, external_reference, first_payment, subscription_id)
 
     _fs().collection("subscriptions").document(uid).set(
         {

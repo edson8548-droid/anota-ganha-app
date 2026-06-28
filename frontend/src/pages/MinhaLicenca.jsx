@@ -6,7 +6,7 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { auth } from '../firebase/config';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { apiUrl } from '../config/api';
-import { CARLOS_PARTNER_CODE, PARTNER_COUPON_ENABLED, normalizePartnerCode } from '../utils/partnerProgram';
+import { getPartnerCouponConfig, isActivePartnerCoupon, normalizePartnerCode } from '../utils/partnerProgram';
 
 const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.45.zip';
 
@@ -35,7 +35,8 @@ const MinhaLicenca = () => {
   const aplicarCupom = async () => {
     if (!cupomCodigo.trim()) return;
     const normalized = normalizePartnerCode(cupomCodigo);
-    if (!PARTNER_COUPON_ENABLED && normalized === CARLOS_PARTNER_CODE) {
+    const partnerConfig = getPartnerCouponConfig(normalized);
+    if (partnerConfig && !isActivePartnerCoupon(normalized)) {
       try {
         localStorage.removeItem('venpro:checkout-coupon');
       } catch {
@@ -45,7 +46,7 @@ const MinhaLicenca = () => {
       return;
     }
 
-    if (normalized === CARLOS_PARTNER_CODE) {
+    if (isActivePartnerCoupon(normalized)) {
       try {
         localStorage.setItem('venpro:checkout-coupon', normalized);
       } catch {
