@@ -41,7 +41,12 @@ const daysUntil = (value) => {
 
 const statusLabel = (subscription) => {
   if (!subscription) return { label: 'Sem assinatura', tone: 'neutral' };
-  if (subscription.status === 'trialing') return { label: 'Trial ativo', tone: 'ok' };
+  if (subscription.status === 'trialing') {
+    const remainingDays = daysUntil(subscription.trialEndsAt);
+    if (remainingDays === null) return { label: 'Trial sem data', tone: 'warn' };
+    if (remainingDays < 0) return { label: 'Trial vencido', tone: 'danger' };
+    return { label: 'Trial ativo', tone: 'ok' };
+  }
   if (subscription.status === 'active') return { label: 'Assinante ativo', tone: 'ok' };
   if (subscription.status === 'pending') return { label: 'Pendente', tone: 'warn' };
   if (subscription.status === 'trial_expired') return { label: 'Trial expirado', tone: 'danger' };
@@ -196,7 +201,7 @@ const AdminPanel = () => {
             {users.map((item) => {
               const status = statusLabel(item.subscription);
               const remainingDays = daysUntil(item.subscription?.trialEndsAt);
-              const lastSeen = item.activity?.lastSeenAt || item.activity?.lastEventAt;
+              const lastSession = item.activity?.lastSeenAt;
 
               return (
                 <article className="admin-user-row" key={item.uid}>
@@ -227,8 +232,8 @@ const AdminPanel = () => {
                       </strong>
                     </div>
                     <div>
-                      <span>Último uso</span>
-                      <strong>{formatDateTime(lastSeen)}</strong>
+                      <span>Última sessão</span>
+                      <strong>{formatDateTime(lastSession)}</strong>
                     </div>
                   </div>
 

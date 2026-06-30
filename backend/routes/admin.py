@@ -23,6 +23,12 @@ COTACAO_READY_ACTIONS = {
     "cotacao_ready_processed",
     "cotacao_ready_preview_completed",
 }
+TOOL_ACTION_PREFIXES = (
+    "cotacao_ready_",
+    "cotatudo_extension_",
+    "vitrine_",
+    "whatsapp_",
+)
 
 _mongo_db = None
 
@@ -98,6 +104,13 @@ def _public_subscription_data(data: dict | None) -> dict | None:
     }
 
 
+def _trial_is_active(subscription: dict | None, now: datetime | None = None) -> bool:
+    if not subscription or subscription.get("status") != "trialing":
+        return False
+    trial_end = _as_utc_datetime(subscription.get("trialEndsAt"))
+    return bool(trial_end and trial_end > (now or datetime.now(timezone.utc)))
+
+
 def _device_activity(user_ref) -> dict:
     devices = list(user_ref.collection("devices").stream())
     last_seen = None
@@ -122,6 +135,10 @@ def _device_activity(user_ref) -> dict:
 
 def _event_datetime(event: dict) -> datetime | None:
     return _as_utc_datetime(event.get("createdAt") or event.get("createdAtIso"))
+
+
+def _is_tool_action(action: str) -> bool:
+    return action.startswith(TOOL_ACTION_PREFIXES)
 
 
 def _compact_job_event(event: dict) -> dict:
@@ -205,6 +222,11 @@ def _audit_activity(db, uid: str, since: datetime) -> dict:
     events.sort(key=lambda item: _event_datetime(item) or datetime.min.replace(tzinfo=timezone.utc))
 
     action_counts = Counter(str(event.get("action") or "unknown") for event in events)
+    tool_event_count = sum(
+        1
+        for event in events
+        if _is_tool_action(str(event.get("action") or ""))
+    )
     job_ids = {
         (event.get("metadata") or {}).get("jobId")
         for event in events
@@ -245,6 +267,7 @@ def _audit_activity(db, uid: str, since: datetime) -> dict:
 
     return {
         "auditEventCount": len(events),
+        "toolEventCount": tool_event_count,
         "actions": dict(action_counts),
         "uniqueCotatudoJobs": len(job_ids),
         "cotacaoReadyCount": len(cotacao_ready_ids),
@@ -302,7 +325,7 @@ def _dedupe_activity_items(items: list[dict]) -> list[dict]:
 
 
 def _recompute_totals(users: list[dict]) -> dict:
-    active_trials = sum(1 for user in users if (user.get("subscription") or {}).get("status") == "trialing")
+    active_trials = sum(1 for user in users if _trial_is_active(user.get("subscription")))
     used_tool = sum(1 for user in users if (user.get("activity") or {}).get("hasToolUsage"))
     no_usage = len(users) - used_tool
     return {
@@ -449,9 +472,9 @@ def _build_recent_users_report(db, *, days: int, limit: int, now: datetime | Non
         device_activity = _device_activity(user_ref)
         audit_activity = _audit_activity(db, uid, since)
         has_tool_usage = bool(
-            device_activity["lastSeenAt"]
-            or audit_activity["auditEventCount"]
+            audit_activity["toolEventCount"]
             or audit_activity["uniqueCotatudoJobs"]
+            or audit_activity["cotacaoReadyCount"]
         )
 
         users.append({

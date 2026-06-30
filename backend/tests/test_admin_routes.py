@@ -287,3 +287,57 @@ def test_admin_merge_cotacao_ready_activity_marks_user_as_used_tool():
     assert activity["cotacaoReadyCount"] == 1
     assert report["totals"]["usedTool"] == 1
     assert report["totals"]["noUsage"] == 0
+
+
+def test_admin_totals_do_not_count_expired_trial_as_active():
+    now = datetime.now(timezone.utc)
+    users = [
+        {
+            "subscription": {
+                "status": "trialing",
+                "trialEndsAt": (now - timedelta(days=1)).isoformat().replace("+00:00", "Z"),
+            },
+            "activity": {"hasToolUsage": False},
+        },
+        {
+            "subscription": {
+                "status": "trialing",
+                "trialEndsAt": (now + timedelta(days=1)).isoformat().replace("+00:00", "Z"),
+            },
+            "activity": {"hasToolUsage": True},
+        },
+    ]
+
+    assert admin._recompute_totals(users) == {
+        "recentUsers": 2,
+        "activeTrials": 1,
+        "usedTool": 1,
+        "noUsage": 1,
+    }
+
+
+def test_admin_device_session_alone_is_not_tool_usage():
+    now = datetime.now(timezone.utc)
+    db = _FakeDb()
+    db.audit = {
+        "event-device": _FakeDoc(
+            "event-device",
+            {
+                "uid": "rca-uid",
+                "action": "device_session_registered",
+                "status": "success",
+                "createdAt": now - timedelta(minutes=5),
+                "metadata": {"newDevice": False},
+            },
+        )
+    }
+
+    report = admin._build_recent_users_report(db, days=4, limit=25, now=now)
+    user = report["users"][0]
+
+    assert user["activity"]["lastSeenAt"] is not None
+    assert user["activity"]["auditEventCount"] == 1
+    assert user["activity"]["toolEventCount"] == 0
+    assert user["activity"]["hasToolUsage"] is False
+    assert report["totals"]["usedTool"] == 0
+    assert report["totals"]["noUsage"] == 1
