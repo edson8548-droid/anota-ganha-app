@@ -313,6 +313,8 @@ def test_admin_totals_do_not_count_expired_trial_as_active():
         "activeTrials": 1,
         "usedTool": 1,
         "noUsage": 1,
+        "needsContact": 0,
+        "stoppedAfterUse": 0,
     }
 
 
@@ -339,5 +341,29 @@ def test_admin_device_session_alone_is_not_tool_usage():
     assert user["activity"]["auditEventCount"] == 1
     assert user["activity"]["toolEventCount"] == 0
     assert user["activity"]["hasToolUsage"] is False
+    assert user["followUp"]["status"] == "never_used"
+    assert user["followUp"]["shouldContact"] is True
     assert report["totals"]["usedTool"] == 0
     assert report["totals"]["noUsage"] == 1
+    assert report["totals"]["needsContact"] == 1
+
+
+def test_admin_follow_up_marks_users_who_stopped_after_using_tool():
+    now = datetime.now(timezone.utc)
+    user = {
+        "subscription": {
+            "status": "trialing",
+            "trialEndsAt": (now + timedelta(days=5)).isoformat().replace("+00:00", "Z"),
+        },
+        "activity": {
+            "hasToolUsage": True,
+            "lastToolUseAt": (now - timedelta(days=4, hours=2)).isoformat().replace("+00:00", "Z"),
+        },
+    }
+
+    follow_up = admin._follow_up_status(user, now)
+
+    assert follow_up["status"] == "stopped"
+    assert follow_up["shouldContact"] is True
+    assert follow_up["daysSinceToolUse"] == 4
+    assert follow_up["label"] == "Parou há 4d"

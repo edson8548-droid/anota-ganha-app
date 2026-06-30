@@ -142,7 +142,7 @@
 
 .admin-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
   margin-bottom: 18px;
 }
@@ -279,7 +279,7 @@
 
 .admin-user-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
   gap: 10px;
 }
 
@@ -334,6 +334,12 @@
   background: rgba(238, 94, 94, .12);
 }
 
+.admin-status.neutral {
+  color: #C5CAD2;
+  border-color: rgba(160, 163, 168, .32);
+  background: rgba(160, 163, 168, .10);
+}
+
 .admin-activity-line {
   display: flex;
   flex-wrap: wrap;
@@ -349,6 +355,12 @@
   padding: 5px 10px;
   font-size: 12px;
   font-weight: 700;
+}
+
+.admin-activity-line .admin-contact-badge {
+  color: #FFCB9D;
+  background: rgba(238, 126, 64, .12);
+  border-color: rgba(238, 126, 64, .28);
 }
 
 .admin-job-list {
@@ -432,7 +444,6 @@
     padding: 18px 14px 36px;
   }
 
-  .admin-metrics-grid,
   .admin-user-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

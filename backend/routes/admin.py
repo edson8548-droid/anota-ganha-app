@@ -17,6 +17,8 @@ security = HTTPBearer(auto_error=False)
 MAX_LOOKBACK_DAYS = 30
 MAX_RECENT_USERS_LIMIT = 50
 AUDIT_EVENT_LIMIT = 300
+FOLLOW_UP_STALE_DAYS = 3
+FOLLOW_UP_WATCH_DAYS = 1
 DEFAULT_ADMIN_ALLOWED_EMAILS = {"edson854_8@hotmail.com"}
 COTACAO_READY_ACTIONS = {
     "cotacao_ready_confirmed",
@@ -76,6 +78,12 @@ def _iso(value) -> str | None:
     return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _latest_datetime(*values) -> datetime | None:
+    dates = [_as_utc_datetime(value) for value in values]
+    dates = [value for value in dates if value]
+    return max(dates) if dates else None
+
+
 def _public_user_data(uid: str, data: dict) -> dict:
     return {
         "uid": uid,
@@ -109,6 +117,37 @@ def _trial_is_active(subscription: dict | None, now: datetime | None = None) -> 
         return False
     trial_end = _as_utc_datetime(subscription.get("trialEndsAt"))
     return bool(trial_end and trial_end > (now or datetime.now(timezone.utc)))
+
+
+def _paid_access_until(subscription: dict | None) -> datetime | None:
+    if not subscription:
+        return None
+
+    access_end = _as_utc_datetime(subscription.get("accessEndsAt"))
+    if access_end:
+        return access_end
+
+    last_payment = _as_utc_datetime(subscription.get("lastPaymentDate"))
+    if last_payment:
+        return last_payment + timedelta(days=30)
+
+    return None
+
+
+def _has_current_access(subscription: dict | None, now: datetime | None = None) -> bool:
+    if not subscription:
+        return False
+
+    current = now or datetime.now(timezone.utc)
+    status = subscription.get("status")
+    if status == "active":
+        return True
+    if status == "trialing":
+        return _trial_is_active(subscription, current)
+    if status in {"canceling", "canceled"}:
+        paid_until = _paid_access_until(subscription)
+        return bool(paid_until and paid_until > current)
+    return False
 
 
 def _device_activity(user_ref) -> dict:
@@ -222,10 +261,14 @@ def _audit_activity(db, uid: str, since: datetime) -> dict:
     events.sort(key=lambda item: _event_datetime(item) or datetime.min.replace(tzinfo=timezone.utc))
 
     action_counts = Counter(str(event.get("action") or "unknown") for event in events)
-    tool_event_count = sum(
-        1
+    tool_events = [
+        event
         for event in events
         if _is_tool_action(str(event.get("action") or ""))
+    ]
+    tool_event_count = sum(
+        1
+        for _event in tool_events
     )
     job_ids = {
         (event.get("metadata") or {}).get("jobId")
@@ -263,7 +306,9 @@ def _audit_activity(db, uid: str, since: datetime) -> dict:
             cotacao_ready_summaries.append(_compact_cotacao_ready_event(event))
 
     last_event = events[-1] if events else None
+    last_tool_event = tool_events[-1] if tool_events else None
     last_metadata = last_event.get("metadata") if isinstance(last_event, dict) and isinstance(last_event.get("metadata"), dict) else {}
+    last_tool_metadata = last_tool_event.get("metadata") if isinstance(last_tool_event, dict) and isinstance(last_tool_event.get("metadata"), dict) else {}
 
     return {
         "auditEventCount": len(events),
@@ -274,8 +319,10 @@ def _audit_activity(db, uid: str, since: datetime) -> dict:
         "firstEventAt": _iso(_event_datetime(events[0])) if events else None,
         "lastEventAt": _iso(_event_datetime(last_event)) if last_event else None,
         "lastAction": last_event.get("action") if last_event else None,
-        "lastToolSite": last_metadata.get("site"),
-        "lastToolMode": last_metadata.get("modo"),
+        "lastToolUseAt": _iso(_event_datetime(last_tool_event)) if last_tool_event else None,
+        "lastToolAction": last_tool_event.get("action") if last_tool_event else None,
+        "lastToolSite": last_tool_metadata.get("site") or last_metadata.get("site"),
+        "lastToolMode": last_tool_metadata.get("modo") or last_metadata.get("modo"),
         "recentCotatudoJobs": job_summaries,
         "recentCotacaoReadyJobs": cotacao_ready_summaries,
     }
@@ -328,15 +375,126 @@ def _recompute_totals(users: list[dict]) -> dict:
     active_trials = sum(1 for user in users if _trial_is_active(user.get("subscription")))
     used_tool = sum(1 for user in users if (user.get("activity") or {}).get("hasToolUsage"))
     no_usage = len(users) - used_tool
+    needs_contact = sum(1 for user in users if (user.get("followUp") or {}).get("shouldContact"))
+    stopped_after_use = sum(1 for user in users if (user.get("followUp") or {}).get("status") == "stopped")
     return {
         "recentUsers": len(users),
         "activeTrials": active_trials,
         "usedTool": used_tool,
         "noUsage": no_usage,
+        "needsContact": needs_contact,
+        "stoppedAfterUse": stopped_after_use,
     }
 
 
+def _days_since(value, now: datetime) -> int | None:
+    dt = _as_utc_datetime(value)
+    if not dt:
+        return None
+    return max(0, int((now - dt).total_seconds() // 86400))
+
+
+def _follow_up_status(user: dict, now: datetime) -> dict:
+    subscription = user.get("subscription") or {}
+    activity = user.get("activity") or {}
+    has_access = _has_current_access(subscription, now)
+    has_tool_usage = bool(activity.get("hasToolUsage"))
+    last_tool_use_at = activity.get("lastToolUseAt")
+    days_since_tool = _days_since(last_tool_use_at, now)
+    days_since_session = _days_since(activity.get("lastSeenAt"), now)
+
+    base = {
+        "lastToolUseAt": last_tool_use_at,
+        "daysSinceToolUse": days_since_tool,
+        "daysSinceSession": days_since_session,
+        "shouldContact": False,
+        "priority": "low",
+        "tone": "neutral",
+    }
+
+    if not has_access:
+        status = subscription.get("status")
+        trial_end = _as_utc_datetime(subscription.get("trialEndsAt"))
+        if status == "pending" and trial_end and trial_end > now:
+            return {
+                **base,
+                "status": "access_pending",
+                "label": "Acesso pendente",
+                "reason": "Chamar para destravar o acesso antes do primeiro uso.",
+                "shouldContact": True,
+                "priority": "high",
+                "tone": "warn",
+            }
+        label = "Trial vencido" if status == "trialing" else "Acesso vencido"
+        return {
+            **base,
+            "status": "access_expired",
+            "label": label,
+            "reason": "Chamar para entender se quer renovar ou se travou no pagamento.",
+            "shouldContact": True,
+            "priority": "high",
+            "tone": "danger",
+        }
+
+    if not has_tool_usage:
+        return {
+            **base,
+            "status": "never_used",
+            "label": "Nunca testou",
+            "reason": "Chamar para ajudar no primeiro uso.",
+            "shouldContact": True,
+            "priority": "medium",
+            "tone": "warn",
+        }
+
+    if days_since_tool is None:
+        return {
+            **base,
+            "status": "used_unknown_time",
+            "label": "Usou sem data",
+            "reason": "Verificar manualmente o histórico.",
+            "shouldContact": True,
+            "priority": "medium",
+            "tone": "warn",
+        }
+
+    if days_since_tool >= FOLLOW_UP_STALE_DAYS:
+        return {
+            **base,
+            "status": "stopped",
+            "label": f"Parou há {days_since_tool}d",
+            "reason": "Chamar para perguntar se travou ou ficou descontente.",
+            "shouldContact": True,
+            "priority": "high",
+            "tone": "danger",
+        }
+
+    if days_since_tool >= FOLLOW_UP_WATCH_DAYS:
+        return {
+            **base,
+            "status": "watch",
+            "label": f"Sem uso há {days_since_tool}d",
+            "reason": "Acompanhar; chamar se completar alguns dias sem usar.",
+            "priority": "medium",
+            "tone": "warn",
+        }
+
+    return {
+        **base,
+        "status": "active",
+        "label": "Usando",
+        "reason": "Uso recente registrado.",
+        "tone": "ok",
+    }
+
+
+def _apply_follow_up_status(users: list[dict], now: datetime) -> None:
+    for user in users:
+        user["followUp"] = _follow_up_status(user, now)
+
+
 def _merge_cotacao_activity(report: dict, activity_by_uid: dict[str, dict]) -> dict:
+    generated_at = _as_utc_datetime(report.get("generatedAt")) or datetime.now(timezone.utc)
     for user in report.get("users", []):
         uid = user.get("uid")
         extra = activity_by_uid.get(uid) or {}
@@ -357,11 +515,16 @@ def _merge_cotacao_activity(report: dict, activity_by_uid: dict[str, dict]) -> d
         activity["cotacaoTableUploads"] = int(extra.get("cotacaoTableUploads") or 0)
         activity["cotacaoLearnedMatches"] = int(extra.get("cotacaoLearnedMatches") or 0)
 
-        last_extra_seen = extra.get("lastCotacaoReadyAt")
+        last_extra_seen = _latest_datetime(
+            extra.get("lastCotacaoReadyAt"),
+            extra.get("lastCotacaoTableUploadAt"),
+        )
         if last_extra_seen:
-            current_last = _as_utc_datetime(activity.get("lastEventAt"))
+            current_last = _as_utc_datetime(activity.get("lastToolUseAt"))
             extra_last = _as_utc_datetime(last_extra_seen)
             if extra_last and (current_last is None or extra_last > current_last):
+                activity["lastToolUseAt"] = _iso(extra_last)
+                activity["lastToolAction"] = "cotacao_ready_session"
                 activity["lastEventAt"] = _iso(extra_last)
                 activity["lastAction"] = "cotacao_ready_session"
                 activity["lastToolSite"] = "cotacao_pronta"
@@ -373,6 +536,7 @@ def _merge_cotacao_activity(report: dict, activity_by_uid: dict[str, dict]) -> d
             or activity.get("cotacaoLearnedMatches")
         )
 
+    _apply_follow_up_status(report.get("users", []), generated_at)
     report["totals"] = _recompute_totals(report.get("users", []))
     return report
 
@@ -388,6 +552,7 @@ async def _mongo_cotacao_activity_for_users(database, uids: list[str], since: da
             "cotacaoLearnedMatches": 0,
             "recentCotacaoReadyJobs": [],
             "lastCotacaoReadyAt": None,
+            "lastCotacaoTableUploadAt": None,
         }
         for uid in uids
     }
@@ -420,7 +585,7 @@ async def _mongo_cotacao_activity_for_users(database, uids: list[str], since: da
         tables = await (
             database.tabelas_mestre.find(
                 {"user_id": {"$in": uids}, "data_upload": {"$gte": since}},
-                {"user_id": 1},
+                {"user_id": 1, "data_upload": 1},
             )
             .limit(MAX_RECENT_USERS_LIMIT * 20)
             .to_list(length=MAX_RECENT_USERS_LIMIT * 20)
@@ -429,6 +594,10 @@ async def _mongo_cotacao_activity_for_users(database, uids: list[str], since: da
             uid = table.get("user_id")
             if uid in activity_by_uid:
                 activity_by_uid[uid]["cotacaoTableUploads"] += 1
+                upload_dt = _as_utc_datetime(table.get("data_upload"))
+                current_upload_dt = _as_utc_datetime(activity_by_uid[uid].get("lastCotacaoTableUploadAt"))
+                if upload_dt and (current_upload_dt is None or upload_dt > current_upload_dt):
+                    activity_by_uid[uid]["lastCotacaoTableUploadAt"] = _iso(upload_dt)
 
         learned = await (
             database.cotacao_aprendizado.find(
@@ -487,7 +656,7 @@ def _build_recent_users_report(db, *, days: int, limit: int, now: datetime | Non
             },
         })
 
-    return {
+    report = {
         "ok": True,
         "generatedAt": _iso(current),
         "window": {
@@ -498,6 +667,9 @@ def _build_recent_users_report(db, *, days: int, limit: int, now: datetime | Non
         "totals": _recompute_totals(users),
         "users": users,
     }
+    _apply_follow_up_status(report["users"], current)
+    report["totals"] = _recompute_totals(report["users"])
+    return report
 
 
 async def _require_admin(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:

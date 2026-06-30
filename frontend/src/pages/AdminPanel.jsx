@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   Clipboard,
   Clock3,
+  MessageCircle,
   RefreshCw,
   ShieldCheck,
   Users,
@@ -175,6 +176,7 @@ const AdminPanel = () => {
           <AdminMetric icon={Users} label="Novos RCAs" value={totals.recentUsers ?? 0} />
           <AdminMetric icon={Activity} label="Testaram a ferramenta" value={totals.usedTool ?? 0} />
           <AdminMetric icon={Clock3} label="Sem uso registrado" value={totals.noUsage ?? 0} />
+          <AdminMetric icon={MessageCircle} label="Chamar conversa" value={totals.needsContact ?? 0} />
           <AdminMetric icon={AlertTriangle} label="Trial vence em 3 dias" value={expiringSoon} />
         </section>
 
@@ -202,6 +204,7 @@ const AdminPanel = () => {
               const status = statusLabel(item.subscription);
               const remainingDays = daysUntil(item.subscription?.trialEndsAt);
               const lastSession = item.activity?.lastSeenAt;
+              const followUp = item.followUp || {};
 
               return (
                 <article className="admin-user-row" key={item.uid}>
@@ -235,12 +238,23 @@ const AdminPanel = () => {
                       <span>Última sessão</span>
                       <strong>{formatDateTime(lastSession)}</strong>
                     </div>
+                    <div>
+                      <span>Última ferramenta</span>
+                      <strong>{formatDateTime(followUp.lastToolUseAt || item.activity?.lastToolUseAt)}</strong>
+                    </div>
+                    <div>
+                      <span>Acompanhamento</span>
+                      <strong className={`admin-status ${followUp.tone || 'neutral'}`}>
+                        {followUp.label || 'Sem sinal'}
+                      </strong>
+                    </div>
                   </div>
 
                   <div className="admin-activity-line">
                     <span>{summarizeActivity(item.activity)}</span>
                     <span>{item.activity?.deviceCount || 0} dispositivo{item.activity?.deviceCount === 1 ? '' : 's'}</span>
                     <span>{item.activity?.loginCount || 0} sessão{item.activity?.loginCount === 1 ? '' : 'ões'}</span>
+                    {followUp.shouldContact && <span className="admin-contact-badge">{followUp.reason}</span>}
                   </div>
 
                   {item.activity?.recentCotatudoJobs?.length > 0 && (
