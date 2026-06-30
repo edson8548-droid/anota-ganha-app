@@ -242,3 +242,48 @@ def test_admin_recent_users_returns_sanitized_operational_data(monkeypatch):
     assert "52998224725" not in serialized
     assert "13999001234" not in serialized
     assert "produto" not in serialized
+
+
+def test_admin_merge_cotacao_ready_activity_marks_user_as_used_tool():
+    now = datetime.now(timezone.utc)
+    report = {
+        "totals": {"recentUsers": 1, "activeTrials": 1, "usedTool": 0, "noUsage": 1},
+        "users": [
+            {
+                "uid": "rca-uid",
+                "subscription": {"status": "trialing"},
+                "activity": {
+                    "auditEventCount": 0,
+                    "uniqueCotatudoJobs": 0,
+                    "cotacaoReadyCount": 0,
+                    "recentCotacaoReadyJobs": [],
+                    "hasToolUsage": False,
+                },
+            }
+        ],
+    }
+
+    admin._merge_cotacao_activity(
+        report,
+        {
+            "rca-uid": {
+                "cotacaoReadyCount": 1,
+                "lastCotacaoReadyAt": now.isoformat().replace("+00:00", "Z"),
+                "recentCotacaoReadyJobs": [
+                    {
+                        "createdAt": now.isoformat().replace("+00:00", "Z"),
+                        "sessionId": "session-1",
+                        "totalItens": 10,
+                        "preenchidos": 8,
+                        "semMatch": 2,
+                    }
+                ],
+            }
+        },
+    )
+
+    activity = report["users"][0]["activity"]
+    assert activity["hasToolUsage"] is True
+    assert activity["cotacaoReadyCount"] == 1
+    assert report["totals"]["usedTool"] == 1
+    assert report["totals"]["noUsage"] == 0

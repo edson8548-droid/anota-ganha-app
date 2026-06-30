@@ -153,3 +153,41 @@ def test_confirmar_aplica_precos_editados_antes_do_aprendizado():
     assert len(ops) == 2
     assert ops[0]._doc["$set"]["preco"] == 7.25
     assert ops[1]._doc["$set"]["preco"] == 3.0
+
+
+def test_cotacao_audit_metadata_sanitizes_to_counts():
+    stats = {
+        "ean": 1,
+        "descricao": 1,
+        "ia": 0,
+        "aprendido": 0,
+        "manual": 1,
+        "sem_match": 2,
+        "total": 5,
+    }
+
+    metadata = cotacao._cotacao_audit_metadata(
+        source="cotacao_pronta",
+        tabela_id="tabela-a",
+        prazo=7,
+        modo="completo",
+        session_id="session-1",
+        stats=stats,
+    )
+
+    assert metadata == {
+        "source": "cotacao_pronta",
+        "sessionId": "session-1",
+        "jobId": None,
+        "tabelaId": "tabela-a",
+        "prazo": 7,
+        "modo": "completo",
+        "totalItens": 5,
+        "preenchidos": 3,
+        "semMatch": 2,
+        "ean": 1,
+        "descricao": 1,
+        "ia": 0,
+        "aprendido": 0,
+        "manual": 1,
+    }

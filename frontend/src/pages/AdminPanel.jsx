@@ -51,8 +51,11 @@ const statusLabel = (subscription) => {
 
 const summarizeActivity = (activity) => {
   if (!activity?.hasToolUsage) return 'Sem uso registrado';
+  const cotacaoReady = activity.cotacaoReadyCount || 0;
   const jobs = activity.uniqueCotatudoJobs || 0;
   const events = activity.auditEventCount || 0;
+  if (cotacaoReady && jobs) return `${cotacaoReady} cotação${cotacaoReady === 1 ? '' : 'ões'} processada${cotacaoReady === 1 ? '' : 's'} + ${jobs} job${jobs === 1 ? '' : 's'} Cotatudo`;
+  if (cotacaoReady) return `${cotacaoReady} cotação${cotacaoReady === 1 ? '' : 'ões'} processada${cotacaoReady === 1 ? '' : 's'}`;
   if (jobs) return `${jobs} job${jobs === 1 ? '' : 's'} de cotação`;
   if (events) return `${events} evento${events === 1 ? '' : 's'} registrado${events === 1 ? '' : 's'}`;
   return 'Sessão registrada';
@@ -242,6 +245,18 @@ const AdminPanel = () => {
                           <span>{job.site || 'site'} · {job.modo || 'modo'} · {job.prazo || '-'} dias</span>
                           <strong>{job.preenchidos ?? 0}/{job.totalItens ?? 0} preenchidos</strong>
                           <em>{job.naoEncontrados ?? 0} não encontrados</em>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {item.activity?.recentCotacaoReadyJobs?.length > 0 && (
+                    <div className="admin-job-list">
+                      {item.activity.recentCotacaoReadyJobs.slice(0, 3).map((job) => (
+                        <div className="admin-job" key={job.sessionId || job.jobId || `${job.createdAt}-${job.prazo}`}>
+                          <span>Cotação Pronta · {job.modo || 'modo'} · {job.prazo || '-'} dias</span>
+                          <strong>{job.preenchidos ?? 0}/{job.totalItens ?? 0} preenchidos</strong>
+                          <em>{job.semMatch ?? 0} sem match</em>
                         </div>
                       ))}
                     </div>

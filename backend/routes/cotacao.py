@@ -193,6 +193,55 @@ def _resultados_para_preview(itens, resultados):
     return preview
 
 
+def _stats_resultados(itens, resultados):
+    stats = {
+        "ean": 0,
+        "descricao": 0,
+        "ia": 0,
+        "aprendido": 0,
+        "manual": 0,
+        "sem_match": 0,
+        "total": len(itens),
+    }
+    for res in resultados:
+        tipo = res.get("tipo")
+        if res.get("preco") is None:
+            stats["sem_match"] += 1
+        elif tipo == "EAN":
+            stats["ean"] += 1
+        elif tipo == "APRENDIDO":
+            stats["aprendido"] += 1
+        elif tipo == "MANUAL":
+            stats["manual"] += 1
+        elif tipo and "IA" in tipo:
+            stats["ia"] += 1
+        else:
+            stats["descricao"] += 1
+    return stats
+
+
+def _cotacao_audit_metadata(*, source, tabela_id, prazo=None, modo=None, session_id=None, job_id=None, stats=None):
+    stats = stats or {}
+    total = int(stats.get("total") or 0)
+    sem_match = int(stats.get("sem_match") or 0)
+    return {
+        "source": source,
+        "sessionId": session_id,
+        "jobId": job_id,
+        "tabelaId": str(tabela_id) if tabela_id else None,
+        "prazo": prazo,
+        "modo": modo,
+        "totalItens": total,
+        "preenchidos": max(total - sem_match, 0),
+        "semMatch": sem_match,
+        "ean": stats.get("ean"),
+        "descricao": stats.get("descricao"),
+        "ia": stats.get("ia"),
+        "aprendido": stats.get("aprendido"),
+        "manual": stats.get("manual"),
+    }
+
+
 def _bucket():
     return AsyncIOMotorGridFSBucket(db)
 
@@ -614,6 +663,7 @@ async def excluir_tabela(
 
 @router.post("/processar")
 async def processar_cotacao(
+    request: Request,
     arquivo: UploadFile = File(...),
     tabela_id: str = Form(...),
     modo: str = Form("ean"),
@@ -678,6 +728,20 @@ async def processar_cotacao(
                 os.unlink(p)
             except OSError:
                 pass
+
+    await audit_event(
+        "cotacao_ready_processed",
+        uid=uid,
+        status="success",
+        metadata=_cotacao_audit_metadata(
+            source="cotacao_pronta",
+            tabela_id=tabela_id,
+            prazo=doc.get("prazo", 28),
+            modo=modo,
+            stats=stats,
+        ),
+        request=request,
+    )
 
     return Response(
         content=resultado_bytes,
@@ -977,12 +1041,29 @@ async def _processar_preview_job(job_id):
             "user_id": job["user_id"],
             "tabela_id": job["tabela_id"],
             "prazo": prazo_efetivo,
+            "modo": modo,
             "cotacao_suffix": job.get("input_suffix", ".xlsx"),
             "cotacao_bytes": conteudo_cotacao,
             "itens": itens,
             "resultados": resultados,
             "created_at": datetime.now(timezone.utc),
         })
+
+        stats = _stats_resultados(itens, resultados)
+        await audit_event(
+            "cotacao_ready_preview_completed",
+            uid=job["user_id"],
+            status="success",
+            metadata=_cotacao_audit_metadata(
+                source="cotacao_pronta",
+                tabela_id=job["tabela_id"],
+                prazo=prazo_efetivo,
+                modo=modo,
+                session_id=session_id,
+                job_id=job_id,
+                stats=stats,
+            ),
+        )
 
         await _cleanup_job_input(job)
         await db.cotacao_jobs.update_one(
@@ -1433,6 +1514,7 @@ async def _salvar_aprendizado_confirmacao(uid, tabela_id, itens, resultados, apr
 @router.post("/confirmar")
 async def confirmar_cotacao(
     payload: ConfirmarPayload,
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     """
@@ -1509,6 +1591,21 @@ async def confirmar_cotacao(
         payload.aprovacoes,
     ))
     _track_background_task(task)
+
+    await audit_event(
+        "cotacao_ready_confirmed",
+        uid=uid,
+        status="success",
+        metadata=_cotacao_audit_metadata(
+            source="cotacao_pronta",
+            tabela_id=sessao["tabela_id"],
+            prazo=sessao.get("prazo"),
+            modo=sessao.get("modo"),
+            session_id=payload.session_id,
+            stats=stats,
+        ),
+        request=request,
+    )
 
     return Response(
         content=resultado_bytes,

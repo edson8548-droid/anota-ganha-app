@@ -18,7 +18,7 @@ from services.security_audit import audit_event
 from services.security_config import PRODUCTION_CORS_ORIGINS, parse_cors_origins
 from services.security_headers import SecurityHeadersMiddleware
 from routes.asaas import router as asaas_router
-from routes.admin import router as admin_router
+from routes.admin import router as admin_router, init_admin
 from routes.license import router as license_router
 from routes.ia import router as ia_router
 from routes.cotacao import router as cotacao_router, init_cotacao, resume_cotacao_jobs, start_cotacao_storage_cleanup
@@ -262,6 +262,7 @@ async def startup_event():
         logger.info("✅ Firebase inicializado")
     except Exception as e:
         logger.error(f"⚠️  Firebase falhou ao inicializar: {e}")
+    init_admin(db)
     init_cotacao(db)
     init_whatsapp(db)
     init_users(db)
