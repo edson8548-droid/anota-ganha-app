@@ -84,11 +84,24 @@ def _latest_datetime(*values) -> datetime | None:
     return max(dates) if dates else None
 
 
+def _public_phone(data: dict) -> str | None:
+    allowed_chars = set("0123456789+ ()-.")
+    for key in ("phone", "telefone", "whatsapp", "celular", "mobilePhone", "mobile"):
+        value = data.get(key)
+        if value is None:
+            continue
+        phone = "".join(char for char in str(value).strip() if char in allowed_chars).strip()
+        if phone:
+            return phone[:40]
+    return None
+
+
 def _public_user_data(uid: str, data: dict) -> dict:
     return {
         "uid": uid,
         "email": data.get("email"),
         "name": data.get("name") or data.get("nome") or data.get("displayName"),
+        "phone": _public_phone(data),
         "role": data.get("role"),
         "licenseType": data.get("license_type"),
         "createdAt": _iso(data.get("created_at") or data.get("createdAt")),

@@ -32,6 +32,8 @@
 .admin-refresh,
 .admin-kicker,
 .admin-icon-button,
+.admin-clear-filter,
+.admin-contact-link,
 .admin-copy {
   display: inline-flex;
   align-items: center;
@@ -67,6 +69,8 @@
 .admin-icon-button,
 .admin-refresh,
 .admin-range button,
+.admin-clear-filter,
+.admin-contact-link,
 .admin-copy,
 .admin-denied button {
   min-height: 38px;
@@ -95,6 +99,21 @@
   cursor: wait;
 }
 
+.admin-clear-filter {
+  min-height: 30px;
+  gap: 6px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.admin-contact-link {
+  min-height: 30px;
+  gap: 6px;
+  padding: 0 10px;
+  text-decoration: none;
+  font-size: 12px;
+}
+
 .admin-range {
   background: #24262A;
   border: 1px solid #4A4D52;
@@ -120,6 +139,8 @@
 .admin-icon-button:hover,
 .admin-refresh:hover,
 .admin-range button:hover,
+.admin-clear-filter:hover,
+.admin-contact-link:hover,
 .admin-copy:hover,
 .admin-denied button:hover {
   border-color: #6A9DB2;
@@ -149,6 +170,7 @@
 
 .admin-metric {
   min-height: 92px;
+  width: 100%;
   background: #363940;
   border: 1px solid #4A4D52;
   border-radius: 8px;
@@ -156,6 +178,26 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: background .18s, border-color .18s, transform .18s;
+}
+
+.admin-metric:hover,
+.admin-metric.active {
+  background: #3C4048;
+  border-color: #6A9DB2;
+}
+
+.admin-metric.active {
+  box-shadow: inset 0 0 0 1px rgba(143, 209, 230, .24);
+}
+
+.admin-metric:focus-visible {
+  outline: 2px solid #8FD1E6;
+  outline-offset: 2px;
 }
 
 .admin-metric-icon {
@@ -231,6 +273,14 @@
   font-weight: 700;
 }
 
+.admin-section-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .admin-empty {
   margin: 18px;
 }
@@ -268,6 +318,25 @@
   color: #A0A3A8;
   font-size: 13px;
   word-break: break-word;
+}
+
+.admin-contact-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.admin-phone-text,
+.admin-phone-empty {
+  color: #C5CAD2;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-phone-empty {
+  color: #7E838B;
 }
 
 .admin-copy {

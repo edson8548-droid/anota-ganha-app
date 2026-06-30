@@ -7,9 +7,11 @@ import {
   Clipboard,
   Clock3,
   MessageCircle,
+  PhoneCall,
   RefreshCw,
   ShieldCheck,
   Users,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthContext } from '../contexts/AuthContext';
@@ -18,6 +20,34 @@ import { canAccessAdminPanel } from '../utils/adminAccess';
 import './AdminPanel.css';
 
 const DAY_OPTIONS = [4, 7, 30];
+
+const FILTERS = {
+  all: {
+    label: 'Novos RCAs',
+    title: 'Cadastros recentes',
+    empty: 'Nenhum cadastro novo nessa janela.',
+  },
+  used: {
+    label: 'Testaram a ferramenta',
+    title: 'RCAs que testaram a ferramenta',
+    empty: 'Nenhum RCA testou a ferramenta nesse filtro.',
+  },
+  noUsage: {
+    label: 'Sem uso registrado',
+    title: 'RCAs sem uso registrado',
+    empty: 'Nenhum RCA sem uso registrado nesse filtro.',
+  },
+  needsContact: {
+    label: 'Chamar conversa',
+    title: 'RCAs para chamar',
+    empty: 'Nenhum RCA marcado para conversa nesse filtro.',
+  },
+  expiringSoon: {
+    label: 'Trial vence em 3 dias',
+    title: 'Trials vencendo em ate 3 dias',
+    empty: 'Nenhum trial vencendo em ate 3 dias nesse filtro.',
+  },
+};
 
 const formatDateTime = (value) => {
   if (!value) return 'Sem registro';
@@ -38,6 +68,35 @@ const daysUntil = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+};
+
+const isTrialExpiringSoon = (item) => {
+  const remaining = daysUntil(item.subscription?.trialEndsAt);
+  return remaining !== null && remaining >= 0 && remaining <= 3;
+};
+
+const phoneDigits = (value) => String(value || '').replace(/\D/g, '');
+
+const phoneDisplay = (value) => {
+  const digits = phoneDigits(value);
+  if (!digits) return '';
+  if (digits.length === 11) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  }
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 13 && digits.startsWith('55')) {
+    return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`;
+  }
+  return String(value || '').trim();
+};
+
+const whatsappUrl = (value) => {
+  const digits = phoneDigits(value);
+  if (!digits) return '';
+  const withCountry = digits.startsWith('55') || digits.length > 11 ? digits : `55${digits}`;
+  return `https://wa.me/${withCountry}`;
 };
 
 const statusLabel = (subscription) => {
@@ -67,14 +126,19 @@ const summarizeActivity = (activity) => {
   return 'Sessão registrada';
 };
 
-const AdminMetric = ({ icon: Icon, label, value }) => (
-  <div className="admin-metric">
+const AdminMetric = ({ icon: Icon, label, value, active, onClick }) => (
+  <button
+    type="button"
+    className={`admin-metric${active ? ' active' : ''}`}
+    onClick={onClick}
+    aria-pressed={active}
+  >
     <div className="admin-metric-icon"><Icon size={18} /></div>
     <div>
       <div className="admin-metric-value">{value}</div>
       <div className="admin-metric-label">{label}</div>
     </div>
-  </div>
+  </button>
 );
 
 const AdminPanel = () => {
@@ -84,6 +148,7 @@ const AdminPanel = () => {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [activeFilter, setActiveFilter] = useState('all');
 
   const canViewAdmin = canAccessAdminPanel(user);
 
@@ -109,10 +174,30 @@ const AdminPanel = () => {
   const totals = report?.totals || {};
   const users = report?.users || [];
 
-  const expiringSoon = useMemo(() => users.filter((item) => {
-    const remaining = daysUntil(item.subscription?.trialEndsAt);
-    return remaining !== null && remaining >= 0 && remaining <= 3;
-  }).length, [users]);
+  const expiringSoon = useMemo(() => users.filter(isTrialExpiringSoon).length, [users]);
+  const filteredUsers = useMemo(() => {
+    if (activeFilter === 'used') {
+      return users.filter((item) => item.activity?.hasToolUsage);
+    }
+    if (activeFilter === 'noUsage') {
+      return users.filter((item) => !item.activity?.hasToolUsage);
+    }
+    if (activeFilter === 'needsContact') {
+      return users.filter((item) => item.followUp?.shouldContact);
+    }
+    if (activeFilter === 'expiringSoon') {
+      return users.filter(isTrialExpiringSoon);
+    }
+    return users;
+  }, [activeFilter, users]);
+  const activeFilterInfo = FILTERS[activeFilter] || FILTERS.all;
+  const metricItems = [
+    { key: 'all', icon: Users, label: FILTERS.all.label, value: totals.recentUsers ?? users.length },
+    { key: 'used', icon: Activity, label: FILTERS.used.label, value: totals.usedTool ?? 0 },
+    { key: 'noUsage', icon: Clock3, label: FILTERS.noUsage.label, value: totals.noUsage ?? 0 },
+    { key: 'needsContact', icon: MessageCircle, label: FILTERS.needsContact.label, value: totals.needsContact ?? 0 },
+    { key: 'expiringSoon', icon: AlertTriangle, label: FILTERS.expiringSoon.label, value: expiringSoon },
+  ];
 
   const copyUid = async (uid) => {
     try {
@@ -173,11 +258,16 @@ const AdminPanel = () => {
 
       <main className="admin-main">
         <section className="admin-metrics-grid">
-          <AdminMetric icon={Users} label="Novos RCAs" value={totals.recentUsers ?? 0} />
-          <AdminMetric icon={Activity} label="Testaram a ferramenta" value={totals.usedTool ?? 0} />
-          <AdminMetric icon={Clock3} label="Sem uso registrado" value={totals.noUsage ?? 0} />
-          <AdminMetric icon={MessageCircle} label="Chamar conversa" value={totals.needsContact ?? 0} />
-          <AdminMetric icon={AlertTriangle} label="Trial vence em 3 dias" value={expiringSoon} />
+          {metricItems.map((metric) => (
+            <AdminMetric
+              key={metric.key}
+              icon={metric.icon}
+              label={metric.label}
+              value={metric.value}
+              active={activeFilter === metric.key}
+              onClick={() => setActiveFilter(metric.key)}
+            />
+          ))}
         </section>
 
         {error && (
@@ -189,22 +279,36 @@ const AdminPanel = () => {
         <section className="admin-list-section">
           <div className="admin-section-header">
             <div>
-              <h2>Cadastros recentes</h2>
+              <h2>{activeFilterInfo.title}</h2>
               <p>{report?.window?.since ? `Desde ${formatDateTime(report.window.since)}` : 'Carregando janela de consulta'}</p>
             </div>
-            <span>{loading ? 'Carregando...' : `${users.length} registro${users.length === 1 ? '' : 's'}`}</span>
+            <div className="admin-section-actions">
+              <span>
+                {loading
+                  ? 'Carregando...'
+                  : `${filteredUsers.length} de ${users.length} registro${users.length === 1 ? '' : 's'}`}
+              </span>
+              {activeFilter !== 'all' && (
+                <button type="button" className="admin-clear-filter" onClick={() => setActiveFilter('all')}>
+                  <X size={14} /> Limpar
+                </button>
+              )}
+            </div>
           </div>
 
-          {!loading && users.length === 0 && (
-            <div className="admin-empty">Nenhum cadastro novo nessa janela.</div>
+          {!loading && filteredUsers.length === 0 && (
+            <div className="admin-empty">{users.length === 0 ? FILTERS.all.empty : activeFilterInfo.empty}</div>
           )}
 
           <div className="admin-user-list">
-            {users.map((item) => {
+            {filteredUsers.map((item) => {
               const status = statusLabel(item.subscription);
               const remainingDays = daysUntil(item.subscription?.trialEndsAt);
               const lastSession = item.activity?.lastSeenAt;
               const followUp = item.followUp || {};
+              const phone = phoneDisplay(item.phone);
+              const digits = phoneDigits(item.phone);
+              const waUrl = whatsappUrl(item.phone);
 
               return (
                 <article className="admin-user-row" key={item.uid}>
@@ -212,6 +316,21 @@ const AdminPanel = () => {
                     <div>
                       <h3>{item.name || 'Sem nome'}</h3>
                       <p>{item.email || 'Sem email'}</p>
+                      <div className="admin-contact-row">
+                        {phone ? (
+                          <>
+                            <span className="admin-phone-text">{phone}</span>
+                            <a className="admin-contact-link" href={`tel:${digits}`}>
+                              <PhoneCall size={14} /> Ligar
+                            </a>
+                            <a className="admin-contact-link" href={waUrl} target="_blank" rel="noreferrer">
+                              <MessageCircle size={14} /> WhatsApp
+                            </a>
+                          </>
+                        ) : (
+                          <span className="admin-phone-empty">Sem telefone no cadastro</span>
+                        )}
+                      </div>
                     </div>
                     <button type="button" className="admin-copy" onClick={() => copyUid(item.uid)} title="Copiar UID">
                       <Clipboard size={15} /> UID

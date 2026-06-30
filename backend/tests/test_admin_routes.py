@@ -231,6 +231,7 @@ def test_admin_recent_users_returns_sanitized_operational_data(monkeypatch):
     user = payload["users"][0]
     assert user["uid"] == "rca-uid"
     assert user["email"] == "rca@example.com"
+    assert user["phone"] == "13999001234"
     assert user["subscription"]["planId"] == "trial"
     assert user["subscription"]["status"] == "trialing"
     assert user["activity"]["uniqueCotatudoJobs"] == 1
@@ -240,7 +241,6 @@ def test_admin_recent_users_returns_sanitized_operational_data(monkeypatch):
     assert "cpf" not in serialized
     assert "telefone" not in serialized
     assert "52998224725" not in serialized
-    assert "13999001234" not in serialized
     assert "produto" not in serialized
 
 
