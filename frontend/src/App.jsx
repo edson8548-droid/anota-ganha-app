@@ -84,6 +84,7 @@ const lazyWithRetry = (importer) => lazy(async () => {
 const Login = lazyWithRetry(() => import('./pages/Login'));
 const Register = lazyWithRetry(() => import('./pages/Register'));
 const Landing = lazyWithRetry(() => import('./pages/Landing'));
+const AdminPanel = lazyWithRetry(() => import('./pages/AdminPanel'));
 const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));
 const Plans = lazyWithRetry(() => import('./pages/Plans'));
 const Checkout = lazyWithRetry(() => import('./pages/Checkout'));
@@ -185,8 +186,7 @@ function AppRoutes() {
           <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
           <Route path="/payment-failure" element={<ProtectedRoute><PaymentFailure /></ProtectedRoute>} />
           <Route path="/payment-pending" element={<ProtectedRoute><PaymentFailure /></ProtectedRoute>} />
-          {/* Admin frontend desativado: operações administrativas devem ficar no backend. */}
-          <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
 
           {/* Rota 404 */}
           <Route path="*" element={<Navigate to="/" replace />} />

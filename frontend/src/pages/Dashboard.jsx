@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileSpreadsheet, ClipboardList, BarChart3, Store, Plus, RotateCcw, Trash2, Copy, MessageCircle, Pencil, LifeBuoy, LogOut, CalendarDays, Bell, CheckCircle2, Clock, StickyNote, Printer, Handshake } from 'lucide-react';
+import { ArrowLeft, FileSpreadsheet, ClipboardList, BarChart3, Store, Plus, RotateCcw, Trash2, Copy, MessageCircle, Pencil, LifeBuoy, LogOut, CalendarDays, Bell, CheckCircle2, Clock, StickyNote, Printer, Handshake, ShieldCheck } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useCampaigns } from '../hooks/useCampaigns';
 import { useClients } from '../hooks/useClients';
@@ -16,6 +16,7 @@ import { campaignsService } from '../services/campaigns.service';
 import { uploadAvatar } from '../services/api';
 import { getDailyMotivationMessage } from '../data/dailyMotivationMessages';
 import { backendUrl } from '../config/api';
+import { canAccessAdminPanel } from '../utils/adminAccess';
 import { getPartnerConfig } from '../utils/partnerProgram';
 import './Dashboard.css';
 
@@ -1604,6 +1605,7 @@ const Dashboard = () => {
               </a>
             </div>
             <div className="header-actions">
+              {canAccessAdminPanel(user) && <button className="btn-nav" onClick={() => navigate('/admin')}><ShieldCheck size={15} /> Admin</button>}
               {partnerConfig && <button className="btn-nav" onClick={() => navigate('/parceiro')}>Parceiro</button>}
               <button className="btn-nav" onClick={() => navigate('/plans')}>Planos</button>
               <button className="btn-nav" onClick={() => navigate('/minha-licenca')}>Licença</button>
