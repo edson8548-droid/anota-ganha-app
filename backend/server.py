@@ -18,6 +18,7 @@ from services.security_audit import audit_event
 from services.security_config import PRODUCTION_CORS_ORIGINS, parse_cors_origins
 from services.security_headers import SecurityHeadersMiddleware
 from routes.asaas import router as asaas_router
+from routes.admin import router as admin_router
 from routes.license import router as license_router
 from routes.ia import router as ia_router
 from routes.cotacao import router as cotacao_router, init_cotacao, resume_cotacao_jobs, start_cotacao_storage_cleanup
@@ -242,6 +243,7 @@ db = client[os.environ.get("DB_NAME", "anota_ganha_db")]
 api_router = APIRouter(prefix="/api")
 
 app.include_router(asaas_router, prefix="/api/asaas", tags=["Asaas"])
+app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
 app.include_router(license_router, prefix="/api/license", tags=["Licença"])
 app.include_router(ia_router, prefix="/api/ia", tags=["Assistente IA"])
 app.include_router(cotacao_router, prefix="/api/cotacao", tags=["Cotação"])
