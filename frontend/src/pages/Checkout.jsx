@@ -8,7 +8,7 @@ import { saveBillingProfile } from '../services/api';
 import { auth, db } from '../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 import { isValidCpfCnpj } from '../utils/documentValidators';
-import { CARLOS_PARTNER_CODE, PARTNER_COUPON_ENABLED, getPartnerCouponDiscount, normalizePartnerCode } from '../utils/partnerProgram';
+import { getPartnerCouponDiscount, isActivePartnerCoupon, normalizePartnerCode } from '../utils/partnerProgram';
 import './Checkout.css';
 
 const onlyDigits = (value) => String(value || '').replace(/\D/g, '');
@@ -85,7 +85,7 @@ const Checkout = () => {
         const storedCoupon = (() => {
           try {
             const value = normalizePartnerCode(localStorage.getItem('venpro:checkout-coupon'));
-            if (!PARTNER_COUPON_ENABLED && value === CARLOS_PARTNER_CODE) {
+            if (value && !isActivePartnerCoupon(value)) {
               localStorage.removeItem('venpro:checkout-coupon');
               return '';
             }
@@ -100,7 +100,7 @@ const Checkout = () => {
           || data.referredByCode
           || data.referralCode
         );
-        if (profileCoupon && (PARTNER_COUPON_ENABLED || profileCoupon !== CARLOS_PARTNER_CODE)) {
+        if (profileCoupon && isActivePartnerCoupon(profileCoupon)) {
           setCouponCode(profileCoupon);
         }
         setPayerData({
@@ -119,9 +119,7 @@ const Checkout = () => {
   }, [user, location.state?.couponCode]);
 
   const rawCouponCode = normalizePartnerCode(couponCode);
-  const normalizedCouponCode = !PARTNER_COUPON_ENABLED && rawCouponCode === CARLOS_PARTNER_CODE
-    ? ''
-    : rawCouponCode;
+  const normalizedCouponCode = isActivePartnerCoupon(rawCouponCode) ? rawCouponCode : '';
   const partnerDiscount = selectedPlan
     ? getPartnerCouponDiscount(selectedPlan.price, normalizedCouponCode)
     : null;
@@ -170,7 +168,7 @@ const Checkout = () => {
 
       const healthResponse = await fetch(backendUrl('/health'), { method: 'GET', mode: 'cors' });
       const health = await healthResponse.json().catch(() => ({}));
-      if (health?.build !== 'partner-coupon-v1') {
+      if (health?.build !== 'partner25-once-v1') {
         throw new Error('Pagamento em atualização. Aguarde o backend publicar a nova versão antes de assinar.');
       }
 

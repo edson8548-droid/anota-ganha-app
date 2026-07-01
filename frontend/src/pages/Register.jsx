@@ -4,7 +4,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { sendWelcomeEmail } from '../services/api';
 import { isValidCPF, onlyDigits } from '../utils/documentValidators';
-import { CARLOS_PARTNER_CODE, PARTNER_COUPON_ENABLED, normalizePartnerCode } from '../utils/partnerProgram';
+import { getPartnerCouponConfig, isActivePartnerCoupon, normalizePartnerCode } from '../utils/partnerProgram';
 import './Register.css';
 
 // ⭐️ INÍCIO: Funções de Máscara (para formatar os campos) ⭐️
@@ -87,6 +87,7 @@ const Register = () => {
   const { register } = useAuthContext();
   const navigate = useNavigate();
   const location = useLocation();
+  const referralPartner = getPartnerCouponConfig(referralCode);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -95,7 +96,7 @@ const Register = () => {
       setReferralCode(fromUrl);
       try {
         localStorage.setItem('venpro:referral-code', fromUrl);
-        if (PARTNER_COUPON_ENABLED && fromUrl === CARLOS_PARTNER_CODE) {
+        if (isActivePartnerCoupon(fromUrl)) {
           localStorage.setItem('venpro:checkout-coupon', fromUrl);
         }
       } catch {
@@ -207,7 +208,9 @@ const Register = () => {
           {referralCode && (
             <div className="register-referral-note">
               Cadastro com codigo de parceiro: <strong>{referralCode}</strong>
-              {referralCode === CARLOS_PARTNER_CODE ? <span>Parceiro Carlos Vinicios</span> : null}
+              {referralPartner?.name ? (
+                <span>{referralPartner.active ? referralPartner.discountLabel : `Parceiro ${referralPartner.name}`}</span>
+              ) : null}
             </div>
           )}
         </div>

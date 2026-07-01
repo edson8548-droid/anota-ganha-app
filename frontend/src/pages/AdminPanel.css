@@ -32,8 +32,9 @@
 .admin-refresh,
 .admin-kicker,
 .admin-icon-button,
-.admin-copy,
-.admin-whatsapp {
+.admin-clear-filter,
+.admin-contact-link,
+.admin-copy {
   display: inline-flex;
   align-items: center;
 }
@@ -68,8 +69,9 @@
 .admin-icon-button,
 .admin-refresh,
 .admin-range button,
+.admin-clear-filter,
+.admin-contact-link,
 .admin-copy,
-.admin-whatsapp,
 .admin-denied button {
   min-height: 38px;
   border: 1px solid #4A4D52;
@@ -97,6 +99,21 @@
   cursor: wait;
 }
 
+.admin-clear-filter {
+  min-height: 30px;
+  gap: 6px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.admin-contact-link {
+  min-height: 30px;
+  gap: 6px;
+  padding: 0 10px;
+  text-decoration: none;
+  font-size: 12px;
+}
+
 .admin-range {
   background: #24262A;
   border: 1px solid #4A4D52;
@@ -122,8 +139,9 @@
 .admin-icon-button:hover,
 .admin-refresh:hover,
 .admin-range button:hover,
+.admin-clear-filter:hover,
+.admin-contact-link:hover,
 .admin-copy:hover,
-.admin-whatsapp:hover,
 .admin-denied button:hover {
   border-color: #6A9DB2;
   color: #fff;
@@ -145,13 +163,14 @@
 
 .admin-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 18px;
 }
 
 .admin-metric {
   min-height: 92px;
+  width: 100%;
   background: #363940;
   border: 1px solid #4A4D52;
   border-radius: 8px;
@@ -163,17 +182,22 @@
   cursor: pointer;
   font: inherit;
   text-align: left;
+  transition: background .18s, border-color .18s, transform .18s;
 }
 
-.admin-metric:hover {
+.admin-metric:hover,
+.admin-metric.active {
+  background: #3C4048;
   border-color: #6A9DB2;
-  background: #3D4149;
 }
 
 .admin-metric.active {
-  border-color: #8FD1E6;
-  background: #33404A;
-  box-shadow: inset 0 0 0 1px rgba(143, 209, 230, .20);
+  box-shadow: inset 0 0 0 1px rgba(143, 209, 230, .24);
+}
+
+.admin-metric:focus-visible {
+  outline: 2px solid #8FD1E6;
+  outline-offset: 2px;
 }
 
 .admin-metric-icon {
@@ -200,27 +224,6 @@
   color: #A0A3A8;
   font-size: 12px;
   font-weight: 700;
-}
-
-.admin-secondary-metrics {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 18px;
-}
-
-.admin-secondary-metrics span {
-  min-height: 34px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid rgba(74, 77, 82, .9);
-  border-radius: 8px;
-  background: #30333A;
-  color: #C5CAD2;
-  padding: 0 11px;
-  font-size: 12px;
-  font-weight: 800;
 }
 
 .admin-alert,
@@ -270,6 +273,14 @@
   font-weight: 700;
 }
 
+.admin-section-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .admin-empty {
   margin: 18px;
 }
@@ -309,39 +320,23 @@
   word-break: break-word;
 }
 
-.admin-contact-line {
+.admin-contact-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 9px;
 }
 
-.admin-contact-line span,
-.admin-whatsapp {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.admin-contact-line span {
-  min-height: 30px;
-  border: 1px solid rgba(143, 209, 230, .18);
-  border-radius: 8px;
-  background: rgba(143, 209, 230, .07);
-  color: #DDE2EA;
-  padding: 0 9px;
+.admin-phone-text,
+.admin-phone-empty {
+  color: #C5CAD2;
   font-size: 12px;
   font-weight: 800;
 }
 
-.admin-whatsapp {
-  min-height: 30px;
-  padding: 0 9px;
-  color: #8FE8BD;
-  text-decoration: none;
-  font-size: 12px;
-  font-weight: 900;
+.admin-phone-empty {
+  color: #7E838B;
 }
 
 .admin-copy {
@@ -353,7 +348,7 @@
 
 .admin-user-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
   gap: 10px;
 }
 
@@ -408,6 +403,12 @@
   background: rgba(238, 94, 94, .12);
 }
 
+.admin-status.neutral {
+  color: #C5CAD2;
+  border-color: rgba(160, 163, 168, .32);
+  background: rgba(160, 163, 168, .10);
+}
+
 .admin-activity-line {
   display: flex;
   flex-wrap: wrap;
@@ -423,6 +424,12 @@
   padding: 5px 10px;
   font-size: 12px;
   font-weight: 700;
+}
+
+.admin-activity-line .admin-contact-badge {
+  color: #FFCB9D;
+  background: rgba(238, 126, 64, .12);
+  border-color: rgba(238, 126, 64, .28);
 }
 
 .admin-job-list {
@@ -506,7 +513,6 @@
     padding: 18px 14px 36px;
   }
 
-  .admin-metrics-grid,
   .admin-user-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -538,10 +544,5 @@
   .admin-section-header,
   .admin-user-main {
     flex-direction: column;
-  }
-
-  .admin-copy {
-    width: 100%;
-    justify-content: center;
   }
 }

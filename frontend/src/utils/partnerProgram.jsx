@@ -1,15 +1,29 @@
 export const CARLOS_PARTNER_CODE = 'carlos14off';
-export const PARTNER_COUPON_ENABLED = false;
+export const PARCEIRO25_COUPON_CODE = 'parceiro25off';
+export const PARCEIRO25_COUPON_DISPLAY_CODE = 'parceiro25%off';
+export const PARTNER_COUPON_ENABLED = true;
 
 const PARTNER_CONFIGS = {
   [CARLOS_PARTNER_CODE]: {
     code: CARLOS_PARTNER_CODE,
     name: 'Carlos Vinicios',
+    active: false,
     discountLabel: 'Cupom pausado por enquanto',
     discountPercentLabel: 'Pausado',
     checkoutFinalPrice: null,
     commissionLabel: 'R$ 40 por assinatura ativa',
     status: 'Piloto ativo'
+  },
+  [PARCEIRO25_COUPON_CODE]: {
+    code: PARCEIRO25_COUPON_DISPLAY_CODE,
+    normalizedCode: PARCEIRO25_COUPON_CODE,
+    name: 'Parceiro',
+    active: true,
+    discountLabel: '25% off',
+    discountPercentLabel: '25% off',
+    checkoutFinalPrice: 74.93,
+    commissionLabel: '',
+    status: 'Cupom único'
   }
 };
 
@@ -65,13 +79,22 @@ export const buildPartnerSignupLink = (code) => {
   return `${origin}/register?ref=${encodeURIComponent(normalized)}`;
 };
 
+export const getPartnerCouponConfig = (code) => {
+  return PARTNER_CONFIGS[normalizePartnerCode(code)] || null;
+};
+
+export const isActivePartnerCoupon = (code) => {
+  const config = getPartnerCouponConfig(code);
+  return Boolean(config?.active && config.checkoutFinalPrice);
+};
+
 export const getPartnerCouponDiscount = (planPrice, code) => {
   if (!PARTNER_COUPON_ENABLED) return null;
 
   const normalized = normalizePartnerCode(code);
   const config = PARTNER_CONFIGS[normalized];
   const price = Number(planPrice || 0);
-  if (!config || !price || !config.checkoutFinalPrice || config.checkoutFinalPrice >= price) {
+  if (!config?.active || !price || !config.checkoutFinalPrice || config.checkoutFinalPrice >= price) {
     return null;
   }
 
@@ -79,6 +102,7 @@ export const getPartnerCouponDiscount = (planPrice, code) => {
   const discountAmount = Number((price - finalPrice).toFixed(2));
   return {
     code: config.code,
+    normalizedCode: config.normalizedCode || normalized,
     label: config.discountLabel,
     percentLabel: config.discountPercentLabel,
     finalPrice,

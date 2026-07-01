@@ -56,7 +56,7 @@
   },
   "scripts": {
     "start": "vite",
-    "build": "vite build && node ../scripts/update-csp.mjs",
+    "build": "node ../scripts/validate-frontend-env.mjs && vite build && node ../scripts/update-csp.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "preview": "vite preview --host 0.0.0.0"

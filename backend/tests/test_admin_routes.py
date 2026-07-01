@@ -112,33 +112,6 @@ class _FakeDb:
                 "cpf": "52998224725",
                 "telefone": "13999001234",
             },
-            "active-old-uid": {
-                "email": "ativo-antigo@example.com",
-                "name": "RCA Antigo Ativo",
-                "role": "user",
-                "license_type": "paid",
-                "created_at": now - timedelta(days=45),
-                "updated_at": now - timedelta(days=2),
-                "telefone": "11988887777",
-            },
-            "stopped-old-uid": {
-                "email": "parado-antigo@example.com",
-                "name": "RCA Antigo Parado",
-                "role": "user",
-                "license_type": "trial",
-                "created_at": now - timedelta(days=60),
-                "updated_at": now - timedelta(days=20),
-                "telefone": "11977776666",
-            },
-            "never-uid": {
-                "email": "sem-uso@example.com",
-                "name": "RCA Sem Uso",
-                "role": "user",
-                "license_type": "trial",
-                "created_at": now - timedelta(days=10),
-                "updated_at": now - timedelta(days=10),
-                "telefone": "11966665555",
-            },
         }
         self.subscriptions = {
             "rca-uid": {
@@ -148,22 +121,6 @@ class _FakeDb:
                 "createdAt": now - timedelta(hours=3),
                 "updatedAt": now - timedelta(hours=2),
                 "userId": "rca-uid",
-            },
-            "active-old-uid": {
-                "planId": "monthly",
-                "status": "active",
-                "accessEndsAt": now + timedelta(days=20),
-                "createdAt": now - timedelta(days=45),
-                "updatedAt": now - timedelta(days=2),
-                "userId": "active-old-uid",
-            },
-            "stopped-old-uid": {
-                "planId": "trial",
-                "status": "trial_expired",
-                "trialEndsAt": now - timedelta(days=45),
-                "createdAt": now - timedelta(days=60),
-                "updatedAt": now - timedelta(days=20),
-                "userId": "stopped-old-uid",
             }
         }
         self.devices = {
@@ -174,26 +131,6 @@ class _FakeDb:
                         "lastSeenAt": now - timedelta(hours=1),
                         "firstSeenAt": now - timedelta(hours=3),
                         "loginCount": 2,
-                    },
-                )
-            },
-            "active-old-uid": {
-                "device-b": _FakeDoc(
-                    "device-b",
-                    {
-                        "lastSeenAt": now - timedelta(days=2),
-                        "firstSeenAt": now - timedelta(days=45),
-                        "loginCount": 8,
-                    },
-                )
-            },
-            "stopped-old-uid": {
-                "device-c": _FakeDoc(
-                    "device-c",
-                    {
-                        "lastSeenAt": now - timedelta(days=21),
-                        "firstSeenAt": now - timedelta(days=60),
-                        "loginCount": 3,
                     },
                 )
             }
@@ -216,23 +153,6 @@ class _FakeDb:
                         "precosRecebidos": 6,
                         "naoEncontrados": 4,
                         "debug": {"produto": "nao deve sair"},
-                    },
-                },
-            ),
-            "event-stopped": _FakeDoc(
-                "event-stopped",
-                {
-                    "uid": "stopped-old-uid",
-                    "action": "cotatudo_extension_fill_reported",
-                    "status": "success",
-                    "createdAt": now - timedelta(days=21),
-                    "metadata": {
-                        "jobId": "job-old",
-                        "site": "vr-cotacao",
-                        "modo": "ean",
-                        "prazo": 14,
-                        "totalItens": 8,
-                        "preenchidos": 8,
                     },
                 },
             )
@@ -260,7 +180,6 @@ def _client(monkeypatch, uid="admin-uid"):
     app.include_router(admin.router, prefix="/api/admin")
     fake_db = _FakeDb()
 
-    admin.clear_admin_report_cache()
     monkeypatch.setenv("ADMIN_ALLOWED_EMAILS", "edson854_8@hotmail.com")
     monkeypatch.setattr(admin, "_fs", lambda: fake_db)
     token_email = fake_db.users.get(uid, {}).get("email")
@@ -307,14 +226,11 @@ def test_admin_recent_users_returns_sanitized_operational_data(monkeypatch):
     assert response.status_code == 200
     payload = response.json()
     assert payload["totals"]["recentUsers"] == 1
-    assert payload["totals"]["registeredUsers"] == 5
-    assert payload["totals"]["usedTool"] == 3
-    assert payload["totals"]["activeToday"] == 1
-    assert payload["totals"]["activeLast7Days"] == 2
-    assert payload["totals"]["stoppedUsing"] == 1
-    assert payload["totals"]["oldRegisteredActive"] == 1
-    assert payload["totals"]["oldRegisteredStopped"] == 1
-    assert payload["totals"]["neverUsed"] == 2
+    assert payload["totals"]["registeredUsers"] == 2
+    assert payload["totals"]["usedTool"] == 1
+    assert "allRegistered" in payload["segments"]
+    assert "activeLast7Days" in payload["segments"]
+    assert len(payload["segments"]["allRegistered"]) == 2
 
     user = payload["users"][0]
     assert user["uid"] == "rca-uid"
@@ -323,11 +239,7 @@ def test_admin_recent_users_returns_sanitized_operational_data(monkeypatch):
     assert user["subscription"]["planId"] == "trial"
     assert user["subscription"]["status"] == "trialing"
     assert user["activity"]["uniqueCotatudoJobs"] == 1
-    assert user["activity"]["totalCotatudoJobs"] == 1
     assert user["activity"]["recentCotatudoJobs"][0]["preenchidos"] == 6
-    assert payload["segments"]["activeLast7Days"][0]["uid"] == "rca-uid"
-    assert payload["segments"]["stoppedUsing"][0]["uid"] == "stopped-old-uid"
-    assert payload["segments"]["oldRegisteredActive"][0]["uid"] == "active-old-uid"
 
     serialized = str(payload).lower()
     assert "cpf" not in serialized
@@ -336,42 +248,128 @@ def test_admin_recent_users_returns_sanitized_operational_data(monkeypatch):
     assert "produto" not in serialized
 
 
-def test_admin_recent_users_reuses_short_cache(monkeypatch):
-    client = _client(monkeypatch, uid="admin-uid")
-    calls = 0
+def test_admin_merge_cotacao_ready_activity_marks_user_as_used_tool():
+    now = datetime.now(timezone.utc)
+    report = {
+        "totals": {"recentUsers": 1, "activeTrials": 1, "usedTool": 0, "noUsage": 1},
+        "users": [
+            {
+                "uid": "rca-uid",
+                "subscription": {"status": "trialing"},
+                "activity": {
+                    "auditEventCount": 0,
+                    "uniqueCotatudoJobs": 0,
+                    "cotacaoReadyCount": 0,
+                    "recentCotacaoReadyJobs": [],
+                    "hasToolUsage": False,
+                },
+            }
+        ],
+    }
 
-    def _fake_build_report(_db, *, days, limit, now=None):
-        nonlocal calls
-        calls += 1
-        return {
-            "ok": True,
-            "generatedAt": "2026-07-01T12:00:00Z",
-            "window": {"days": days, "returnedPerSegmentLimit": limit},
-            "totals": {
-                "registeredUsers": 0,
-                "totalRegistered": 0,
-                "recentUsers": 0,
-                "activeTrials": 0,
-                "usedTool": 0,
-                "noUsage": 0,
-                "activeToday": 0,
-                "activeLast7Days": 0,
-                "stoppedUsing": 0,
-                "oldRegisteredActive": 0,
-                "oldRegisteredStopped": 0,
-                "neverUsed": 0,
+    admin._merge_cotacao_activity(
+        report,
+        {
+            "rca-uid": {
+                "cotacaoReadyCount": 1,
+                "lastCotacaoReadyAt": now.isoformat().replace("+00:00", "Z"),
+                "recentCotacaoReadyJobs": [
+                    {
+                        "createdAt": now.isoformat().replace("+00:00", "Z"),
+                        "sessionId": "session-1",
+                        "totalItens": 10,
+                        "preenchidos": 8,
+                        "semMatch": 2,
+                    }
+                ],
+            }
+        },
+    )
+
+    activity = report["users"][0]["activity"]
+    assert activity["hasToolUsage"] is True
+    assert activity["cotacaoReadyCount"] == 1
+    assert report["totals"]["usedTool"] == 1
+    assert report["totals"]["noUsage"] == 0
+
+
+def test_admin_totals_do_not_count_expired_trial_as_active():
+    now = datetime.now(timezone.utc)
+    users = [
+        {
+            "subscription": {
+                "status": "trialing",
+                "trialEndsAt": (now - timedelta(days=1)).isoformat().replace("+00:00", "Z"),
             },
-            "segments": {},
-            "users": [],
-        }
+            "activity": {"hasToolUsage": False},
+        },
+        {
+            "subscription": {
+                "status": "trialing",
+                "trialEndsAt": (now + timedelta(days=1)).isoformat().replace("+00:00", "Z"),
+            },
+            "activity": {"hasToolUsage": True},
+        },
+    ]
 
-    monkeypatch.setattr(admin, "_build_recent_users_report", _fake_build_report)
+    assert admin._recompute_totals(users) == {
+        "recentUsers": 2,
+        "activeTrials": 1,
+        "usedTool": 1,
+        "noUsage": 1,
+        "needsContact": 0,
+        "stoppedAfterUse": 0,
+    }
 
-    first = client.get("/api/admin/recent-users?days=7&limit=25", headers={"Authorization": "Bearer token"})
-    second = client.get("/api/admin/recent-users?days=7&limit=25", headers={"Authorization": "Bearer token"})
 
-    assert first.status_code == 200
-    assert second.status_code == 200
-    assert calls == 1
-    assert first.json()["cache"]["hit"] is False
-    assert second.json()["cache"]["hit"] is True
+def test_admin_device_session_alone_is_not_tool_usage():
+    now = datetime.now(timezone.utc)
+    db = _FakeDb()
+    db.audit = {
+        "event-device": _FakeDoc(
+            "event-device",
+            {
+                "uid": "rca-uid",
+                "action": "device_session_registered",
+                "status": "success",
+                "createdAt": now - timedelta(minutes=5),
+                "metadata": {"newDevice": False},
+            },
+        )
+    }
+
+    report = admin._build_recent_users_report(db, days=4, limit=25, now=now)
+    user = report["users"][0]
+
+    assert user["activity"]["lastSeenAt"] is not None
+    assert user["activity"]["auditEventCount"] == 1
+    assert user["activity"]["toolEventCount"] == 0
+    assert user["activity"]["hasToolUsage"] is False
+    assert user["followUp"]["status"] == "never_used"
+    assert user["followUp"]["shouldContact"] is True
+    assert report["totals"]["usedTool"] == 0
+    assert report["totals"]["recentUsers"] == 1
+    assert report["totals"]["registeredUsers"] == 2
+    assert report["totals"]["noUsage"] == 2
+    assert report["totals"]["needsContact"] == 2
+
+
+def test_admin_follow_up_marks_users_who_stopped_after_using_tool():
+    now = datetime.now(timezone.utc)
+    user = {
+        "subscription": {
+            "status": "trialing",
+            "trialEndsAt": (now + timedelta(days=5)).isoformat().replace("+00:00", "Z"),
+        },
+        "activity": {
+            "hasToolUsage": True,
+            "lastToolUseAt": (now - timedelta(days=4, hours=2)).isoformat().replace("+00:00", "Z"),
+        },
+    }
+
+    follow_up = admin._follow_up_status(user, now)
+
+    assert follow_up["status"] == "stopped"
+    assert follow_up["shouldContact"] is True
+    assert follow_up["daysSinceToolUse"] == 4
+    assert follow_up["label"] == "Parou há 4d"

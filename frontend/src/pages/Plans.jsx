@@ -5,7 +5,7 @@ import { ArrowLeft, FileSpreadsheet, Send, ClipboardList, Puzzle, BarChart3, Mes
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import api from '../services/api';
-import { CARLOS_PARTNER_CODE, PARTNER_COUPON_ENABLED, getPartnerCouponDiscount, normalizePartnerCode } from '../utils/partnerProgram';
+import { getPartnerCouponConfig, getPartnerCouponDiscount, isActivePartnerCoupon, normalizePartnerCode } from '../utils/partnerProgram';
 import './Plans.css';
 
 const Plans = () => {
@@ -17,7 +17,7 @@ const Plans = () => {
   const [couponCode, setCouponCode] = useState(() => {
     try {
       const storedCoupon = normalizePartnerCode(localStorage.getItem('venpro:checkout-coupon'));
-      if (!PARTNER_COUPON_ENABLED && storedCoupon === CARLOS_PARTNER_CODE) {
+      if (storedCoupon && !isActivePartnerCoupon(storedCoupon)) {
         localStorage.removeItem('venpro:checkout-coupon');
         return '';
       }
@@ -42,7 +42,8 @@ const Plans = () => {
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
     const normalized = normalizePartnerCode(couponCode);
-    if (!PARTNER_COUPON_ENABLED && normalized === CARLOS_PARTNER_CODE) {
+    const partnerConfig = getPartnerCouponConfig(normalized);
+    if (partnerConfig && !isActivePartnerCoupon(normalized)) {
       setCheckoutCoupon('');
       try {
         localStorage.removeItem('venpro:checkout-coupon');
@@ -53,7 +54,7 @@ const Plans = () => {
       return;
     }
 
-    if (normalized === CARLOS_PARTNER_CODE) {
+    if (isActivePartnerCoupon(normalized)) {
       setCheckoutCoupon(normalized);
       try {
         localStorage.setItem('venpro:checkout-coupon', normalized);
@@ -79,7 +80,7 @@ const Plans = () => {
 
   const handleAssinar = () => {
     setLoading(true);
-    const activeCoupon = PARTNER_COUPON_ENABLED ? checkoutCoupon : '';
+    const activeCoupon = isActivePartnerCoupon(checkoutCoupon) ? checkoutCoupon : '';
     navigate('/checkout', { state: { planId: 'monthly', couponCode: activeCoupon || undefined } });
   };
 

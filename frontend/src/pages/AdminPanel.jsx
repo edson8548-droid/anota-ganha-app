@@ -4,16 +4,14 @@ import {
   Activity,
   AlertTriangle,
   ArrowLeft,
-  Calendar,
   Clipboard,
   Clock3,
   MessageCircle,
-  Phone,
+  PhoneCall,
   RefreshCw,
   ShieldCheck,
-  UserCheck,
-  UserX,
   Users,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthContext } from '../contexts/AuthContext';
@@ -22,72 +20,54 @@ import { canAccessAdminPanel } from '../utils/adminAccess';
 import './AdminPanel.css';
 
 const DAY_OPTIONS = [4, 7, 30];
-const SEGMENT_OPTIONS = [
-  {
-    key: 'allRegistered',
-    totalKey: 'registeredUsers',
-    icon: Users,
+
+const FILTERS = {
+  allRegistered: {
     label: 'RCAs cadastrados',
     title: 'Todos os RCAs cadastrados',
-    empty: 'Nenhum RCA cadastrado foi encontrado.',
+    empty: 'Nenhum RCA cadastrado encontrado.',
   },
-  {
-    key: 'newUsers',
-    totalKey: 'recentUsers',
-    icon: Calendar,
+  newUsers: {
     label: 'Novos no período',
-    title: 'Cadastros novos',
+    title: 'Cadastros recentes',
     empty: 'Nenhum cadastro novo nessa janela.',
   },
-  {
-    key: 'activeToday',
-    totalKey: 'activeToday',
-    icon: Activity,
+  used: {
+    label: 'Testaram a ferramenta',
+    title: 'RCAs que testaram a ferramenta',
+    empty: 'Nenhum RCA testou a ferramenta nesse filtro.',
+  },
+  activeToday: {
     label: 'Usaram hoje',
-    title: 'RCAs usando hoje',
-    empty: 'Nenhum RCA usou a ferramenta hoje.',
+    title: 'RCAs com uso hoje',
+    empty: 'Nenhum uso registrado hoje.',
   },
-  {
-    key: 'activeLast7Days',
-    totalKey: 'activeLast7Days',
-    icon: UserCheck,
+  activeLast7Days: {
     label: 'Usaram 7 dias',
-    title: 'RCAs ativos na semana',
-    empty: 'Nenhum RCA usou a ferramenta nos últimos 7 dias.',
+    title: 'RCAs ativos nos últimos 7 dias',
+    empty: 'Nenhum uso registrado nos últimos 7 dias.',
   },
-  {
-    key: 'stoppedUsing',
-    totalKey: 'stoppedUsing',
-    icon: Clock3,
+  stoppedUsing: {
     label: 'Pararam de usar',
+    title: 'RCAs que usaram e pararam',
+    empty: 'Nenhum RCA parado nesse filtro.',
+  },
+  needsContact: {
+    label: 'Chamar conversa',
     title: 'RCAs para chamar',
-    empty: 'Nenhum RCA com uso antigo parado foi encontrado.',
+    empty: 'Nenhum RCA marcado para conversa nesse filtro.',
   },
-  {
-    key: 'oldRegisteredActive',
-    totalKey: 'oldRegisteredActive',
-    icon: ShieldCheck,
-    label: 'Antigos ativos',
-    title: 'Cadastrados há mais tempo e ainda usando',
-    empty: 'Nenhum cadastro antigo ativo foi encontrado.',
-  },
-  {
-    key: 'oldRegisteredStopped',
-    totalKey: 'oldRegisteredStopped',
-    icon: UserX,
-    label: 'Entraram e pararam',
-    title: 'Cadastrados antigos que pararam',
-    empty: 'Nenhum cadastro antigo parado foi encontrado.',
-  },
-  {
-    key: 'neverUsed',
-    totalKey: 'neverUsed',
-    icon: AlertTriangle,
+  neverUsed: {
     label: 'Nunca usaram',
-    title: 'Cadastrados sem uso registrado',
-    empty: 'Nenhum RCA sem uso registrado foi encontrado.',
+    title: 'RCAs que ainda não usaram',
+    empty: 'Nenhum RCA sem uso registrado nesse filtro.',
   },
-];
+  expiringSoon: {
+    label: 'Trial vence em 3 dias',
+    title: 'Trials vencendo em ate 3 dias',
+    empty: 'Nenhum trial vencendo em ate 3 dias nesse filtro.',
+  },
+};
 
 const formatDateTime = (value) => {
   if (!value) return 'Sem registro';
@@ -110,43 +90,43 @@ const daysUntil = (value) => {
   return Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 };
 
-const formatDaysAgo = (value) => {
-  if (value === null || value === undefined) return 'Sem registro';
-  if (value === 0) return 'Hoje';
-  if (value === 1) return 'há 1 dia';
-  return `há ${value} dias`;
-};
-
-const formatAccountAge = (value) => {
-  if (value === null || value === undefined) return 'Sem data';
-  if (value === 0) return 'Hoje';
-  if (value === 1) return '1 dia';
-  return `${value} dias`;
+const isTrialExpiringSoon = (item) => {
+  const remaining = daysUntil(item.subscription?.trialEndsAt);
+  return remaining !== null && remaining >= 0 && remaining <= 3;
 };
 
 const phoneDigits = (value) => String(value || '').replace(/\D/g, '');
 
-const formatPhone = (value) => {
+const phoneDisplay = (value) => {
   const digits = phoneDigits(value);
-  if (!digits) return 'Sem telefone';
-  const local = digits.startsWith('55') && digits.length > 11 ? digits.slice(2) : digits;
-  if (local.length === 11) return `(${local.slice(0, 2)}) ${local.slice(2, 7)}-${local.slice(7)}`;
-  if (local.length === 10) return `(${local.slice(0, 2)}) ${local.slice(2, 6)}-${local.slice(6)}`;
-  return digits;
+  if (!digits) return '';
+  if (digits.length === 11) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  }
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 13 && digits.startsWith('55')) {
+    return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`;
+  }
+  return String(value || '').trim();
 };
 
-const whatsappUrl = (item) => {
-  const digits = phoneDigits(item?.phone);
-  if (digits.length < 10) return null;
-  const normalized = digits.startsWith('55') && digits.length > 11 ? digits : `55${digits}`;
-  const firstName = String(item?.name || '').trim().split(/\s+/)[0] || 'tudo bem';
-  const message = `Olá, ${firstName}. Aqui é o Edson da Venpro. Vi seu cadastro e queria entender se posso ajudar você a usar melhor a ferramenta.`;
-  return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
+const whatsappUrl = (value) => {
+  const digits = phoneDigits(value);
+  if (!digits) return '';
+  const withCountry = digits.startsWith('55') || digits.length > 11 ? digits : `55${digits}`;
+  return `https://wa.me/${withCountry}`;
 };
 
 const statusLabel = (subscription) => {
   if (!subscription) return { label: 'Sem assinatura', tone: 'neutral' };
-  if (subscription.status === 'trialing') return { label: 'Trial ativo', tone: 'ok' };
+  if (subscription.status === 'trialing') {
+    const remainingDays = daysUntil(subscription.trialEndsAt);
+    if (remainingDays === null) return { label: 'Trial sem data', tone: 'warn' };
+    if (remainingDays < 0) return { label: 'Trial vencido', tone: 'danger' };
+    return { label: 'Trial ativo', tone: 'ok' };
+  }
   if (subscription.status === 'active') return { label: 'Assinante ativo', tone: 'ok' };
   if (subscription.status === 'pending') return { label: 'Pendente', tone: 'warn' };
   if (subscription.status === 'trial_expired') return { label: 'Trial expirado', tone: 'danger' };
@@ -156,18 +136,23 @@ const statusLabel = (subscription) => {
 
 const summarizeActivity = (activity) => {
   if (!activity?.hasToolUsage) return 'Sem uso registrado';
-  const jobs = activity.totalCotatudoJobs || activity.uniqueCotatudoJobs || 0;
-  const events = activity.recentAuditEventCount ?? activity.auditEventCount ?? 0;
-  const suffix = activity.daysSinceLastActivity !== null && activity.daysSinceLastActivity !== undefined
-    ? ` · último uso ${formatDaysAgo(activity.daysSinceLastActivity)}`
-    : '';
-  if (jobs) return `${jobs} job${jobs === 1 ? '' : 's'} de cotação${suffix}`;
-  if (events) return `${events} evento${events === 1 ? '' : 's'} registrado${events === 1 ? '' : 's'}${suffix}`;
-  return `Sessão registrada${suffix}`;
+  const cotacaoReady = activity.cotacaoReadyCount || 0;
+  const jobs = activity.uniqueCotatudoJobs || 0;
+  const events = activity.auditEventCount || 0;
+  if (cotacaoReady && jobs) return `${cotacaoReady} cotação${cotacaoReady === 1 ? '' : 'ões'} processada${cotacaoReady === 1 ? '' : 's'} + ${jobs} job${jobs === 1 ? '' : 's'} Cotatudo`;
+  if (cotacaoReady) return `${cotacaoReady} cotação${cotacaoReady === 1 ? '' : 'ões'} processada${cotacaoReady === 1 ? '' : 's'}`;
+  if (jobs) return `${jobs} job${jobs === 1 ? '' : 's'} de cotação`;
+  if (events) return `${events} evento${events === 1 ? '' : 's'} registrado${events === 1 ? '' : 's'}`;
+  return 'Sessão registrada';
 };
 
-const AdminMetric = ({ active, icon: Icon, label, onClick, value }) => (
-  <button type="button" className={`admin-metric ${active ? 'active' : ''}`} onClick={onClick}>
+const AdminMetric = ({ icon: Icon, label, value, active, onClick }) => (
+  <button
+    type="button"
+    className={`admin-metric${active ? ' active' : ''}`}
+    onClick={onClick}
+    aria-pressed={active}
+  >
     <div className="admin-metric-icon"><Icon size={18} /></div>
     <div>
       <div className="admin-metric-value">{value}</div>
@@ -180,10 +165,10 @@ const AdminPanel = () => {
   const navigate = useNavigate();
   const { user } = useAuthContext();
   const [days, setDays] = useState(4);
-  const [selectedSegment, setSelectedSegment] = useState('allRegistered');
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [activeFilter, setActiveFilter] = useState('allRegistered');
 
   const canViewAdmin = canAccessAdminPanel(user);
 
@@ -207,29 +192,40 @@ const AdminPanel = () => {
   }, [loadReport]);
 
   const totals = report?.totals || {};
-  const users = report?.users || [];
   const segments = report?.segments || {};
-  const allRegisteredUsers = segments.allRegistered || users;
-  const selectedConfig = SEGMENT_OPTIONS.find((item) => item.key === selectedSegment) || SEGMENT_OPTIONS[0];
-  const selectedUsers = segments[selectedSegment] || (selectedSegment === 'allRegistered' ? allRegisteredUsers : users);
+  const users = segments.allRegistered || report?.users || [];
 
-  const expiringSoon = useMemo(() => allRegisteredUsers.filter((item) => {
-    const remaining = daysUntil(item.subscription?.trialEndsAt);
-    return remaining !== null && remaining >= 0 && remaining <= 3;
-  }).length, [allRegisteredUsers]);
-
-  const segmentDescription = useMemo(() => {
-    const staleDays = report?.window?.staleAfterDays || 14;
-    const longTermDays = report?.window?.longTermAccountDays || 30;
-    if (selectedSegment === 'newUsers') return `Cadastros feitos nos últimos ${days} dias.`;
-    if (selectedSegment === 'activeToday') return 'RCAs com login ou evento registrado nas últimas 24 horas.';
-    if (selectedSegment === 'activeLast7Days') return 'RCAs com login ou evento registrado nos últimos 7 dias.';
-    if (selectedSegment === 'stoppedUsing') return `RCAs que já usaram e estão sem uso há ${staleDays} dias ou mais.`;
-    if (selectedSegment === 'oldRegisteredActive') return `Cadastrados há ${longTermDays} dias ou mais e ativos nos últimos 7 dias.`;
-    if (selectedSegment === 'oldRegisteredStopped') return `Cadastrados há ${longTermDays} dias ou mais que pararam de usar.`;
-    if (selectedSegment === 'neverUsed') return 'RCAs cadastrados sem uso registrado no painel.';
-    return 'Base total de RCAs cadastrados carregada para acompanhamento.';
-  }, [days, report?.window?.longTermAccountDays, report?.window?.staleAfterDays, selectedSegment]);
+  const expiringSoon = useMemo(() => users.filter(isTrialExpiringSoon).length, [users]);
+  const filteredUsers = useMemo(() => {
+    if (Array.isArray(segments[activeFilter])) {
+      return segments[activeFilter];
+    }
+    if (activeFilter === 'used') {
+      return users.filter((item) => item.activity?.hasToolUsage);
+    }
+    if (activeFilter === 'needsContact') {
+      return users.filter((item) => item.followUp?.shouldContact);
+    }
+    if (activeFilter === 'neverUsed') {
+      return users.filter((item) => !item.activity?.hasToolUsage);
+    }
+    if (activeFilter === 'expiringSoon') {
+      return users.filter(isTrialExpiringSoon);
+    }
+    return users;
+  }, [activeFilter, segments, users]);
+  const activeFilterInfo = FILTERS[activeFilter] || FILTERS.allRegistered;
+  const metricItems = [
+    { key: 'allRegistered', icon: Users, label: FILTERS.allRegistered.label, value: totals.registeredUsers ?? totals.totalRegistered ?? users.length },
+    { key: 'newUsers', icon: Users, label: FILTERS.newUsers.label, value: totals.recentUsers ?? segments.newUsers?.length ?? 0 },
+    { key: 'used', icon: Activity, label: FILTERS.used.label, value: totals.usedTool ?? 0 },
+    { key: 'activeToday', icon: Clock3, label: FILTERS.activeToday.label, value: totals.activeToday ?? segments.activeToday?.length ?? 0 },
+    { key: 'activeLast7Days', icon: Activity, label: FILTERS.activeLast7Days.label, value: totals.activeLast7Days ?? segments.activeLast7Days?.length ?? 0 },
+    { key: 'stoppedUsing', icon: AlertTriangle, label: FILTERS.stoppedUsing.label, value: totals.stoppedUsing ?? totals.stoppedAfterUse ?? 0 },
+    { key: 'needsContact', icon: MessageCircle, label: FILTERS.needsContact.label, value: totals.needsContact ?? 0 },
+    { key: 'neverUsed', icon: Clock3, label: FILTERS.neverUsed.label, value: totals.neverUsed ?? totals.noUsage ?? 0 },
+    { key: 'expiringSoon', icon: AlertTriangle, label: FILTERS.expiringSoon.label, value: expiringSoon },
+  ];
 
   const copyUid = async (uid) => {
     try {
@@ -290,23 +286,17 @@ const AdminPanel = () => {
 
       <main className="admin-main">
         <section className="admin-metrics-grid">
-          {SEGMENT_OPTIONS.map((option) => (
+          {metricItems.map((metric) => (
             <AdminMetric
-              key={option.key}
-              active={selectedSegment === option.key}
-              icon={option.icon}
-              label={option.label}
-              value={totals[option.totalKey] ?? 0}
-              onClick={() => setSelectedSegment(option.key)}
+              key={metric.key}
+              icon={metric.icon}
+              label={metric.label}
+              value={metric.value}
+              active={activeFilter === metric.key}
+              onClick={() => setActiveFilter(metric.key)}
             />
           ))}
         </section>
-
-        <div className="admin-secondary-metrics">
-          <span><Activity size={14} /> {totals.usedTool ?? 0} já testaram a ferramenta</span>
-          <span><Clock3 size={14} /> {totals.noUsage ?? 0} sem uso registrado</span>
-          <span><AlertTriangle size={14} /> {expiringSoon} trials vencem em 3 dias</span>
-        </div>
 
         {error && (
           <div className="admin-alert">
@@ -317,23 +307,36 @@ const AdminPanel = () => {
         <section className="admin-list-section">
           <div className="admin-section-header">
             <div>
-              <h2>{selectedConfig.title}</h2>
-              <p>{segmentDescription}</p>
+              <h2>{activeFilterInfo.title}</h2>
+              <p>{report?.window?.since ? `Desde ${formatDateTime(report.window.since)}` : 'Carregando janela de consulta'}</p>
             </div>
-            <span>{loading ? 'Carregando...' : `${selectedUsers.length} registro${selectedUsers.length === 1 ? '' : 's'}`}</span>
+            <div className="admin-section-actions">
+              <span>
+                {loading
+                  ? 'Carregando...'
+                  : `${filteredUsers.length} de ${users.length} registro${users.length === 1 ? '' : 's'}`}
+              </span>
+              {activeFilter !== 'allRegistered' && (
+                <button type="button" className="admin-clear-filter" onClick={() => setActiveFilter('allRegistered')}>
+                  <X size={14} /> Limpar
+                </button>
+              )}
+            </div>
           </div>
 
-          {!loading && selectedUsers.length === 0 && (
-            <div className="admin-empty">{selectedConfig.empty}</div>
+          {!loading && filteredUsers.length === 0 && (
+            <div className="admin-empty">{users.length === 0 ? FILTERS.allRegistered.empty : activeFilterInfo.empty}</div>
           )}
 
           <div className="admin-user-list">
-            {selectedUsers.map((item) => {
+            {filteredUsers.map((item) => {
               const status = statusLabel(item.subscription);
-              const periodEnd = item.subscription?.trialEndsAt || item.subscription?.accessEndsAt;
-              const remainingDays = daysUntil(periodEnd);
-              const lastSeen = item.activity?.lastActivityAt || item.activity?.lastSeenAt || item.activity?.lastEventAt;
-              const contactUrl = whatsappUrl(item);
+              const remainingDays = daysUntil(item.subscription?.trialEndsAt);
+              const lastSession = item.activity?.lastSeenAt;
+              const followUp = item.followUp || {};
+              const phone = phoneDisplay(item.phone);
+              const digits = phoneDigits(item.phone);
+              const waUrl = whatsappUrl(item.phone);
 
               return (
                 <article className="admin-user-row" key={item.uid}>
@@ -341,12 +344,19 @@ const AdminPanel = () => {
                     <div>
                       <h3>{item.name || 'Sem nome'}</h3>
                       <p>{item.email || 'Sem email'}</p>
-                      <div className="admin-contact-line">
-                        <span><Phone size={13} /> {formatPhone(item.phone)}</span>
-                        {contactUrl && (
-                          <a className="admin-whatsapp" href={contactUrl} target="_blank" rel="noopener noreferrer">
-                            <MessageCircle size={14} /> Chamar
-                          </a>
+                      <div className="admin-contact-row">
+                        {phone ? (
+                          <>
+                            <span className="admin-phone-text">{phone}</span>
+                            <a className="admin-contact-link" href={`tel:${digits}`}>
+                              <PhoneCall size={14} /> Ligar
+                            </a>
+                            <a className="admin-contact-link" href={waUrl} target="_blank" rel="noreferrer">
+                              <MessageCircle size={14} /> WhatsApp
+                            </a>
+                          </>
+                        ) : (
+                          <span className="admin-phone-empty">Sem telefone no cadastro</span>
                         )}
                       </div>
                     </div>
@@ -361,31 +371,29 @@ const AdminPanel = () => {
                       <strong>{formatDateTime(item.createdAt)}</strong>
                     </div>
                     <div>
-                      <span>Tempo cadastrado</span>
-                      <strong>{formatAccountAge(item.accountAgeDays)}</strong>
-                    </div>
-                    <div>
                       <span>Status</span>
                       <strong className={`admin-status ${status.tone}`}>{status.label}</strong>
                     </div>
                     <div>
-                      <span>Fim do acesso</span>
+                      <span>Fim do trial</span>
                       <strong>
-                        {formatDateTime(periodEnd)}
+                        {formatDateTime(item.subscription?.trialEndsAt)}
                         {remainingDays !== null && remainingDays >= 0 ? ` (${remainingDays}d)` : ''}
                       </strong>
                     </div>
                     <div>
-                      <span>Primeiro uso</span>
-                      <strong>{formatDateTime(item.activity?.firstActivityAt)}</strong>
+                      <span>Última sessão</span>
+                      <strong>{formatDateTime(lastSession)}</strong>
                     </div>
                     <div>
-                      <span>Último uso</span>
-                      <strong>{formatDateTime(lastSeen)}</strong>
+                      <span>Última ferramenta</span>
+                      <strong>{formatDateTime(followUp.lastToolUseAt || item.activity?.lastToolUseAt)}</strong>
                     </div>
                     <div>
-                      <span>Sem uso há</span>
-                      <strong>{formatDaysAgo(item.activity?.daysSinceLastActivity)}</strong>
+                      <span>Acompanhamento</span>
+                      <strong className={`admin-status ${followUp.tone || 'neutral'}`}>
+                        {followUp.label || 'Sem sinal'}
+                      </strong>
                     </div>
                   </div>
 
@@ -393,6 +401,7 @@ const AdminPanel = () => {
                     <span>{summarizeActivity(item.activity)}</span>
                     <span>{item.activity?.deviceCount || 0} dispositivo{item.activity?.deviceCount === 1 ? '' : 's'}</span>
                     <span>{item.activity?.loginCount || 0} sessão{item.activity?.loginCount === 1 ? '' : 'ões'}</span>
+                    {followUp.shouldContact && <span className="admin-contact-badge">{followUp.reason}</span>}
                   </div>
 
                   {item.activity?.recentCotatudoJobs?.length > 0 && (
@@ -402,6 +411,18 @@ const AdminPanel = () => {
                           <span>{job.site || 'site'} · {job.modo || 'modo'} · {job.prazo || '-'} dias</span>
                           <strong>{job.preenchidos ?? 0}/{job.totalItens ?? 0} preenchidos</strong>
                           <em>{job.naoEncontrados ?? 0} não encontrados</em>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {item.activity?.recentCotacaoReadyJobs?.length > 0 && (
+                    <div className="admin-job-list">
+                      {item.activity.recentCotacaoReadyJobs.slice(0, 3).map((job) => (
+                        <div className="admin-job" key={job.sessionId || job.jobId || `${job.createdAt}-${job.prazo}`}>
+                          <span>Cotação Pronta · {job.modo || 'modo'} · {job.prazo || '-'} dias</span>
+                          <strong>{job.preenchidos ?? 0}/{job.totalItens ?? 0} preenchidos</strong>
+                          <em>{job.semMatch ?? 0} sem match</em>
                         </div>
                       ))}
                     </div>

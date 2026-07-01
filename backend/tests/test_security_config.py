@@ -11,12 +11,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from routes import asaas as asaas_routes
 from routes.asaas import (
     ASAAS_PLANS,
+    PARCEIRO25_COUPON_CODE,
     _asaas_error_detail,
+    _apply_subscription_coupon,
     _find_or_create_customer,
     _create_single_payment,
     _find_customer_by_query,
     _find_reusable_pending_payment,
     _find_subscription_user_id,
+    _normalize_coupon_code,
+    _release_subscription_coupon_usage,
+    _reserve_subscription_coupon_usage,
     asaas_webhook,
 )
 from services.security_config import LOCAL_CORS_ORIGINS, PRODUCTION_CORS_ORIGINS, parse_cors_origins
@@ -36,6 +41,49 @@ class FakeAsaasResponse:
 
     def json(self):
         return self._data
+
+
+class FakeCouponSnapshot:
+    def __init__(self, data):
+        self._data = data
+        self.exists = data is not None
+
+    def to_dict(self):
+        return dict(self._data or {})
+
+
+class FakeCouponDocument:
+    def __init__(self):
+        self.data = None
+
+    def create(self, data):
+        if self.data is not None:
+            raise asaas_routes.AlreadyExists("Document already exists")
+        self.data = dict(data)
+
+    def get(self):
+        return FakeCouponSnapshot(self.data)
+
+    def delete(self):
+        self.data = None
+
+
+class FakeCouponCollection:
+    def __init__(self):
+        self.docs = {}
+
+    def document(self, doc_id):
+        self.docs.setdefault(doc_id, FakeCouponDocument())
+        return self.docs[doc_id]
+
+
+class FakeCouponDb:
+    def __init__(self):
+        self.collections = {}
+
+    def collection(self, name):
+        self.collections.setdefault(name, FakeCouponCollection())
+        return self.collections[name]
 
 
 def test_cors_fallback_in_production_does_not_include_localhost(monkeypatch):
@@ -95,6 +143,48 @@ def test_asaas_plan_prices_match_public_offer():
     assert "annual_upfront" not in ASAAS_PLANS
     assert asaas_routes.ASAAS_PAYMENT_MODE == "subscription"
     assert asaas_routes.ASAAS_SUBSCRIPTION_FALLBACK_TO_SINGLE is False
+
+
+def test_parceiro25_coupon_accepts_percent_code_and_applies_half_up_discount():
+    assert _normalize_coupon_code("parceiro25%off") == PARCEIRO25_COUPON_CODE
+
+    discounted_plan, coupon = _apply_subscription_coupon(ASAAS_PLANS["monthly"], "parceiro25%off")
+
+    assert discounted_plan["price"] == 74.93
+    assert coupon["couponCode"] == PARCEIRO25_COUPON_CODE
+    assert coupon["couponDisplayCode"] == "parceiro25%off"
+    assert coupon["discountAmount"] == 24.97
+    assert coupon["oneTime"] is True
+
+
+def test_parceiro25_coupon_usage_is_global_one_time(monkeypatch):
+    fake_db = FakeCouponDb()
+    monkeypatch.setattr(asaas_routes, "_fs", lambda: fake_db)
+    _, coupon = _apply_subscription_coupon(ASAAS_PLANS["monthly"], "parceiro25%off")
+
+    first_usage = _reserve_subscription_coupon_usage("uid-primeiro", coupon)
+    same_user_retry = _reserve_subscription_coupon_usage("uid-primeiro", coupon)
+
+    assert first_usage == {"code": PARCEIRO25_COUPON_CODE, "created": True, "reusedBySameUser": False}
+    assert same_user_retry == {"code": PARCEIRO25_COUPON_CODE, "created": False, "reusedBySameUser": True}
+
+    with pytest.raises(HTTPException) as exc:
+        _reserve_subscription_coupon_usage("uid-segundo", coupon)
+
+    assert exc.value.status_code == 400
+    assert "já foi usado" in exc.value.detail
+
+
+def test_parceiro25_coupon_reservation_can_be_released_after_asaas_failure(monkeypatch):
+    fake_db = FakeCouponDb()
+    monkeypatch.setattr(asaas_routes, "_fs", lambda: fake_db)
+    _, coupon = _apply_subscription_coupon(ASAAS_PLANS["monthly"], "parceiro25%off")
+
+    first_usage = _reserve_subscription_coupon_usage("uid-primeiro", coupon)
+    _release_subscription_coupon_usage(first_usage)
+    second_usage = _reserve_subscription_coupon_usage("uid-segundo", coupon)
+
+    assert second_usage == {"code": PARCEIRO25_COUPON_CODE, "created": True, "reusedBySameUser": False}
 
 
 def test_asaas_finds_user_from_monthly_external_reference():

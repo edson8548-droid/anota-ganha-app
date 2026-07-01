@@ -2,10 +2,7 @@ import asyncio
 import logging
 import os
 from collections import Counter
-from copy import deepcopy
 from datetime import datetime, timedelta, timezone
-from threading import Lock
-from time import monotonic
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -20,12 +17,27 @@ security = HTTPBearer(auto_error=False)
 MAX_LOOKBACK_DAYS = 30
 MAX_RECENT_USERS_LIMIT = 200
 AUDIT_EVENT_LIMIT = 300
-STALE_AFTER_DAYS = 14
-LONG_TERM_ACCOUNT_DAYS = 30
-DEFAULT_ADMIN_REPORT_CACHE_TTL_SECONDS = 180
+FOLLOW_UP_STALE_DAYS = 3
+FOLLOW_UP_WATCH_DAYS = 1
 DEFAULT_ADMIN_ALLOWED_EMAILS = {"edson854_8@hotmail.com"}
-_ADMIN_REPORT_CACHE: dict[tuple[int, int], dict] = {}
-_ADMIN_REPORT_CACHE_LOCK = Lock()
+COTACAO_READY_ACTIONS = {
+    "cotacao_ready_confirmed",
+    "cotacao_ready_processed",
+    "cotacao_ready_preview_completed",
+}
+TOOL_ACTION_PREFIXES = (
+    "cotacao_ready_",
+    "cotatudo_extension_",
+    "vitrine_",
+    "whatsapp_",
+)
+
+_mongo_db = None
+
+
+def init_admin(database):
+    global _mongo_db
+    _mongo_db = database
 
 
 def _fs():
@@ -37,76 +49,6 @@ def _admin_allowed_emails() -> set[str]:
     if raw is None:
         return DEFAULT_ADMIN_ALLOWED_EMAILS
     return {email.strip().lower() for email in raw.split(",") if email.strip()}
-
-
-def _admin_report_cache_ttl_seconds() -> int:
-    raw = os.environ.get("ADMIN_REPORT_CACHE_TTL_SECONDS")
-    if raw is None:
-        return DEFAULT_ADMIN_REPORT_CACHE_TTL_SECONDS
-    try:
-        ttl = int(raw)
-    except ValueError:
-        return DEFAULT_ADMIN_REPORT_CACHE_TTL_SECONDS
-    return max(0, min(ttl, 600))
-
-
-def clear_admin_report_cache() -> None:
-    with _ADMIN_REPORT_CACHE_LOCK:
-        _ADMIN_REPORT_CACHE.clear()
-
-
-def _with_cache_metadata(report: dict, *, hit: bool, ttl_seconds: int, expires_in_seconds: int | None = None) -> dict:
-    result = deepcopy(report)
-    result["cache"] = {
-        "hit": hit,
-        "ttlSeconds": ttl_seconds,
-        "expiresInSeconds": expires_in_seconds,
-    }
-    return result
-
-
-def _get_cached_admin_report(days: int, limit: int) -> dict | None:
-    ttl_seconds = _admin_report_cache_ttl_seconds()
-    if ttl_seconds <= 0:
-        return None
-
-    cache_key = (days, limit)
-    now = monotonic()
-    with _ADMIN_REPORT_CACHE_LOCK:
-        entry = _ADMIN_REPORT_CACHE.get(cache_key)
-        if not entry:
-            return None
-        if entry["expiresAt"] <= now:
-            _ADMIN_REPORT_CACHE.pop(cache_key, None)
-            return None
-        expires_in = max(0, int(entry["expiresAt"] - now))
-        return _with_cache_metadata(
-            entry["report"],
-            hit=True,
-            ttl_seconds=ttl_seconds,
-            expires_in_seconds=expires_in,
-        )
-
-
-def _set_cached_admin_report(days: int, limit: int, report: dict) -> dict:
-    ttl_seconds = _admin_report_cache_ttl_seconds()
-    if ttl_seconds <= 0:
-        return _with_cache_metadata(report, hit=False, ttl_seconds=0, expires_in_seconds=None)
-
-    expires_at = monotonic() + ttl_seconds
-    cache_key = (days, limit)
-    with _ADMIN_REPORT_CACHE_LOCK:
-        _ADMIN_REPORT_CACHE[cache_key] = {
-            "expiresAt": expires_at,
-            "report": deepcopy(report),
-        }
-
-    return _with_cache_metadata(
-        report,
-        hit=False,
-        ttl_seconds=ttl_seconds,
-        expires_in_seconds=ttl_seconds,
-    )
 
 
 def _is_allowed_admin_identity(decoded: dict, user_data: dict) -> bool:
@@ -136,14 +78,21 @@ def _iso(value) -> str | None:
     return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _latest_datetime(*values) -> datetime | None:
+    dates = [_as_utc_datetime(value) for value in values]
+    dates = [value for value in dates if value]
+    return max(dates) if dates else None
+
+
 def _public_phone(data: dict) -> str | None:
-    for key in ("telefone", "phone", "whatsapp", "celular"):
-        raw = data.get(key)
-        if not raw:
+    allowed_chars = set("0123456789+ ()-.")
+    for key in ("phone", "telefone", "whatsapp", "celular", "mobilePhone", "mobile"):
+        value = data.get(key)
+        if value is None:
             continue
-        digits = "".join(ch for ch in str(raw) if ch.isdigit())
-        if len(digits) >= 8:
-            return digits[:20]
+        phone = "".join(char for char in str(value).strip() if char in allowed_chars).strip()
+        if phone:
+            return phone[:40]
     return None
 
 
@@ -176,17 +125,51 @@ def _public_subscription_data(data: dict | None) -> dict | None:
     }
 
 
+def _trial_is_active(subscription: dict | None, now: datetime | None = None) -> bool:
+    if not subscription or subscription.get("status") != "trialing":
+        return False
+    trial_end = _as_utc_datetime(subscription.get("trialEndsAt"))
+    return bool(trial_end and trial_end > (now or datetime.now(timezone.utc)))
+
+
+def _paid_access_until(subscription: dict | None) -> datetime | None:
+    if not subscription:
+        return None
+
+    access_end = _as_utc_datetime(subscription.get("accessEndsAt"))
+    if access_end:
+        return access_end
+
+    last_payment = _as_utc_datetime(subscription.get("lastPaymentDate"))
+    if last_payment:
+        return last_payment + timedelta(days=30)
+
+    return None
+
+
+def _has_current_access(subscription: dict | None, now: datetime | None = None) -> bool:
+    if not subscription:
+        return False
+
+    current = now or datetime.now(timezone.utc)
+    status = subscription.get("status")
+    if status == "active":
+        return True
+    if status == "trialing":
+        return _trial_is_active(subscription, current)
+    if status in {"canceling", "canceled"}:
+        paid_until = _paid_access_until(subscription)
+        return bool(paid_until and paid_until > current)
+    return False
+
+
 def _device_activity(user_ref) -> dict:
     devices = list(user_ref.collection("devices").stream())
-    first_seen = None
     last_seen = None
     login_count = 0
 
     for doc in devices:
         data = doc.to_dict() or {}
-        first_at = _as_utc_datetime(data.get("firstSeenAt") or data.get("createdAt"))
-        if first_at and (first_seen is None or first_at < first_seen):
-            first_seen = first_at
         seen_at = _as_utc_datetime(data.get("lastSeenAt"))
         if seen_at and (last_seen is None or seen_at > last_seen):
             last_seen = seen_at
@@ -198,13 +181,16 @@ def _device_activity(user_ref) -> dict:
     return {
         "deviceCount": len(devices),
         "loginCount": login_count,
-        "firstSeenAt": _iso(first_seen),
         "lastSeenAt": _iso(last_seen),
     }
 
 
 def _event_datetime(event: dict) -> datetime | None:
     return _as_utc_datetime(event.get("createdAt") or event.get("createdAtIso"))
+
+
+def _is_tool_action(action: str) -> bool:
+    return action.startswith(TOOL_ACTION_PREFIXES)
 
 
 def _compact_job_event(event: dict) -> dict:
@@ -224,55 +210,90 @@ def _compact_job_event(event: dict) -> dict:
     }
 
 
-def _stream_audit_docs(db, uid: str):
-    query = db.collection(AUDIT_COLLECTION).where("uid", "==", uid)
-    try:
-        return list(
-            query
-            .order_by("createdAt", direction=firestore.Query.DESCENDING)
-            .limit(AUDIT_EVENT_LIMIT)
-            .stream()
-        )
-    except Exception:
-        logger.warning("[ADMIN] Falha ao ordenar auditoria uid=%s; tentando sem order_by", uid, exc_info=True)
+def _compact_cotacao_ready_event(event: dict) -> dict:
+    metadata = event.get("metadata") if isinstance(event.get("metadata"), dict) else {}
+    total = metadata.get("totalItens") or metadata.get("total")
+    sem_match = metadata.get("semMatch") or metadata.get("sem_match")
+    preenchidos = metadata.get("preenchidos")
+    if preenchidos is None and isinstance(total, int) and isinstance(sem_match, int):
+        preenchidos = max(total - sem_match, 0)
 
-    try:
-        return list(query.limit(AUDIT_EVENT_LIMIT).stream())
-    except Exception:
-        logger.exception("[ADMIN] Falha ao carregar auditoria uid=%s", uid)
-        return []
+    return {
+        "createdAt": _iso(event.get("createdAt") or event.get("createdAtIso")),
+        "source": metadata.get("source") or "cotacao_pronta",
+        "sessionId": metadata.get("sessionId"),
+        "jobId": metadata.get("jobId"),
+        "tabelaId": metadata.get("tabelaId"),
+        "prazo": metadata.get("prazo"),
+        "modo": metadata.get("modo"),
+        "totalItens": total,
+        "preenchidos": preenchidos,
+        "semMatch": sem_match,
+    }
+
+
+def _cotacao_session_summary(session: dict) -> dict:
+    resultados = session.get("resultados") if isinstance(session.get("resultados"), list) else []
+    itens = session.get("itens") if isinstance(session.get("itens"), list) else []
+    total = len(itens) or len(resultados)
+    preenchidos = sum(
+        1
+        for item in resultados
+        if isinstance(item, dict) and item.get("preco") is not None
+    )
+
+    return {
+        "createdAt": _iso(session.get("created_at") or session.get("createdAt")),
+        "source": "cotacao_pronta",
+        "sessionId": str(session.get("_id") or ""),
+        "tabelaId": str(session.get("tabela_id") or ""),
+        "prazo": session.get("prazo"),
+        "modo": session.get("modo"),
+        "totalItens": total,
+        "preenchidos": preenchidos,
+        "semMatch": max(total - preenchidos, 0),
+    }
 
 
 def _audit_activity(db, uid: str, since: datetime) -> dict:
-    loaded_events = []
-    recent_events = []
+    query = db.collection(AUDIT_COLLECTION).where("uid", "==", uid).limit(AUDIT_EVENT_LIMIT)
+    events = []
 
-    for doc in _stream_audit_docs(db, uid):
+    try:
+        docs = query.stream()
+    except Exception:
+        logger.exception("[ADMIN] Falha ao carregar auditoria uid=%s", uid)
+        docs = []
+
+    for doc in docs:
         data = doc.to_dict() or {}
         created_at = _event_datetime(data)
-        if created_at:
-            loaded_events.append(data)
         if created_at and created_at >= since:
-            recent_events.append(data)
+            events.append(data)
 
-    loaded_events.sort(key=lambda item: _event_datetime(item) or datetime.min.replace(tzinfo=timezone.utc))
-    recent_events.sort(key=lambda item: _event_datetime(item) or datetime.min.replace(tzinfo=timezone.utc))
+    events.sort(key=lambda item: _event_datetime(item) or datetime.min.replace(tzinfo=timezone.utc))
 
-    action_counts = Counter(str(event.get("action") or "unknown") for event in recent_events)
+    action_counts = Counter(str(event.get("action") or "unknown") for event in events)
+    tool_events = [
+        event
+        for event in events
+        if _is_tool_action(str(event.get("action") or ""))
+    ]
+    tool_event_count = sum(
+        1
+        for _event in tool_events
+    )
     job_ids = {
         (event.get("metadata") or {}).get("jobId")
-        for event in recent_events
+        for event in events
         if isinstance(event.get("metadata"), dict) and (event.get("metadata") or {}).get("jobId")
     }
-    loaded_job_ids = {
-        (event.get("metadata") or {}).get("jobId")
-        for event in loaded_events
-        if isinstance(event.get("metadata"), dict) and (event.get("metadata") or {}).get("jobId")
-    }
+    cotacao_ready_ids = set()
+    cotacao_ready_summaries = []
 
     job_summaries = []
     seen_jobs = set()
-    for event in reversed(recent_events):
+    for event in reversed(events):
         action = str(event.get("action") or "")
         metadata = event.get("metadata") if isinstance(event.get("metadata"), dict) else {}
         job_id = metadata.get("jobId")
@@ -283,135 +304,487 @@ def _audit_activity(db, uid: str, since: datetime) -> dict:
         if len(job_summaries) >= 6:
             break
 
-    first_event = loaded_events[0] if loaded_events else None
-    last_event = loaded_events[-1] if loaded_events else None
+    seen_cotacao_ready = set()
+    for event in reversed(events):
+        action = str(event.get("action") or "")
+        if action not in COTACAO_READY_ACTIONS:
+            continue
+        metadata = event.get("metadata") if isinstance(event.get("metadata"), dict) else {}
+        key = metadata.get("sessionId") or metadata.get("jobId") or _iso(event.get("createdAt") or event.get("createdAtIso"))
+        if not key or key in seen_cotacao_ready:
+            continue
+        seen_cotacao_ready.add(key)
+        cotacao_ready_ids.add(key)
+        if len(cotacao_ready_summaries) < 6:
+            cotacao_ready_summaries.append(_compact_cotacao_ready_event(event))
+
+    last_event = events[-1] if events else None
+    last_tool_event = tool_events[-1] if tool_events else None
     last_metadata = last_event.get("metadata") if isinstance(last_event, dict) and isinstance(last_event.get("metadata"), dict) else {}
+    last_tool_metadata = last_tool_event.get("metadata") if isinstance(last_tool_event, dict) and isinstance(last_tool_event.get("metadata"), dict) else {}
 
     return {
-        "auditEventCount": len(recent_events),
-        "recentAuditEventCount": len(recent_events),
-        "loadedAuditEventCount": len(loaded_events),
+        "auditEventCount": len(events),
+        "toolEventCount": tool_event_count,
         "actions": dict(action_counts),
         "uniqueCotatudoJobs": len(job_ids),
-        "totalCotatudoJobs": len(loaded_job_ids),
-        "firstEventAt": _iso(_event_datetime(first_event)) if first_event else None,
+        "cotacaoReadyCount": len(cotacao_ready_ids),
+        "firstEventAt": _iso(_event_datetime(events[0])) if events else None,
         "lastEventAt": _iso(_event_datetime(last_event)) if last_event else None,
         "lastAction": last_event.get("action") if last_event else None,
-        "lastToolSite": last_metadata.get("site"),
-        "lastToolMode": last_metadata.get("modo"),
+        "lastToolUseAt": _iso(_event_datetime(last_tool_event)) if last_tool_event else None,
+        "lastToolAction": last_tool_event.get("action") if last_tool_event else None,
+        "lastToolSite": last_tool_metadata.get("site") or last_metadata.get("site"),
+        "lastToolMode": last_tool_metadata.get("modo") or last_metadata.get("modo"),
         "recentCotatudoJobs": job_summaries,
+        "recentCotacaoReadyJobs": cotacao_ready_summaries,
     }
-
-
-def _user_created_at(doc) -> datetime:
-    data = doc.to_dict() or {}
-    return _as_utc_datetime(data.get("created_at") or data.get("createdAt")) or datetime.min.replace(tzinfo=timezone.utc)
 
 
 def _stream_user_docs(db):
     try:
-        docs = list(db.collection("users").stream())
+        return list(db.collection("users").stream())
     except Exception:
-        logger.exception("[ADMIN] Falha ao consultar users")
+        logger.warning("[ADMIN] Falha ao consultar users", exc_info=True)
         return []
-    return sorted(
-        docs,
-        key=_user_created_at,
-        reverse=True,
+
+
+def _user_created_at(user: dict) -> datetime | None:
+    return _as_utc_datetime(user.get("createdAt"))
+
+
+def _last_activity_at(user: dict) -> datetime | None:
+    activity = user.get("activity") or {}
+    return _latest_datetime(
+        activity.get("lastToolUseAt"),
+        activity.get("lastSeenAt"),
+        activity.get("lastEventAt"),
+        user.get("updatedAt"),
     )
 
 
-def _days_since(current: datetime, value) -> int | None:
-    dt = _as_utc_datetime(value)
-    if not dt:
-        return None
-    return max(0, int((current - dt).total_seconds() // 86400))
-
-
-def _latest_iso(*values) -> str | None:
-    dates = [dt for dt in (_as_utc_datetime(value) for value in values) if dt]
-    return _iso(max(dates)) if dates else None
-
-
-def _earliest_iso(*values) -> str | None:
-    dates = [dt for dt in (_as_utc_datetime(value) for value in values) if dt]
-    return _iso(min(dates)) if dates else None
-
-
 def _sort_by_created_desc(users: list[dict]) -> list[dict]:
+    fallback = datetime.min.replace(tzinfo=timezone.utc)
     return sorted(
         users,
-        key=lambda user: _as_utc_datetime(user.get("createdAt")) or datetime.min.replace(tzinfo=timezone.utc),
+        key=lambda user: _user_created_at(user) or _as_utc_datetime(user.get("updatedAt")) or fallback,
         reverse=True,
     )
 
 
 def _sort_by_activity_desc(users: list[dict]) -> list[dict]:
+    fallback = datetime.min.replace(tzinfo=timezone.utc)
     return sorted(
         users,
-        key=lambda user: _as_utc_datetime((user.get("activity") or {}).get("lastActivityAt")) or datetime.min.replace(tzinfo=timezone.utc),
+        key=lambda user: _last_activity_at(user) or fallback,
         reverse=True,
     )
 
 
-def _sort_by_idle_desc(users: list[dict]) -> list[dict]:
-    return sorted(
-        users,
-        key=lambda user: (
-            (user.get("activity") or {}).get("daysSinceLastActivity") or -1,
-            user.get("accountAgeDays") or -1,
-        ),
-        reverse=True,
-    )
+def _unique_users_by_uid(users: list[dict]) -> list[dict]:
+    unique = {}
+    for user in users:
+        uid = user.get("uid")
+        if uid and uid not in unique:
+            unique[uid] = user
+    return list(unique.values())
 
 
-def _build_segments(users: list[dict], current: datetime, since: datetime) -> dict[str, list[dict]]:
-    active_today_cutoff = current - timedelta(days=1)
-    active_week_cutoff = current - timedelta(days=7)
-
-    def created_after(user: dict, cutoff: datetime) -> bool:
-        created_at = _as_utc_datetime(user.get("createdAt"))
-        return bool(created_at and created_at >= cutoff)
-
-    def last_activity_after(user: dict, cutoff: datetime) -> bool:
-        activity_at = _as_utc_datetime((user.get("activity") or {}).get("lastActivityAt"))
-        return bool(activity_at and activity_at >= cutoff)
-
-    def stopped(user: dict) -> bool:
-        activity = user.get("activity") or {}
-        return bool(
-            activity.get("hasToolUsage")
-            and activity.get("daysSinceLastActivity") is not None
-            and activity.get("daysSinceLastActivity") >= STALE_AFTER_DAYS
-        )
-
-    def long_term(user: dict) -> bool:
-        return bool(user.get("accountAgeDays") is not None and user.get("accountAgeDays") >= LONG_TERM_ACCOUNT_DAYS)
+def _build_segments(users: list[dict], *, since: datetime, now: datetime, limit: int) -> dict:
+    active_today_since = now - timedelta(days=1)
+    active_week_since = now - timedelta(days=7)
 
     all_registered = _sort_by_created_desc(users)
-    new_users = _sort_by_created_desc([user for user in users if created_after(user, since)])
-    active_today = _sort_by_activity_desc([user for user in users if last_activity_after(user, active_today_cutoff)])
-    active_week = _sort_by_activity_desc([user for user in users if last_activity_after(user, active_week_cutoff)])
-    stopped_users = _sort_by_idle_desc([user for user in users if stopped(user)])
-    old_active = _sort_by_activity_desc([user for user in users if long_term(user) and last_activity_after(user, active_week_cutoff)])
-    old_stopped = _sort_by_idle_desc([user for user in users if long_term(user) and stopped(user)])
-    never_used = _sort_by_created_desc([user for user in users if not (user.get("activity") or {}).get("hasToolUsage")])
+    new_users = [
+        user
+        for user in all_registered
+        if (_user_created_at(user) and _user_created_at(user) >= since)
+    ]
+    active_today = [
+        user
+        for user in users
+        if (_last_activity_at(user) and _last_activity_at(user) >= active_today_since)
+    ]
+    active_last_7_days = [
+        user
+        for user in users
+        if (_last_activity_at(user) and _last_activity_at(user) >= active_week_since)
+    ]
+    stopped_using = [
+        user
+        for user in users
+        if (user.get("followUp") or {}).get("status") == "stopped"
+    ]
+    needs_contact = [
+        user
+        for user in users
+        if (user.get("followUp") or {}).get("shouldContact")
+    ]
+    never_used = [
+        user
+        for user in users
+        if not (user.get("activity") or {}).get("hasToolUsage")
+    ]
 
     return {
-        "allRegistered": all_registered,
-        "newUsers": new_users,
-        "activeToday": active_today,
-        "activeLast7Days": active_week,
-        "stoppedUsing": stopped_users,
-        "oldRegisteredActive": old_active,
-        "oldRegisteredStopped": old_stopped,
-        "neverUsed": never_used,
+        "allRegistered": all_registered[:limit],
+        "newUsers": new_users[:limit],
+        "activeToday": _sort_by_activity_desc(active_today)[:limit],
+        "activeLast7Days": _sort_by_activity_desc(active_last_7_days)[:limit],
+        "stoppedUsing": _sort_by_activity_desc(stopped_using)[:limit],
+        "needsContact": _sort_by_activity_desc(needs_contact)[:limit],
+        "neverUsed": _sort_by_created_desc(never_used)[:limit],
+    }
+
+
+def _sort_activity_items(items: list[dict]) -> list[dict]:
+    return sorted(
+        items,
+        key=lambda item: _as_utc_datetime(item.get("createdAt")) or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
+
+
+def _dedupe_activity_items(items: list[dict]) -> list[dict]:
+    deduped = []
+    seen = set()
+    for item in _sort_activity_items(items):
+        key = item.get("sessionId") or item.get("jobId") or item.get("createdAt")
+        if key and key in seen:
+            continue
+        if key:
+            seen.add(key)
+        deduped.append(item)
+    return deduped
+
+
+def _recompute_totals(users: list[dict]) -> dict:
+    active_trials = sum(1 for user in users if _trial_is_active(user.get("subscription")))
+    used_tool = sum(1 for user in users if (user.get("activity") or {}).get("hasToolUsage"))
+    no_usage = len(users) - used_tool
+    needs_contact = sum(1 for user in users if (user.get("followUp") or {}).get("shouldContact"))
+    stopped_after_use = sum(1 for user in users if (user.get("followUp") or {}).get("status") == "stopped")
+    return {
+        "recentUsers": len(users),
+        "activeTrials": active_trials,
+        "usedTool": used_tool,
+        "noUsage": no_usage,
+        "needsContact": needs_contact,
+        "stoppedAfterUse": stopped_after_use,
+    }
+
+
+def _compute_report_totals(all_users: list[dict], recent_users: list[dict], now: datetime | None = None) -> dict:
+    totals = _recompute_totals(all_users)
+    current = now or datetime.now(timezone.utc)
+    active_today_since = current - timedelta(days=1)
+    active_week_since = current - timedelta(days=7)
+
+    totals.update({
+        "registeredUsers": len(all_users),
+        "totalRegistered": len(all_users),
+        "recentUsers": len(recent_users),
+        "activeToday": sum(
+            1
+            for user in all_users
+            if (_last_activity_at(user) and _last_activity_at(user) >= active_today_since)
+        ),
+        "activeLast7Days": sum(
+            1
+            for user in all_users
+            if (_last_activity_at(user) and _last_activity_at(user) >= active_week_since)
+        ),
+        "stoppedUsing": sum(
+            1
+            for user in all_users
+            if (user.get("followUp") or {}).get("status") == "stopped"
+        ),
+        "neverUsed": sum(
+            1
+            for user in all_users
+            if not (user.get("activity") or {}).get("hasToolUsage")
+        ),
+    })
+    return totals
+
+
+def _days_since(value, now: datetime) -> int | None:
+    dt = _as_utc_datetime(value)
+    if not dt:
+        return None
+    return max(0, int((now - dt).total_seconds() // 86400))
+
+
+def _follow_up_status(user: dict, now: datetime) -> dict:
+    subscription = user.get("subscription") or {}
+    activity = user.get("activity") or {}
+    has_access = _has_current_access(subscription, now)
+    has_tool_usage = bool(activity.get("hasToolUsage"))
+    last_tool_use_at = activity.get("lastToolUseAt")
+    days_since_tool = _days_since(last_tool_use_at, now)
+    days_since_session = _days_since(activity.get("lastSeenAt"), now)
+
+    base = {
+        "lastToolUseAt": last_tool_use_at,
+        "daysSinceToolUse": days_since_tool,
+        "daysSinceSession": days_since_session,
+        "shouldContact": False,
+        "priority": "low",
+        "tone": "neutral",
+    }
+
+    if not has_access:
+        status = subscription.get("status")
+        trial_end = _as_utc_datetime(subscription.get("trialEndsAt"))
+        if status == "pending" and trial_end and trial_end > now:
+            return {
+                **base,
+                "status": "access_pending",
+                "label": "Acesso pendente",
+                "reason": "Chamar para destravar o acesso antes do primeiro uso.",
+                "shouldContact": True,
+                "priority": "high",
+                "tone": "warn",
+            }
+        label = "Trial vencido" if status == "trialing" else "Acesso vencido"
+        return {
+            **base,
+            "status": "access_expired",
+            "label": label,
+            "reason": "Chamar para entender se quer renovar ou se travou no pagamento.",
+            "shouldContact": True,
+            "priority": "high",
+            "tone": "danger",
+        }
+
+    if not has_tool_usage:
+        return {
+            **base,
+            "status": "never_used",
+            "label": "Nunca testou",
+            "reason": "Chamar para ajudar no primeiro uso.",
+            "shouldContact": True,
+            "priority": "medium",
+            "tone": "warn",
+        }
+
+    if days_since_tool is None:
+        return {
+            **base,
+            "status": "used_unknown_time",
+            "label": "Usou sem data",
+            "reason": "Verificar manualmente o histórico.",
+            "shouldContact": True,
+            "priority": "medium",
+            "tone": "warn",
+        }
+
+    if days_since_tool >= FOLLOW_UP_STALE_DAYS:
+        return {
+            **base,
+            "status": "stopped",
+            "label": f"Parou há {days_since_tool}d",
+            "reason": "Chamar para perguntar se travou ou ficou descontente.",
+            "shouldContact": True,
+            "priority": "high",
+            "tone": "danger",
+        }
+
+    if days_since_tool >= FOLLOW_UP_WATCH_DAYS:
+        return {
+            **base,
+            "status": "watch",
+            "label": f"Sem uso há {days_since_tool}d",
+            "reason": "Acompanhar; chamar se completar alguns dias sem usar.",
+            "priority": "medium",
+            "tone": "warn",
+        }
+
+    return {
+        **base,
+        "status": "active",
+        "label": "Usando",
+        "reason": "Uso recente registrado.",
+        "tone": "ok",
+    }
+
+
+def _apply_follow_up_status(users: list[dict], now: datetime) -> None:
+    for user in users:
+        user["followUp"] = _follow_up_status(user, now)
+
+
+def _report_user_refs(report: dict) -> list[dict]:
+    refs = []
+    for user in report.get("users", []):
+        if isinstance(user, dict):
+            refs.append(user)
+
+    segments = report.get("segments") if isinstance(report.get("segments"), dict) else {}
+    for segment_users in segments.values():
+        if not isinstance(segment_users, list):
+            continue
+        for user in segment_users:
+            if isinstance(user, dict):
+                refs.append(user)
+
+    return _unique_users_by_uid(refs)
+
+
+def _report_registered_users(report: dict) -> list[dict]:
+    segments = report.get("segments") if isinstance(report.get("segments"), dict) else {}
+    all_registered = segments.get("allRegistered") if isinstance(segments, dict) else None
+    if isinstance(all_registered, list):
+        return _unique_users_by_uid([user for user in all_registered if isinstance(user, dict)])
+    return _unique_users_by_uid([user for user in report.get("users", []) if isinstance(user, dict)])
+
+
+def _merge_cotacao_activity(report: dict, activity_by_uid: dict[str, dict]) -> dict:
+    generated_at = _as_utc_datetime(report.get("generatedAt")) or datetime.now(timezone.utc)
+    for user in _report_user_refs(report):
+        uid = user.get("uid")
+        extra = activity_by_uid.get(uid) or {}
+        if not extra:
+            continue
+
+        activity = user.setdefault("activity", {})
+        existing_ready_jobs = activity.get("recentCotacaoReadyJobs") or []
+        extra_ready_jobs = extra.get("recentCotacaoReadyJobs") or []
+        merged_ready_jobs = _dedupe_activity_items([*existing_ready_jobs, *extra_ready_jobs])[:6]
+
+        activity["recentCotacaoReadyJobs"] = merged_ready_jobs
+        activity["cotacaoReadyCount"] = max(
+            int(activity.get("cotacaoReadyCount") or 0),
+            int(extra.get("cotacaoReadyCount") or 0),
+            len(merged_ready_jobs),
+        )
+        activity["cotacaoTableUploads"] = int(extra.get("cotacaoTableUploads") or 0)
+        activity["cotacaoLearnedMatches"] = int(extra.get("cotacaoLearnedMatches") or 0)
+
+        last_extra_seen = _latest_datetime(
+            extra.get("lastCotacaoReadyAt"),
+            extra.get("lastCotacaoTableUploadAt"),
+        )
+        if last_extra_seen:
+            current_last = _as_utc_datetime(activity.get("lastToolUseAt"))
+            extra_last = _as_utc_datetime(last_extra_seen)
+            if extra_last and (current_last is None or extra_last > current_last):
+                activity["lastToolUseAt"] = _iso(extra_last)
+                activity["lastToolAction"] = "cotacao_ready_session"
+                activity["lastEventAt"] = _iso(extra_last)
+                activity["lastAction"] = "cotacao_ready_session"
+                activity["lastToolSite"] = "cotacao_pronta"
+
+        activity["hasToolUsage"] = bool(
+            activity.get("hasToolUsage")
+            or activity.get("cotacaoReadyCount")
+            or activity.get("cotacaoTableUploads")
+            or activity.get("cotacaoLearnedMatches")
+        )
+
+    if not isinstance(report.get("segments"), dict):
+        _apply_follow_up_status(report.get("users", []), generated_at)
+        report["totals"] = _recompute_totals(report.get("users", []))
+        return report
+
+    registered_users = _report_registered_users(report)
+    _apply_follow_up_status(_report_user_refs(report), generated_at)
+    report["segments"] = _build_segments(
+        registered_users,
+        since=_as_utc_datetime((report.get("window") or {}).get("since")) or generated_at,
+        now=generated_at,
+        limit=int((report.get("window") or {}).get("limit") or MAX_RECENT_USERS_LIMIT),
+    )
+    report["users"] = report["segments"]["newUsers"]
+    report["totals"] = _compute_report_totals(registered_users, report["users"], generated_at)
+    return report
+
+
+async def _mongo_cotacao_activity_for_users(database, uids: list[str], since: datetime) -> dict[str, dict]:
+    if database is None or not uids:
+        return {}
+
+    activity_by_uid = {
+        uid: {
+            "cotacaoReadyCount": 0,
+            "cotacaoTableUploads": 0,
+            "cotacaoLearnedMatches": 0,
+            "recentCotacaoReadyJobs": [],
+            "lastCotacaoReadyAt": None,
+            "lastCotacaoTableUploadAt": None,
+        }
+        for uid in uids
+    }
+
+    try:
+        sessions = await (
+            database.cotacao_sessoes.find(
+                {"user_id": {"$in": uids}, "created_at": {"$gte": since}},
+                {"_id": 1, "user_id": 1, "created_at": 1, "tabela_id": 1, "prazo": 1, "modo": 1, "itens": 1, "resultados": 1},
+            )
+            .sort("created_at", -1)
+            .limit(MAX_RECENT_USERS_LIMIT * 10)
+            .to_list(length=MAX_RECENT_USERS_LIMIT * 10)
+        )
+
+        for session in sessions:
+            uid = session.get("user_id")
+            if uid not in activity_by_uid:
+                continue
+            summary = _cotacao_session_summary(session)
+            bucket = activity_by_uid[uid]
+            bucket["cotacaoReadyCount"] += 1
+            if len(bucket["recentCotacaoReadyJobs"]) < 6:
+                bucket["recentCotacaoReadyJobs"].append(summary)
+            session_dt = _as_utc_datetime(session.get("created_at"))
+            current_last = _as_utc_datetime(bucket.get("lastCotacaoReadyAt"))
+            if session_dt and (current_last is None or session_dt > current_last):
+                bucket["lastCotacaoReadyAt"] = _iso(session_dt)
+
+        tables = await (
+            database.tabelas_mestre.find(
+                {"user_id": {"$in": uids}, "data_upload": {"$gte": since}},
+                {"user_id": 1, "data_upload": 1},
+            )
+            .limit(MAX_RECENT_USERS_LIMIT * 20)
+            .to_list(length=MAX_RECENT_USERS_LIMIT * 20)
+        )
+        for table in tables:
+            uid = table.get("user_id")
+            if uid in activity_by_uid:
+                activity_by_uid[uid]["cotacaoTableUploads"] += 1
+                upload_dt = _as_utc_datetime(table.get("data_upload"))
+                current_upload_dt = _as_utc_datetime(activity_by_uid[uid].get("lastCotacaoTableUploadAt"))
+                if upload_dt and (current_upload_dt is None or upload_dt > current_upload_dt):
+                    activity_by_uid[uid]["lastCotacaoTableUploadAt"] = _iso(upload_dt)
+
+        learned = await (
+            database.cotacao_aprendizado.find(
+                {"user_id": {"$in": uids}, "updated_at": {"$gte": since}},
+                {"user_id": 1},
+            )
+            .limit(MAX_RECENT_USERS_LIMIT * 100)
+            .to_list(length=MAX_RECENT_USERS_LIMIT * 100)
+        )
+        for item in learned:
+            uid = item.get("user_id")
+            if uid in activity_by_uid:
+                activity_by_uid[uid]["cotacaoLearnedMatches"] += 1
+    except Exception:
+        logger.exception("[ADMIN] Falha ao carregar atividade de cotacao no Mongo")
+        return {}
+
+    return {
+        uid: data
+        for uid, data in activity_by_uid.items()
+        if data["cotacaoReadyCount"] or data["cotacaoTableUploads"] or data["cotacaoLearnedMatches"]
     }
 
 
 def _build_recent_users_report(db, *, days: int, limit: int, now: datetime | None = None) -> dict:
     current = now or datetime.now(timezone.utc)
     since = current - timedelta(days=days)
+    activity_since = current - timedelta(days=MAX_LOOKBACK_DAYS)
     user_docs = _stream_user_docs(db)
     users = []
 
@@ -426,66 +799,40 @@ def _build_recent_users_report(db, *, days: int, limit: int, now: datetime | Non
         subscription = sub_doc.to_dict() if getattr(sub_doc, "exists", False) else None
 
         device_activity = _device_activity(user_ref)
-        audit_activity = _audit_activity(db, uid, since)
-        last_activity_at = _latest_iso(device_activity.get("lastSeenAt"), audit_activity.get("lastEventAt"))
-        first_activity_at = _earliest_iso(device_activity.get("firstSeenAt"), audit_activity.get("firstEventAt"))
+        audit_activity = _audit_activity(db, uid, activity_since)
         has_tool_usage = bool(
-            last_activity_at
-            or audit_activity["loadedAuditEventCount"]
-            or audit_activity["totalCotatudoJobs"]
-            or device_activity["loginCount"]
+            audit_activity["toolEventCount"]
+            or audit_activity["uniqueCotatudoJobs"]
+            or audit_activity["cotacaoReadyCount"]
         )
-        public_user = _public_user_data(uid, data)
 
         users.append({
-            **public_user,
-            "accountAgeDays": _days_since(current, public_user.get("createdAt")),
+            **_public_user_data(uid, data),
             "subscription": _public_subscription_data(subscription),
             "activity": {
                 **device_activity,
                 **audit_activity,
                 "hasToolUsage": has_tool_usage,
-                "firstActivityAt": first_activity_at,
-                "lastActivityAt": last_activity_at,
-                "daysSinceLastActivity": _days_since(current, last_activity_at),
             },
         })
 
-    segments = _build_segments(users, current, since)
-    limited_segments = {key: value[:limit] for key, value in segments.items()}
-
-    active_trials = sum(1 for user in users if (user.get("subscription") or {}).get("status") == "trialing")
-    used_tool = sum(1 for user in users if (user.get("activity") or {}).get("hasToolUsage"))
-    no_usage = len(users) - used_tool
-
-    return {
+    _apply_follow_up_status(users, current)
+    segments = _build_segments(users, since=since, now=current, limit=limit)
+    report = {
         "ok": True,
         "generatedAt": _iso(current),
         "window": {
             "days": days,
             "since": _iso(since),
+            "activitySince": _iso(activity_since),
             "until": _iso(current),
-            "staleAfterDays": STALE_AFTER_DAYS,
-            "longTermAccountDays": LONG_TERM_ACCOUNT_DAYS,
-            "returnedPerSegmentLimit": limit,
+            "limit": limit,
         },
-        "totals": {
-            "registeredUsers": len(users),
-            "totalRegistered": len(users),
-            "recentUsers": len(segments["newUsers"]),
-            "activeTrials": active_trials,
-            "usedTool": used_tool,
-            "noUsage": no_usage,
-            "activeToday": len(segments["activeToday"]),
-            "activeLast7Days": len(segments["activeLast7Days"]),
-            "stoppedUsing": len(segments["stoppedUsing"]),
-            "oldRegisteredActive": len(segments["oldRegisteredActive"]),
-            "oldRegisteredStopped": len(segments["oldRegisteredStopped"]),
-            "neverUsed": len(segments["neverUsed"]),
-        },
-        "segments": limited_segments,
-        "users": limited_segments["newUsers"],
+        "totals": _compute_report_totals(users, segments["newUsers"], current),
+        "segments": segments,
+        "users": segments["newUsers"],
     }
+    return report
 
 
 async def _require_admin(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
@@ -516,16 +863,19 @@ async def _require_admin(credentials: HTTPAuthorizationCredentials = Depends(sec
 @router.get("/recent-users")
 async def recent_users(
     days: int = Query(4, ge=1, le=MAX_LOOKBACK_DAYS),
-    limit: int = Query(MAX_RECENT_USERS_LIMIT, ge=1, le=MAX_RECENT_USERS_LIMIT),
+    limit: int = Query(25, ge=1, le=MAX_RECENT_USERS_LIMIT),
     admin_uid: str = Depends(_require_admin),
 ):
-    report = _get_cached_admin_report(days, limit)
-    cache_hit = report is not None
-    if report is None:
-        db = _fs()
-        fresh_report = await asyncio.to_thread(_build_recent_users_report, db, days=days, limit=limit)
-        report = _set_cached_admin_report(days, limit, fresh_report)
-
+    db = _fs()
+    report = await asyncio.to_thread(_build_recent_users_report, db, days=days, limit=limit)
+    window = report.get("window") or {}
+    since = _as_utc_datetime(window.get("activitySince") or window.get("since")) or (datetime.now(timezone.utc) - timedelta(days=MAX_LOOKBACK_DAYS))
+    segments = report.get("segments") if isinstance(report.get("segments"), dict) else {}
+    registered_users = segments.get("allRegistered") if isinstance(segments.get("allRegistered"), list) else report.get("users", [])
+    uid_list = [user["uid"] for user in registered_users if user.get("uid")]
+    cotacao_activity = await _mongo_cotacao_activity_for_users(_mongo_db, uid_list, since)
+    if cotacao_activity:
+        report = _merge_cotacao_activity(report, cotacao_activity)
     await audit_event(
         "admin_recent_users_viewed",
         uid=admin_uid,
@@ -534,7 +884,7 @@ async def recent_users(
             "days": days,
             "limit": limit,
             "count": report["totals"]["recentUsers"],
-            "cacheHit": cache_hit,
+            "registeredUsers": report["totals"].get("registeredUsers"),
         },
     )
     return report
