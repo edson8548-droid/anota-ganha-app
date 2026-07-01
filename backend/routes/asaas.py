@@ -13,6 +13,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from firebase_admin import auth as firebase_auth, firestore
 from google.api_core.exceptions import AlreadyExists, Conflict
 from pydantic import BaseModel
+from services.email_verification_access import ensure_email_verified_for_required_user
 from services.security_audit import audit_event
 from services.security_config import is_production_environment
 
@@ -70,7 +71,9 @@ async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(securi
         raise HTTPException(status_code=401, detail="Token obrigatório")
     try:
         decoded = await asyncio.to_thread(firebase_auth.verify_id_token, credentials.credentials)
-        return decoded["uid"]
+        return await ensure_email_verified_for_required_user(decoded, route="asaas")
+    except HTTPException:
+        raise
     except Exception:
         logger.warning("[SECURITY] auth_invalid route=asaas")
         raise HTTPException(status_code=401, detail="Token inválido")

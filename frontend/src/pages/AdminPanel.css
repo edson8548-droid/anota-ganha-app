@@ -432,6 +432,96 @@
   border-color: rgba(238, 126, 64, .28);
 }
 
+.admin-activity-line .admin-risk-badge {
+  color: #FFB4B4;
+  background: rgba(238, 94, 94, .12);
+  border-color: rgba(238, 94, 94, .32);
+}
+
+.admin-risk-box {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(238, 94, 94, .10);
+  border: 1px solid rgba(238, 94, 94, .34);
+}
+
+.admin-risk-box.medium {
+  background: rgba(232, 168, 48, .10);
+  border-color: rgba(232, 168, 48, .34);
+}
+
+.admin-risk-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #FFB4B4;
+  font-size: 13px;
+}
+
+.admin-risk-box.medium .admin-risk-title {
+  color: #F2D99A;
+}
+
+.admin-risk-title strong {
+  color: inherit;
+}
+
+.admin-risk-title span {
+  margin-left: auto;
+  color: #A0A3A8;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-risk-reasons {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #E1E1E1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.admin-risk-related {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.admin-risk-related-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.45fr);
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid rgba(74, 77, 82, .85);
+  border-radius: 8px;
+  background: rgba(36, 38, 42, .74);
+}
+
+.admin-risk-related-item div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+}
+
+.admin-risk-related-item strong,
+.admin-risk-related-item span {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.admin-risk-related-item strong {
+  color: #fff;
+}
+
+.admin-risk-related-item span {
+  color: #C5CAD2;
+}
+
 .admin-job-list {
   display: grid;
   gap: 8px;
@@ -518,6 +608,10 @@
   }
 
   .admin-job {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-risk-related-item {
     grid-template-columns: 1fr;
   }
 }

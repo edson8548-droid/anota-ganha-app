@@ -18,6 +18,10 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 import firebase_admin
 from firebase_admin import firestore, auth as firebase_auth
+from services.email_verification_access import (
+    EMAIL_NOT_VERIFIED_MESSAGE,
+    ensure_email_verified_for_required_user,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -75,6 +79,8 @@ async def validate_license(payload: ValidateRequest):
     user_doc = users[0]
     user_id = user_doc.id
     user_data = user_doc.to_dict()
+    if user_data.get("requiresEmailVerification") and user_data.get("emailVerified") is not True:
+        return {"active": False, "message": EMAIL_NOT_VERIFIED_MESSAGE}
 
     # Verifica assinatura
     sub_ref = db.collection("subscriptions").document(user_id)
@@ -141,7 +147,9 @@ async def get_or_create_license_key(
 
     try:
         decoded = firebase_auth.verify_id_token(credentials.credentials)
-        uid_token = decoded.get("uid")
+        uid_token = await ensure_email_verified_for_required_user(decoded, route="license_key")
+    except HTTPException:
+        raise
     except Exception:
         logger.warning("[SECURITY] auth_invalid route=license_key")
         raise HTTPException(status_code=401, detail="Token inválido ou expirado")
@@ -192,7 +200,9 @@ async def regenerate_license_key(
 
     try:
         decoded = firebase_auth.verify_id_token(credentials.credentials)
-        user_id = decoded.get("uid")
+        user_id = await ensure_email_verified_for_required_user(decoded, route="license_regenerate")
+    except HTTPException:
+        raise
     except Exception:
         logger.warning("[SECURITY] auth_invalid route=license_regenerate")
         raise HTTPException(status_code=401, detail="Token inválido")
@@ -225,7 +235,9 @@ async def apply_coupon(
 
     try:
         decoded = firebase_auth.verify_id_token(credentials.credentials)
-        user_id = decoded.get("uid")
+        user_id = await ensure_email_verified_for_required_user(decoded, route="license_coupon")
+    except HTTPException:
+        raise
     except Exception:
         logger.warning("[SECURITY] auth_invalid route=license_coupon")
         raise HTTPException(status_code=401, detail="Token inválido")
@@ -324,7 +336,9 @@ async def admin_create_coupon(
 
     try:
         decoded = firebase_auth.verify_id_token(credentials.credentials)
-        user_id = decoded.get("uid")
+        user_id = await ensure_email_verified_for_required_user(decoded, route="license_admin_coupon")
+    except HTTPException:
+        raise
     except Exception:
         logger.warning("[SECURITY] auth_invalid route=license_admin_coupon")
         raise HTTPException(status_code=401, detail="Token inválido")

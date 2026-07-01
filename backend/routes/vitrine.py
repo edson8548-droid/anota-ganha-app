@@ -29,6 +29,7 @@ from bson import ObjectId
 from pymongo.errors import OperationFailure
 import firebase_admin
 from firebase_admin import auth as firebase_auth
+from services.email_verification_access import ensure_email_verified_for_required_user
 from services.public_files import stream_public_gridfs_file
 from services.security_audit import audit_event
 from services.subscription_access import ensure_subscription_access
@@ -256,7 +257,7 @@ async def _verify_user_token(token: str) -> str:
         raise HTTPException(401, "Token obrigatório")
     try:
         decoded = await asyncio.to_thread(firebase_auth.verify_id_token, token)
-        uid = decoded["uid"]
+        uid = await ensure_email_verified_for_required_user(decoded, route="vitrine")
         await ensure_subscription_access(uid)
         return uid
     except HTTPException:

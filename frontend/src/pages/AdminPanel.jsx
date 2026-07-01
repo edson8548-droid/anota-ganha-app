@@ -32,6 +32,11 @@ const FILTERS = {
     title: 'Cadastros recentes',
     empty: 'Nenhum cadastro novo nessa janela.',
   },
+  suspiciousUsers: {
+    label: 'Cadastros suspeitos',
+    title: 'Possíveis cadastros duplicados',
+    empty: 'Nenhum cadastro suspeito encontrado.',
+  },
   used: {
     label: 'Testaram a ferramenta',
     title: 'RCAs que testaram a ferramenta',
@@ -218,6 +223,7 @@ const AdminPanel = () => {
   const metricItems = [
     { key: 'allRegistered', icon: Users, label: FILTERS.allRegistered.label, value: totals.registeredUsers ?? totals.totalRegistered ?? users.length },
     { key: 'newUsers', icon: Users, label: FILTERS.newUsers.label, value: totals.recentUsers ?? segments.newUsers?.length ?? 0 },
+    { key: 'suspiciousUsers', icon: AlertTriangle, label: FILTERS.suspiciousUsers.label, value: totals.suspiciousUsers ?? segments.suspiciousUsers?.length ?? 0 },
     { key: 'used', icon: Activity, label: FILTERS.used.label, value: totals.usedTool ?? 0 },
     { key: 'activeToday', icon: Clock3, label: FILTERS.activeToday.label, value: totals.activeToday ?? segments.activeToday?.length ?? 0 },
     { key: 'activeLast7Days', icon: Activity, label: FILTERS.activeLast7Days.label, value: totals.activeLast7Days ?? segments.activeLast7Days?.length ?? 0 },
@@ -334,6 +340,7 @@ const AdminPanel = () => {
               const remainingDays = daysUntil(item.subscription?.trialEndsAt);
               const lastSession = item.activity?.lastSeenAt;
               const followUp = item.followUp || {};
+              const risk = item.risk || {};
               const phone = phoneDisplay(item.phone);
               const digits = phoneDigits(item.phone);
               const waUrl = whatsappUrl(item.phone);
@@ -401,8 +408,47 @@ const AdminPanel = () => {
                     <span>{summarizeActivity(item.activity)}</span>
                     <span>{item.activity?.deviceCount || 0} dispositivo{item.activity?.deviceCount === 1 ? '' : 's'}</span>
                     <span>{item.activity?.loginCount || 0} sessão{item.activity?.loginCount === 1 ? '' : 'ões'}</span>
+                    {risk.suspicious && <span className="admin-risk-badge">{risk.label || 'Cadastro suspeito'}</span>}
                     {followUp.shouldContact && <span className="admin-contact-badge">{followUp.reason}</span>}
                   </div>
+
+                  {risk.suspicious && (
+                    <div className={`admin-risk-box ${risk.level || 'medium'}`}>
+                      <div className="admin-risk-title">
+                        <AlertTriangle size={15} />
+                        <strong>{risk.label || 'Possível cadastro duplicado'}</strong>
+                        <span>{risk.score ? `score ${risk.score}` : 'verificar'}</span>
+                      </div>
+                      {risk.reasons?.length > 0 && (
+                        <ul className="admin-risk-reasons">
+                          {risk.reasons.map((reason) => (
+                            <li key={reason}>{reason}</li>
+                          ))}
+                        </ul>
+                      )}
+                      {risk.relatedUsers?.length > 0 && (
+                        <div className="admin-risk-related">
+                          {risk.relatedUsers.slice(0, 4).map((related) => {
+                            const relatedStatus = statusLabel(related.subscription);
+                            const relatedPhone = phoneDisplay(related.phone);
+                            return (
+                              <div className="admin-risk-related-item" key={related.uid || related.email}>
+                                <div>
+                                  <strong>{related.name || 'Sem nome'}</strong>
+                                  <span>{related.email || 'Sem email'}</span>
+                                </div>
+                                <div>
+                                  <span>{relatedPhone || 'Sem telefone'}</span>
+                                  <span className={`admin-status ${relatedStatus.tone}`}>{relatedStatus.label}</span>
+                                  <span>Trial: {formatDateTime(related.subscription?.trialEndsAt)}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {item.activity?.recentCotatudoJobs?.length > 0 && (
                     <div className="admin-job-list">

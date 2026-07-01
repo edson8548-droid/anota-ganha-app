@@ -66,7 +66,7 @@ function getPriceAdjustment(original, current) {
   };
 }
 
-export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
+export default function ReviewMatches({ itens, onConfirmar, confirmando, modoMatch = 'ean' }) {
   const [aprovacoes, setAprovacoes] = useState(() =>
     itens.map(it => it.status === 'aprovado')
   );
@@ -146,6 +146,15 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
   const temPrecoInvalido = itens.some((item, idx) =>
     aprovacoes[idx] && precosEditados[idx] == null
   );
+  const podeAprovarTodos = modoMatch === 'completo';
+  const aprovaveisEmLote = itens.filter((item, idx) =>
+    !aprovacoes[idx] && item.status === 'pendente' && precosEditados[idx] != null
+  ).length;
+  const aprovarTodosComPreco = () => {
+    setAprovacoes(prev => prev.map((aprovado, idx) =>
+      aprovado || (itens[idx]?.status === 'pendente' && precosEditados[idx] != null)
+    ));
+  };
   const confirmarDisabled = confirmando || aprovados === 0 || temPrecoInvalido;
   const confirmarLabel = confirmando ? 'Gerando Excel...' : `Confirmar e salvar como (${aprovados})`;
   const renderConfirmarButton = (fullWidth = false) => (
@@ -226,6 +235,25 @@ export default function ReviewMatches({ itens, onConfirmar, confirmando }) {
         >
           Aplicar nos aprovados
         </button>
+        {podeAprovarTodos && (
+          <button
+            onClick={aprovarTodosComPreco}
+            disabled={aprovaveisEmLote === 0}
+            title="Aprova somente itens em revisão que têm preço"
+            style={{
+              background: aprovaveisEmLote === 0 ? '#475569' : '#16a34a',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              padding: '6px 10px',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: aprovaveisEmLote === 0 ? 'not-allowed' : 'pointer',
+            }}
+          >
+            Aprovar todos com preço ({aprovaveisEmLote})
+          </button>
+        )}
       </div>
 
       <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>

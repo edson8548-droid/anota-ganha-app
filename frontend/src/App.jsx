@@ -83,6 +83,7 @@ const lazyWithRetry = (importer) => lazy(async () => {
 
 const Login = lazyWithRetry(() => import('./pages/Login'));
 const Register = lazyWithRetry(() => import('./pages/Register'));
+const EmailVerificationRequired = lazyWithRetry(() => import('./pages/EmailVerificationRequired'));
 const Landing = lazyWithRetry(() => import('./pages/Landing'));
 const AdminPanel = lazyWithRetry(() => import('./pages/AdminPanel'));
 const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));
@@ -165,6 +166,7 @@ function AppRoutes() {
           {/* Autenticação */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/verificar-email" element={<EmailVerificationRequired />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
 
           {/* Aplicação */}

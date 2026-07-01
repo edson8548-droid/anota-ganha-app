@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
-import { sendWelcomeEmail } from '../services/api';
 import { isValidCPF, onlyDigits } from '../utils/documentValidators';
 import { getPartnerCouponConfig, isActivePartnerCoupon, normalizePartnerCode } from '../utils/partnerProgram';
 import './Register.css';
@@ -158,12 +157,11 @@ const Register = () => {
       };
       
       // ⭐️ A chamada 'register' agora envia os dados adicionais
-      await register(email, password, additionalData);
-      sendWelcomeEmail().catch((welcomeErr) => {
-        console.warn('[Register] Não foi possível enviar email de boas-vindas:', welcomeErr?.message || welcomeErr);
+      const createdUser = await register(email, password, additionalData);
+      navigate('/verificar-email', {
+        replace: true,
+        state: { email: createdUser?.email || email },
       });
-      
-      navigate('/dashboard');
     } catch (err) {
       console.error('Erro no registro:', err);
       const backendMessage = err?.response?.data?.detail || err?.message;
@@ -356,6 +354,10 @@ const Register = () => {
               </button>
             </div>
             {getFieldError('confirmPassword') && <span className="field-error">{getFieldError('confirmPassword')}</span>}
+          </div>
+
+          <div className="register-email-confirmation-note">
+            Ao criar a conta, enviaremos um email de confirmação. Verifique também Spam, Lixo eletrônico e Promoções.
           </div>
           
           <button 

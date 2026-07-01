@@ -18,6 +18,7 @@ from pymongo.errors import OperationFailure
 from services.public_files import stream_public_gridfs_file
 from services.security_audit import audit_event, hash_identifier
 from services.email_service import build_welcome_email, send_transactional_email
+from services.email_verification_access import ensure_email_verified_for_required_user
 from services.upload_validation import IMAGE_CONTENT_TYPES, safe_filename, validate_upload
 from pydantic import BaseModel, EmailStr, Field
 
@@ -325,7 +326,9 @@ async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(securi
         raise HTTPException(401, "Token obrigatório")
     try:
         decoded = await asyncio.to_thread(firebase_auth.verify_id_token, credentials.credentials)
-        return decoded['uid']
+        return await ensure_email_verified_for_required_user(decoded, route="users")
+    except HTTPException:
+        raise
     except Exception:
         logger.warning("[SECURITY] auth_invalid route=users")
         raise HTTPException(401, "Token inválido")
@@ -337,7 +340,9 @@ async def _verify_user_token(token: str) -> str:
         raise HTTPException(401, "Token obrigatório")
     try:
         decoded = await asyncio.to_thread(firebase_auth.verify_id_token, token)
-        return decoded["uid"]
+        return await ensure_email_verified_for_required_user(decoded, route="users_token")
+    except HTTPException:
+        raise
     except Exception:
         logger.warning("[SECURITY] auth_invalid route=users_token")
         raise HTTPException(401, "Token inválido")
@@ -1003,6 +1008,9 @@ async def register(
         "telefone": telefone_clean,
         "role": "user",
         "license_type": "trial",
+        "requiresEmailVerification": True,
+        "emailVerified": False,
+        "emailVerificationRequiredAt": firestore.SERVER_TIMESTAMP,
         "trial_ends_at": firestore.SERVER_TIMESTAMP,
         "created_at": firestore.SERVER_TIMESTAMP,
         "updated_at": firestore.SERVER_TIMESTAMP,

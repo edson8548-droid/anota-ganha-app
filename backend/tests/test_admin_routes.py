@@ -248,6 +248,61 @@ def test_admin_recent_users_returns_sanitized_operational_data(monkeypatch):
     assert "produto" not in serialized
 
 
+def test_admin_report_flags_possible_duplicate_trial_signup_without_exposing_private_ids():
+    now = datetime(2026, 7, 1, 12, tzinfo=timezone.utc)
+    db = _FakeDb()
+    db.users.update({
+        "luciano-uid": {
+            "email": "lucianocabreracarvalho@gmail.com",
+            "name": "Luciano",
+            "role": "user",
+            "created_at": datetime(2026, 6, 15, 13, 3, tzinfo=timezone.utc),
+            "telefone": "13981228883",
+            "cpf": "11122233344",
+        },
+        "lorenzo-uid": {
+            "email": "lojadocabrera@gmail.com",
+            "name": "Lorenzo Goes Carvalho",
+            "role": "user",
+            "created_at": datetime(2026, 6, 30, 21, 48, tzinfo=timezone.utc),
+            "telefone": "13998014483",
+            "cpf": "55566677788",
+        },
+    })
+    db.subscriptions.update({
+        "luciano-uid": {
+            "planId": "trial",
+            "status": "trialing",
+            "trialEndsAt": datetime(2026, 6, 30, 13, 3, tzinfo=timezone.utc),
+            "createdAt": datetime(2026, 6, 15, 13, 3, tzinfo=timezone.utc),
+        },
+        "lorenzo-uid": {
+            "planId": "trial",
+            "status": "trialing",
+            "trialEndsAt": datetime(2026, 7, 15, 21, 48, tzinfo=timezone.utc),
+            "createdAt": datetime(2026, 6, 30, 21, 48, tzinfo=timezone.utc),
+        },
+    })
+
+    report = admin._build_recent_users_report(db, days=4, limit=25, now=now)
+
+    suspicious = report["segments"]["suspiciousUsers"]
+    suspicious_uids = {user["uid"] for user in suspicious}
+    assert {"luciano-uid", "lorenzo-uid"}.issubset(suspicious_uids)
+    assert report["totals"]["suspiciousUsers"] == 2
+
+    lorenzo = next(user for user in suspicious if user["uid"] == "lorenzo-uid")
+    assert lorenzo["risk"]["suspicious"] is True
+    assert "Novo cadastro perto do fim do trial de outro RCA" in lorenzo["risk"]["reasons"]
+    assert any(related["email"] == "lucianocabreracarvalho@gmail.com" for related in lorenzo["risk"]["relatedUsers"])
+
+    serialized = str(report).lower()
+    assert "11122233344" not in serialized
+    assert "55566677788" not in serialized
+    assert "cpf" not in serialized
+    assert "device-a" not in serialized
+
+
 def test_admin_merge_cotacao_ready_activity_marks_user_as_used_tool():
     now = datetime.now(timezone.utc)
     report = {
@@ -319,6 +374,7 @@ def test_admin_totals_do_not_count_expired_trial_as_active():
         "noUsage": 1,
         "needsContact": 0,
         "stoppedAfterUse": 0,
+        "suspiciousUsers": 0,
     }
 
 

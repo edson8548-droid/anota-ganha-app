@@ -3,6 +3,8 @@ import logging
 import os
 from collections import Counter
 from datetime import datetime, timedelta, timezone
+import re
+import unicodedata
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -19,7 +21,27 @@ MAX_RECENT_USERS_LIMIT = 200
 AUDIT_EVENT_LIMIT = 300
 FOLLOW_UP_STALE_DAYS = 3
 FOLLOW_UP_WATCH_DAYS = 1
+SUSPICIOUS_TRIAL_WINDOW_DAYS = 2
+SUSPICIOUS_SCORE_THRESHOLD = 5
 DEFAULT_ADMIN_ALLOWED_EMAILS = {"edson854_8@hotmail.com"}
+IDENTITY_STOPWORDS = {
+    "admin",
+    "gmail",
+    "hotmail",
+    "outlook",
+    "yahoo",
+    "live",
+    "email",
+    "mail",
+    "com",
+    "combr",
+    "br",
+    "loja",
+    "teste",
+    "usuario",
+    "user",
+    "rca",
+}
 COTACAO_READY_ACTIONS = {
     "cotacao_ready_confirmed",
     "cotacao_ready_processed",
@@ -163,12 +185,15 @@ def _has_current_access(subscription: dict | None, now: datetime | None = None) 
     return False
 
 
-def _device_activity(user_ref) -> dict:
+def _device_profile(user_ref) -> tuple[dict, set[str]]:
     devices = list(user_ref.collection("devices").stream())
     last_seen = None
     login_count = 0
+    device_keys = set()
 
     for doc in devices:
+        if getattr(doc, "id", None):
+            device_keys.add(str(doc.id))
         data = doc.to_dict() or {}
         seen_at = _as_utc_datetime(data.get("lastSeenAt"))
         if seen_at and (last_seen is None or seen_at > last_seen):
@@ -178,11 +203,19 @@ def _device_activity(user_ref) -> dict:
         except (TypeError, ValueError):
             pass
 
-    return {
-        "deviceCount": len(devices),
-        "loginCount": login_count,
-        "lastSeenAt": _iso(last_seen),
-    }
+    return (
+        {
+            "deviceCount": len(devices),
+            "loginCount": login_count,
+            "lastSeenAt": _iso(last_seen),
+        },
+        device_keys,
+    )
+
+
+def _device_activity(user_ref) -> dict:
+    activity, _device_keys = _device_profile(user_ref)
+    return activity
 
 
 def _event_datetime(event: dict) -> datetime | None:
@@ -390,6 +423,243 @@ def _unique_users_by_uid(users: list[dict]) -> list[dict]:
     return list(unique.values())
 
 
+def _digits_only(value) -> str:
+    return re.sub(r"\D+", "", str(value or ""))
+
+
+def _document_digits(data: dict) -> str | None:
+    for key in ("cpf", "document", "documento", "cpfCnpj", "cpf_cnpj", "taxId"):
+        digits = _digits_only(data.get(key))
+        if len(digits) in {11, 14}:
+            return digits
+    return None
+
+
+def _phone_ddd(phone_digits: str) -> str | None:
+    if phone_digits.startswith("55") and len(phone_digits) >= 12:
+        return phone_digits[2:4]
+    if len(phone_digits) >= 10:
+        return phone_digits[:2]
+    return None
+
+
+def _normalize_identity_text(value) -> str:
+    normalized = unicodedata.normalize("NFKD", str(value or ""))
+    without_accents = "".join(char for char in normalized if not unicodedata.combining(char))
+    return re.sub(r"[^a-z0-9]+", " ", without_accents.lower()).strip()
+
+
+def _email_local_part(email) -> str:
+    local = str(email or "").split("@", 1)[0]
+    return re.sub(r"[^a-z0-9]+", "", _normalize_identity_text(local))
+
+
+def _identity_tokens(name, email) -> set[str]:
+    local = str(email or "").split("@", 1)[0].replace(".", " ").replace("_", " ").replace("-", " ")
+    words = _normalize_identity_text(f"{name or ''} {local}").split()
+    return {
+        word
+        for word in words
+        if len(word) >= 4 and word not in IDENTITY_STOPWORDS and not word.isdigit()
+    }
+
+
+def _longest_common_substring_len(first: str, second: str) -> int:
+    if not first or not second:
+        return 0
+
+    previous = [0] * (len(second) + 1)
+    best = 0
+    for char_first in first:
+        current = [0] * (len(second) + 1)
+        for idx, char_second in enumerate(second, start=1):
+            if char_first == char_second:
+                current[idx] = previous[idx - 1] + 1
+                best = max(best, current[idx])
+        previous = current
+    return best
+
+
+def _identity_match_reason(profile_a: dict, profile_b: dict) -> str | None:
+    tokens_a = profile_a.get("identityTokens") or set()
+    tokens_b = profile_b.get("identityTokens") or set()
+    if tokens_a & tokens_b:
+        return "Nome ou e-mail parecido"
+
+    for token_a in tokens_a:
+        for token_b in tokens_b:
+            smaller = min(len(token_a), len(token_b))
+            if smaller >= 6 and (token_a in token_b or token_b in token_a):
+                return "Nome ou e-mail parecido"
+
+    email_a = profile_a.get("emailLocal") or ""
+    email_b = profile_b.get("emailLocal") or ""
+    if _longest_common_substring_len(email_a, email_b) >= 7:
+        return "E-mails com trecho parecido"
+    return None
+
+
+def _trial_timing_matches(profile_a: dict, profile_b: dict) -> bool:
+    window = timedelta(days=SUSPICIOUS_TRIAL_WINDOW_DAYS)
+    for newer, older in ((profile_a, profile_b), (profile_b, profile_a)):
+        newer_created = newer.get("createdAt")
+        older_created = older.get("createdAt")
+        older_trial_end = older.get("trialEndsAt")
+        if not newer_created or not older_trial_end:
+            continue
+        if older_created and newer_created < older_created:
+            continue
+        if abs(newer_created - older_trial_end) <= window:
+            return True
+    return False
+
+
+def _related_user_summary(user: dict) -> dict:
+    subscription = user.get("subscription") if isinstance(user.get("subscription"), dict) else None
+    return {
+        "uid": user.get("uid"),
+        "name": user.get("name"),
+        "email": user.get("email"),
+        "phone": user.get("phone"),
+        "createdAt": user.get("createdAt"),
+        "subscription": {
+            "planId": subscription.get("planId"),
+            "status": subscription.get("status"),
+            "trialEndsAt": subscription.get("trialEndsAt"),
+        } if subscription else None,
+    }
+
+
+def _suspicion_profile(uid: str, source_data: dict, public_user: dict, device_keys: set[str]) -> dict:
+    phone_digits = _digits_only(public_user.get("phone"))
+    subscription = public_user.get("subscription") if isinstance(public_user.get("subscription"), dict) else {}
+    return {
+        "uid": uid,
+        "createdAt": _as_utc_datetime(public_user.get("createdAt")),
+        "trialEndsAt": _as_utc_datetime(subscription.get("trialEndsAt")),
+        "documentDigits": _document_digits(source_data),
+        "phoneDigits": phone_digits,
+        "phoneDdd": _phone_ddd(phone_digits),
+        "deviceKeys": set(device_keys or set()),
+        "identityTokens": _identity_tokens(public_user.get("name"), public_user.get("email")),
+        "emailLocal": _email_local_part(public_user.get("email")),
+        "public": _related_user_summary(public_user),
+    }
+
+
+def _empty_risk() -> dict:
+    return {
+        "suspicious": False,
+        "score": 0,
+        "level": "low",
+        "label": "Sem sinal forte",
+        "reasons": [],
+        "relatedUsers": [],
+    }
+
+
+def _suspicious_pair_score(profile_a: dict, profile_b: dict) -> tuple[int, list[str]]:
+    score = 0
+    reasons = []
+    has_identity_or_strong_signal = False
+
+    document_a = profile_a.get("documentDigits")
+    document_b = profile_b.get("documentDigits")
+    if document_a and document_b and document_a == document_b:
+        score += 8
+        has_identity_or_strong_signal = True
+        reasons.append("Mesmo documento em outro cadastro")
+
+    phone_a = profile_a.get("phoneDigits")
+    phone_b = profile_b.get("phoneDigits")
+    if phone_a and phone_b and phone_a == phone_b and len(phone_a) >= 10:
+        score += 7
+        has_identity_or_strong_signal = True
+        reasons.append("Mesmo número em outro cadastro")
+
+    if (profile_a.get("deviceKeys") or set()) & (profile_b.get("deviceKeys") or set()):
+        score += 6
+        has_identity_or_strong_signal = True
+        reasons.append("Mesmo aparelho em outro cadastro")
+
+    ddd_a = profile_a.get("phoneDdd")
+    ddd_b = profile_b.get("phoneDdd")
+    if ddd_a and ddd_b and ddd_a == ddd_b:
+        score += 1
+        reasons.append("Mesmo DDD no número cadastrado")
+
+    identity_reason = _identity_match_reason(profile_a, profile_b)
+    if identity_reason:
+        score += 2
+        has_identity_or_strong_signal = True
+        reasons.append(identity_reason)
+
+    if _trial_timing_matches(profile_a, profile_b):
+        score += 4
+        reasons.append("Novo cadastro perto do fim do trial de outro RCA")
+
+    if score < SUSPICIOUS_SCORE_THRESHOLD or not has_identity_or_strong_signal:
+        return 0, []
+    return score, reasons
+
+
+def _append_risk_match(user: dict, *, score: int, reasons: list[str], related: dict) -> None:
+    risk = user.setdefault("risk", _empty_risk())
+    risk["score"] = int(risk.get("score") or 0) + score
+    existing_reasons = set(risk.get("reasons") or [])
+    for reason in reasons:
+        if reason not in existing_reasons:
+            risk.setdefault("reasons", []).append(reason)
+            existing_reasons.add(reason)
+
+    related_uid = related.get("uid")
+    related_users = risk.setdefault("relatedUsers", [])
+    if related_uid and all(item.get("uid") != related_uid for item in related_users):
+        related_users.append(related)
+
+
+def _apply_suspicious_signals(users: list[dict], profiles: dict[str, dict]) -> None:
+    users_by_uid = {user.get("uid"): user for user in users if user.get("uid")}
+    for user in users_by_uid.values():
+        user["risk"] = _empty_risk()
+
+    uids = [uid for uid in users_by_uid if uid in profiles]
+    for index, uid_a in enumerate(uids):
+        profile_a = profiles[uid_a]
+        for uid_b in uids[index + 1:]:
+            profile_b = profiles[uid_b]
+            score, reasons = _suspicious_pair_score(profile_a, profile_b)
+            if not score:
+                continue
+            _append_risk_match(users_by_uid[uid_a], score=score, reasons=reasons, related=profile_b["public"])
+            _append_risk_match(users_by_uid[uid_b], score=score, reasons=reasons, related=profile_a["public"])
+
+    for user in users_by_uid.values():
+        risk = user.get("risk") or _empty_risk()
+        if not risk.get("relatedUsers"):
+            user["risk"] = _empty_risk()
+            continue
+        score = int(risk.get("score") or 0)
+        risk["suspicious"] = True
+        risk["score"] = score
+        risk["level"] = "high" if score >= 8 else "medium"
+        risk["label"] = "Possível cadastro duplicado"
+        risk["relatedUsers"] = _sort_by_created_desc(risk.get("relatedUsers") or [])
+        user["risk"] = risk
+
+
+def _sort_suspicious_users(users: list[dict]) -> list[dict]:
+    fallback = datetime.min.replace(tzinfo=timezone.utc)
+    return sorted(
+        users,
+        key=lambda user: (
+            int((user.get("risk") or {}).get("score") or 0),
+            _user_created_at(user) or fallback,
+        ),
+        reverse=True,
+    )
+
+
 def _build_segments(users: list[dict], *, since: datetime, now: datetime, limit: int) -> dict:
     active_today_since = now - timedelta(days=1)
     active_week_since = now - timedelta(days=7)
@@ -420,6 +690,11 @@ def _build_segments(users: list[dict], *, since: datetime, now: datetime, limit:
         for user in users
         if (user.get("followUp") or {}).get("shouldContact")
     ]
+    suspicious_users = [
+        user
+        for user in users
+        if (user.get("risk") or {}).get("suspicious")
+    ]
     never_used = [
         user
         for user in users
@@ -433,6 +708,7 @@ def _build_segments(users: list[dict], *, since: datetime, now: datetime, limit:
         "activeLast7Days": _sort_by_activity_desc(active_last_7_days)[:limit],
         "stoppedUsing": _sort_by_activity_desc(stopped_using)[:limit],
         "needsContact": _sort_by_activity_desc(needs_contact)[:limit],
+        "suspiciousUsers": _sort_suspicious_users(suspicious_users)[:limit],
         "neverUsed": _sort_by_created_desc(never_used)[:limit],
     }
 
@@ -464,6 +740,7 @@ def _recompute_totals(users: list[dict]) -> dict:
     no_usage = len(users) - used_tool
     needs_contact = sum(1 for user in users if (user.get("followUp") or {}).get("shouldContact"))
     stopped_after_use = sum(1 for user in users if (user.get("followUp") or {}).get("status") == "stopped")
+    suspicious_users = sum(1 for user in users if (user.get("risk") or {}).get("suspicious"))
     return {
         "recentUsers": len(users),
         "activeTrials": active_trials,
@@ -471,6 +748,7 @@ def _recompute_totals(users: list[dict]) -> dict:
         "noUsage": no_usage,
         "needsContact": needs_contact,
         "stoppedAfterUse": stopped_after_use,
+        "suspiciousUsers": suspicious_users,
     }
 
 
@@ -787,6 +1065,7 @@ def _build_recent_users_report(db, *, days: int, limit: int, now: datetime | Non
     activity_since = current - timedelta(days=MAX_LOOKBACK_DAYS)
     user_docs = _stream_user_docs(db)
     users = []
+    suspicion_profiles = {}
 
     for doc in user_docs:
         uid = doc.id
@@ -798,7 +1077,7 @@ def _build_recent_users_report(db, *, days: int, limit: int, now: datetime | Non
         sub_doc = db.collection("subscriptions").document(uid).get()
         subscription = sub_doc.to_dict() if getattr(sub_doc, "exists", False) else None
 
-        device_activity = _device_activity(user_ref)
+        device_activity, device_keys = _device_profile(user_ref)
         audit_activity = _audit_activity(db, uid, activity_since)
         has_tool_usage = bool(
             audit_activity["toolEventCount"]
@@ -806,7 +1085,7 @@ def _build_recent_users_report(db, *, days: int, limit: int, now: datetime | Non
             or audit_activity["cotacaoReadyCount"]
         )
 
-        users.append({
+        user_payload = {
             **_public_user_data(uid, data),
             "subscription": _public_subscription_data(subscription),
             "activity": {
@@ -814,9 +1093,12 @@ def _build_recent_users_report(db, *, days: int, limit: int, now: datetime | Non
                 **audit_activity,
                 "hasToolUsage": has_tool_usage,
             },
-        })
+        }
+        users.append(user_payload)
+        suspicion_profiles[uid] = _suspicion_profile(uid, data, user_payload, device_keys)
 
     _apply_follow_up_status(users, current)
+    _apply_suspicious_signals(users, suspicion_profiles)
     segments = _build_segments(users, since=since, now=current, limit=limit)
     report = {
         "ok": True,

@@ -33,6 +33,7 @@ from services.excel_processor import (
 )
 from services.matching_engine import limpar_ean, normalizar_nome
 from services.subscription_access import ensure_subscription_access
+from services.email_verification_access import ensure_email_verified_for_required_user
 from services.upload_validation import PDF_CONTENT_TYPES, XLSX_CONTENT_TYPES, validate_upload
 from services.security_audit import audit_event
 
@@ -505,7 +506,7 @@ async def _get_user_id_from_token(token: str | None) -> str:
         raise HTTPException(401, "Token obrigatório")
     try:
         decoded = firebase_auth.verify_id_token(token)
-        uid = decoded['uid']
+        uid = await ensure_email_verified_for_required_user(decoded, route="cotacao")
         await ensure_subscription_access(uid)
         return uid
     except HTTPException:

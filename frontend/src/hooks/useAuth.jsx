@@ -13,6 +13,7 @@ import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { isValidCPF, onlyDigits } from '../utils/documentValidators';
 import { registerDeviceSession } from '../utils/deviceSession';
+import { sendVerificationEmail } from '../utils/emailVerification';
 import { registerUser } from '../services/api';
 
 export const useAuth = () => {
@@ -27,6 +28,8 @@ export const useAuth = () => {
         try {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           const userData = userDoc.data();
+          const requiresEmailVerification = Boolean(userData?.requiresEmailVerification);
+          const emailVerified = firebaseUser.emailVerified || userData?.emailVerified === true;
           
           const isAdmin = userData?.role === 'admin';
           console.log(`[Auth] Usuário autenticado. Admin? ${isAdmin}`);
@@ -36,14 +39,17 @@ export const useAuth = () => {
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
-            emailVerified: firebaseUser.emailVerified,
             ...userData,
+            emailVerified,
+            requiresEmailVerification,
             isAdmin: isAdmin 
           });
 
-          registerDeviceSession().catch((sessionErr) => {
-            console.warn('[Auth] Não foi possível registrar dispositivo:', sessionErr?.message || sessionErr);
-          });
+          if (!requiresEmailVerification || emailVerified) {
+            registerDeviceSession().catch((sessionErr) => {
+              console.warn('[Auth] Não foi possível registrar dispositivo:', sessionErr?.message || sessionErr);
+            });
+          }
         } catch (err) {
           console.error('Erro ao buscar dados do usuário:', err);
           setUser({
@@ -52,6 +58,7 @@ export const useAuth = () => {
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
             emailVerified: firebaseUser.emailVerified,
+            requiresEmailVerification: false,
             isAdmin: false 
           });
 
@@ -115,6 +122,11 @@ export const useAuth = () => {
       if (additionalData.name && userCredential.user.displayName !== additionalData.name) {
         await updateProfile(userCredential.user, { displayName: additionalData.name });
       }
+      try {
+        await sendVerificationEmail(userCredential.user);
+      } catch (verificationErr) {
+        console.warn('[Register] Não foi possível enviar email de confirmação:', verificationErr?.message || verificationErr);
+      }
 
       return userCredential.user;
     } catch (err) {
@@ -150,6 +162,30 @@ export const useAuth = () => {
       setError(getErrorMessage(err.code));
       throw err;
     }
+  };
+
+  const refreshCurrentUser = async () => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return null;
+
+    await firebaseUser.reload();
+    await firebaseUser.getIdToken(true);
+    setUser(prev => prev
+      ? {
+          ...prev,
+          emailVerified: firebaseUser.emailVerified,
+        }
+      : {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          photoURL: firebaseUser.photoURL,
+          emailVerified: firebaseUser.emailVerified,
+          requiresEmailVerification: false,
+          isAdmin: false,
+        }
+    );
+    return firebaseUser;
   };
 
   // Atualizar perfil (Mantido)
@@ -193,6 +229,7 @@ export const useAuth = () => {
     register,
     logout,
     resetPassword,
+    refreshCurrentUser,
     updateUserProfile,
     isAuthenticated: !!user
   };

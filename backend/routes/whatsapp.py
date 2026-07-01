@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 import firebase_admin
 from firebase_admin import auth as firebase_auth, firestore
 from services.public_files import PUBLIC_IMAGE_TYPES, PUBLIC_PDF_TYPES, stream_public_gridfs_file
+from services.email_verification_access import ensure_email_verified_for_required_user
 from services.security_audit import audit_event, hash_identifier
 from services.subscription_access import ensure_subscription_access
 from services.upload_validation import CSV_CONTENT_TYPES, IMAGE_CONTENT_TYPES, PDF_CONTENT_TYPES, validate_upload
@@ -50,7 +51,7 @@ async def get_user_id(credentials: HTTPAuthorizationCredentials = Depends(securi
         decoded = await asyncio.to_thread(
             firebase_auth.verify_id_token, credentials.credentials
         )
-        uid = decoded['uid']
+        uid = await ensure_email_verified_for_required_user(decoded, route="whatsapp")
         await ensure_subscription_access(uid)
         return uid
     except HTTPException:

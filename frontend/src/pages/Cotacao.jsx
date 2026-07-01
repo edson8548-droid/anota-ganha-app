@@ -707,6 +707,7 @@ function CotacaoTab({
               </div>
               <ReviewMatches
                 itens={reviewData.itens}
+                modoMatch={modoMatch}
                 onConfirmar={handleConfirmar}
                 confirmando={confirmando}
               />

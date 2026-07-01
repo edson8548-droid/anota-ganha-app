@@ -240,6 +240,16 @@
   animation: shake 0.4s;
 }
 
+.register-email-confirmation-note {
+  padding: 11px 13px;
+  background: rgba(58, 133, 168, 0.12);
+  border: 1px solid rgba(58, 133, 168, 0.32);
+  color: #c7e7f4;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-8px); }
