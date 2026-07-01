@@ -454,7 +454,7 @@ const AdminPanel = () => {
                     <div className="admin-job-list">
                       {item.activity.recentCotatudoJobs.slice(0, 3).map((job) => (
                         <div className="admin-job" key={job.jobId || `${job.createdAt}-${job.prazo}`}>
-                          <span>{job.site || 'site'} · {job.modo || 'modo'} · {job.prazo || '-'} dias</span>
+                          <span>{formatDateTime(job.createdAt)} · {job.site || 'site'} · {job.modo || 'modo'} · {job.prazo || '-'} dias</span>
                           <strong>{job.preenchidos ?? 0}/{job.totalItens ?? 0} preenchidos</strong>
                           <em>{job.naoEncontrados ?? 0} não encontrados</em>
                         </div>
@@ -466,9 +466,37 @@ const AdminPanel = () => {
                     <div className="admin-job-list">
                       {item.activity.recentCotacaoReadyJobs.slice(0, 3).map((job) => (
                         <div className="admin-job" key={job.sessionId || job.jobId || `${job.createdAt}-${job.prazo}`}>
-                          <span>Cotação Pronta · {job.modo || 'modo'} · {job.prazo || '-'} dias</span>
+                          <span>{formatDateTime(job.createdAt)} · Cotação Pronta · {job.modo || 'modo'} · {job.prazo || '-'} dias</span>
                           <strong>{job.preenchidos ?? 0}/{job.totalItens ?? 0} preenchidos</strong>
                           <em>{job.semMatch ?? 0} sem match</em>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {item.activity?.recentToolEvents?.length > 0
+                    && !item.activity?.recentCotatudoJobs?.length
+                    && !item.activity?.recentCotacaoReadyJobs?.length && (
+                    <div className="admin-event-list">
+                      <div className="admin-event-list-title">Ferramentas recentes</div>
+                      {item.activity.recentToolEvents.slice(0, 4).map((event) => (
+                        <div className={`admin-event ${event.tone || 'neutral'}`} key={`tool-${event.createdAt}-${event.action}-${event.detail}`}>
+                          <span className="admin-event-time">{formatDateTime(event.createdAt)}</span>
+                          <strong>{event.label || event.action || 'Evento'}</strong>
+                          <em>{event.detail || event.status || 'Registrado'}</em>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {item.activity?.recentEvents?.length > 0 && (
+                    <div className="admin-event-list">
+                      <div className="admin-event-list-title">Linha do tempo recente</div>
+                      {item.activity.recentEvents.slice(0, 6).map((event) => (
+                        <div className={`admin-event ${event.tone || 'neutral'}`} key={`${event.createdAt}-${event.action}-${event.detail}`}>
+                          <span className="admin-event-time">{formatDateTime(event.createdAt)}</span>
+                          <strong>{event.label || event.action || 'Evento'}</strong>
+                          <em>{event.detail || event.status || 'Registrado'}</em>
                         </div>
                       ))}
                     </div>

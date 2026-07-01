@@ -265,6 +265,80 @@ def _compact_cotacao_ready_event(event: dict) -> dict:
     }
 
 
+def _compact_recent_event(event: dict) -> dict:
+    action = str(event.get("action") or "unknown")
+    status = str(event.get("status") or "")
+    metadata = event.get("metadata") if isinstance(event.get("metadata"), dict) else {}
+    created_at = _iso(event.get("createdAt") or event.get("createdAtIso"))
+    base = {
+        "createdAt": created_at,
+        "action": action,
+        "status": status,
+        "label": action.replace("_", " "),
+        "detail": status or "Registrado",
+        "tone": "neutral",
+    }
+
+    if action == "device_session_registered":
+        return {
+            **base,
+            "label": "Sessão registrada",
+            "detail": "Novo dispositivo" if metadata.get("newDevice") else "Dispositivo já registrado",
+        }
+
+    if action == "welcome_email_sent":
+        return {
+            **base,
+            "label": "Email de boas-vindas",
+            "detail": "Enviado para o RCA",
+        }
+
+    if action == "vitrine_list_parsed":
+        items = metadata.get("items")
+        return {
+            **base,
+            "label": "Vitrine processada",
+            "detail": f"{items} item{'' if items == 1 else 's'} lido{'' if items == 1 else 's'}" if isinstance(items, int) else "Lista lida",
+            "tone": "ok",
+        }
+
+    if action == "cotatudo_extension_fill_reported":
+        job = _compact_job_event(event)
+        total = job.get("totalItens") or 0
+        preenchidos = job.get("preenchidos") or 0
+        nao_encontrados = job.get("naoEncontrados") or 0
+        context = " · ".join(
+            str(value)
+            for value in (job.get("site") or "Cotatudo", job.get("modo"), f"{job.get('prazo')} dias" if job.get("prazo") else None)
+            if value
+        )
+        return {
+            **base,
+            "label": "Cotatudo preenchido",
+            "detail": f"{context} · {preenchidos}/{total} preenchidos · {nao_encontrados} não encontrados",
+            "tone": "ok" if preenchidos else "warn",
+        }
+
+    if action in COTACAO_READY_ACTIONS:
+        job = _compact_cotacao_ready_event(event)
+        total = job.get("totalItens") or 0
+        preenchidos = job.get("preenchidos") or 0
+        sem_match = job.get("semMatch") or 0
+        context = " · ".join(
+            str(value)
+            for value in ("Cotação Pronta", job.get("modo"), f"{job.get('prazo')} dias" if job.get("prazo") else None)
+            if value
+        )
+        return {
+            **base,
+            "label": "Cotação Pronta",
+            "detail": f"{context} · {preenchidos}/{total} preenchidos · {sem_match} sem match",
+            "tone": "ok" if preenchidos else "warn",
+        }
+
+    return base
+
+
 def _cotacao_session_summary(session: dict) -> dict:
     resultados = session.get("resultados") if isinstance(session.get("resultados"), list) else []
     itens = session.get("itens") if isinstance(session.get("itens"), list) else []
@@ -355,6 +429,14 @@ def _audit_activity(db, uid: str, since: datetime) -> dict:
     last_tool_event = tool_events[-1] if tool_events else None
     last_metadata = last_event.get("metadata") if isinstance(last_event, dict) and isinstance(last_event.get("metadata"), dict) else {}
     last_tool_metadata = last_tool_event.get("metadata") if isinstance(last_tool_event, dict) and isinstance(last_tool_event.get("metadata"), dict) else {}
+    recent_events = [
+        _compact_recent_event(event)
+        for event in list(reversed(events))[:8]
+    ]
+    recent_tool_events = [
+        _compact_recent_event(event)
+        for event in list(reversed(tool_events))[:4]
+    ]
 
     return {
         "auditEventCount": len(events),
@@ -369,6 +451,8 @@ def _audit_activity(db, uid: str, since: datetime) -> dict:
         "lastToolAction": last_tool_event.get("action") if last_tool_event else None,
         "lastToolSite": last_tool_metadata.get("site") or last_metadata.get("site"),
         "lastToolMode": last_tool_metadata.get("modo") or last_metadata.get("modo"),
+        "recentEvents": recent_events,
+        "recentToolEvents": recent_tool_events,
         "recentCotatudoJobs": job_summaries,
         "recentCotacaoReadyJobs": cotacao_ready_summaries,
     }

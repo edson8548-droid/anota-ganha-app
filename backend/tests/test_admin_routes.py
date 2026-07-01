@@ -240,6 +240,9 @@ def test_admin_recent_users_returns_sanitized_operational_data(monkeypatch):
     assert user["subscription"]["status"] == "trialing"
     assert user["activity"]["uniqueCotatudoJobs"] == 1
     assert user["activity"]["recentCotatudoJobs"][0]["preenchidos"] == 6
+    assert user["activity"]["recentEvents"][0]["label"] == "Cotatudo preenchido"
+    assert "6/10 preenchidos" in user["activity"]["recentEvents"][0]["detail"]
+    assert user["activity"]["recentToolEvents"][0]["label"] == "Cotatudo preenchido"
 
     serialized = str(payload).lower()
     assert "cpf" not in serialized
@@ -401,6 +404,8 @@ def test_admin_device_session_alone_is_not_tool_usage():
     assert user["activity"]["auditEventCount"] == 1
     assert user["activity"]["toolEventCount"] == 0
     assert user["activity"]["hasToolUsage"] is False
+    assert user["activity"]["recentEvents"][0]["label"] == "Sessão registrada"
+    assert user["activity"]["recentEvents"][0]["detail"] == "Dispositivo já registrado"
     assert user["followUp"]["status"] == "never_used"
     assert user["followUp"]["shouldContact"] is True
     assert report["totals"]["usedTool"] == 0
@@ -408,6 +413,7 @@ def test_admin_device_session_alone_is_not_tool_usage():
     assert report["totals"]["registeredUsers"] == 2
     assert report["totals"]["noUsage"] == 2
     assert report["totals"]["needsContact"] == 2
+    assert "deviceHash" not in str(report)
 
 
 def test_admin_follow_up_marks_users_who_stopped_after_using_tool():
