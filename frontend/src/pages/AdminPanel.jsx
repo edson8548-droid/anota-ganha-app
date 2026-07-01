@@ -4,10 +4,15 @@ import {
   Activity,
   AlertTriangle,
   ArrowLeft,
+  Calendar,
   Clipboard,
   Clock3,
+  MessageCircle,
+  Phone,
   RefreshCw,
   ShieldCheck,
+  UserCheck,
+  UserX,
   Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -17,6 +22,72 @@ import { canAccessAdminPanel } from '../utils/adminAccess';
 import './AdminPanel.css';
 
 const DAY_OPTIONS = [4, 7, 30];
+const SEGMENT_OPTIONS = [
+  {
+    key: 'allRegistered',
+    totalKey: 'registeredUsers',
+    icon: Users,
+    label: 'RCAs cadastrados',
+    title: 'Todos os RCAs cadastrados',
+    empty: 'Nenhum RCA cadastrado foi encontrado.',
+  },
+  {
+    key: 'newUsers',
+    totalKey: 'recentUsers',
+    icon: Calendar,
+    label: 'Novos no período',
+    title: 'Cadastros novos',
+    empty: 'Nenhum cadastro novo nessa janela.',
+  },
+  {
+    key: 'activeToday',
+    totalKey: 'activeToday',
+    icon: Activity,
+    label: 'Usaram hoje',
+    title: 'RCAs usando hoje',
+    empty: 'Nenhum RCA usou a ferramenta hoje.',
+  },
+  {
+    key: 'activeLast7Days',
+    totalKey: 'activeLast7Days',
+    icon: UserCheck,
+    label: 'Usaram 7 dias',
+    title: 'RCAs ativos na semana',
+    empty: 'Nenhum RCA usou a ferramenta nos últimos 7 dias.',
+  },
+  {
+    key: 'stoppedUsing',
+    totalKey: 'stoppedUsing',
+    icon: Clock3,
+    label: 'Pararam de usar',
+    title: 'RCAs para chamar',
+    empty: 'Nenhum RCA com uso antigo parado foi encontrado.',
+  },
+  {
+    key: 'oldRegisteredActive',
+    totalKey: 'oldRegisteredActive',
+    icon: ShieldCheck,
+    label: 'Antigos ativos',
+    title: 'Cadastrados há mais tempo e ainda usando',
+    empty: 'Nenhum cadastro antigo ativo foi encontrado.',
+  },
+  {
+    key: 'oldRegisteredStopped',
+    totalKey: 'oldRegisteredStopped',
+    icon: UserX,
+    label: 'Entraram e pararam',
+    title: 'Cadastrados antigos que pararam',
+    empty: 'Nenhum cadastro antigo parado foi encontrado.',
+  },
+  {
+    key: 'neverUsed',
+    totalKey: 'neverUsed',
+    icon: AlertTriangle,
+    label: 'Nunca usaram',
+    title: 'Cadastrados sem uso registrado',
+    empty: 'Nenhum RCA sem uso registrado foi encontrado.',
+  },
+];
 
 const formatDateTime = (value) => {
   if (!value) return 'Sem registro';
@@ -39,6 +110,40 @@ const daysUntil = (value) => {
   return Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 };
 
+const formatDaysAgo = (value) => {
+  if (value === null || value === undefined) return 'Sem registro';
+  if (value === 0) return 'Hoje';
+  if (value === 1) return 'há 1 dia';
+  return `há ${value} dias`;
+};
+
+const formatAccountAge = (value) => {
+  if (value === null || value === undefined) return 'Sem data';
+  if (value === 0) return 'Hoje';
+  if (value === 1) return '1 dia';
+  return `${value} dias`;
+};
+
+const phoneDigits = (value) => String(value || '').replace(/\D/g, '');
+
+const formatPhone = (value) => {
+  const digits = phoneDigits(value);
+  if (!digits) return 'Sem telefone';
+  const local = digits.startsWith('55') && digits.length > 11 ? digits.slice(2) : digits;
+  if (local.length === 11) return `(${local.slice(0, 2)}) ${local.slice(2, 7)}-${local.slice(7)}`;
+  if (local.length === 10) return `(${local.slice(0, 2)}) ${local.slice(2, 6)}-${local.slice(6)}`;
+  return digits;
+};
+
+const whatsappUrl = (item) => {
+  const digits = phoneDigits(item?.phone);
+  if (digits.length < 10) return null;
+  const normalized = digits.startsWith('55') && digits.length > 11 ? digits : `55${digits}`;
+  const firstName = String(item?.name || '').trim().split(/\s+/)[0] || 'tudo bem';
+  const message = `Olá, ${firstName}. Aqui é o Edson da Venpro. Vi seu cadastro e queria entender se posso ajudar você a usar melhor a ferramenta.`;
+  return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
+};
+
 const statusLabel = (subscription) => {
   if (!subscription) return { label: 'Sem assinatura', tone: 'neutral' };
   if (subscription.status === 'trialing') return { label: 'Trial ativo', tone: 'ok' };
@@ -51,27 +156,31 @@ const statusLabel = (subscription) => {
 
 const summarizeActivity = (activity) => {
   if (!activity?.hasToolUsage) return 'Sem uso registrado';
-  const jobs = activity.uniqueCotatudoJobs || 0;
-  const events = activity.auditEventCount || 0;
-  if (jobs) return `${jobs} job${jobs === 1 ? '' : 's'} de cotação`;
-  if (events) return `${events} evento${events === 1 ? '' : 's'} registrado${events === 1 ? '' : 's'}`;
-  return 'Sessão registrada';
+  const jobs = activity.totalCotatudoJobs || activity.uniqueCotatudoJobs || 0;
+  const events = activity.recentAuditEventCount ?? activity.auditEventCount ?? 0;
+  const suffix = activity.daysSinceLastActivity !== null && activity.daysSinceLastActivity !== undefined
+    ? ` · último uso ${formatDaysAgo(activity.daysSinceLastActivity)}`
+    : '';
+  if (jobs) return `${jobs} job${jobs === 1 ? '' : 's'} de cotação${suffix}`;
+  if (events) return `${events} evento${events === 1 ? '' : 's'} registrado${events === 1 ? '' : 's'}${suffix}`;
+  return `Sessão registrada${suffix}`;
 };
 
-const AdminMetric = ({ icon: Icon, label, value }) => (
-  <div className="admin-metric">
+const AdminMetric = ({ active, icon: Icon, label, onClick, value }) => (
+  <button type="button" className={`admin-metric ${active ? 'active' : ''}`} onClick={onClick}>
     <div className="admin-metric-icon"><Icon size={18} /></div>
     <div>
       <div className="admin-metric-value">{value}</div>
       <div className="admin-metric-label">{label}</div>
     </div>
-  </div>
+  </button>
 );
 
 const AdminPanel = () => {
   const navigate = useNavigate();
   const { user } = useAuthContext();
   const [days, setDays] = useState(4);
+  const [selectedSegment, setSelectedSegment] = useState('allRegistered');
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -83,7 +192,7 @@ const AdminPanel = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await api.get('/admin/recent-users', { params: { days, limit: 25 } });
+      const response = await api.get('/admin/recent-users', { params: { days, limit: 200 } });
       setReport(response.data);
     } catch (err) {
       const message = err?.response?.data?.detail || 'Não foi possível carregar o painel admin.';
@@ -99,11 +208,28 @@ const AdminPanel = () => {
 
   const totals = report?.totals || {};
   const users = report?.users || [];
+  const segments = report?.segments || {};
+  const allRegisteredUsers = segments.allRegistered || users;
+  const selectedConfig = SEGMENT_OPTIONS.find((item) => item.key === selectedSegment) || SEGMENT_OPTIONS[0];
+  const selectedUsers = segments[selectedSegment] || (selectedSegment === 'allRegistered' ? allRegisteredUsers : users);
 
-  const expiringSoon = useMemo(() => users.filter((item) => {
+  const expiringSoon = useMemo(() => allRegisteredUsers.filter((item) => {
     const remaining = daysUntil(item.subscription?.trialEndsAt);
     return remaining !== null && remaining >= 0 && remaining <= 3;
-  }).length, [users]);
+  }).length, [allRegisteredUsers]);
+
+  const segmentDescription = useMemo(() => {
+    const staleDays = report?.window?.staleAfterDays || 14;
+    const longTermDays = report?.window?.longTermAccountDays || 30;
+    if (selectedSegment === 'newUsers') return `Cadastros feitos nos últimos ${days} dias.`;
+    if (selectedSegment === 'activeToday') return 'RCAs com login ou evento registrado nas últimas 24 horas.';
+    if (selectedSegment === 'activeLast7Days') return 'RCAs com login ou evento registrado nos últimos 7 dias.';
+    if (selectedSegment === 'stoppedUsing') return `RCAs que já usaram e estão sem uso há ${staleDays} dias ou mais.`;
+    if (selectedSegment === 'oldRegisteredActive') return `Cadastrados há ${longTermDays} dias ou mais e ativos nos últimos 7 dias.`;
+    if (selectedSegment === 'oldRegisteredStopped') return `Cadastrados há ${longTermDays} dias ou mais que pararam de usar.`;
+    if (selectedSegment === 'neverUsed') return 'RCAs cadastrados sem uso registrado no painel.';
+    return 'Base total de RCAs cadastrados carregada para acompanhamento.';
+  }, [days, report?.window?.longTermAccountDays, report?.window?.staleAfterDays, selectedSegment]);
 
   const copyUid = async (uid) => {
     try {
@@ -164,11 +290,23 @@ const AdminPanel = () => {
 
       <main className="admin-main">
         <section className="admin-metrics-grid">
-          <AdminMetric icon={Users} label="Novos RCAs" value={totals.recentUsers ?? 0} />
-          <AdminMetric icon={Activity} label="Testaram a ferramenta" value={totals.usedTool ?? 0} />
-          <AdminMetric icon={Clock3} label="Sem uso registrado" value={totals.noUsage ?? 0} />
-          <AdminMetric icon={AlertTriangle} label="Trial vence em 3 dias" value={expiringSoon} />
+          {SEGMENT_OPTIONS.map((option) => (
+            <AdminMetric
+              key={option.key}
+              active={selectedSegment === option.key}
+              icon={option.icon}
+              label={option.label}
+              value={totals[option.totalKey] ?? 0}
+              onClick={() => setSelectedSegment(option.key)}
+            />
+          ))}
         </section>
+
+        <div className="admin-secondary-metrics">
+          <span><Activity size={14} /> {totals.usedTool ?? 0} já testaram a ferramenta</span>
+          <span><Clock3 size={14} /> {totals.noUsage ?? 0} sem uso registrado</span>
+          <span><AlertTriangle size={14} /> {expiringSoon} trials vencem em 3 dias</span>
+        </div>
 
         {error && (
           <div className="admin-alert">
@@ -179,21 +317,23 @@ const AdminPanel = () => {
         <section className="admin-list-section">
           <div className="admin-section-header">
             <div>
-              <h2>Cadastros recentes</h2>
-              <p>{report?.window?.since ? `Desde ${formatDateTime(report.window.since)}` : 'Carregando janela de consulta'}</p>
+              <h2>{selectedConfig.title}</h2>
+              <p>{segmentDescription}</p>
             </div>
-            <span>{loading ? 'Carregando...' : `${users.length} registro${users.length === 1 ? '' : 's'}`}</span>
+            <span>{loading ? 'Carregando...' : `${selectedUsers.length} registro${selectedUsers.length === 1 ? '' : 's'}`}</span>
           </div>
 
-          {!loading && users.length === 0 && (
-            <div className="admin-empty">Nenhum cadastro novo nessa janela.</div>
+          {!loading && selectedUsers.length === 0 && (
+            <div className="admin-empty">{selectedConfig.empty}</div>
           )}
 
           <div className="admin-user-list">
-            {users.map((item) => {
+            {selectedUsers.map((item) => {
               const status = statusLabel(item.subscription);
-              const remainingDays = daysUntil(item.subscription?.trialEndsAt);
-              const lastSeen = item.activity?.lastSeenAt || item.activity?.lastEventAt;
+              const periodEnd = item.subscription?.trialEndsAt || item.subscription?.accessEndsAt;
+              const remainingDays = daysUntil(periodEnd);
+              const lastSeen = item.activity?.lastActivityAt || item.activity?.lastSeenAt || item.activity?.lastEventAt;
+              const contactUrl = whatsappUrl(item);
 
               return (
                 <article className="admin-user-row" key={item.uid}>
@@ -201,6 +341,14 @@ const AdminPanel = () => {
                     <div>
                       <h3>{item.name || 'Sem nome'}</h3>
                       <p>{item.email || 'Sem email'}</p>
+                      <div className="admin-contact-line">
+                        <span><Phone size={13} /> {formatPhone(item.phone)}</span>
+                        {contactUrl && (
+                          <a className="admin-whatsapp" href={contactUrl} target="_blank" rel="noopener noreferrer">
+                            <MessageCircle size={14} /> Chamar
+                          </a>
+                        )}
+                      </div>
                     </div>
                     <button type="button" className="admin-copy" onClick={() => copyUid(item.uid)} title="Copiar UID">
                       <Clipboard size={15} /> UID
@@ -213,19 +361,31 @@ const AdminPanel = () => {
                       <strong>{formatDateTime(item.createdAt)}</strong>
                     </div>
                     <div>
+                      <span>Tempo cadastrado</span>
+                      <strong>{formatAccountAge(item.accountAgeDays)}</strong>
+                    </div>
+                    <div>
                       <span>Status</span>
                       <strong className={`admin-status ${status.tone}`}>{status.label}</strong>
                     </div>
                     <div>
-                      <span>Fim do trial</span>
+                      <span>Fim do acesso</span>
                       <strong>
-                        {formatDateTime(item.subscription?.trialEndsAt)}
+                        {formatDateTime(periodEnd)}
                         {remainingDays !== null && remainingDays >= 0 ? ` (${remainingDays}d)` : ''}
                       </strong>
                     </div>
                     <div>
+                      <span>Primeiro uso</span>
+                      <strong>{formatDateTime(item.activity?.firstActivityAt)}</strong>
+                    </div>
+                    <div>
                       <span>Último uso</span>
                       <strong>{formatDateTime(lastSeen)}</strong>
+                    </div>
+                    <div>
+                      <span>Sem uso há</span>
+                      <strong>{formatDaysAgo(item.activity?.daysSinceLastActivity)}</strong>
                     </div>
                   </div>
 
