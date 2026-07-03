@@ -107,6 +107,9 @@ const getPaidAccessEnd = (subscription) => {
   const explicitEnd = toDate(subscription?.accessEndsAt);
   if (explicitEnd) return explicitEnd;
 
+  const currentPeriodEnd = toDate(subscription?.currentPeriodEnd);
+  if (currentPeriodEnd) return currentPeriodEnd;
+
   const lastPayment = toDate(subscription?.lastPaymentDate);
   if (!lastPayment) return null;
 
@@ -138,8 +141,9 @@ const ProtectedRoute = ({ children, requireSubscription = false }) => {
 
     const subscription = subscriptionState.subscription;
     const accessEndsAt = getPaidAccessEnd(subscription);
-    const hasCanceledPaidAccess = ['canceling', 'canceled'].includes(subscription?.status) && accessEndsAt && accessEndsAt > new Date();
-    const hasAccess = subscription?.status === 'active' || subscriptionState.isTrialActive || hasCanceledPaidAccess;
+    const paidAccessStatuses = ['canceling', 'canceled', 'pending'];
+    const hasPaidAccess = paidAccessStatuses.includes(subscription?.status) && accessEndsAt && accessEndsAt > new Date();
+    const hasAccess = subscription?.status === 'active' || subscriptionState.isTrialActive || hasPaidAccess;
     if (!hasAccess) {
       return <SubscriptionRequired />;
     }

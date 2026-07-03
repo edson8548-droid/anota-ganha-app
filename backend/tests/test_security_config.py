@@ -1,7 +1,7 @@
 import asyncio
 import os
 import sys
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from fastapi import HTTPException
@@ -28,8 +28,15 @@ from services.security_config import LOCAL_CORS_ORIGINS, PRODUCTION_CORS_ORIGINS
 
 
 class FakeRequest:
+    def __init__(self, body=None):
+        self._body = body or {"event": "IGNORED"}
+        self.headers = {}
+        self.method = "POST"
+        self.url = type("Url", (), {"path": "/api/asaas/webhook"})()
+        self.client = None
+
     async def json(self):
-        return {"event": "IGNORED"}
+        return self._body
 
 
 class FakeAsaasResponse:
@@ -86,6 +93,50 @@ class FakeCouponDb:
         return self.collections[name]
 
 
+class FakeSnapshot:
+    def __init__(self, data):
+        self._data = data
+        self.exists = data is not None
+
+    def to_dict(self):
+        return dict(self._data or {})
+
+
+class FakeDocument:
+    def __init__(self, data=None):
+        self.data = data
+
+    def get(self):
+        return FakeSnapshot(self.data)
+
+    def set(self, data, merge=False):
+        if merge and self.data is not None:
+            self.data.update(data)
+        else:
+            self.data = dict(data)
+
+
+class FakeCollection:
+    def __init__(self, docs=None):
+        self.docs = {doc_id: FakeDocument(data) for doc_id, data in (docs or {}).items()}
+
+    def document(self, doc_id):
+        self.docs.setdefault(doc_id, FakeDocument())
+        return self.docs[doc_id]
+
+
+class FakeDb:
+    def __init__(self, collections=None):
+        self.collections = {
+            name: FakeCollection(docs)
+            for name, docs in (collections or {}).items()
+        }
+
+    def collection(self, name):
+        self.collections.setdefault(name, FakeCollection())
+        return self.collections[name]
+
+
 def test_cors_fallback_in_production_does_not_include_localhost(monkeypatch):
     monkeypatch.delenv("CORS_ORIGINS", raising=False)
     monkeypatch.setenv("APP_ENV", "production")
@@ -135,6 +186,49 @@ def test_asaas_webhook_rejects_invalid_token(monkeypatch):
         asyncio.run(asaas_webhook(FakeRequest(), asaas_access_token="token-errado"))
 
     assert exc.value.status_code == 401
+
+
+def test_asaas_overdue_does_not_revoke_current_paid_period(monkeypatch):
+    uid = "uid-daniel"
+    now = datetime.now(timezone.utc)
+    fake_db = FakeDb({
+        "subscriptions": {
+            uid: {
+                "status": "active",
+                "planId": "monthly",
+                "asaasPaymentId": "pay_received",
+                "asaasSubscriptionId": "sub_123",
+                "lastPaymentDate": now - timedelta(days=1),
+                "currentPeriodEnd": now + timedelta(days=29),
+            }
+        }
+    })
+
+    async def fake_audit_event(*args, **kwargs):
+        return None
+
+    monkeypatch.delenv("ASAAS_WEBHOOK_TOKEN", raising=False)
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setattr(asaas_routes, "_fs", lambda: fake_db)
+    monkeypatch.setattr(asaas_routes, "audit_event", fake_audit_event)
+
+    body = {
+        "event": "PAYMENT_OVERDUE",
+        "payment": {
+            "id": "pay_overdue",
+            "subscription": "sub_123",
+            "externalReference": f"{uid}-monthly-99.90",
+            "dueDate": "2026-07-01",
+        },
+    }
+
+    asyncio.run(asaas_webhook(FakeRequest(body)))
+
+    data = fake_db.collection("subscriptions").document(uid).data
+    assert data["status"] == "active"
+    assert data["asaasPaymentId"] == "pay_received"
+    assert data["lastPaymentIssueEvent"] == "PAYMENT_OVERDUE"
+    assert data["lastPaymentIssuePaymentId"] == "pay_overdue"
 
 
 def test_asaas_plan_prices_match_public_offer():

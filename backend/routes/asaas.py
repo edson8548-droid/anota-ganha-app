@@ -478,6 +478,16 @@ def _as_datetime(value) -> Optional[datetime]:
     return None
 
 
+def _has_paid_access(subscription_data: dict, now: datetime) -> bool:
+    for field in ("accessEndsAt", "currentPeriodEnd"):
+        access_end = _as_datetime(subscription_data.get(field))
+        if access_end and access_end > now:
+            return True
+
+    last_payment = _as_datetime(subscription_data.get("lastPaymentDate"))
+    return bool(last_payment and last_payment + timedelta(days=30) > now)
+
+
 def _access_end_for_cancel(subscription_data: dict) -> datetime:
     now = datetime.now(timezone.utc)
     candidates = [
@@ -735,9 +745,10 @@ async def asaas_webhook(
             plan_id = known_plan_id
             break
 
+    now = datetime.now(timezone.utc)
     update = {
         "provider": "asaas",
-        "updatedAt": datetime.now(timezone.utc),
+        "updatedAt": now,
     }
 
     if event in {"PAYMENT_CONFIRMED", "PAYMENT_RECEIVED"}:
@@ -747,7 +758,7 @@ async def asaas_webhook(
                 "planId": plan_id,
                 "asaasPaymentId": payment.get("id"),
                 "asaasSubscriptionId": payment.get("subscription") or subscription.get("id"),
-                "lastPaymentDate": datetime.now(timezone.utc),
+                "lastPaymentDate": now,
                 "currentPeriodEnd": _period_end_for_plan(plan_id),
                 "amount": payment.get("value") or existing_data.get("amount") or ASAAS_PLANS.get(plan_id, ASAAS_PLANS[DEFAULT_ASAAS_PLAN_ID])["price"],
                 "nextDueDate": payment.get("dueDate"),
@@ -755,14 +766,25 @@ async def asaas_webhook(
             }
         )
     elif event in {"PAYMENT_OVERDUE", "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED"}:
-        update.update(
-            {
-                "status": "pending",
-                "asaasPaymentId": payment.get("id"),
-                "asaasSubscriptionId": payment.get("subscription") or subscription.get("id"),
-                "nextDueDate": payment.get("dueDate"),
-            }
-        )
+        if _has_paid_access(existing_data, now):
+            update.update(
+                {
+                    "lastPaymentIssueEvent": event,
+                    "lastPaymentIssueAt": now,
+                    "lastPaymentIssuePaymentId": payment.get("id"),
+                    "lastPaymentIssueDueDate": payment.get("dueDate"),
+                    "asaasSubscriptionId": payment.get("subscription") or subscription.get("id"),
+                }
+            )
+        else:
+            update.update(
+                {
+                    "status": "pending",
+                    "asaasPaymentId": payment.get("id"),
+                    "asaasSubscriptionId": payment.get("subscription") or subscription.get("id"),
+                    "nextDueDate": payment.get("dueDate"),
+                }
+            )
     elif event in {"SUBSCRIPTION_INACTIVATED", "SUBSCRIPTION_DELETED"}:
         existing_access_end = _as_datetime(existing_data.get("accessEndsAt"))
         if existing_data.get("cancelAtPeriodEnd") and existing_access_end and existing_access_end > datetime.now(timezone.utc):

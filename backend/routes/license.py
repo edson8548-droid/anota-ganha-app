@@ -39,6 +39,34 @@ def _gerar_chave():
     return f"{raw[0:4]}-{raw[4:8]}-{raw[8:12]}-{raw[12:16]}"
 
 
+def _as_datetime(value) -> Optional[datetime]:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    if hasattr(value, "timestamp"):
+        return datetime.fromtimestamp(value.timestamp(), tz=timezone.utc)
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
+
+
+def _paid_access_until(subscription: dict) -> Optional[datetime]:
+    for field in ("accessEndsAt", "currentPeriodEnd"):
+        access_end = _as_datetime(subscription.get(field))
+        if access_end:
+            return access_end
+
+    last_payment = _as_datetime(subscription.get("lastPaymentDate"))
+    if last_payment:
+        return last_payment + timedelta(days=30)
+
+    return None
+
+
 # ─── Modelos ───────────────────────────────────────────────────────────────────
 
 class ValidateRequest(BaseModel):
@@ -106,9 +134,8 @@ async def validate_license(payload: ValidateRequest):
         trial_end = sub.get("trialEndsAt")
         if trial_end:
             # Firestore timestamp → datetime
-            if hasattr(trial_end, "timestamp"):
-                trial_end = datetime.fromtimestamp(trial_end.timestamp(), tz=timezone.utc)
-            if now < trial_end:
+            trial_end = _as_datetime(trial_end)
+            if trial_end and now < trial_end:
                 days_left = max(0, (trial_end - now).days)
                 return {
                     "active": True,
@@ -117,6 +144,16 @@ async def validate_license(payload: ValidateRequest):
                     "user_name": user_data.get("name", "Assinante"),
                 }
         return {"active": False, "message": "Trial expirado. Acesse o painel para assinar."}
+
+    if status in {"pending", "canceling", "canceled"}:
+        paid_until = _paid_access_until(sub)
+        if paid_until and paid_until > now:
+            return {
+                "active": True,
+                "message": "Licença ativa",
+                "plan": sub.get("planId", "monthly"),
+                "user_name": user_data.get("name", "Assinante"),
+            }
 
     mensagens = {
         "canceled": "Assinatura cancelada. Renove no painel para continuar.",

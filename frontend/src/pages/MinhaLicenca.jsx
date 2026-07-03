@@ -90,9 +90,11 @@ const MinhaLicenca = () => {
   };
 
   const explicitAccessEnd = toDate(subscription?.accessEndsAt);
+  const currentPeriodEnd = toDate(subscription?.currentPeriodEnd);
   const lastPaymentDate = toDate(subscription?.lastPaymentDate);
-  const accessEndsAt = explicitAccessEnd || (lastPaymentDate ? new Date(lastPaymentDate.getTime() + 30 * 24 * 60 * 60 * 1000) : null);
+  const accessEndsAt = explicitAccessEnd || currentPeriodEnd || (lastPaymentDate ? new Date(lastPaymentDate.getTime() + 30 * 24 * 60 * 60 * 1000) : null);
   const hasCanceledPaidAccess = ['canceling', 'canceled'].includes(subscription?.status) && accessEndsAt && accessEndsAt > new Date();
+  const hasPendingPaidAccess = subscription?.status === 'pending' && accessEndsAt && accessEndsAt > new Date();
 
   const cancelarAssinatura = async () => {
     closeConfirm();
@@ -123,6 +125,9 @@ const MinhaLicenca = () => {
     if (s === 'canceling' || (s === 'canceled' && hasCanceledPaidAccess)) {
       return { cor: '#f59e0b', icone: '⏳', texto: `Cancelada — acesso até ${accessEndsAt ? accessEndsAt.toLocaleDateString('pt-BR') : 'o fim do período pago'}` };
     }
+    if (s === 'pending' && hasPendingPaidAccess) {
+      return { cor: '#10b981', icone: '✅', texto: `Ativa — acesso pago até ${accessEndsAt.toLocaleDateString('pt-BR')}` };
+    }
     if (s === 'trialing')      return { cor: '#f59e0b', icone: '🎁', texto: `Teste grátis — ${trialEndsAt ? `até ${trialEndsAt.toLocaleDateString('pt-BR')}` : ''}` };
     if (s === 'trial_expired') return { cor: '#ef4444', icone: '⏰', texto: 'Teste grátis expirado' };
     if (s === 'canceled')      return { cor: '#ef4444', icone: '❌', texto: 'Cancelada' };
@@ -130,7 +135,7 @@ const MinhaLicenca = () => {
   };
 
   const status = statusInfo();
-  const assinaturaAtiva = subscription?.status === 'active' || isTrialActive || hasCanceledPaidAccess;
+  const assinaturaAtiva = subscription?.status === 'active' || isTrialActive || hasCanceledPaidAccess || hasPendingPaidAccess;
 
   return (
     <div style={s.page}>

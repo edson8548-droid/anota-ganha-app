@@ -23,13 +23,30 @@ def _as_datetime(value) -> Optional[datetime]:
 
 
 def _has_paid_access(subscription: dict, now: datetime) -> bool:
-    access_end = _as_datetime(subscription.get("accessEndsAt"))
-    if access_end and access_end > now:
-        return True
+    for field in ("accessEndsAt", "currentPeriodEnd"):
+        access_end = _as_datetime(subscription.get(field))
+        if access_end and access_end > now:
+            return True
 
     last_payment = _as_datetime(subscription.get("lastPaymentDate"))
     if last_payment and last_payment + timedelta(days=30) > now:
         return True
+
+    return False
+
+
+def _subscription_has_access(subscription: dict, now: datetime) -> bool:
+    status = subscription.get("status")
+
+    if status == "active":
+        return True
+
+    if status == "trialing":
+        trial_end = _as_datetime(subscription.get("trialEndsAt"))
+        return bool(trial_end and trial_end > now)
+
+    if status in {"canceling", "canceled", "pending"}:
+        return _has_paid_access(subscription, now)
 
     return False
 
@@ -40,20 +57,8 @@ def _has_subscription_access_sync(uid: str) -> bool:
         return False
 
     subscription = doc.to_dict() or {}
-    status = subscription.get("status")
     now = datetime.now(timezone.utc)
-
-    if status == "active":
-        return True
-
-    if status == "trialing":
-        trial_end = _as_datetime(subscription.get("trialEndsAt"))
-        return bool(trial_end and trial_end > now)
-
-    if status in {"canceling", "canceled"}:
-        return _has_paid_access(subscription, now)
-
-    return False
+    return _subscription_has_access(subscription, now)
 
 
 async def ensure_subscription_access(uid: str) -> str:
