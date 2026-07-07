@@ -99,9 +99,11 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
         self.last_cleanup = 0
 
     def _client_ip(self, request):
+        # Último valor do X-Forwarded-For: é o que o proxy do Render anexa.
+        # Valores à esquerda podem ser forjados pelo cliente para burlar o rate limit.
         forwarded_for = request.headers.get("x-forwarded-for", "")
         if forwarded_for:
-            return forwarded_for.split(",")[0].strip()
+            return forwarded_for.split(",")[-1].strip()
         if request.client:
             return request.client.host
         return "unknown"
@@ -121,6 +123,8 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
             return (300, 60, "/api/asaas/webhook")
         if path == "/api/license/validate":
             return (30, 60, "/api/license/validate")
+        if path == "/api/license/validate-by-cpf":
+            return (20, 60, "/api/license/validate-by-cpf")
         if path.startswith("/api/vitrine/publica/"):
             return (180, 60, "/api/vitrine/publica")
         if path.startswith("/api/vitrine/imagens/") or path.startswith("/api/whatsapp/fotos/") or path.startswith("/api/users/avatars/"):

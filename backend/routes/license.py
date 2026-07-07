@@ -9,6 +9,7 @@ Fluxo:
 """
 
 import os
+import re
 import uuid
 import logging
 from fastapi import APIRouter, HTTPException, Request, Depends
@@ -406,3 +407,86 @@ async def admin_create_coupon(
 
     logger.info(f"Cupom criado: {code} por admin {user_id}")
     return {"success": True, "message": f"Cupom {code} criado com {payload.max_uses} usos de {payload.days_free} dias"}
+
+
+# ─── POST /api/license/validate-by-cpf ─────────────────────────────────────────
+
+class ValidateByCpfRequest(BaseModel):
+    cpf: str
+
+
+@router.post("/validate-by-cpf")
+async def validate_by_cpf(payload: ValidateByCpfRequest):
+    """
+    Chamado pelo APK Android do RCA.
+    Verifica acesso pelo CPF cadastrado — sem necessidade de login.
+    """
+    cpf = re.sub(r"[^\d]", "", payload.cpf or "")
+    if len(cpf) != 11:
+        return {"active": False, "message": "CPF invalido. Verifique e tente novamente."}
+
+    db = get_db()
+
+    users_query = db.collection("users").where("cpf", "==", cpf).limit(1)
+    users = list(users_query.stream())
+
+    if not users:
+        logger.warning(f"APK: CPF nao encontrado hash={cpf[:3]}****")
+        return {"active": False, "message": "CPF nao encontrado. Verifique ou cadastre-se em venpro.com.br"}
+
+    user_doc = users[0]
+    user_id = user_doc.id
+    user_data = user_doc.to_dict()
+
+    if user_data.get("role") == "admin":
+        logger.info(f"APK: acesso admin liberado uid={user_id}")
+        return {"active": True, "message": "Acesso liberado", "user_name": user_data.get("name", "Admin")}
+
+    sub_ref = db.collection("subscriptions").document(user_id)
+    sub_doc = sub_ref.get()
+
+    if not sub_doc.exists:
+        return {"active": False, "message": "Sem assinatura ativa. Acesse venpro.com.br para assinar."}
+
+    sub = sub_doc.to_dict()
+    status = sub.get("status", "")
+    now = datetime.now(timezone.utc)
+
+    if status == "active":
+        logger.info(f"APK: acesso liberado uid={user_id} nome={user_data.get('name', '')}")
+        return {
+            "active": True,
+            "message": "Acesso liberado",
+            "plan": sub.get("planId", "monthly"),
+            "user_name": user_data.get("name", "Assinante"),
+        }
+
+    if status == "trialing":
+        trial_end = _as_datetime(sub.get("trialEndsAt"))
+        if trial_end and now < trial_end:
+            days_left = max(0, (trial_end - now).days)
+            return {
+                "active": True,
+                "message": f"Trial ativo — {days_left} dia(s) restante(s)",
+                "plan": "trial",
+                "user_name": user_data.get("name", "Assinante"),
+            }
+        return {"active": False, "message": "Trial expirado. Acesse venpro.com.br para assinar."}
+
+    if status in {"pending", "canceling", "canceled"}:
+        paid_until = _paid_access_until(sub)
+        if paid_until and paid_until > now:
+            return {
+                "active": True,
+                "message": "Acesso liberado",
+                "plan": sub.get("planId", "monthly"),
+                "user_name": user_data.get("name", "Assinante"),
+            }
+
+    mensagens = {
+        "canceled": "Assinatura cancelada. Renove em venpro.com.br para continuar.",
+        "suspended": "Assinatura suspensa. Entre em contato com o suporte.",
+        "pending": "Pagamento pendente. Aguarde a confirmacao.",
+    }
+    msg = mensagens.get(status, f"Assinatura inativa ({status}). Acesse venpro.com.br.")
+    return {"active": False, "message": msg}
