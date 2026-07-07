@@ -4,6 +4,7 @@ import {
   Activity,
   AlertTriangle,
   ArrowLeft,
+  CalendarClock,
   Clipboard,
   Clock3,
   MessageCircle,
@@ -11,6 +12,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Users,
+  Wallet,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -72,6 +74,36 @@ const FILTERS = {
     title: 'Trials vencendo em ate 3 dias',
     empty: 'Nenhum trial vencendo em ate 3 dias nesse filtro.',
   },
+};
+
+const WEBHOOK_ALERT_LABELS = {
+  asaas_webhook_unmapped: 'Pagamento recebido sem usuário mapeado — verificar no Asaas',
+  asaas_webhook_invalid_token: 'Webhook com token inválido — possível tentativa de fraude',
+  asaas_webhook_token_missing: 'Webhook sem token configurado no servidor',
+};
+
+const PAYMENT_ISSUE_LABELS = {
+  PAYMENT_OVERDUE: 'Pagamento vencido',
+  PAYMENT_CREDIT_CARD_CAPTURE_REFUSED: 'Cartão recusado',
+};
+
+const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+}).format(Number(value) || 0);
+
+// Datas de vencimento vêm sem horário (ex.: 2026-07-10T00:00:00Z);
+// formatar em UTC evita mostrar o dia anterior no fuso de Brasília.
+const formatDateOnly = (value) => {
+  if (!value) return 'Sem data';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Sem data';
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'UTC',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
 };
 
 const formatDateTime = (value) => {
@@ -171,9 +203,14 @@ const AdminPanel = () => {
   const { user } = useAuthContext();
   const [days, setDays] = useState(4);
   const [report, setReport] = useState(null);
+  const [billing, setBilling] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeFilter, setActiveFilter] = useState('allRegistered');
+  const [trialSearch, setTrialSearch] = useState('');
+  const [trialResults, setTrialResults] = useState(null);
+  const [trialLoading, setTrialLoading] = useState(false);
+  const [trialGranting, setTrialGranting] = useState('');
 
   const canViewAdmin = canAccessAdminPanel(user);
 
@@ -181,15 +218,20 @@ const AdminPanel = () => {
     if (!canViewAdmin) return;
     setLoading(true);
     setError('');
-    try {
-      const response = await api.get('/admin/recent-users', { params: { days, limit: 200 } });
-      setReport(response.data);
-    } catch (err) {
-      const message = err?.response?.data?.detail || 'Não foi possível carregar o painel admin.';
+    const [reportResult, billingResult] = await Promise.allSettled([
+      api.get('/admin/recent-users', { params: { days, limit: 200 } }),
+      api.get('/admin/billing-overview', { params: { days: 7 } }),
+    ]);
+    if (reportResult.status === 'fulfilled') {
+      setReport(reportResult.value.data);
+    } else {
+      const message = reportResult.reason?.response?.data?.detail || 'Não foi possível carregar o painel admin.';
       setError(message);
-    } finally {
-      setLoading(false);
     }
+    if (billingResult.status === 'fulfilled') {
+      setBilling(billingResult.value.data);
+    }
+    setLoading(false);
   }, [canViewAdmin, days]);
 
   useEffect(() => {
@@ -242,6 +284,36 @@ const AdminPanel = () => {
     }
   };
 
+  const searchForTrial = async () => {
+    if (trialSearch.trim().length < 2) return;
+    setTrialLoading(true);
+    setTrialResults(null);
+    try {
+      const res = await api.get('/admin/apk-search-user', { params: { q: trialSearch.trim() } });
+      setTrialResults(res.data.users || []);
+    } catch {
+      toast.error('Erro ao buscar usuário.');
+    } finally {
+      setTrialLoading(false);
+    }
+  };
+
+  const grantTrial = async (uid, name, days = 15) => {
+    setTrialGranting(uid);
+    try {
+      await api.post('/admin/apk-set-trial', { uid, days });
+      toast.success(`${days} dias de trial concedidos para ${name}.`);
+      setTrialResults((prev) => prev?.map((u) => u.uid === uid
+        ? { ...u, subscriptionStatus: 'trialing', trialEndsAt: new Date(Date.now() + days * 86400000).toISOString() }
+        : u
+      ));
+    } catch {
+      toast.error('Erro ao conceder trial.');
+    } finally {
+      setTrialGranting('');
+    }
+  };
+
   if (!canViewAdmin) {
     return (
       <div className="admin-page">
@@ -291,6 +363,117 @@ const AdminPanel = () => {
       </header>
 
       <main className="admin-main">
+        {billing && (
+          <>
+            <section className="admin-metrics-grid">
+              <div className="admin-metric static">
+                <div className="admin-metric-icon"><Users size={18} /></div>
+                <div>
+                  <div className="admin-metric-value">{billing.totals?.activeSubscribers ?? 0}</div>
+                  <div className="admin-metric-label">Assinantes ativos</div>
+                </div>
+              </div>
+              <div className="admin-metric static">
+                <div className="admin-metric-icon"><Wallet size={18} /></div>
+                <div>
+                  <div className="admin-metric-value">{formatCurrency(billing.totals?.monthlyRevenueEstimate)}</div>
+                  <div className="admin-metric-label">Receita mensal estimada</div>
+                </div>
+              </div>
+              <div className="admin-metric static">
+                <div className="admin-metric-icon"><CalendarClock size={18} /></div>
+                <div>
+                  <div className="admin-metric-value">{billing.totals?.upcomingRenewals ?? 0}</div>
+                  <div className="admin-metric-label">Vencimentos em 7 dias</div>
+                </div>
+              </div>
+              <div className={`admin-metric static${(billing.totals?.paymentIssues ?? 0) > 0 ? ' warn' : ''}`}>
+                <div className="admin-metric-icon"><AlertTriangle size={18} /></div>
+                <div>
+                  <div className="admin-metric-value">{billing.totals?.paymentIssues ?? 0}</div>
+                  <div className="admin-metric-label">Problemas de pagamento</div>
+                </div>
+              </div>
+            </section>
+
+            {billing.webhookAlerts?.length > 0 && (
+              <div className="admin-alert danger">
+                <div className="admin-alert-title">
+                  <AlertTriangle size={17} />
+                  <strong>
+                    {billing.webhookAlerts.length} alerta{billing.webhookAlerts.length === 1 ? '' : 's'} de webhook nos últimos 7 dias
+                  </strong>
+                </div>
+                <ul className="admin-alert-list">
+                  {billing.webhookAlerts.slice(0, 8).map((alert) => (
+                    <li key={`${alert.createdAt}-${alert.action}-${alert.uid || 'sem-uid'}`}>
+                      <span>{formatDateTime(alert.createdAt)}</span>
+                      {' — '}
+                      {WEBHOOK_ALERT_LABELS[alert.action] || alert.action}
+                      {alert.event ? ` (evento ${alert.event})` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {billing.paymentIssues?.length > 0 && (
+              <section className="admin-list-section admin-billing-block">
+                <div className="admin-section-header">
+                  <div>
+                    <h2>Problemas de pagamento</h2>
+                    <p>Assinantes com pagamento pendente, vencido ou cartão recusado</p>
+                  </div>
+                </div>
+                <div className="admin-job-list">
+                  {billing.paymentIssues.map((issue) => {
+                    const waUrl = whatsappUrl(issue.phone);
+                    return (
+                      <div className="admin-job" key={`issue-${issue.uid}`}>
+                        <span>
+                          {issue.name || 'Sem nome'} · {issue.email || 'Sem email'}
+                        </span>
+                        <strong>
+                          {PAYMENT_ISSUE_LABELS[issue.paymentIssueEvent]
+                            || (issue.status === 'pending' ? 'Pagamento pendente' : issue.status)}
+                          {issue.nextDueDate ? ` · vence ${formatDateOnly(issue.nextDueDate)}` : ''}
+                        </strong>
+                        {waUrl ? (
+                          <a className="admin-contact-link" href={waUrl} target="_blank" rel="noreferrer">
+                            <MessageCircle size={14} /> WhatsApp
+                          </a>
+                        ) : (
+                          <em>Sem telefone</em>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {billing.upcomingRenewals?.length > 0 && (
+              <section className="admin-list-section admin-billing-block">
+                <div className="admin-section-header">
+                  <div>
+                    <h2>Próximos vencimentos (7 dias)</h2>
+                    <p>Cobranças que o Asaas vai gerar em breve</p>
+                  </div>
+                </div>
+                <div className="admin-job-list">
+                  {billing.upcomingRenewals.map((renewal) => (
+                    <div className="admin-job" key={`renewal-${renewal.uid}`}>
+                      <span>{renewal.name || 'Sem nome'} · {renewal.email || 'Sem email'}</span>
+                      <strong>{formatDateOnly(renewal.nextDueDate)}</strong>
+                      <em>{formatCurrency(renewal.amount)}</em>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
+        )}
+
         <section className="admin-metrics-grid">
           {metricItems.map((metric) => (
             <AdminMetric
@@ -505,6 +688,67 @@ const AdminPanel = () => {
               );
             })}
           </div>
+        </section>
+
+        <section className="admin-section">
+          <h2 className="admin-section-title">Trial APK</h2>
+          <div className="admin-trial-search">
+            <input
+              className="admin-trial-input"
+              type="text"
+              placeholder="Buscar RCA por nome ou CPF..."
+              value={trialSearch}
+              onChange={(e) => setTrialSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && searchForTrial()}
+            />
+            <button
+              type="button"
+              className="admin-refresh"
+              onClick={searchForTrial}
+              disabled={trialLoading || trialSearch.trim().length < 2}
+            >
+              {trialLoading ? <RefreshCw size={15} className="spinning" /> : 'Buscar'}
+            </button>
+          </div>
+
+          {trialResults !== null && trialResults.length === 0 && (
+            <p className="admin-empty">Nenhum RCA encontrado.</p>
+          )}
+
+          {trialResults && trialResults.length > 0 && (
+            <div className="admin-trial-list">
+              {trialResults.map((u) => (
+                <div key={u.uid} className="admin-trial-row">
+                  <div className="admin-trial-info">
+                    <strong>{u.name || 'Sem nome'}</strong>
+                    <span>{u.email}</span>
+                    <span className={`admin-status-badge ${u.subscriptionStatus === 'trialing' ? 'ok' : u.subscriptionStatus === 'active' ? 'ok' : 'warn'}`}>
+                      {u.subscriptionStatus}
+                      {u.trialEndsAt ? ` — vence ${formatDateOnly(u.trialEndsAt)}` : ''}
+                    </span>
+                  </div>
+                  <div className="admin-trial-actions">
+                    <button
+                      type="button"
+                      className="admin-refresh"
+                      disabled={trialGranting === u.uid}
+                      onClick={() => grantTrial(u.uid, u.name, 15)}
+                    >
+                      {trialGranting === u.uid ? <RefreshCw size={14} className="spinning" /> : '15 dias trial'}
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-refresh"
+                      disabled={trialGranting === u.uid}
+                      onClick={() => grantTrial(u.uid, u.name, 30)}
+                    >
+                      30 dias
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </main>
     </div>

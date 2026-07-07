@@ -226,6 +226,56 @@
   font-weight: 700;
 }
 
+.admin-metric.static {
+  cursor: default;
+}
+
+.admin-metric.static:hover {
+  background: #363940;
+  border-color: #4A4D52;
+}
+
+.admin-metric.static.warn {
+  border-color: rgba(232, 168, 48, .55);
+}
+
+.admin-metric.static.warn .admin-metric-icon {
+  background: rgba(232, 168, 48, .16);
+  color: #F2D99A;
+}
+
+.admin-alert.danger {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  border-color: rgba(224, 84, 84, .45);
+  background: rgba(224, 84, 84, .10);
+  color: #F2B3B3;
+}
+
+.admin-alert-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-alert-list {
+  margin: 0;
+  padding-left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12.5px;
+}
+
+.admin-alert-list span {
+  color: #D9A0A0;
+}
+
+.admin-billing-block {
+  margin-bottom: 18px;
+}
+
 .admin-alert,
 .admin-empty {
   border: 1px solid rgba(232, 168, 48, .35);
@@ -692,4 +742,63 @@
   .admin-user-main {
     flex-direction: column;
   }
+}
+
+/* Trial APK */
+.admin-trial-search {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.admin-trial-input {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--admin-border, #334155);
+  background: var(--admin-card-bg, #1e293b);
+  color: var(--admin-text, #f1f5f9);
+  font-size: 14px;
+}
+
+.admin-trial-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-trial-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--admin-card-bg, #1e293b);
+  border: 1px solid var(--admin-border, #334155);
+}
+
+.admin-trial-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--admin-text-muted, #94a3b8);
+}
+
+.admin-trial-info strong {
+  color: var(--admin-text, #f1f5f9);
+  font-size: 14px;
+}
+
+.admin-trial-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.admin-status-badge { font-size: 12px; font-weight: 500; }
+.admin-status-badge.ok { color: #4ade80; }
+.admin-status-badge.warn { color: #facc15; }
+.admin-status-badge.danger { color: #f87171; }
 }

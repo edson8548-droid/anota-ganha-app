@@ -9,6 +9,7 @@ import unicodedata
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from firebase_admin import auth as firebase_auth, firestore
+from pydantic import BaseModel as pydantic_BaseModel
 
 from services.security_audit import AUDIT_COLLECTION, audit_event
 
@@ -53,6 +54,15 @@ TOOL_ACTION_PREFIXES = (
     "vitrine_",
     "whatsapp_",
 )
+BILLING_UPCOMING_DAYS = 7
+BILLING_MONTHLY_PRICE_FALLBACK = 99.90
+WEBHOOK_ALERT_ACTIONS = (
+    "asaas_webhook_unmapped",
+    "asaas_webhook_invalid_token",
+    "asaas_webhook_token_missing",
+)
+WEBHOOK_ALERT_QUERY_LIMIT = 200
+WEBHOOK_ALERT_RESPONSE_LIMIT = 50
 
 _mongo_db = None
 
@@ -87,9 +97,10 @@ def _as_utc_datetime(value) -> datetime | None:
         return datetime.fromtimestamp(value.timestamp(), tz=timezone.utc)
     if isinstance(value, str):
         try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
             return None
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
     return None
 
 
@@ -1226,6 +1237,174 @@ async def _require_admin(credentials: HTTPAuthorizationCredentials = Depends(sec
     return uid
 
 
+def _billing_amount(subscription: dict) -> float:
+    try:
+        amount = float(subscription.get("amount") or 0)
+    except (TypeError, ValueError):
+        amount = 0.0
+    return amount if amount > 0 else BILLING_MONTHLY_PRICE_FALLBACK
+
+
+def _billing_user_entry(db, uid: str, subscription: dict, cache: dict) -> dict:
+    if uid not in cache:
+        user_doc = db.collection("users").document(uid).get()
+        data = user_doc.to_dict() if getattr(user_doc, "exists", False) else {}
+        data = data or {}
+        cache[uid] = {
+            "uid": uid,
+            "name": data.get("name") or data.get("nome") or data.get("displayName"),
+            "email": data.get("email"),
+            "phone": _public_phone(data),
+        }
+    entry = dict(cache[uid])
+    entry.update(
+        {
+            "status": subscription.get("status"),
+            "planId": subscription.get("planId"),
+            "amount": _billing_amount(subscription),
+            "nextDueDate": _iso(subscription.get("nextDueDate")),
+            "lastPaymentDate": _iso(subscription.get("lastPaymentDate")),
+            "currentPeriodEnd": _iso(subscription.get("currentPeriodEnd")),
+            "accessEndsAt": _iso(subscription.get("accessEndsAt")),
+            "trialEndsAt": _iso(subscription.get("trialEndsAt")),
+        }
+    )
+    return entry
+
+
+def _webhook_alerts(db, since: datetime) -> list[dict]:
+    alerts = []
+    for action in WEBHOOK_ALERT_ACTIONS:
+        try:
+            docs = (
+                db.collection(AUDIT_COLLECTION)
+                .where("action", "==", action)
+                .limit(WEBHOOK_ALERT_QUERY_LIMIT)
+                .stream()
+            )
+        except Exception:
+            logger.exception("[ADMIN] Falha ao carregar alertas de webhook action=%s", action)
+            continue
+        for doc in docs:
+            data = doc.to_dict() or {}
+            created_at = _event_datetime(data)
+            if not created_at or created_at < since:
+                continue
+            metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+            alerts.append(
+                {
+                    "action": action,
+                    "status": data.get("status"),
+                    "uid": data.get("uid"),
+                    "event": metadata.get("event"),
+                    "createdAt": _iso(created_at),
+                }
+            )
+    alerts.sort(key=lambda item: item.get("createdAt") or "", reverse=True)
+    return alerts[:WEBHOOK_ALERT_RESPONSE_LIMIT]
+
+
+def _build_billing_overview(db, *, days: int, now: datetime | None = None) -> dict:
+    current = now or datetime.now(timezone.utc)
+    since = current - timedelta(days=days)
+    upcoming_until = current + timedelta(days=BILLING_UPCOMING_DAYS)
+
+    counts = Counter()
+    mrr = 0.0
+    user_cache: dict = {}
+    active_subscribers = []
+    upcoming_renewals = []
+    payment_issues = []
+
+    for doc in db.collection("subscriptions").stream():
+        subscription = doc.to_dict() or {}
+        uid = doc.id
+        status = subscription.get("status") or "none"
+
+        if status == "active":
+            counts["active"] += 1
+            mrr += _billing_amount(subscription)
+            entry = _billing_user_entry(db, uid, subscription, user_cache)
+            active_subscribers.append(entry)
+
+            next_due = _as_utc_datetime(subscription.get("nextDueDate"))
+            if next_due and next_due <= upcoming_until:
+                upcoming_renewals.append(entry)
+        elif status == "trialing":
+            if _trial_is_active(subscription, current):
+                counts["trialingActive"] += 1
+            else:
+                counts["trialExpired"] += 1
+        elif status == "trial_expired":
+            counts["trialExpired"] += 1
+        elif status == "pending":
+            counts["pendingPayment"] += 1
+            payment_issues.append(_billing_user_entry(db, uid, subscription, user_cache))
+        elif status == "canceling":
+            counts["canceling"] += 1
+        elif status == "canceled":
+            counts["canceled"] += 1
+        else:
+            counts["other"] += 1
+
+        issue_at = _as_utc_datetime(subscription.get("lastPaymentIssueAt"))
+        if status != "pending" and issue_at and issue_at >= since:
+            entry = _billing_user_entry(db, uid, subscription, user_cache)
+            entry["paymentIssueEvent"] = subscription.get("lastPaymentIssueEvent")
+            entry["paymentIssueAt"] = _iso(issue_at)
+            payment_issues.append(entry)
+
+    webhook_alerts = _webhook_alerts(db, since)
+
+    active_subscribers.sort(key=lambda item: item.get("nextDueDate") or "9999")
+    upcoming_renewals.sort(key=lambda item: item.get("nextDueDate") or "9999")
+
+    return {
+        "window": {
+            "days": days,
+            "since": _iso(since),
+            "until": _iso(current),
+            "upcomingUntil": _iso(upcoming_until),
+        },
+        "totals": {
+            "activeSubscribers": counts["active"],
+            "monthlyRevenueEstimate": round(mrr, 2),
+            "trialingActive": counts["trialingActive"],
+            "trialExpired": counts["trialExpired"],
+            "pendingPayment": counts["pendingPayment"],
+            "canceling": counts["canceling"],
+            "canceled": counts["canceled"],
+            "paymentIssues": len(payment_issues),
+            "webhookAlerts": len(webhook_alerts),
+            "upcomingRenewals": len(upcoming_renewals),
+        },
+        "activeSubscribers": active_subscribers,
+        "upcomingRenewals": upcoming_renewals,
+        "paymentIssues": payment_issues,
+        "webhookAlerts": webhook_alerts,
+    }
+
+
+@router.get("/billing-overview")
+async def billing_overview(
+    days: int = Query(7, ge=1, le=MAX_LOOKBACK_DAYS),
+    admin_uid: str = Depends(_require_admin),
+):
+    db = _fs()
+    report = await asyncio.to_thread(_build_billing_overview, db, days=days)
+    await audit_event(
+        "admin_billing_viewed",
+        uid=admin_uid,
+        status="success",
+        metadata={
+            "days": days,
+            "activeSubscribers": report["totals"]["activeSubscribers"],
+            "webhookAlerts": report["totals"]["webhookAlerts"],
+        },
+    )
+    return report
+
+
 @router.get("/recent-users")
 async def recent_users(
     days: int = Query(4, ge=1, le=MAX_LOOKBACK_DAYS),
@@ -1254,3 +1433,97 @@ async def recent_users(
         },
     )
     return report
+
+
+# ─── Gerenciamento de trial APK ────────────────────────────────────────────────
+
+def _normalize(text: str) -> str:
+    return unicodedata.normalize("NFD", text or "").encode("ascii", "ignore").decode().lower()
+
+
+@router.get("/apk-search-user")
+async def apk_search_user(
+    q: str = Query(..., min_length=2),
+    admin_uid: str = Depends(_require_admin),
+):
+    """Busca usuarios por nome ou CPF para gerenciar trial do APK."""
+    db = _fs()
+    q_norm = _normalize(q)
+    q_digits = re.sub(r"[^\d]", "", q)
+
+    users_ref = db.collection("users").limit(300)
+    docs = await asyncio.to_thread(lambda: list(users_ref.stream()))
+
+    results = []
+    for doc in docs:
+        data = doc.to_dict()
+        name = data.get("name") or data.get("nome") or ""
+        cpf = data.get("cpf") or ""
+        if q_norm in _normalize(name) or (q_digits and q_digits in cpf):
+            sub_doc = await asyncio.to_thread(
+                lambda uid=doc.id: db.collection("subscriptions").document(uid).get()
+            )
+            sub = sub_doc.to_dict() if sub_doc.exists else {}
+            trial_end = _iso(sub.get("trialEndsAt"))
+            results.append({
+                "uid": doc.id,
+                "name": name,
+                "email": data.get("email"),
+                "cpf": cpf,
+                "subscriptionStatus": sub.get("status") or "sem assinatura",
+                "trialEndsAt": trial_end,
+            })
+
+    return {"users": results[:20]}
+
+
+class SetTrialRequest(pydantic_BaseModel):
+    uid: str
+    days: int = 15
+
+
+@router.post("/apk-set-trial")
+async def apk_set_trial(
+    payload: SetTrialRequest,
+    admin_uid: str = Depends(_require_admin),
+):
+    """Define trial de N dias para um RCA identificado pelo uid."""
+    if payload.days < 1 or payload.days > 365:
+        raise HTTPException(400, "Dias deve ser entre 1 e 365")
+
+    db = _fs()
+    user_ref = db.collection("users").document(payload.uid)
+    user_doc = await asyncio.to_thread(user_ref.get)
+    if not user_doc.exists:
+        raise HTTPException(404, "Usuario nao encontrado")
+
+    user_data = user_doc.to_dict()
+    now = datetime.now(timezone.utc)
+    trial_end = now + timedelta(days=payload.days)
+
+    sub_ref = db.collection("subscriptions").document(payload.uid)
+    await asyncio.to_thread(
+        sub_ref.set,
+        {
+            "userId": payload.uid,
+            "status": "trialing",
+            "trialEndsAt": trial_end,
+            "updatedAt": now,
+            "grantedBy": admin_uid,
+        },
+        True,  # merge=True
+    )
+
+    logger.info(f"Trial concedido: uid={payload.uid} dias={payload.days} admin={admin_uid}")
+    await audit_event(
+        "admin_apk_trial_granted",
+        uid=admin_uid,
+        status="success",
+        metadata={"target_uid": payload.uid, "days": payload.days},
+    )
+    return {
+        "success": True,
+        "name": user_data.get("name") or user_data.get("nome"),
+        "trialEndsAt": trial_end.isoformat(),
+        "days": payload.days,
+    }
