@@ -10,6 +10,7 @@ import html
 import uuid
 import asyncio
 import logging
+import tempfile
 import unicodedata
 import requests
 import ipaddress
@@ -1349,6 +1350,83 @@ async def parse_lista(req: ParseListRequest, uid: str = Depends(get_user_id)):
 
 
 # ═══════════════════════════════════════
+# PUXAR DA TABELA (tabelas_mestre da Cotação Pronta)
+# ═══════════════════════════════════════
+
+def _tabelas_bucket():
+    # Tabelas mestre ficam no bucket GridFS padrão (mesmo da Cotação Pronta)
+    return AsyncIOMotorGridFSBucket(_db)
+
+
+@router.get("/tabelas")
+async def listar_tabelas_vitrine(uid: str = Depends(get_user_id)):
+    tabelas = []
+    async for doc in _db.tabelas_mestre.find({"user_id": uid}).sort("data_upload", -1):
+        prazo = doc.get("prazo", 28)
+        tabelas.append({
+            "id": str(doc["_id"]),
+            "nome": doc.get("nome") or doc.get("filename") or "Tabela",
+            "qtd_produtos": doc.get("qtd_produtos", 0),
+            "prazos_disponiveis": doc.get("prazos_disponiveis") or [prazo],
+            "data_upload": doc["data_upload"].isoformat() if doc.get("data_upload") else None,
+        })
+    return tabelas
+
+
+@router.get("/tabelas/{tabela_id}/itens")
+async def listar_itens_tabela_vitrine(tabela_id: str, prazo: int = 7, uid: str = Depends(get_user_id)):
+    from services.excel_processor import ler_tabela_mestre
+
+    try:
+        oid = ObjectId(tabela_id)
+    except Exception:
+        raise HTTPException(400, "ID inválido")
+
+    doc = await _db.tabelas_mestre.find_one({"_id": oid, "user_id": uid})
+    if not doc:
+        raise HTTPException(404, "Tabela não encontrada")
+
+    prazos_disponiveis = doc.get("prazos_disponiveis") or [doc.get("prazo", 28)]
+    if prazo not in prazos_disponiveis:
+        prazo = prazos_disponiveis[0]
+
+    grid_out = await _tabelas_bucket().open_download_stream(doc["grid_id"])
+    conteudo = await grid_out.read()
+
+    suffix = doc.get("ext") or ".xlsx"
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    tmp.write(conteudo)
+    tmp.close()
+    try:
+        _, precos_nome_lista = await asyncio.to_thread(ler_tabela_mestre, tmp.name, prazo=prazo)
+    except Exception:
+        logger.exception("[vitrine/tabelas] erro ao ler tabela %s", tabela_id)
+        raise HTTPException(400, "Erro ao ler a tabela")
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
+
+    itens = []
+    for item in precos_nome_lista:
+        itens.append({
+            "nome": item.get("orig") or "",
+            "ean": item.get("ean") or None,
+            "preco": item.get("preco"),
+            "qtd_caixa": item.get("fracionamento") or None,
+        })
+
+    return {
+        "tabela": doc.get("nome"),
+        "prazo": prazo,
+        "prazos_disponiveis": prazos_disponiveis,
+        "total": len(itens),
+        "itens": itens,
+    }
+
+
+# ═══════════════════════════════════════
 # IMAGENS
 # ═══════════════════════════════════════
 
@@ -1491,6 +1569,103 @@ async def upload_logo(
 SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "").strip()
 
 
+def _serper_normalize_text(value: Any) -> str:
+    text = unicodedata.normalize("NFD", str(value or ""))
+    text = "".join(c for c in text if unicodedata.category(c) != "Mn")
+    return text.upper()
+
+
+def _serper_tokens(value: Any) -> list[str]:
+    text = _serper_normalize_text(value)
+    replacements = {
+        " C/": " COM ",
+        " S/": " SEM ",
+        " C ": " COM ",
+        " S ": " SEM ",
+        "ACHOC": "ACHOCOLATADO",
+        "ADOC": "ADOCANTE",
+        "AMAC": "AMACIANTE",
+        "CATCHUP": "KETCHUP",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    raw = re.findall(r"[A-Z0-9]+", text)
+    stop = {
+        "A", "O", "E", "DE", "DO", "DA", "DAS", "DOS", "EM", "AO",
+        "COM", "SEM", "PARA", "UN", "UND", "UNID", "CX", "FD", "KG",
+        "G", "ML", "L", "LT", "PT", "PCT", "PO", "LIQ", "TRAD",
+        "TRADICIONAL", "PRODUTO", "EMBALAGEM",
+    }
+    return [token for token in raw if len(token) > 1 and token not in stop]
+
+
+def _serper_probable_brand_tokens(product_name: str) -> list[str]:
+    category_terms = {
+        "ABS", "ABSORVENTE", "ABSORVENTES", "ACENDEDOR", "ACETONA",
+        "ACHOCOLATADO", "ADOCANTE", "AGUA", "ALCOOL", "AMACIANTE",
+        "BALA", "BEB", "BISC", "COND", "CONDICIONADOR", "CR", "DT",
+        "LAVA", "MICELAR", "NOITE", "OXIGENADA", "PALLET", "POTE",
+        "PROT", "REMOVEDOR", "ROUPA", "SAB", "SACHET", "SH", "SHAMPOO",
+        "SUAVE",
+    }
+    return [
+        token
+        for token in _serper_tokens(product_name)
+        if token not in category_terms and token.isalpha()
+    ][:2]
+
+
+def _serper_quantity_pairs(value: Any) -> set[tuple[str, str]]:
+    text = _serper_normalize_text(value).replace(",", ".")
+    pairs = set()
+    for number, unit in re.findall(r"(\d+(?:\.\d+)?)\s*(KG|G|ML|L|UN|UND|UNID|VOL)", text):
+        if number.endswith(".0"):
+            number = number[:-2]
+        pairs.add((number, {"UND": "UN", "UNID": "UN"}.get(unit, unit)))
+    return pairs
+
+
+def _serper_candidate_text(img: dict) -> str:
+    return " ".join(
+        str(img.get(key) or "")
+        for key in ("title", "source", "domain", "link", "imageUrl", "thumbnailUrl")
+    )
+
+
+def _serper_block_reason(img: dict) -> Optional[str]:
+    text = _serper_normalize_text(_serper_candidate_text(img))
+    blocked_terms = [
+        "PINTEREST", "FACEBOOK", "INSTAGRAM", "YOUTUBE", "TIKTOK",
+        "RECEITA", "COMO FAZER", "UNBOXING", "REVIEW", "AVALIACAO",
+        "ISTOCK", "ALAMY", "SHUTTERSTOCK", "PEXELS", "DREAMSTIME",
+        "ADOBE", "VECTEEZY", "WIKIPEDIA", "WIKIMEDIA", "PDF", "MANUAL",
+        "FOTO DE", "MAO", "HOLDING", "PESSOA",
+    ]
+    for term in blocked_terms:
+        if term in text:
+            return term.lower()
+    return None
+
+
+def _serper_match_flags(product_name: str, img: dict) -> list[str]:
+    candidate_text = _serper_candidate_text(img)
+    candidate_tokens = set(_serper_tokens(candidate_text))
+    flags = []
+
+    brands = _serper_probable_brand_tokens(product_name)
+    if brands and not any(brand in candidate_tokens for brand in brands):
+        flags.append("marca_nao_confirmada")
+
+    product_qty = _serper_quantity_pairs(product_name)
+    candidate_qty = _serper_quantity_pairs(candidate_text)
+    if product_qty and not (product_qty & candidate_qty):
+        product_units = {unit for _, unit in product_qty}
+        candidate_units = {unit for _, unit in candidate_qty}
+        flags.append("quantidade_conflitante" if product_units & candidate_units else "quantidade_nao_confirmada")
+
+    return flags
+
+
 def _image_score(img: dict) -> int:
     url = img.get("imageUrl") or img.get("thumbnailUrl") or ""
     width = int(img.get("imageWidth") or img.get("width") or 0)
@@ -1507,6 +1682,30 @@ def _image_score(img: dict) -> int:
     if "thumb" in url.lower():
         score -= 30
     return score
+
+
+def _serper_candidate_score(product_name: str, img: dict, rank: int) -> tuple[int, list[str]]:
+    score = _image_score(img) + max(0, 50 - rank * 4)
+    product_tokens = set(_serper_tokens(product_name))
+    candidate_tokens = set(_serper_tokens(_serper_candidate_text(img)))
+    if product_tokens and candidate_tokens:
+        score += min(len(product_tokens & candidate_tokens), 6) * 16
+    if any(brand in candidate_tokens for brand in _serper_probable_brand_tokens(product_name)):
+        score += 35
+
+    product_qty = _serper_quantity_pairs(product_name)
+    candidate_qty = _serper_quantity_pairs(_serper_candidate_text(img))
+    if product_qty & candidate_qty:
+        score += 35
+
+    flags = _serper_match_flags(product_name, img)
+    if "marca_nao_confirmada" in flags:
+        score -= 70
+    if "quantidade_nao_confirmada" in flags:
+        score -= 25
+    if "quantidade_conflitante" in flags:
+        score -= 85
+    return score, flags
 
 
 def _serper_images(product_name: str, limit: int = 6) -> dict:
@@ -1531,18 +1730,26 @@ def _serper_images(product_name: str, limit: int = 6) -> dict:
         logger.info(f"[Serper] images received: {len(raw_images)}")
         candidates = []
         seen = set()
-        for img in raw_images:
+        for rank, img in enumerate(raw_images):
             url = img.get("imageUrl") or img.get("thumbnailUrl") or ""
             if not url or url in seen or url.lower().endswith(".svg"):
                 continue
+            if _serper_block_reason(img):
+                continue
             seen.add(url)
+            score, flags = _serper_candidate_score(product_name, img, rank)
+            if score < 145:
+                continue
             candidates.append({
                 "image_url": url,
                 "thumbnail_url": img.get("thumbnailUrl") or url,
                 "width": img.get("imageWidth") or img.get("width"),
                 "height": img.get("imageHeight") or img.get("height"),
-                "source": "serper",
-                "_score": _image_score(img),
+                "title": img.get("title") or "",
+                "source": img.get("domain") or img.get("source") or "serper",
+                "source_page": img.get("link") or img.get("googleUrl") or "",
+                "needs_review": bool(flags) or score < 190,
+                "_score": score,
             })
 
         candidates.sort(key=lambda item: item["_score"], reverse=True)
@@ -1559,8 +1766,11 @@ def _serper_images(product_name: str, limit: int = 6) -> dict:
 
 def _serper_search(product_name: str) -> dict:
     """Busca síncrona no Serper.dev — chamada via asyncio.to_thread()."""
-    result = _serper_images(product_name, limit=1)
-    return {"found": result["found"], "image_url": result["image_url"], "match": result["match"]}
+    result = _serper_images(product_name, limit=6)
+    for image in result.get("images") or []:
+        if not image.get("needs_review"):
+            return {"found": True, "image_url": image["image_url"], "match": result.get("match")}
+    return {"found": False, "image_url": None, "match": None}
 
 
 async def _find_learned_image(nome_norm: str, uid: str) -> Optional[dict]:

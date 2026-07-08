@@ -605,6 +605,8 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
         }
         if fracionamento:
             item_nome['fracionamento'] = fracionamento
+        if ean:
+            item_nome['ean'] = ean
         precos_nome_lista.append(item_nome)
 
     if incluir_meta:

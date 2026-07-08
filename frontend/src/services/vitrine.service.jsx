@@ -366,6 +366,20 @@ export const vitrineService = {
     return axios.post(apiUrl('/vitrine/parse-lista'), { lista }, { headers });
   },
 
+  // Tabelas de preço enviadas na Cotação Pronta
+  async listarTabelas() {
+    const headers = await getHeaders();
+    return axios.get(apiUrl('/vitrine/tabelas'), { headers });
+  },
+
+  async itensTabela(tabelaId, prazo) {
+    const headers = await getHeaders();
+    return axios.get(apiUrl('/vitrine/tabelas/' + tabelaId + '/itens'), {
+      headers,
+      params: { prazo },
+    });
+  },
+
   // Imagens
   async uploadImagem(offerId, itemId, file) {
     const headers = await getMultipartHeaders();

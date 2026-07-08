@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, Store, Plus, Pencil, Trash2, Copy, Eye, X, Check, Image, Search } from 'lucide-react';
+import { ArrowLeft, Store, Plus, Pencil, Trash2, Copy, Eye, X, Check, Image, Search, Table2 } from 'lucide-react';
 import { vitrineService } from '../services/vitrine.service';
+import TabelaPickerModal from '../components/TabelaPickerModal';
 import './Vitrine.css';
 
 const UNIDADES = ['UN', 'CX', 'FD', 'PC', 'PCT', 'KG', 'L', 'ML', 'G', 'FRD', 'BAG'];
@@ -71,6 +72,7 @@ export default function Vitrine() {
   const [itensParsed, setItensParsed] = useState([]);
   const [editandoOferta, setEditandoOferta] = useState(null); // para editar dados da oferta salva
   const [imagePicker, setImagePicker] = useState(null);
+  const [tabelaPickerAberto, setTabelaPickerAberto] = useState(false);
 
   const logoInputRef = useRef(null);
 
@@ -183,6 +185,26 @@ export default function Vitrine() {
     if (encontradas > 0) {
       toast.success(`${encontradas} foto(s) encontradas automaticamente`);
     }
+  };
+
+  const adicionarDaTabela = (produtos) => {
+    const stamp = Date.now();
+    const novos = produtos.map((p, i) => ({
+      _key: `tabela-${i}-${stamp}`,
+      product_name: p.nome || '',
+      ean: p.ean || '',
+      category: '',
+      price: p.preco != null ? String(p.preco) : '',
+      unit: 'UN',
+      units_per_package: p.qtd_caixa ? String(p.qtd_caixa) : '',
+      _imageFile: null,
+      _imagePreview: null,
+      _searching: true,
+    }));
+    setItensParsed(prev => [...prev, ...novos]);
+    setTabelaPickerAberto(false);
+    toast.success(`${novos.length} produto(s) adicionados da tabela — revise e ajuste`);
+    buscarImagensAutomaticamente(novos, setItensParsed);
   };
 
   const updateItem = (key, field, value) => {
@@ -524,7 +546,11 @@ export default function Vitrine() {
               <div className="vt-paste-hint">
                 Cole uma linha por produto ou uma lista compactada de IA/PDF. O sistema interpreta nome, preço, unidade e quantidade por embalagem.
               </div>
-              <div style={{ display:'flex', gap:10, marginTop:12 }}>
+              <div style={{ display:'flex', gap:10, marginTop:12, flexWrap:'wrap' }}>
+                <button className="vt-btn-primary" onClick={() => setTabelaPickerAberto(true)}>
+                  <Table2 size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                  Puxar da tabela
+                </button>
                 <button className="vt-btn-primary" onClick={parsearLista} disabled={parsing || !listaTexto.trim()}>
                   {parsing ? 'Interpretando...' : 'Interpretar lista'}
                 </button>
@@ -563,6 +589,13 @@ export default function Vitrine() {
                 picker={imagePicker}
                 onClose={() => setImagePicker(null)}
                 onSelect={selecionarImagem}
+              />
+            )}
+
+            {tabelaPickerAberto && (
+              <TabelaPickerModal
+                onClose={() => setTabelaPickerAberto(false)}
+                onAdd={adicionarDaTabela}
               />
             )}
           </div>
@@ -608,12 +641,12 @@ function ItemReview({ item, onChange, onRemove, onImageChange, onSearchImage }) 
                 onChange={e => onImageChange(e.target.files[0])} />
             </div>
             <button
-              title="Buscar foto no Google"
+              title="Pesquisar foto na internet"
               onClick={onSearchImage}
               disabled={item._searching}
               style={{ background: item._imagePreview ? 'rgba(58,133,168,.15)' : '#363940', border: '1px solid #4A4D52', borderRadius: 6, cursor:'pointer', color: item._imagePreview ? '#3A85A8' : '#A0A3A8', padding:'4px 8px', display:'flex', alignItems:'center', gap: 4, fontSize: 11, fontWeight: 600 }}
             >
-              {item._searching ? '...' : <><Search size={12} /> Foto</>}
+              {item._searching ? '...' : <><Search size={12} /> Pesquisar</>}
             </button>
           </div>
           <div className="vt-review-item-name">
@@ -672,7 +705,7 @@ function ImagePickerModal({ picker, onClose, onSelect }) {
       <div className="vt-image-picker" onClick={e => e.stopPropagation()}>
         <div className="vt-image-picker-header">
           <div>
-            <div className="vt-image-picker-title">Escolha uma foto</div>
+            <div className="vt-image-picker-title">Pesquisar foto na internet</div>
             <div className="vt-image-picker-sub">{picker.productName}</div>
           </div>
           <button className="vt-btn-remove" onClick={onClose} title="Fechar">
@@ -691,7 +724,11 @@ function ImagePickerModal({ picker, onClose, onSelect }) {
                 onClick={() => onSelect(img.image_url)}
               >
                 <img src={img.thumbnail_url || img.image_url} alt="" />
-                <span>Usar esta foto</span>
+                <span>Usar foto</span>
+                {img.needs_review && <em>Conferir produto</em>}
+                {(img.source || img.title) && (
+                  <small>{img.source || img.title}</small>
+                )}
               </button>
             ))}
           </div>
