@@ -26,6 +26,7 @@ export default function TabelaPickerModal({ onClose, onAdd }) {
   const [carregandoItens, setCarregandoItens] = useState(false);
   const [busca, setBusca] = useState('');
   const [selecionados, setSelecionados] = useState(() => new Set());
+  const [limite, setLimite] = useState(MAX_VISIVEIS);
 
   useEffect(() => {
     let ativo = true;
@@ -51,6 +52,7 @@ export default function TabelaPickerModal({ onClose, onAdd }) {
     setCarregandoItens(true);
     setItens(null);
     setSelecionados(new Set());
+    setLimite(MAX_VISIVEIS);
     try {
       const res = await vitrineService.itensTabela(t.id, p);
       setItens(res.data.itens || []);
@@ -79,7 +81,14 @@ export default function TabelaPickerModal({ onClose, onAdd }) {
       });
   }, [itens, busca]);
 
-  const visiveis = filtrados.slice(0, MAX_VISIVEIS);
+  const visiveis = filtrados.slice(0, limite);
+
+  const carregarMaisAoRolar = (e) => {
+    const el = e.currentTarget;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 300 && limite < filtrados.length) {
+      setLimite(l => l + 300);
+    }
+  };
 
   const toggle = (idx) => {
     setSelecionados(prev => {
@@ -189,14 +198,14 @@ export default function TabelaPickerModal({ onClose, onAdd }) {
               <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#6B6E74' }} />
               <input className="vt-input" style={{ paddingLeft: 36 }}
                 placeholder="Buscar por nome ou EAN..."
-                value={busca} onChange={e => setBusca(e.target.value)} />
+                value={busca} onChange={e => { setBusca(e.target.value); setLimite(MAX_VISIVEIS); }} />
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: '#A0A3A8' }}>
               <span>
                 {carregandoItens
                   ? 'Carregando produtos...'
-                  : `${filtrados.length} produto${filtrados.length !== 1 ? 's' : ''}${filtrados.length > MAX_VISIVEIS ? ` (mostrando ${MAX_VISIVEIS} — refine a busca)` : ''}`}
+                  : `${filtrados.length} produto${filtrados.length !== 1 ? 's' : ''}${limite < filtrados.length ? ` — mostrando ${visiveis.length}, role para ver mais` : ''}`}
               </span>
               <span style={{ display: 'flex', gap: 10 }}>
                 <button onClick={selecionarFiltrados} disabled={carregandoItens || !filtrados.length}
@@ -210,7 +219,8 @@ export default function TabelaPickerModal({ onClose, onAdd }) {
               </span>
             </div>
 
-            <div style={{ flex: 1, overflow: 'auto', border: '1px solid #4A4D52', borderRadius: 10, minHeight: 120 }}>
+            <div onScroll={carregarMaisAoRolar}
+              style={{ flex: 1, overflow: 'auto', border: '1px solid #4A4D52', borderRadius: 10, minHeight: 120 }}>
               {visiveis.map(it => {
                 const marcado = selecionados.has(it._idx);
                 return (

@@ -333,3 +333,14 @@
   .vt-card-actions { flex-direction: column; }
   .vt-link-box { width: 100%; }
 }
+
+/* Campos numéricos sem setinhas (preço unitário, qtd por embalagem) */
+.vt-review-item input[type="number"]::-webkit-outer-spin-button,
+.vt-review-item input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.vt-review-item input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

@@ -1708,8 +1708,13 @@ def _serper_candidate_score(product_name: str, img: dict, rank: int) -> tuple[in
     return score, flags
 
 
-def _serper_images(product_name: str, limit: int = 6) -> dict:
-    """Busca opções de imagem no Serper.dev e retorna a melhor + alternativas."""
+def _serper_images(product_name: str, limit: int = 6, strict: bool = True) -> dict:
+    """Busca opções de imagem no Serper.dev e retorna a melhor + alternativas.
+
+    strict=True: só candidatos confiáveis (usado na foto automática).
+    strict=False: devolve as melhores opções mesmo sem confirmação de marca/quantidade,
+    marcadas com needs_review — usado quando o RCA pede para escolher a foto.
+    """
     if not SERPER_API_KEY:
         logger.warning("[Serper] SERPER_API_KEY não configurada")
         return {"found": False, "image_url": None, "match": None, "images": []}
@@ -1718,7 +1723,7 @@ def _serper_images(product_name: str, limit: int = 6) -> dict:
         resp = requests.post(
             "https://google.serper.dev/images",
             headers={"X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json"},
-            json={"q": f"{product_name} produto", "gl": "br", "hl": "pt", "num": 10},
+            json={"q": f"{product_name} produto", "gl": "br", "hl": "pt", "num": 10 if strict else 20},
             timeout=10,
         )
         logger.info(f"[Serper] status={resp.status_code} query={product_name!r}")
@@ -1734,11 +1739,12 @@ def _serper_images(product_name: str, limit: int = 6) -> dict:
             url = img.get("imageUrl") or img.get("thumbnailUrl") or ""
             if not url or url in seen or url.lower().endswith(".svg"):
                 continue
-            if _serper_block_reason(img):
+            blocked = _serper_block_reason(img)
+            if strict and blocked:
                 continue
             seen.add(url)
             score, flags = _serper_candidate_score(product_name, img, rank)
-            if score < 145:
+            if strict and score < 145:
                 continue
             candidates.append({
                 "image_url": url,
@@ -1748,7 +1754,7 @@ def _serper_images(product_name: str, limit: int = 6) -> dict:
                 "title": img.get("title") or "",
                 "source": img.get("domain") or img.get("source") or "serper",
                 "source_page": img.get("link") or img.get("googleUrl") or "",
-                "needs_review": bool(flags) or score < 190,
+                "needs_review": bool(flags) or bool(blocked) or score < 190,
                 "_score": score,
             })
 
@@ -1908,11 +1914,13 @@ async def aprender_imagem(req: LearnImageRequest, uid: str = Depends(get_user_id
 
 @router.get("/sugerir-imagens")
 async def sugerir_imagens(product_name: str, uid: str = Depends(get_user_id)):
-    """Retorna até 6 opções da internet para o RCA escolher outra foto."""
+    """Retorna até 8 opções da internet para o RCA escolher outra foto.
+
+    Aqui o RCA decide: não corta por nota mínima, só marca as duvidosas."""
     product_name = (product_name or "").strip()
     if len(product_name) < 2 or len(product_name) > 120:
         raise HTTPException(400, "Nome do produto inválido")
-    result = await asyncio.to_thread(_serper_images, product_name, 6)
+    result = await asyncio.to_thread(_serper_images, product_name, 8, False)
     return result
 
 
