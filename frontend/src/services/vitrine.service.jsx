@@ -395,19 +395,19 @@ export const vitrineService = {
     return axios.post(apiUrl('/vitrine/ofertas/' + offerId + '/logo'), form, { headers });
   },
 
-  async sugerirImagem(productName) {
+  async sugerirImagem(productName, ean) {
     const headers = await getHeaders();
     return axios.get(apiUrl('/vitrine/sugerir-imagem'), {
       headers,
-      params: { product_name: productName },
+      params: { product_name: productName, ean: ean || '' },
     });
   },
 
-  async sugerirImagens(productName) {
+  async sugerirImagens(productName, ean) {
     const headers = await getHeaders();
     return axios.get(apiUrl('/vitrine/sugerir-imagens'), {
       headers,
-      params: { product_name: productName },
+      params: { product_name: productName, ean: ean || '' },
     });
   },
 

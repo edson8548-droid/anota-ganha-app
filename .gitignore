@@ -53,3 +53,8 @@ scripts/create_slide2_callouts.py
 scripts/create_slide2_mockup.py
 scripts/generate_logo_variants.py
 scripts/model_router.py
+
+# Credenciais Firebase (nunca commitar)
+serviceAccount.json
+backend/serviceAccount.json
+*-adminsdk-*.json

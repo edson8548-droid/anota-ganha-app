@@ -165,7 +165,7 @@ export default function Vitrine() {
         const item = fila.shift();
         if (!item?.product_name?.trim()) continue;
         try {
-          const res = await vitrineService.sugerirImagem(item.product_name);
+          const res = await vitrineService.sugerirImagem(item.product_name, item.ean);
           if (res.data.found && res.data.image_url) {
             encontradas += 1;
             setItems(prev => prev.map(it =>
@@ -198,13 +198,15 @@ export default function Vitrine() {
       unit: 'UN',
       units_per_package: p.qtd_caixa ? String(p.qtd_caixa) : '',
       _imageFile: null,
-      _imagePreview: null,
-      _searching: true,
+      _imagePreview: p.foto_url || null,
+      _imageUrl: p.foto_url || null,
+      _searching: !p.foto_url,
     }));
     setItensParsed(prev => [...prev, ...novos]);
     setTabelaPickerAberto(false);
-    toast.success(`${novos.length} produto(s) adicionados da tabela — revise e ajuste`);
-    buscarImagensAutomaticamente(novos, setItensParsed);
+    const comFotoBanco = novos.filter(n => n._imageUrl).length;
+    toast.success(`${novos.length} produto(s) adicionados${comFotoBanco ? ` (${comFotoBanco} com foto do banco)` : ''} — revise e ajuste`);
+    buscarImagensAutomaticamente(novos.filter(n => !n._imageUrl), setItensParsed);
   };
 
   const updateItem = (key, field, value) => {
@@ -232,11 +234,11 @@ export default function Vitrine() {
     ));
   };
 
-  const handleSearchImage = async (key, productName) => {
+  const handleSearchImage = async (key, productName, ean) => {
     if (!productName?.trim()) { toast.warning('Digite o nome do produto primeiro'); return; }
     setImagePicker({ key, productName, loading: true, images: [] });
     try {
-      const res = await vitrineService.sugerirImagens(productName);
+      const res = await vitrineService.sugerirImagens(productName, ean);
       const images = res.data.images || [];
       if (images.length) {
         setImagePicker({ key, productName, loading: false, images });
@@ -574,7 +576,7 @@ export default function Vitrine() {
                       onChange={(field, value) => updateItem(item._key, field, value)}
                       onRemove={() => removeItem(item._key)}
                       onImageChange={(file) => handleImagePick(item._key, file)}
-                      onSearchImage={() => handleSearchImage(item._key, item.product_name)}
+                      onSearchImage={() => handleSearchImage(item._key, item.product_name, item.ean)}
                     />
                   ))}
                 </div>

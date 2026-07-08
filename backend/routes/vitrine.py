@@ -7,6 +7,7 @@ import os
 import re
 import io
 import html
+import json
 import uuid
 import asyncio
 import logging
@@ -1350,6 +1351,37 @@ async def parse_lista(req: ParseListRequest, uid: str = Depends(get_user_id)):
 
 
 # ═══════════════════════════════════════
+# BANCO DE FOTOS POR EAN (fotos aprovadas pelo Edson, Firebase Storage)
+# Gerado por scripts/subir_banco_fotos.py → backend/data/produtos_fotos.json
+# ═══════════════════════════════════════
+
+_FOTOS_BANCO: dict = {}
+
+
+def _carregar_fotos_banco():
+    global _FOTOS_BANCO
+    caminho = Path(__file__).resolve().parent.parent / "data" / "produtos_fotos.json"
+    try:
+        with open(caminho, encoding="utf-8") as f:
+            _FOTOS_BANCO = json.load(f)
+        logger.info("[fotos_banco] %d fotos por EAN carregadas", len(_FOTOS_BANCO))
+    except FileNotFoundError:
+        _FOTOS_BANCO = {}
+    except Exception:
+        logger.exception("[fotos_banco] erro ao carregar produtos_fotos.json")
+        _FOTOS_BANCO = {}
+
+
+_carregar_fotos_banco()
+
+
+def _foto_banco(ean) -> Optional[str]:
+    if not ean:
+        return None
+    return _FOTOS_BANCO.get(str(ean).strip())
+
+
+# ═══════════════════════════════════════
 # PUXAR DA TABELA (tabelas_mestre da Cotação Pronta)
 # ═══════════════════════════════════════
 
@@ -1410,11 +1442,13 @@ async def listar_itens_tabela_vitrine(tabela_id: str, prazo: int = 7, uid: str =
 
     itens = []
     for item in precos_nome_lista:
+        ean = item.get("ean") or None
         itens.append({
             "nome": item.get("orig") or "",
-            "ean": item.get("ean") or None,
+            "ean": ean,
             "preco": item.get("preco"),
             "qtd_caixa": item.get("fracionamento") or None,
+            "foto_url": _foto_banco(ean),
         })
 
     return {
@@ -1798,11 +1832,16 @@ async def _find_learned_image(nome_norm: str, uid: str) -> Optional[dict]:
 
 
 @router.get("/sugerir-imagem")
-async def sugerir_imagem(product_name: str, uid: str = Depends(get_user_id)):
-    """Busca imagem: 1) banco interno, 2) Serper.dev (Google Images)."""
+async def sugerir_imagem(product_name: str, ean: str = "", uid: str = Depends(get_user_id)):
+    """Busca imagem: 1) banco de fotos aprovadas por EAN, 2) banco interno, 3) Serper."""
     product_name = (product_name or "").strip()
     if len(product_name) < 2 or len(product_name) > 120:
         raise HTTPException(400, "Nome do produto inválido")
+
+    # 0. Banco de fotos aprovadas — lookup direto por EAN (foto exata do produto)
+    foto_banco = _foto_banco(ean)
+    if foto_banco:
+        return {"found": True, "image_url": foto_banco, "match": "banco_venpro"}
 
     nome_norm = normalizar(product_name)
     logger.info("[sugerir-imagem] query_len=%s norm=%r", len(product_name), nome_norm)
@@ -1913,14 +1952,28 @@ async def aprender_imagem(req: LearnImageRequest, uid: str = Depends(get_user_id
 
 
 @router.get("/sugerir-imagens")
-async def sugerir_imagens(product_name: str, uid: str = Depends(get_user_id)):
-    """Retorna até 8 opções da internet para o RCA escolher outra foto.
+async def sugerir_imagens(product_name: str, ean: str = "", uid: str = Depends(get_user_id)):
+    """Retorna até 8 opções para o RCA escolher outra foto.
 
-    Aqui o RCA decide: não corta por nota mínima, só marca as duvidosas."""
+    Foto do banco aprovado (por EAN) vem primeiro; depois opções da internet
+    sem corte por nota mínima — aqui o RCA decide, duvidosas vêm marcadas."""
     product_name = (product_name or "").strip()
     if len(product_name) < 2 or len(product_name) > 120:
         raise HTTPException(400, "Nome do produto inválido")
     result = await asyncio.to_thread(_serper_images, product_name, 8, False)
+
+    foto_banco = _foto_banco(ean)
+    if foto_banco:
+        images = [img for img in result.get("images", []) if img.get("image_url") != foto_banco]
+        images.insert(0, {
+            "image_url": foto_banco,
+            "thumbnail_url": foto_banco,
+            "title": product_name,
+            "source": "Banco Venpro (aprovada)",
+            "source_page": "",
+            "needs_review": False,
+        })
+        result = {"found": True, "image_url": foto_banco, "match": "banco_venpro", "images": images}
     return result
 
 
