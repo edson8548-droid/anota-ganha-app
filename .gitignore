@@ -58,3 +58,6 @@ scripts/model_router.py
 serviceAccount.json
 backend/serviceAccount.json
 *-adminsdk-*.json
+
+# Banco de fotos servido pelo Hosting (266MB, fora do git; vite copia public/ no build)
+frontend/public/fotos-produtos/
