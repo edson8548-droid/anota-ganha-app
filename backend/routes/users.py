@@ -963,8 +963,8 @@ async def register(
     if not email or '@' not in email or '.' not in email:
         raise HTTPException(400, "Email inválido")
 
-    if len(password) < 6:
-        raise HTTPException(400, "A senha deve ter no mínimo 6 caracteres")
+    if len(password) < 8:
+        raise HTTPException(400, "A senha deve ter no mínimo 8 caracteres")
 
     dados_pagador = _validar_dados_pagador(nome, payload.cpf, payload.telefone)
     if dados_pagador["documentoTipo"] != "cpf":
@@ -994,7 +994,7 @@ async def register(
         if "EMAIL_EXISTS" in error_text or "already exists" in error_text.lower():
             raise HTTPException(400, "Este email já está cadastrado")
         elif "WEAK_PASSWORD" in error_text:
-            raise HTTPException(400, "A senha é muito fraca. Use no mínimo 6 caracteres")
+            raise HTTPException(400, "A senha é muito fraca. Use no mínimo 8 caracteres")
         raise HTTPException(400, "Erro ao criar usuário")
 
     # 6. Salva dados adicionais no Firestore (incluindo documento validado)

@@ -243,7 +243,7 @@ const getErrorMessage = (errorCode) => {
     'auth/invalid-email': 'Email inválido',
     'auth/user-disabled': 'Usuário desativado',
     'auth/email-already-in-use': 'Este email já está cadastrado',
-    'auth/weak-password': 'Senha muito fraca. Use no mínimo 6 caracteres',
+    'auth/weak-password': 'Senha muito fraca. Use no mínimo 8 caracteres',
     'auth/network-request-failed': 'Erro de conexão. Verifique sua internet',
     'auth/too-many-requests': 'Muitas tentativas. Tente novamente mais tarde',
     'auth/invalid-credential': 'Credenciais inválidas',

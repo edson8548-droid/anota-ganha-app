@@ -37,9 +37,11 @@ def hash_identifier(value: Optional[str]) -> Optional[str]:
 def _client_ip(request) -> Optional[str]:
     if not request:
         return None
+    # Último valor do X-Forwarded-For: é o que o proxy do Render anexa.
+    # Valores à esquerda podem ser forjados pelo cliente.
     forwarded_for = request.headers.get("x-forwarded-for", "")
     if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
+        return forwarded_for.split(",")[-1].strip()
     if request.client:
         return request.client.host
     return None

@@ -72,7 +72,7 @@ const Register = () => {
       case 'cpf': return !isValidCPF(cpf) ? 'CPF inválido' : null;
       case 'telefone': return onlyDigits(telefone).length < 10 ? 'Telefone inválido' : null;
       case 'email': return !email.includes('@') || !email.includes('.') ? 'Email inválido' : null;
-      case 'password': return password.length < 6 ? 'Mínimo 6 caracteres' : null;
+      case 'password': return password.length < 8 ? 'Mínimo 8 caracteres' : null;
       case 'confirmPassword': return confirmPassword !== password ? 'As senhas não coincidem' : null;
       default: return null;
     }
@@ -127,8 +127,8 @@ const Register = () => {
       return;
     }
 
-    if (password.length < 6) {
-      setError('A senha deve ter no mínimo 6 caracteres');
+    if (password.length < 8) {
+      setError('A senha deve ter no mínimo 8 caracteres');
       return;
     }
     
@@ -180,7 +180,7 @@ const Register = () => {
           setError('Email inválido');
           break;
         case 'auth/weak-password':
-          setError('Senha muito fraca. Use no mínimo 6 caracteres');
+          setError('Senha muito fraca. Use no mínimo 8 caracteres');
           break;
         case 'backend/register':
           setError(backendMessage || 'Erro ao criar conta. Tente novamente.');
@@ -293,7 +293,7 @@ const Register = () => {
               <input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
-                placeholder="Mínimo 6 caracteres"
+                placeholder="Mínimo 8 caracteres"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onBlur={() => touch('password')}

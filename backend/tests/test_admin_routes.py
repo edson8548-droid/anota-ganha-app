@@ -435,3 +435,113 @@ def test_admin_follow_up_marks_users_who_stopped_after_using_tool():
     assert follow_up["shouldContact"] is True
     assert follow_up["daysSinceToolUse"] == 4
     assert follow_up["label"] == "Parou há 4d"
+
+
+def test_admin_billing_overview_requires_token():
+    app = FastAPI()
+    app.include_router(admin.router, prefix="/api/admin")
+    client = TestClient(app)
+
+    response = client.get("/api/admin/billing-overview")
+
+    assert response.status_code == 401
+
+
+def test_admin_billing_overview_blocks_non_admin(monkeypatch):
+    client = _client(monkeypatch, uid="normal-uid")
+
+    response = client.get("/api/admin/billing-overview", headers={"Authorization": "Bearer token"})
+
+    assert response.status_code == 403
+
+
+def test_admin_billing_overview_returns_report(monkeypatch):
+    client = _client(monkeypatch, uid="admin-uid")
+
+    response = client.get("/api/admin/billing-overview", headers={"Authorization": "Bearer token"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["totals"]["activeSubscribers"] == 0
+    assert payload["totals"]["trialingActive"] == 1
+    assert payload["totals"]["webhookAlerts"] == 0
+    assert payload["webhookAlerts"] == []
+
+
+def test_billing_overview_counts_subscribers_issues_and_webhook_alerts():
+    now = datetime.now(timezone.utc)
+    db = _FakeDb()
+    db.users.update({
+        "pago-uid": {
+            "email": "pago@example.com",
+            "name": "Assinante Pago",
+            "role": "user",
+            "telefone": "13999005678",
+        },
+        "pendente-uid": {
+            "email": "pendente@example.com",
+            "name": "Assinante Pendente",
+            "role": "user",
+        },
+    })
+    db.subscriptions.update({
+        "pago-uid": {
+            "status": "active",
+            "planId": "monthly",
+            "amount": 99.9,
+            "nextDueDate": (now + timedelta(days=3)).strftime("%Y-%m-%d"),
+            "lastPaymentDate": now - timedelta(days=27),
+        },
+        "pendente-uid": {
+            "status": "pending",
+            "planId": "monthly",
+            "nextDueDate": (now - timedelta(days=2)).strftime("%Y-%m-%d"),
+        },
+    })
+    db.audit["webhook-1"] = _FakeDoc(
+        "webhook-1",
+        {
+            "action": "asaas_webhook_unmapped",
+            "status": "ignored",
+            "createdAt": now - timedelta(days=1),
+            "metadata": {"event": "PAYMENT_CONFIRMED"},
+        },
+    )
+    db.audit["webhook-antigo"] = _FakeDoc(
+        "webhook-antigo",
+        {
+            "action": "asaas_webhook_unmapped",
+            "status": "ignored",
+            "createdAt": now - timedelta(days=20),
+            "metadata": {"event": "PAYMENT_CONFIRMED"},
+        },
+    )
+
+    report = admin._build_billing_overview(db, days=7, now=now)
+
+    assert report["totals"]["activeSubscribers"] == 1
+    assert report["totals"]["monthlyRevenueEstimate"] == 99.9
+    assert report["totals"]["pendingPayment"] == 1
+    assert report["totals"]["trialingActive"] == 1
+    assert report["totals"]["upcomingRenewals"] == 1
+    assert report["totals"]["webhookAlerts"] == 1
+
+    assert report["activeSubscribers"][0]["email"] == "pago@example.com"
+    assert report["upcomingRenewals"][0]["uid"] == "pago-uid"
+    assert report["paymentIssues"][0]["email"] == "pendente@example.com"
+    assert report["webhookAlerts"][0]["event"] == "PAYMENT_CONFIRMED"
+
+    serialized = str(report).lower()
+    assert "cpf" not in serialized
+    assert "52998224725" not in serialized
+
+
+def test_billing_overview_uses_fallback_price_when_amount_missing():
+    now = datetime.now(timezone.utc)
+    db = _FakeDb()
+    db.users["pago-uid"] = {"email": "pago@example.com", "name": "Pago", "role": "user"}
+    db.subscriptions["pago-uid"] = {"status": "active", "planId": "monthly"}
+
+    report = admin._build_billing_overview(db, days=7, now=now)
+
+    assert report["totals"]["monthlyRevenueEstimate"] == admin.BILLING_MONTHLY_PRICE_FALLBACK
