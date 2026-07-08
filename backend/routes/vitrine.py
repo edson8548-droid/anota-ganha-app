@@ -1810,7 +1810,8 @@ def _serper_images(product_name: str, limit: int = 6, strict: bool = True) -> di
         logger.info(f"[Serper] status={resp.status_code} query={product_name!r}")
         if resp.status_code != 200:
             logger.error(f"[Serper] status={resp.status_code} body={resp.text[:300]}")
-            return {"found": False, "image_url": None, "match": None, "images": []}
+            erro = "sem_creditos" if "credits" in resp.text.lower() else "indisponivel"
+            return {"found": False, "image_url": None, "match": None, "images": [], "error": erro}
 
         raw_images = resp.json().get("images", [])
         logger.info(f"[Serper] images received: {len(raw_images)}")
@@ -1848,7 +1849,7 @@ def _serper_images(product_name: str, limit: int = 6, strict: bool = True) -> di
         return {"found": True, "image_url": images[0]["image_url"], "match": "serper", "images": images}
     except Exception as e:
         logger.error(f"[Serper] exception: {e}")
-        return {"found": False, "image_url": None, "match": None, "images": []}
+        return {"found": False, "image_url": None, "match": None, "images": [], "error": "indisponivel"}
 
 
 def _serper_search(product_name: str) -> dict:

@@ -142,6 +142,12 @@ export default function VitrineEditar() {
       const images = res.data.images || [];
       if (images.length) {
         setImagePicker({ key, productName, loading: false, images });
+      } else if (res.data.error === 'sem_creditos') {
+        toast.error('Busca de fotos na internet sem créditos (Serper.dev) — avise o administrador. Você ainda pode enviar uma foto clicando na imagem do produto.');
+        setImagePicker(null);
+      } else if (res.data.error) {
+        toast.error('Busca de fotos indisponível no momento. Tente de novo em instantes.');
+        setImagePicker(null);
       } else {
         toast.warning('Nenhuma imagem encontrada para este produto');
         setImagePicker(null);
