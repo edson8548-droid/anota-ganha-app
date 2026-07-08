@@ -1480,13 +1480,16 @@ async def listar_itens_tabela_vitrine(tabela_id: str, prazo: int = 7, uid: str =
         except OSError:
             pass
 
+    # Escolha humana explícita (aprendida) corrige a aprovada em massa quando divergirem
+    todos_eans = [item.get("ean") for item in precos_nome_lista if item.get("ean")]
+    aprendidas = await _fotos_aprendidas_lote(todos_eans)
+
     itens = []
-    sem_foto_aprovada = []
     for item in precos_nome_lista:
         ean = item.get("ean") or None
-        foto = _foto_banco(ean)
-        if ean and not foto:
-            sem_foto_aprovada.append(ean)
+        foto = None
+        if ean:
+            foto = aprendidas.get(re.sub(r"\D", "", ean)) or _foto_banco(ean)
         itens.append({
             "nome": item.get("orig") or "",
             "ean": ean,
@@ -1494,13 +1497,6 @@ async def listar_itens_tabela_vitrine(tabela_id: str, prazo: int = 7, uid: str =
             "qtd_caixa": item.get("fracionamento") or None,
             "foto_url": foto,
         })
-
-    # Completa com fotos aprendidas das escolhas anteriores dos RCAs
-    aprendidas = await _fotos_aprendidas_lote(sem_foto_aprovada)
-    if aprendidas:
-        for it in itens:
-            if not it["foto_url"] and it["ean"]:
-                it["foto_url"] = aprendidas.get(re.sub(r"\D", "", it["ean"]))
 
     return {
         "tabela": doc.get("nome"),
@@ -1889,13 +1885,13 @@ async def sugerir_imagem(product_name: str, ean: str = "", uid: str = Depends(ge
     if len(product_name) < 2 or len(product_name) > 120:
         raise HTTPException(400, "Nome do produto inválido")
 
-    # 0. Banco de fotos por EAN: aprovadas do Edson, depois aprendidas dos RCAs
-    foto_banco = _foto_banco(ean)
-    if foto_banco:
-        return {"found": True, "image_url": foto_banco, "match": "banco_venpro"}
+    # 0. Banco de fotos por EAN: escolha humana explícita corrige a aprovada em massa
     foto_aprendida = await _foto_aprendida(ean)
     if foto_aprendida:
         return {"found": True, "image_url": foto_aprendida, "match": "banco_aprendido"}
+    foto_banco = _foto_banco(ean)
+    if foto_banco:
+        return {"found": True, "image_url": foto_banco, "match": "banco_venpro"}
 
     nome_norm = normalizar(product_name)
     logger.info("[sugerir-imagem] query_len=%s norm=%r", len(product_name), nome_norm)
@@ -2018,11 +2014,11 @@ async def sugerir_imagens(product_name: str, ean: str = "", uid: str = Depends(g
         raise HTTPException(400, "Nome do produto inválido")
     result = await asyncio.to_thread(_serper_images, product_name, 8, False)
 
-    foto_banco = _foto_banco(ean)
-    origem = "Banco Venpro (aprovada)"
+    foto_banco = await _foto_aprendida(ean)
+    origem = "Foto corrigida antes"
     if not foto_banco:
-        foto_banco = await _foto_aprendida(ean)
-        origem = "Foto usada antes"
+        foto_banco = _foto_banco(ean)
+        origem = "Banco Venpro (aprovada)"
     if foto_banco:
         images = [img for img in result.get("images", []) if img.get("image_url") != foto_banco]
         images.insert(0, {
