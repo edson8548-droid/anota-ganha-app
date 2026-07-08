@@ -266,6 +266,50 @@ def _parse_fracionamento(valor):
     return (f"{numero:.3f}".rstrip("0").rstrip(".")).replace(".", ",")
 
 
+# Padrões conservadores de texto de embalagem: só extrai quando a quantidade é
+# inequívoca (CX-12, CX24, FD 6, C/12, 12X750GR, 24UN). Peso/volume (380G,
+# 200ML, 2L) e tokens soltos (UN, CJ) ficam vazios — melhor faltar que inventar.
+_QTD_EMBALAGEM_PATTERNS = [
+    _re.compile(r"^(?:CX|FD|CJ|PCT|DP|SC|CAIXA|FARDO|UN)\s*-?\s*C?/?\s*([0-9]{1,4})(?![0-9.,])", _re.IGNORECASE),
+    # token inteiro "PREFIXO-N" (EV-6, PC-17): só com hífen e nada depois do número
+    _re.compile(r"^[A-Z]{1,5}\s*-\s*([0-9]{1,4})$", _re.IGNORECASE),
+    _re.compile(r"^([0-9]{1,4})\s*X\s*[0-9]", _re.IGNORECASE),
+    _re.compile(r"\bC/\s*([0-9]{1,4})\b", _re.IGNORECASE),
+    _re.compile(r"^([0-9]{1,4})\s*UN\b", _re.IGNORECASE),
+]
+
+
+def _qtd_caixa_de_embalagem(valor):
+    """Extrai a quantidade por caixa do texto de embalagem exportado pelo APK."""
+    if valor is None:
+        return None
+    try:
+        if pd.isna(valor):
+            return None
+    except Exception:
+        pass
+    raw = str(valor).strip()
+    if not raw or raw.upper() in {"NONE", "NAN", "NULL"}:
+        return None
+    for pattern in _QTD_EMBALAGEM_PATTERNS:
+        match = pattern.search(raw)
+        if match:
+            numero = int(match.group(1))
+            if 0 < numero <= 9999:
+                return str(numero)
+    return None
+
+
+def _coluna_embalagem(colunas, ignorar_cols=None):
+    ignorar_cols = {c for c in (ignorar_cols or set()) if c is not None}
+    for col in colunas:
+        if col in ignorar_cols:
+            continue
+        if _normalizar_cabecalho(col) in {"EMB", "EMBALAGEM"}:
+            return col
+    return None
+
+
 def _xlsx_safe_bytes(caminho_arquivo):
     """
     Retorna BytesIO do xlsx com styles.xml corrigido.
@@ -513,6 +557,7 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
     col_ean_final = None
     col_preco_final = None
     col_fracionamento_final = None
+    col_embalagem_final = None
 
     for hdr in range(0, 12):
         try:
@@ -553,6 +598,9 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
                 col_ean_final = c_ean
                 col_preco_final = c_preco
                 col_fracionamento_final = c_fracionamento
+                col_embalagem_final = _coluna_embalagem(
+                    cols, ignorar_cols=ignorar_fracionamento | {c_fracionamento}
+                )
                 break
         except Exception:
             continue
@@ -569,6 +617,10 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
                 df_final.columns,
                 ignorar_cols={col_nome_final, col_ean_final, col_preco_final},
             )
+            col_embalagem_final = _coluna_embalagem(
+                df_final.columns,
+                ignorar_cols={col_nome_final, col_ean_final, col_preco_final, col_fracionamento_final},
+            )
         except Exception:
             return ({}, [], {}) if incluir_meta else ({}, [])
 
@@ -584,6 +636,8 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
         ean_raw = row[col_ean_final] if col_ean_final is not None else None
         ean = limpar_ean(ean_raw)
         fracionamento = _parse_fracionamento(row[col_fracionamento_final]) if col_fracionamento_final is not None else None
+        if not fracionamento and col_embalagem_final is not None:
+            fracionamento = _qtd_caixa_de_embalagem(row[col_embalagem_final])
 
         try:
             preco = float(str(row[col_preco_final]).replace(",", ".").replace("R$", "").replace(" ", "").strip())
