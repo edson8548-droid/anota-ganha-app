@@ -12,6 +12,7 @@ import csv
 import glob
 import json
 import shutil
+import hashlib
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DESTINO = os.path.join(RAIZ, "frontend", "public", "fotos-produtos")
@@ -36,6 +37,29 @@ for m in sorted(glob.glob(os.path.join(MANIFESTS, "*.csv"))):
             if os.path.exists(caminho):
                 itens.setdefault(ean, caminho)
 
+# Fotos salvas à mão pelo Edson (Downloads\venpro-banco-imagens\manuais\<EAN>.jpg/png/webp)
+# têm prioridade sobre as do manifest e são convertidas para webp 900x900.
+MANUAIS = os.path.join(BASE_IMGS, "manuais")
+manuais = 0
+if os.path.isdir(MANUAIS):
+    from PIL import Image
+    for arq in sorted(glob.glob(os.path.join(MANUAIS, "*.*"))):
+        base, ext = os.path.splitext(os.path.basename(arq))
+        ean = "".join(ch for ch in base if ch.isdigit())
+        if not (8 <= len(ean) <= 14) or ext.lower() not in (".jpg", ".jpeg", ".png", ".webp"):
+            continue
+        webp = os.path.join(MANUAIS, ean + ".otimizada.webp")
+        if not os.path.exists(webp) or os.path.getmtime(webp) < os.path.getmtime(arq):
+            img = Image.open(arq).convert("RGB")
+            img.thumbnail((900, 900))
+            fundo = Image.new("RGB", (900, 900), (255, 255, 255))
+            fundo.paste(img, ((900 - img.width) // 2, (900 - img.height) // 2))
+            fundo.save(webp, "WEBP", quality=85)
+        itens[ean] = webp
+        manuais += 1
+if manuais:
+    print(f"fotos manuais incluidas: {manuais}")
+
 os.makedirs(DESTINO, exist_ok=True)
 mapa = {}
 copiadas = puladas = 0
@@ -46,7 +70,9 @@ for ean, origem in itens.items():
         copiadas += 1
     else:
         puladas += 1
-    mapa[ean] = f"{URL_BASE}/{ean}.webp"
+    # ?v= muda quando a foto muda — fura o cache de 1 ano em correções
+    versao = hashlib.md5(open(destino, "rb").read()).hexdigest()[:8]
+    mapa[ean] = f"{URL_BASE}/{ean}.webp?v={versao}"
 
 os.makedirs(os.path.dirname(SAIDA), exist_ok=True)
 with open(SAIDA, "w", encoding="utf-8") as f:
