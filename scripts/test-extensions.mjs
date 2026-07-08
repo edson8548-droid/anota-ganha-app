@@ -42,10 +42,14 @@ describe('extensoes Chrome', () => {
     assert.match(manifest.description, /Intersolid Cotação/);
     assert.match(manifest.description, /Cotação Web SMUS/);
     assert.match(manifest.description, /Catalog Fornecedor/);
+    assert.match(manifest.description, /Hipcomerp/);
+    assert.match(manifest.description, /Easy Cotação Web/);
     assert.ok(manifest.host_permissions.includes('https://infomagcotacao.com/*'));
     assert.ok(manifest.host_permissions.includes('https://*.intersolid.com.br/*'));
     assert.ok(manifest.host_permissions.includes('http://cotacaoweb.smus.com.br/*'));
     assert.ok(manifest.host_permissions.includes('https://catalog-32594.bubbleapps.io/*'));
+    assert.ok(manifest.host_permissions.includes('https://cotacao.hipcomerp.com.br/*'));
+    assert.ok(manifest.host_permissions.includes('http://gepautomacao.dyndns.org/*'));
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('http://179.0.124.205/*')),
       'manifest precisa carregar content script no VR Cotacao conhecido'
@@ -77,6 +81,14 @@ describe('extensoes Chrome', () => {
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('https://catalog-32594.bubbleapps.io/*')),
       'manifest precisa carregar content script no Catalog Fornecedor'
+    );
+    assert.ok(
+      manifest.content_scripts.some(script => (script.matches || []).includes('https://cotacao.hipcomerp.com.br/*')),
+      'manifest precisa carregar content script no Hipcomerp'
+    );
+    assert.ok(
+      manifest.content_scripts.some(script => (script.matches || []).includes('http://gepautomacao.dyndns.org/*')),
+      'manifest precisa carregar content script no Easy Cotacao Web'
     );
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('https://*/fornecedores/*/cotacao/*')),
@@ -138,6 +150,7 @@ describe('extensoes Chrome', () => {
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.43.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.44.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.45.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.48.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-whatsapp-extension.zip')));
   });
 
@@ -158,5 +171,47 @@ describe('extensoes Chrome', () => {
     assert.match(contentJs, /requireExactEan/);
     assert.match(contentJs, /function bubbleCatalogRowShowsPrice/);
     assert.match(contentJs, /bubbleCatalogRowShowsPrice\(row, item\.price, samePriceLike, item\)/);
+  });
+
+  it('Hipcomerp usa fluxo paginado com trava antes de salvar', () => {
+    const manifest = readJson('chrome-extension/manifest.json');
+    const popupJs = readText('chrome-extension/popup.js');
+    const contentJs = readText('chrome-extension/content.js');
+
+    assert.equal(manifest.version, '1.0.48');
+    assert.match(popupJs, /'hipcomerp-cotacao': 'Hipcomerp'/);
+    assert.match(popupJs, /function isHipcomerpCotacaoUrl/);
+    assert.match(popupJs, /async function runHipcomerpJob/);
+    assert.match(popupJs, /sem preço ficam zerado/);
+    assert.match(popupJs, /filled !== pricesToFill\.length/);
+    assert.match(popupJs, /Preço encontrado na tabela não entrou no campo da tela\. Não cliquei em salvar\./);
+    assert.match(popupJs, /advanceHipcomerp/);
+    assert.match(contentJs, /function isHipcomerpCotacaoPage/);
+    assert.match(contentJs, /function getHipcomerpRows/);
+    assert.match(contentJs, /function getHipcomerpPriceCandidates/);
+    assert.match(contentJs, /async function advanceHipcomerpPage/);
+    assert.match(contentJs, /salvar\\s\+e\\s\+carregar\\s\+mais/);
+  });
+
+  it('Easy Cotação Web preenche Qtd. Emb. antes do preço com fallback 1', () => {
+    const manifest = readJson('chrome-extension/manifest.json');
+    const popupJs = readText('chrome-extension/popup.js');
+    const contentJs = readText('chrome-extension/content.js');
+    const cotacaoPy = readText('backend/routes/cotacao.py');
+
+    assert.equal(manifest.version, '1.0.48');
+    assert.match(popupJs, /'easy-cotacao-web': 'Easy Cotação Web'/);
+    assert.match(popupJs, /function isEasyCotacaoWebUrl/);
+    assert.match(popupJs, /gepautomacao\.dyndns\.org/);
+    assert.match(contentJs, /function isEasyCotacaoWebPage/);
+    assert.match(contentJs, /function getEasyCotacaoRows/);
+    assert.match(contentJs, /function getEasyCotacaoPriceCandidates/);
+    assert.match(contentJs, /function getEasyCotacaoQuantityValue[\s\S]*\|\| '1'/);
+    assert.match(contentJs, /async function ensureEasyCotacaoQuantity/);
+    assert.match(contentJs, /site === 'easy-cotacao-web'/);
+    assert.match(contentJs, /easyCotacaoRowShowsPrice/);
+    assert.match(cotacaoPy, /"easy-cotacao-web"/);
+    assert.match(cotacaoPy, /COTACAO_EXTENSION_SITES_COM_FRACIONAMENTO/);
+    assert.match(cotacaoPy, /fracionamento = "1"/);
   });
 });

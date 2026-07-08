@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Venpro — Preencher Cotação",
-  "version": "1.0.45",
-  "description": "Preenchedor de cotações do Venpro para Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor e novos portais compatíveis.",
+  "version": "1.0.48",
+  "description": "Preenchedor de cotações do Venpro para Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor, Hipcomerp, Easy Cotação Web e novos portais compatíveis.",
   "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel"],
   "host_permissions": [
     "https://cotatudo.com.br/*",
@@ -28,6 +28,10 @@
     "https://cotacaoweb.smus.com.br/*",
     "http://cotacaoweb.smus.com.br/*",
     "https://catalog-32594.bubbleapps.io/*",
+    "https://cotacao.hipcomerp.com.br/*",
+    "http://cotacao.hipcomerp.com.br/*",
+    "https://gepautomacao.dyndns.org/*",
+    "http://gepautomacao.dyndns.org/*",
     "https://api.venpro.com.br/*"
   ],
   "action": {
@@ -79,6 +83,10 @@
         "https://cotacaoweb.smus.com.br/*",
         "http://cotacaoweb.smus.com.br/*",
         "https://catalog-32594.bubbleapps.io/*",
+        "https://cotacao.hipcomerp.com.br/*",
+        "http://cotacao.hipcomerp.com.br/*",
+        "https://gepautomacao.dyndns.org/*",
+        "http://gepautomacao.dyndns.org/*",
         "https://*/fornecedores/*/cotacao/*",
         "http://*/fornecedores/*/cotacao/*",
         "https://*/cotacao/*",

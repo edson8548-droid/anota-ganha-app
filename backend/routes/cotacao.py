@@ -59,6 +59,8 @@ MAX_COTACAO_PREVIEW_BYTES = 14 * 1024 * 1024
 MAX_TABELA_PRAZOS_BYTES = 25 * 1024 * 1024
 MAX_ACTIVE_PREVIEW_JOBS_PER_USER = int(os.environ.get("MAX_ACTIVE_PREVIEW_JOBS_PER_USER", "1"))
 MAX_RUNNING_COTACAO_JOBS = int(os.environ.get("MAX_RUNNING_COTACAO_JOBS", "3"))
+COTACAO_EXTENSION_SITES_COM_FRACIONAMENTO = {"bubble-catalog-fornecedor", "easy-cotacao-web"}
+COTACAO_EXTENSION_SITES_FRACIONAMENTO_PADRAO_1 = {"easy-cotacao-web"}
 COTACAO_CLEANUP_INTERVAL_SECONDS = int(os.environ.get("COTACAO_CLEANUP_INTERVAL_SECONDS", "3600"))
 COTACAO_TEMP_ARTIFACT_TTL_SECONDS = 12 * 60 * 60
 COTACAO_TABELA_MESTRE_TTL_SECONDS = int(
@@ -1735,7 +1737,8 @@ async def match_cotatudo(
 
     try:
         prazo_efetivo = payload.prazo if payload.prazo > 0 else doc.get("prazo", 28)
-        is_bubble_catalog = payload.site == "bubble-catalog-fornecedor"
+        site = str(payload.site or "").strip()
+        usa_fracionamento = site in COTACAO_EXTENSION_SITES_COM_FRACIONAMENTO
 
         itens_para_match = [
             {"nome": it.nome, "ean": it.ean or "", "linha": it.idx}
@@ -1755,7 +1758,7 @@ async def match_cotatudo(
             return {"precos": [], "stats": stats}
 
         def _match_sync():
-            if is_bubble_catalog:
+            if usa_fracionamento:
                 pd, pl, meta_por_ean = ler_tabela_mestre(tmp_mestre.name, prazo=prazo_efetivo, incluir_meta=True)
             else:
                 pd, pl = ler_tabela_mestre(tmp_mestre.name, prazo=prazo_efetivo)
@@ -1785,8 +1788,10 @@ async def match_cotatudo(
             if res.get("preco") is not None:
                 preco_str = f"{res['preco']:.2f}".replace(".", ",")
                 preco_item = {"idx": item["linha"], "price": preco_str}
-                if is_bubble_catalog:
+                if usa_fracionamento:
                     fracionamento = (meta_por_ean.get(limpar_ean(item.get("ean", ""))) or {}).get("fracionamento")
+                    if not fracionamento and site in COTACAO_EXTENSION_SITES_FRACIONAMENTO_PADRAO_1:
+                        fracionamento = "1"
                     if fracionamento:
                         preco_item["fracionamento"] = fracionamento
                 precos.append(preco_item)

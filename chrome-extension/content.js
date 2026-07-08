@@ -2,6 +2,8 @@
 
 const cotacaoWebSmusPriceCellMeta = new WeakMap();
 const bubbleCatalogRowMeta = new WeakMap();
+const hipcomerpRowMeta = new WeakMap();
+const easyCotacaoRowMeta = new WeakMap();
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -13,6 +15,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     if (msg.action === 'fillPrices') {
       return fillQuotationPrices(msg.prices, { empresaColuna: msg.empresaColuna });
+    }
+    if (msg.action === 'advanceHipcomerp') {
+      return advanceHipcomerpPage();
     }
     if (msg.action === 'detectSite') {
       const site = detectQuotationSite();
@@ -337,6 +342,530 @@ function isBubbleCatalogFornecedorPage(hostname = window.location.hostname || ''
       && loose.includes('produto')
       && loose.includes('fracionamento')
       && loose.includes('valor'));
+}
+
+function isHipcomerpCotacaoPage(hostname = window.location.hostname || '', bodyText = document.body?.innerText || '') {
+  if (!/(^|\.)cotacao\.hipcomerp\.com\.br$/i.test(hostname)) return false;
+  const loose = normalizeLooseText(bodyText);
+  return loose.includes('fornecedor')
+    && loose.includes('digitados')
+    && loose.includes('cotacao')
+    && (loose.includes('preco p/ unidade') || loose.includes('preco p unidade'));
+}
+
+function isEasyCotacaoWebPage(hostname = window.location.hostname || '', path = window.location.pathname || '', bodyText = document.body?.innerText || '') {
+  const loose = normalizeLooseText(bodyText);
+  const urlText = normalizeLooseText(`${hostname}${path}${window.location.hash || ''}`);
+  return urlText.includes('easycotacao')
+    || loose.includes('easy - cotacao web')
+    || (loose.includes('salvar cotacao')
+      && (loose.includes('qtd. emb') || loose.includes('qtd emb'))
+      && loose.includes('preco')
+      && loose.includes('similar'));
+}
+
+function getEasyCotacaoEditableControls(root = document.body) {
+  const unsafeTypes = /^(hidden|button|submit|reset|checkbox|radio|file|image|password)$/i;
+  const self = isEditableValueControl(root)
+    && !(root.tagName === 'INPUT' && unsafeTypes.test(String(root.getAttribute('type') || '').toLowerCase()))
+    && !root.disabled
+    && !root.readOnly
+    && isVisible(root)
+    ? [root]
+    : [];
+  const controls = Array.from(root.querySelectorAll('input, textarea, [contenteditable="true"], [role="textbox"]'))
+    .filter(control => !control.disabled && !control.readOnly && isVisible(control))
+    .filter(control => !(control.tagName === 'INPUT' && unsafeTypes.test(String(control.getAttribute('type') || '').toLowerCase())));
+  return [...self, ...controls].filter((el, index, all) => all.indexOf(el) === index);
+}
+
+function getEasyCotacaoCellByHeader(row, includePatterns, excludePatterns = []) {
+  const visualIndex = findVisualColumnIndexByHeader(row, includePatterns, excludePatterns);
+  if (visualIndex >= 0) return getCellAtVisualColumn(row, visualIndex);
+
+  const index = findColumnIndexByHeader(row, includePatterns, excludePatterns);
+  if (index >= 0) return getDirectCells(row)[index] || null;
+
+  return null;
+}
+
+function easyCotacaoControlsByPosition(root) {
+  return getEasyCotacaoEditableControls(root)
+    .map(el => ({ el, rect: el.getBoundingClientRect() }))
+    .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left)
+    .map(item => item.el);
+}
+
+function isEasyCotacaoIgnoredText(text) {
+  const loose = normalizeLooseText(text);
+  return !loose
+    || loose === 'todos'
+    || loose === 'cotados'
+    || loose === 'nao cotados'
+    || loose === 'produto'
+    || loose === 'qtd'
+    || loose === 'qtd.'
+    || loose === 'qtd. emb.'
+    || loose === 'qtd emb'
+    || loose === 'preco'
+    || loose === 'similar'
+    || loose === 'observacao'
+    || loose === 'salvar cotacao'
+    || loose === 'sair'
+    || /^qtd:?\s*[\d,.]+$/i.test(text)
+    || /^0[,.]0{1,2}$/.test(text)
+    || /^r\$\s*0(?:[,.]0{1,2})?$/i.test(text);
+}
+
+function cleanupEasyCotacaoProductName(value, ean = '') {
+  let text = normalizeCellText(value)
+    .replace(/\bObserva[çc][ãa]o:?.*$/i, '')
+    .replace(/\bQtd\.?\s*:?.*$/i, '')
+    .replace(/\bPre[çc]o\b.*$/i, '')
+    .replace(/\bSimilar\b.*$/i, '')
+    .replace(/r\$\s*\d+(?:[,.]\d+)?/ig, '')
+    .trim();
+  if (ean) text = text.replace(ean, '').trim();
+  text = text
+    .replace(/\b\d{8,14}\b/g, '')
+    .replace(/^\d{1,10}\s+/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text;
+}
+
+function getEasyCotacaoQuantityTarget(row) {
+  const meta = easyCotacaoRowMeta.get(row);
+  if (meta?.quantityInput && isVisible(meta.quantityInput) && isEditableValueControl(meta.quantityInput)) {
+    return meta.quantityInput;
+  }
+
+  const quantityCell = getEasyCotacaoCellByHeader(row, [
+    /qtd\.?\s*emb\.?/i,
+    /quantidade\s*emb/i,
+    /\bemb\.?\b/i,
+  ], [/pre[çc]o|produto|similar|total/i]);
+  const quantityControl = quantityCell ? easyCotacaoControlsByPosition(quantityCell)[0] : null;
+  if (quantityControl) {
+    if (meta) meta.quantityInput = quantityControl;
+    return quantityControl;
+  }
+
+  const priceCell = getEasyCotacaoCellByHeader(row, [/^\s*pre[çc]o\s*$/i, /\bpre[çc]o\b/i], [/produto|similar|qtd|emb|total/i]);
+  const priceControls = new Set(priceCell ? easyCotacaoControlsByPosition(priceCell) : []);
+  const controls = easyCotacaoControlsByPosition(row).filter(control => !priceControls.has(control));
+  if (controls.length >= 1) {
+    const first = controls[0];
+    const context = normalizeLooseText(`${first.name || ''} ${first.id || ''} ${first.className || ''} ${first.placeholder || ''} ${first.closest?.('td, th')?.textContent || ''}`);
+    if (controls.length >= 2 || context.includes('qtd') || context.includes('emb')) {
+      if (meta) meta.quantityInput = first;
+      return first;
+    }
+  }
+
+  return null;
+}
+
+function getEasyCotacaoPriceTarget(row) {
+  const meta = easyCotacaoRowMeta.get(row);
+  if (meta?.priceInput && isVisible(meta.priceInput) && isEditableValueControl(meta.priceInput)) {
+    return meta.priceInput;
+  }
+
+  const priceCell = getEasyCotacaoCellByHeader(row, [
+    /^\s*pre[çc]o\s*$/i,
+    /\bpre[çc]o\b/i,
+    /\bvalor\b/i,
+  ], [/produto|similar|qtd|emb|total/i]);
+  const priceControl = priceCell ? easyCotacaoControlsByPosition(priceCell)[0] : null;
+  if (priceControl) {
+    if (meta) meta.priceInput = priceControl;
+    return priceControl;
+  }
+
+  const quantityTarget = getEasyCotacaoQuantityTarget(row);
+  const controls = easyCotacaoControlsByPosition(row).filter(control => control !== quantityTarget);
+  const priceLike = controls.filter(control => {
+    const context = normalizeLooseText(`${control.name || ''} ${control.id || ''} ${control.className || ''} ${control.placeholder || ''} ${control.getAttribute('aria-label') || ''} ${control.closest?.('td, th')?.textContent || ''}`);
+    return (context.includes('preco') || context.includes('valor'))
+      && !context.includes('qtd')
+      && !context.includes('emb');
+  });
+
+  const target = priceLike[0] || controls[controls.length - 1] || null;
+  if (target && meta) meta.priceInput = target;
+  return target;
+}
+
+function getEasyCotacaoPriceCandidates(row) {
+  const target = getEasyCotacaoPriceTarget(row);
+  return target ? [target] : [];
+}
+
+function parseEasyCotacaoRowMeta(row) {
+  const fullText = normalizeCellText(row?.innerText || row?.textContent || '');
+  const ean = extractEANFromRow(row, 'easy-cotacao-web') || limparEAN(fullText) || '';
+  if (!ean || !/[A-Za-zÀ-ú]{3}/.test(fullText)) return null;
+
+  const eanIndex = fullText.indexOf(ean);
+  const beforeEan = eanIndex >= 0 ? fullText.slice(0, eanIndex) : '';
+  const codeMatch = beforeEan.match(/(\d{2,10})\s*$/);
+  const codigo = codeMatch ? codeMatch[1] : '';
+
+  let nome = '';
+  const productCell = getEasyCotacaoCellByHeader(row, [
+    /produto/i,
+    /descri[çc][ãa]o/i,
+    /mercadoria/i,
+  ], [/pre[çc]o|qtd|emb|similar/i]);
+  if (productCell) nome = cleanupEasyCotacaoProductName(productCell.textContent || '', ean);
+
+  if (!nome) {
+    const lines = String(row.innerText || row.textContent || '')
+      .split(/\n+/)
+      .map(normalizeCellText)
+      .filter(Boolean);
+    for (const line of lines) {
+      const candidate = cleanupEasyCotacaoProductName(line, ean);
+      if (candidate && /[A-Za-zÀ-ú]{3}/.test(candidate) && !isEasyCotacaoIgnoredText(candidate)) {
+        nome = candidate;
+        break;
+      }
+    }
+  }
+
+  if (!nome) nome = cleanupEasyCotacaoProductName(extractProductNameFromRow(row), ean);
+  if (!nome) return null;
+
+  return {
+    codigo,
+    ean,
+    nome,
+    quantityInput: null,
+    priceInput: null,
+    signature: `${codigo}|${ean}|${normalizeRowKey(nome)}`,
+  };
+}
+
+function isEasyCotacaoProductRow(row) {
+  const text = normalizeCellText(row?.innerText || row?.textContent || '');
+  if (!/\d{8,14}/.test(text) || !/[A-Za-zÀ-ú]{3}/.test(text)) return false;
+  const meta = parseEasyCotacaoRowMeta(row);
+  if (!meta) return false;
+  easyCotacaoRowMeta.set(row, meta);
+  return easyCotacaoControlsByPosition(row).length > 0;
+}
+
+function getEasyCotacaoRows() {
+  const rows = [];
+  const seen = new Set();
+  for (const row of Array.from(document.querySelectorAll('tr')).filter(isVisible)) {
+    if (!isEasyCotacaoProductRow(row)) continue;
+    const meta = easyCotacaoRowMeta.get(row) || parseEasyCotacaoRowMeta(row);
+    const key = `${meta?.signature || ''}|${rows.length}`;
+    if (!meta || seen.has(key)) continue;
+    meta.quantityInput = getEasyCotacaoQuantityTarget(row);
+    meta.priceInput = getEasyCotacaoPriceTarget(row);
+    easyCotacaoRowMeta.set(row, meta);
+    rows.push(row);
+    seen.add(key);
+  }
+  return rows;
+}
+
+function easyCotacaoRowShowsPrice(row, expectedPrice, samePriceLike, empresaColuna = 0) {
+  const target = getSelectedPriceInput(row, empresaColuna, 'easy-cotacao-web');
+  return target ? samePriceLike(getControlValue(target), expectedPrice) : false;
+}
+
+function getHipcomerpEditableControls(root = document.body) {
+  const unsafeTypes = /^(hidden|button|submit|reset|checkbox|radio|file|image|password)$/i;
+  const self = isEditableValueControl(root)
+    && !(root.tagName === 'INPUT' && unsafeTypes.test(String(root.getAttribute('type') || '').toLowerCase()))
+    && !root.disabled
+    && !root.readOnly
+    && isVisible(root)
+    ? [root]
+    : [];
+  const controls = Array.from(root.querySelectorAll('input, textarea, [contenteditable="true"], [role="textbox"]'))
+    .filter(control => !control.disabled && !control.readOnly && isVisible(control))
+    .filter(control => !(control.tagName === 'INPUT' && unsafeTypes.test(String(control.getAttribute('type') || '').toLowerCase())));
+  return [...self, ...controls].filter((el, index, all) => all.indexOf(el) === index);
+}
+
+function hipcomerpLines(root) {
+  return String(root?.innerText || root?.textContent || '')
+    .split(/\n+/)
+    .map(normalizeCellText)
+    .filter(Boolean);
+}
+
+function isHipcomerpIgnoredText(text) {
+  const loose = normalizeLooseText(text);
+  return !loose
+    || loose === 'fornecedor'
+    || loose === 'digitados'
+    || loose === 'cotacao'
+    || loose === 'exportar'
+    || loose === 'importar'
+    || loose === 'preco p/ unidade'
+    || loose === 'preco p unidade'
+    || loose === 'salvar e carregar mais'
+    || /^r\$\s*0(?:[,.]0{1,2})?$/i.test(text)
+    || /^r\$$/i.test(text);
+}
+
+function cleanupHipcomerpProductName(value, ean = '') {
+  let text = normalizeCellText(value)
+    .replace(/pre[çc]o\s*p\/?\s*unidade.*$/i, '')
+    .replace(/r\$\s*\d+(?:[,.]\d+)?/ig, '')
+    .trim();
+  if (ean) text = text.replace(ean, '').trim();
+  text = text.replace(/^\d{1,10}\s+/, '').trim();
+  return text;
+}
+
+function parseHipcomerpCardMeta(card) {
+  const lines = hipcomerpLines(card);
+  const fullText = normalizeCellText(lines.join(' '));
+  const ean = limparEAN(fullText);
+  if (!ean || !/[A-Za-zÀ-ú]{3}/.test(fullText)) return null;
+
+  const eanIndex = fullText.indexOf(ean);
+  const beforeEan = eanIndex >= 0 ? fullText.slice(0, eanIndex) : '';
+  const codeMatch = beforeEan.match(/(\d{2,10})\s*$/);
+  const codigo = codeMatch ? codeMatch[1] : '';
+  let nome = '';
+
+  const lineIndex = lines.findIndex(line => line.includes(ean));
+  if (lineIndex >= 0) {
+    const eanLine = lines[lineIndex];
+    const lineAfterEan = cleanupHipcomerpProductName(
+      eanLine.slice(eanLine.indexOf(ean) + ean.length),
+      ean
+    );
+    if (/[A-Za-zÀ-ú]{3}/.test(lineAfterEan) && !isHipcomerpIgnoredText(lineAfterEan)) {
+      nome = lineAfterEan;
+    }
+
+    if (!nome) {
+      for (const line of lines.slice(lineIndex + 1)) {
+        const candidate = cleanupHipcomerpProductName(line, ean);
+        if (candidate && /[A-Za-zÀ-ú]{3}/.test(candidate) && !isHipcomerpIgnoredText(candidate)) {
+          nome = candidate;
+          break;
+        }
+      }
+    }
+  }
+
+  if (!nome) {
+    const escapedEan = ean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = fullText.match(new RegExp(`${escapedEan}\\s+(.+?)(?:\\s+Pre[çc]o\\s*p\\/?\\s*unidade|\\s+R\\$|$)`, 'i'));
+    if (match) nome = cleanupHipcomerpProductName(match[1], ean);
+  }
+
+  if (!nome) return null;
+
+  return {
+    codigo,
+    ean,
+    nome,
+    priceInput: null,
+    signature: `${codigo}|${ean}|${normalizeRowKey(nome)}`,
+  };
+}
+
+function isHipcomerpProductCardText(root) {
+  const text = normalizeCellText(root?.innerText || root?.textContent || '');
+  return /\d{8,14}/.test(text)
+    && /[A-Za-zÀ-ú]{3}/.test(text)
+    && /pre[çc]o\s*p\/?\s*unidade/i.test(text);
+}
+
+function findHipcomerpCardRoot(from) {
+  let current = from;
+  while (current && current !== document.body && current !== document.documentElement) {
+    if (isHipcomerpProductCardText(current)) return current;
+    current = current.parentElement;
+  }
+  return null;
+}
+
+function isHipcomerpPriceControl(control) {
+  const meta = `${control.name || ''} ${control.id || ''} ${control.className || ''} ${control.placeholder || ''} ${control.getAttribute('aria-label') || ''}`.toLowerCase();
+  if (/(preco|preço|valor|unit)/.test(meta)) return true;
+  const card = findHipcomerpCardRoot(control);
+  return Boolean(card && isHipcomerpProductCardText(card));
+}
+
+function getHipcomerpPriceCandidates(row) {
+  const meta = hipcomerpRowMeta.get(row);
+  if (meta?.priceInput && isVisible(meta.priceInput) && isEditableValueControl(meta.priceInput)) {
+    return [meta.priceInput];
+  }
+
+  const controls = getHipcomerpEditableControls(row).filter(isHipcomerpPriceControl);
+  if (controls.length) {
+    if (meta) meta.priceInput = controls[0];
+    return [controls[0]];
+  }
+
+  const fallbackControls = getHipcomerpEditableControls(row);
+  if (fallbackControls.length) {
+    if (meta) meta.priceInput = fallbackControls[0];
+    return [fallbackControls[0]];
+  }
+
+  return [];
+}
+
+function getHipcomerpRows() {
+  const rows = [];
+  const seen = new Set();
+
+  for (const control of getHipcomerpEditableControls(document.body).filter(isHipcomerpPriceControl)) {
+    const card = findHipcomerpCardRoot(control);
+    if (!card || seen.has(card)) continue;
+    const meta = parseHipcomerpCardMeta(card);
+    if (!meta) continue;
+    meta.priceInput = control;
+    hipcomerpRowMeta.set(card, meta);
+    rows.push(card);
+    seen.add(card);
+  }
+
+  if (rows.length) return rows;
+
+  const candidates = Array.from(document.querySelectorAll('div, li, section, article'))
+    .filter(isVisible)
+    .filter(isHipcomerpProductCardText)
+    .map(el => ({ el, area: Math.max(1, el.getBoundingClientRect().width * el.getBoundingClientRect().height) }))
+    .sort((a, b) => a.area - b.area);
+
+  for (const { el } of candidates) {
+    if (rows.some(row => el.contains(row) || row.contains(el))) continue;
+    const meta = parseHipcomerpCardMeta(el);
+    if (!meta) continue;
+    hipcomerpRowMeta.set(el, meta);
+    rows.push(el);
+  }
+
+  return rows;
+}
+
+function getHipcomerpRowSignature(row) {
+  const meta = hipcomerpRowMeta.get(row) || parseHipcomerpCardMeta(row);
+  return meta?.signature || '';
+}
+
+function hipcomerpPageSignature() {
+  return getHipcomerpRows()
+    .map(getHipcomerpRowSignature)
+    .filter(Boolean)
+    .join('||');
+}
+
+function hipcomerpRowShowsPrice(row, expectedPrice, samePriceLike, empresaColuna = 0) {
+  return getSelectedPriceInput(row, empresaColuna, 'hipcomerp-cotacao')
+    ? samePriceLike(getControlValue(getSelectedPriceInput(row, empresaColuna, 'hipcomerp-cotacao')), expectedPrice)
+    : false;
+}
+
+function getHipcomerpClickable(el) {
+  return el.closest?.('button, [role="button"], a, [onclick]') || el;
+}
+
+function isDisabledAction(el) {
+  const target = getHipcomerpClickable(el);
+  return Boolean(target.disabled)
+    || target.getAttribute?.('aria-disabled') === 'true'
+    || /\b(disabled|desabilitado)\b/i.test(`${target.className || ''}`);
+}
+
+function findHipcomerpSaveAction() {
+  const candidates = Array.from(document.querySelectorAll('button, [role="button"], a, div, span'))
+    .filter(isVisible)
+    .map(el => ({
+      el,
+      target: getHipcomerpClickable(el),
+      text: normalizeCellText(el.innerText || el.textContent || ''),
+    }))
+    .filter(item => item.text && item.text.length <= 80)
+    .filter(item => !isDisabledAction(item.el))
+    .map(item => {
+      const tag = String(item.target?.tagName || '').toLowerCase();
+      const rank = tag === 'button' ? 4
+        : item.target?.getAttribute?.('role') === 'button' ? 3
+        : tag === 'a' ? 2
+        : item.target?.hasAttribute?.('onclick') ? 1
+        : 0;
+      return { ...item, rank };
+    })
+    .sort((a, b) => b.rank - a.rank);
+
+  const next = candidates.find(item => /salvar\s+e\s+carregar\s+mais/i.test(item.text));
+  if (next) return { el: next.target, kind: 'next', text: next.text };
+
+  const final = candidates.find(item => /^(salvar|salvar\s+e\s+finalizar|finalizar)$/i.test(item.text));
+  if (final) return { el: final.target, kind: 'final', text: final.text };
+
+  return null;
+}
+
+async function advanceHipcomerpPage() {
+  const beforeSignature = hipcomerpPageSignature();
+  const beforeCount = getHipcomerpRows().length;
+  const action = findHipcomerpSaveAction();
+  if (!action) {
+    return { ok: true, advanced: false, done: true, reason: 'save_button_not_found', rowCount: beforeCount };
+  }
+
+  try {
+    action.el.scrollIntoView({ block: 'center', inline: 'nearest' });
+  } catch {}
+  await waitForGridRender(80);
+
+  try {
+    action.el.click?.();
+    action.el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+  } catch {
+    return { ok: false, advanced: false, done: false, reason: 'click_failed', rowCount: beforeCount };
+  }
+
+  if (action.kind === 'final') {
+    await waitForGridRender(700);
+    return { ok: true, advanced: false, done: true, saved: true, reason: 'final_saved', rowCount: beforeCount };
+  }
+
+  for (let i = 0; i < 48; i++) {
+    await waitForGridRender(250);
+    const afterSignature = hipcomerpPageSignature();
+    const afterCount = getHipcomerpRows().length;
+    if (afterSignature && afterSignature !== beforeSignature) {
+      return {
+        ok: true,
+        advanced: true,
+        done: false,
+        reason: 'next_loaded',
+        rowCount: afterCount,
+        beforeSignature,
+        afterSignature,
+      };
+    }
+    if (!afterCount) {
+      return { ok: true, advanced: false, done: true, reason: 'no_visible_items_after_save', rowCount: 0 };
+    }
+  }
+
+  return {
+    ok: false,
+    advanced: false,
+    done: false,
+    reason: 'items_not_changed_after_save',
+    rowCount: beforeCount,
+    beforeSignature,
+  };
 }
 
 function bubbleCatalogTextItems() {
@@ -852,6 +1381,8 @@ function getPriceCandidates(row, site = 'generic') {
   if (site === 'intersolid-cotacao') return getIntersolidPriceCandidates(row);
   if (site === 'cotacao-web-smus') return getCotacaoWebSmusPriceCandidates(row);
   if (site === 'bubble-catalog-fornecedor') return getBubbleCatalogPriceCandidates(row);
+  if (site === 'hipcomerp-cotacao') return getHipcomerpPriceCandidates(row);
+  if (site === 'easy-cotacao-web') return getEasyCotacaoPriceCandidates(row);
   const inputs = getEditableInputs(row);
   const priceLike = inputs.filter(isPriceLikeInput);
   return priceLike.length ? priceLike : inputs;
@@ -882,6 +1413,8 @@ function detectQuotationSite() {
     && /\bMensagem\s+Fornecedor\b/i.test(bodyText);
 
   if (window.location.hostname.includes('cotatudo.com.br')) return 'cotatudo';
+  if (isHipcomerpCotacaoPage(hostname, bodyText)) return 'hipcomerp-cotacao';
+  if (isEasyCotacaoWebPage(hostname, path, bodyText)) return 'easy-cotacao-web';
   if (isBubbleCatalogFornecedorPage(hostname, path, bodyText)) return 'bubble-catalog-fornecedor';
   if (/(^|\.)cotacaoweb\.smus\.com\.br$/i.test(hostname)
     && (/cotacaoweb/i.test(`${hostname}${path}${window.location.hash || ''}`) || looksCotacaoWebSmus)) return 'cotacao-web-smus';
@@ -947,6 +1480,14 @@ function getQuotationRows(site) {
 
   if (site === 'bubble-catalog-fornecedor') {
     return getBubbleCatalogRows();
+  }
+
+  if (site === 'hipcomerp-cotacao') {
+    return getHipcomerpRows();
+  }
+
+  if (site === 'easy-cotacao-web') {
+    return getEasyCotacaoRows();
   }
 
   return Array.from(document.querySelectorAll('tr')).filter(row => getEditableInputs(row).length > 0);
@@ -1166,6 +1707,34 @@ async function scanCotacaoWebSmusRows(onRow, options = {}) {
 }
 
 function extractItemFromRow(row, idx, site, empresaColuna) {
+  if (site === 'easy-cotacao-web') {
+    const meta = easyCotacaoRowMeta.get(row) || parseEasyCotacaoRowMeta(row);
+    if (!meta || (!meta.ean && !meta.nome)) return null;
+    const priceTarget = getSelectedPriceInput(row, empresaColuna, site);
+    return {
+      idx,
+      ean: meta.ean || '',
+      nome: meta.nome || '',
+      codigo: meta.codigo || '',
+      signature: meta.signature || '',
+      filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
+    };
+  }
+
+  if (site === 'hipcomerp-cotacao') {
+    const meta = hipcomerpRowMeta.get(row) || parseHipcomerpCardMeta(row);
+    if (!meta || (!meta.ean && !meta.nome)) return null;
+    const priceTarget = getSelectedPriceInput(row, empresaColuna, site);
+    return {
+      idx,
+      ean: meta.ean || '',
+      nome: meta.nome || '',
+      codigo: meta.codigo || '',
+      signature: meta.signature || '',
+      filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
+    };
+  }
+
   if (site === 'bubble-catalog-fornecedor') {
     const meta = bubbleCatalogRowMeta.get(row);
     if (!meta || (!meta.ean && !meta.nome)) return null;
@@ -1265,6 +1834,10 @@ async function fillQuotationPrices(prices, options = {}) {
       ? (type === 'number'
         ? [dot3, dot, noDecimalsDot, comma3, comma, raw]
         : [comma3, comma, dot3, dot, raw, noDecimalsDot])
+      : site === 'hipcomerp-cotacao'
+        ? (type === 'number'
+          ? [dot, noDecimalsDot, comma, raw]
+          : [comma, `R$ ${comma}`, dot, raw, noDecimalsDot])
       : (type === 'number'
         ? [dot, noDecimalsDot, comma, raw]
         : [comma, dot, raw, noDecimalsDot]);
@@ -1700,10 +2273,25 @@ async function fillQuotationPrices(prices, options = {}) {
     ) || '1';
   }
 
+  function getEasyCotacaoQuantityValue(item = {}) {
+    return normalizeBubbleCatalogFraction(
+      item.fracionamento
+      ?? item.fraction
+      ?? item.quantidade_caixa
+      ?? item.quantidadeCaixa
+      ?? item.qtd_caixa
+      ?? ''
+    ) || '1';
+  }
+
   function sameBubbleCatalogFraction(current, desired) {
     const a = parsePriceNumber(current);
     const b = parsePriceNumber(desired);
     return a !== null && b !== null && Math.abs(a - b) < 0.0001;
+  }
+
+  function sameEasyCotacaoQuantity(current, desired) {
+    return sameBubbleCatalogFraction(current, desired);
   }
 
   async function ensureBubbleCatalogFraction(row, item = {}) {
@@ -1726,6 +2314,31 @@ async function fillQuotationPrices(prices, options = {}) {
     }
 
     return { ok, changed: ok, reason: ok ? 'fraction_filled' : 'fraction_rejected', fracionamento };
+  }
+
+  async function ensureEasyCotacaoQuantity(row, item = {}) {
+    const meta = easyCotacaoRowMeta.get(row) || parseEasyCotacaoRowMeta(row);
+    if (!meta) return { ok: true, changed: false, reason: 'row_meta_not_found', fracionamento: '1' };
+
+    easyCotacaoRowMeta.set(row, meta);
+    const target = getEasyCotacaoQuantityTarget(row);
+    const fracionamento = getEasyCotacaoQuantityValue(item);
+    if (!target) {
+      return { ok: true, changed: false, reason: 'quantity_input_not_found', fracionamento };
+    }
+
+    const current = getControlValue(target);
+    if (sameEasyCotacaoQuantity(current, fracionamento)) {
+      return { ok: true, changed: false, reason: 'quantity_already_filled', fracionamento };
+    }
+
+    const ok = await setPlainControlValue(target, fracionamento);
+    await waitForGridRender(140);
+    if (ok && meta.priceInput && !isEditableValueControl(meta.priceInput)) {
+      meta.priceInput = null;
+    }
+
+    return { ok, changed: ok, reason: ok ? 'quantity_filled' : 'quantity_rejected', fracionamento };
   }
 
   async function fillCotacaoWebSmusPrices() {
@@ -1804,6 +2417,7 @@ async function fillQuotationPrices(prices, options = {}) {
   }
 
   const isBubbleCatalogFornecedor = site === 'bubble-catalog-fornecedor';
+  const isEasyCotacaoWeb = site === 'easy-cotacao-web';
 
   for (const item of prices) {
     let row = rows[item.idx];
@@ -1844,6 +2458,22 @@ async function fillQuotationPrices(prices, options = {}) {
         input = getSelectedPriceInput(row, empresaColuna, site);
       }
     }
+    if (isEasyCotacaoWeb) {
+      fractionResult = await ensureEasyCotacaoQuantity(row, item);
+      if (!fractionResult.ok) {
+        failed.push(item.idx);
+        details.push({
+          idx: item.idx,
+          reason: fractionResult.reason || 'quantity_rejected',
+          fracionamento: fractionResult.fracionamento || '',
+        });
+        continue;
+      }
+      if (fractionResult.changed || !input) {
+        await waitForGridRender(fractionResult.changed ? 160 : 60);
+        input = getSelectedPriceInput(row, empresaColuna, site);
+      }
+    }
 
     if (!input) {
       if (isBubbleCatalogFornecedor && bubbleCatalogRowShowsPrice(row, item.price, samePriceLike, item)) {
@@ -1855,6 +2485,8 @@ async function fillQuotationPrices(prices, options = {}) {
         idx: item.idx,
         reason: isBubbleCatalogFornecedor
           ? (fractionResult?.reason || 'input_not_found')
+          : isEasyCotacaoWeb
+            ? (fractionResult?.reason || 'input_not_found')
           : 'input_not_found',
         fracionamento: fractionResult?.fracionamento || '',
       });
@@ -1868,6 +2500,12 @@ async function fillQuotationPrices(prices, options = {}) {
       await waitForGridRender(140);
       row = findBubbleCatalogCurrentRowForItem(item, row, { requireExactEan: true });
       persisted = Boolean(row && bubbleCatalogRowShowsPrice(row, item.price, samePriceLike, item));
+    } else if (site === 'hipcomerp-cotacao') {
+      await waitForGridRender(160);
+      persisted = Boolean(ok && hipcomerpRowShowsPrice(row, item.price, samePriceLike, empresaColuna));
+    } else if (isEasyCotacaoWeb) {
+      await waitForGridRender(160);
+      persisted = Boolean(ok && easyCotacaoRowShowsPrice(row, item.price, samePriceLike, empresaColuna));
     }
 
     if (persisted) count++;

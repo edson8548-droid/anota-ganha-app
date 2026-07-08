@@ -3,7 +3,7 @@ const BATCH = 50;
 const STUCK_MS = 3 * 60 * 1000;
 const MAX_RESULT_DETAILS = 12;
 const BTN_LABEL = 'Preencher Cotação';
-const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS ou Catalog Fornecedor primeiro.';
+const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor, Hipcomerp ou Easy Cotação Web primeiro.';
 const SITE_LABELS = {
   cotatudo: 'Cotatudo',
   'vr-cotacao': 'VR Cotação',
@@ -13,6 +13,8 @@ const SITE_LABELS = {
   'intersolid-cotacao': 'Intersolid Cotação',
   'cotacao-web-smus': 'Cotação Web SMUS',
   'bubble-catalog-fornecedor': 'Catalog Fornecedor',
+  'hipcomerp-cotacao': 'Hipcomerp',
+  'easy-cotacao-web': 'Easy Cotação Web',
   generic: 'Cotação compatível',
 };
 
@@ -76,6 +78,12 @@ function setDetectedSite(tab, pageInfo = null) {
     type = 'ok';
   } else if (isBubbleCatalogFornecedorUrl(url)) {
     label = 'Site detectado: Catalog Fornecedor';
+    type = 'ok';
+  } else if (isHipcomerpCotacaoUrl(url)) {
+    label = 'Site detectado: Hipcomerp';
+    type = 'ok';
+  } else if (isEasyCotacaoWebUrl(url)) {
+    label = 'Site detectado: Easy Cotação Web';
     type = 'ok';
   }
 
@@ -313,6 +321,11 @@ function applyState(state) {
     btnEl.textContent = BTN_LABEL;
     updateFillButtonState();
     setStatus(`Erro: ${state.msg}`, 'err');
+    if ((state.processados || state.preenchidos || state.naoEncontrados || state.falhas)
+      || (Array.isArray(state.naoEncontradosDetalhes) && state.naoEncontradosDetalhes.length)
+      || (Array.isArray(state.falhasDetalhes) && state.falhasDetalhes.length)) {
+      renderResults(state);
+    }
   }
 }
 
@@ -347,7 +360,9 @@ function isSupportedQuotationUrl(url = '') {
     || isInfomagCotacaoUrl(url)
     || isIntersolidCotacaoUrl(url)
     || isCotacaoWebSmusUrl(url)
-    || isBubbleCatalogFornecedorUrl(url);
+    || isBubbleCatalogFornecedorUrl(url)
+    || isHipcomerpCotacaoUrl(url)
+    || isEasyCotacaoWebUrl(url);
 }
 
 function isPotentialQuotationUrl(url = '') {
@@ -410,6 +425,25 @@ function isBubbleCatalogFornecedorUrl(url = '') {
   }
 }
 
+function isHipcomerpCotacaoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)cotacao\.hipcomerp\.com\.br$/i.test(parsed.hostname);
+  } catch {
+    return /^(https?:\/\/)?cotacao\.hipcomerp\.com\.br(?:\/|#|$)/i.test(url);
+  }
+}
+
+function isEasyCotacaoWebUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)gepautomacao\.dyndns\.org$/i.test(parsed.hostname)
+      && /easycotacao|cotacao/i.test(`${parsed.pathname}${parsed.hash}`);
+  } catch {
+    return /^(https?:\/\/)?gepautomacao\.dyndns\.org(?::\d+)?\/.*easycotacao/i.test(url);
+  }
+}
+
 async function getQuotationTab(options = {}) {
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (active?.id && isPotentialQuotationUrl(active.url || '')) return active;
@@ -435,6 +469,10 @@ async function getQuotationTab(options = {}) {
       'https://cotacaoweb.smus.com.br/*',
       'http://cotacaoweb.smus.com.br/*',
       'https://catalog-32594.bubbleapps.io/*',
+      'https://cotacao.hipcomerp.com.br/*',
+      'http://cotacao.hipcomerp.com.br/*',
+      'https://gepautomacao.dyndns.org/*',
+      'http://gepautomacao.dyndns.org/*',
       'https://*/fornecedores/*/cotacao/*',
       'http://*/fornecedores/*/cotacao/*',
       'https://*/cotacao/*',
@@ -462,6 +500,8 @@ function detectSiteFromUrl(url = '') {
   if (isIntersolidCotacaoUrl(url)) return 'intersolid-cotacao';
   if (isCotacaoWebSmusUrl(url)) return 'cotacao-web-smus';
   if (isBubbleCatalogFornecedorUrl(url)) return 'bubble-catalog-fornecedor';
+  if (isHipcomerpCotacaoUrl(url)) return 'hipcomerp-cotacao';
+  if (isEasyCotacaoWebUrl(url)) return 'easy-cotacao-web';
   return 'generic';
 }
 
@@ -807,6 +847,276 @@ async function runJob(job, startBatch = 0, initial = {}) {
   await storageRemove('processingJob');
 }
 
+function hipcomerpPageSignature(items = []) {
+  return (items || [])
+    .map(item => item.signature || `${item.codigo || ''}|${item.ean || ''}|${item.nome || ''}`)
+    .filter(Boolean)
+    .join('||');
+}
+
+async function extractOpenQuotationItems(empresaColuna) {
+  const extractResult = await sendToQuotationPage({ action: 'extractItems', empresaColuna });
+  const items = (extractResult.items || []).filter(item => !item.filled && (item.nome || item.ean));
+  return { ...extractResult, items };
+}
+
+async function saveHipcomerpStopState(message, state) {
+  await saveState({
+    status: 'error',
+    msg: message,
+    total: state.total || state.processados || 0,
+    processados: state.processados || 0,
+    preenchidos: state.preenchidos || 0,
+    naoEncontrados: state.naoEncontrados || 0,
+    falhas: state.falhas || 0,
+    naoEncontradosDetalhes: state.naoEncontradosDetalhes || [],
+    falhasDetalhes: state.falhasDetalhes || [],
+    pct: state.pct || 0,
+    ts: Date.now(),
+  });
+}
+
+async function runHipcomerpJob(job, initial = {}) {
+  running = true;
+  cancelRequested = false;
+  await storageSet({ processingJob: job });
+
+  const token = await getToken();
+  if (!token) throw new Error('Login expirado. Abra o painel do Venpro e tente de novo.');
+
+  let tela = initial.tela || 0;
+  let preenchidos = initial.preenchidos || 0;
+  let naoEncontrados = initial.naoEncontrados || 0;
+  let falhasPreenchimento = initial.falhas || 0;
+  let processados = initial.processados || 0;
+  let naoEncontradosDetalhes = Array.isArray(initial.naoEncontradosDetalhes) ? [...initial.naoEncontradosDetalhes] : [];
+  let falhasDetalhes = Array.isArray(initial.falhasDetalhes) ? [...initial.falhasDetalhes] : [];
+  const seenPages = new Set(Array.isArray(initial.pageSignatures) ? initial.pageSignatures : []);
+  const maxTelas = 300;
+
+  while (tela < maxTelas) {
+    if (cancelRequested) {
+      await saveState({
+        status: 'paused',
+        total: processados,
+        processados,
+        preenchidos,
+        naoEncontrados,
+        falhas: falhasPreenchimento,
+        naoEncontradosDetalhes,
+        falhasDetalhes,
+        pct: 0,
+        tela,
+        pageSignatures: Array.from(seenPages),
+        ts: Date.now(),
+      });
+      return;
+    }
+
+    const extractResult = await extractOpenQuotationItems(job.empresaColuna || 0);
+    const items = extractResult.items;
+    const pageSignature = hipcomerpPageSignature(items);
+
+    if (!items.length) {
+      await saveState({
+        status: 'done',
+        total: processados,
+        processados,
+        preenchidos,
+        naoEncontrados,
+        falhas: falhasPreenchimento,
+        naoEncontradosDetalhes,
+        falhasDetalhes,
+        pct: 100,
+      });
+      await storageRemove('processingJob');
+      return;
+    }
+
+    if (pageSignature && seenPages.has(pageSignature)) {
+      await saveHipcomerpStopState('A próxima tela não mudou depois de salvar. Parei para evitar repetir os mesmos itens.', {
+        total: processados + items.length,
+        processados,
+        preenchidos,
+        naoEncontrados,
+        falhas: falhasPreenchimento,
+        naoEncontradosDetalhes,
+        falhasDetalhes,
+      });
+      return;
+    }
+    if (pageSignature) seenPages.add(pageSignature);
+
+    job.items = items;
+    job.pageSignatures = Array.from(seenPages);
+    await storageSet({ processingJob: job });
+
+    const telaNumero = tela + 1;
+    setProgress(0, `Tela ${telaNumero}: ${items.length} itens visíveis`);
+    setStatus(`Hipcomerp: buscando preços da tela ${telaNumero}...`, 'info');
+
+    const data = await matchBatch(token, job, items, telaNumero, null);
+    const precos = Array.isArray(data.precos) ? data.precos : [];
+    const missingDetails = missingDetailsForBatch(items, precos);
+    const missingCount = missingDetails.length || Math.max(0, items.length - precos.length);
+    naoEncontradosDetalhes = mergeResultDetails(naoEncontradosDetalhes, missingDetails);
+    naoEncontrados += missingCount;
+
+    setStatus(
+      missingCount > 0
+        ? `Hipcomerp: preenchendo ${precos.length} preço(s); ${missingCount} sem preço ficam zerado(s).`
+        : `Hipcomerp: preenchendo ${precos.length} preço(s) da tela ${telaNumero}...`,
+      'info'
+    );
+    const pricesToFill = enrichPricesForFill(precos, items);
+    const fillResult = pricesToFill.length > 0
+      ? await sendToQuotationPage({
+        action: 'fillPrices',
+        prices: pricesToFill,
+        empresaColuna: job.empresaColuna || 0,
+      })
+      : { filled: 0, failed: [], details: [], site: job.site, rowCount: items.length };
+    const filled = fillResult?.filled || 0;
+    const failedCount = Array.isArray(fillResult?.failed) ? fillResult.failed.length : 0;
+    const failureDetails = failureDetailsFromFill(fillResult, pricesToFill);
+    falhasDetalhes = mergeResultDetails(falhasDetalhes, failureDetails);
+    const fillFailures = failedCount || Math.max(0, pricesToFill.length - filled);
+
+    if (filled !== pricesToFill.length || failedCount > 0) {
+      falhasPreenchimento += fillFailures;
+      await reportFill(token, {
+        event_type: 'hipcomerp_page',
+        status: 'error',
+        job_id: job.jobId,
+        tabela_id: job.tabelaId,
+        prazo: job.prazo,
+        modo: job.modo,
+        site: job.site,
+        batch_index: telaNumero,
+        total_itens: processados + items.length,
+        batch_total: items.length,
+        precos_recebidos: precos.length,
+        preenchidos: filled,
+        falhas: fillFailures,
+        nao_encontrados: missingCount,
+        debug: {
+          site_detectado: fillResult?.site || job.site,
+          linhas_detectadas: fillResult?.rowCount || null,
+          detalhes: Array.isArray(fillResult?.details) ? fillResult.details.slice(0, 30) : [],
+          nao_encontrados_detalhes: missingDetails.slice(0, 30),
+          falhas_detalhes: failureDetails.slice(0, 30),
+        },
+      });
+      await saveHipcomerpStopState('Preço encontrado na tabela não entrou no campo da tela. Não cliquei em salvar.', {
+        total: processados + items.length,
+        processados,
+        preenchidos,
+        naoEncontrados,
+        falhas: falhasPreenchimento,
+        naoEncontradosDetalhes,
+        falhasDetalhes,
+      });
+      return;
+    }
+
+    preenchidos += filled;
+    processados += items.length;
+
+    await reportFill(token, {
+      event_type: 'hipcomerp_page',
+      status: 'success',
+      job_id: job.jobId,
+      tabela_id: job.tabelaId,
+      prazo: job.prazo,
+      modo: job.modo,
+      site: job.site,
+      batch_index: telaNumero,
+      total_itens: processados,
+      batch_total: items.length,
+      precos_recebidos: precos.length,
+      preenchidos: filled,
+      falhas: 0,
+      nao_encontrados: missingCount,
+      debug: {
+        nao_encontrados_detalhes: missingDetails.slice(0, 30),
+      },
+    });
+
+    await saveState({
+      status: 'processing',
+      total: processados,
+      processados,
+      preenchidos,
+      naoEncontrados,
+      falhas: falhasPreenchimento,
+      naoEncontradosDetalhes,
+      falhasDetalhes,
+      pct: 0,
+      tela: telaNumero,
+      pageSignatures: Array.from(seenPages),
+      ts: Date.now(),
+    });
+
+    setStatus(`Hipcomerp: tela ${telaNumero} preenchida. Salvando e carregando mais...`, 'info');
+    const advanceResult = await sendToQuotationPage({ action: 'advanceHipcomerp' });
+    if (!advanceResult?.ok) {
+      await saveHipcomerpStopState(`Não consegui avançar no Hipcomerp (${advanceResult?.reason || 'erro desconhecido'}).`, {
+        total: processados,
+        processados,
+        preenchidos,
+        naoEncontrados,
+        falhas: falhasPreenchimento,
+        naoEncontradosDetalhes,
+        falhasDetalhes,
+      });
+      return;
+    }
+
+    if (advanceResult.done) {
+      await reportFill(token, {
+        event_type: 'job',
+        status: 'done',
+        job_id: job.jobId,
+        tabela_id: job.tabelaId,
+        prazo: job.prazo,
+        modo: job.modo,
+        site: job.site,
+        total_itens: processados,
+        batch_total: processados,
+        preenchidos,
+        falhas: falhasPreenchimento,
+        nao_encontrados: naoEncontrados,
+        debug: { reason: advanceResult.reason || 'done' },
+      });
+      await saveState({
+        status: 'done',
+        total: processados,
+        processados,
+        preenchidos,
+        naoEncontrados,
+        falhas: falhasPreenchimento,
+        naoEncontradosDetalhes,
+        falhasDetalhes,
+        pct: 100,
+      });
+      await storageRemove('processingJob');
+      return;
+    }
+
+    tela++;
+  }
+
+  await saveHipcomerpStopState('Parei no limite de 300 telas para evitar loop infinito.', {
+    total: processados,
+    processados,
+    preenchidos,
+    naoEncontrados,
+    falhas: falhasPreenchimento,
+    naoEncontradosDetalhes,
+    falhasDetalhes,
+  });
+}
+
 async function startProcessing() {
   const tabelaId = tabelasEl.value;
   const prazo = parseInt(prazoEl.value, 10);
@@ -840,8 +1150,13 @@ async function startProcessing() {
     const job = { jobId: createJobId(), items, tabelaId, prazo, modo, empresaColuna, site };
     setProgress(0, `0 / ${items.length} itens`);
     showRunning();
-    setStatus(`Processando ${items.length} itens...`, 'info');
-    await runJob(job);
+    if (site === 'hipcomerp-cotacao') {
+      setStatus(`Hipcomerp: iniciando com ${items.length} itens visíveis...`, 'info');
+      await runHipcomerpJob(job);
+    } else {
+      setStatus(`Processando ${items.length} itens...`, 'info');
+      await runJob(job);
+    }
   } catch (err) {
     await saveState({ status: 'error', msg: err.message || 'Erro ao preencher cotação', total: 0, processados: 0, preenchidos: 0, naoEncontrados: 0, falhas: 0, pct: 0, ts: Date.now() });
   }
@@ -851,7 +1166,7 @@ async function resumeProcessing() {
   const data = await storageGet(['processingJob', 'processingState']);
   const job = data.processingJob;
   const state = data.processingState || {};
-  if (!job?.items?.length) {
+  if (!job || (job.site !== 'hipcomerp-cotacao' && !job.items?.length)) {
     resetUI();
     setStatus('Não encontrei processamento para retomar. Inicie novamente.', 'err');
     return;
@@ -864,14 +1179,27 @@ async function resumeProcessing() {
   setStatus('Retomando processamento...', 'info');
 
   try {
-    await runJob(job, state.batchIndex || 0, {
-      preenchidos: state.preenchidos || 0,
-      naoEncontrados: state.naoEncontrados || 0,
-      falhas: state.falhas || 0,
-      processados: state.processados || 0,
-      naoEncontradosDetalhes: state.naoEncontradosDetalhes || [],
-      falhasDetalhes: state.falhasDetalhes || [],
-    });
+    if (job.site === 'hipcomerp-cotacao') {
+      await runHipcomerpJob(job, {
+        tela: state.tela || 0,
+        preenchidos: state.preenchidos || 0,
+        naoEncontrados: state.naoEncontrados || 0,
+        falhas: state.falhas || 0,
+        processados: state.processados || 0,
+        naoEncontradosDetalhes: state.naoEncontradosDetalhes || [],
+        falhasDetalhes: state.falhasDetalhes || [],
+        pageSignatures: state.pageSignatures || job.pageSignatures || [],
+      });
+    } else {
+      await runJob(job, state.batchIndex || 0, {
+        preenchidos: state.preenchidos || 0,
+        naoEncontrados: state.naoEncontrados || 0,
+        falhas: state.falhas || 0,
+        processados: state.processados || 0,
+        naoEncontradosDetalhes: state.naoEncontradosDetalhes || [],
+        falhasDetalhes: state.falhasDetalhes || [],
+      });
+    }
   } catch (err) {
     await saveState({ ...state, status: 'error', msg: err.message || 'Erro ao retomar processamento', ts: Date.now() });
   }
