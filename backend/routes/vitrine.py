@@ -1381,6 +1381,46 @@ def _foto_banco(ean) -> Optional[str]:
     return _FOTOS_BANCO.get(str(ean).strip())
 
 
+def _ean_valido(ean) -> Optional[str]:
+    limpo = re.sub(r"\D", "", str(ean or ""))
+    return limpo if 8 <= len(limpo) <= 14 else None
+
+
+async def _foto_aprendida(ean) -> Optional[str]:
+    """Foto escolhida por um RCA anteriormente para este EAN (banco que cresce com o uso)."""
+    limpo = _ean_valido(ean)
+    if not limpo:
+        return None
+    doc = await _db.produtos_fotos_aprendidas.find_one({"ean": limpo}, {"url": 1})
+    return doc.get("url") if doc else None
+
+
+async def _fotos_aprendidas_lote(eans: list) -> dict:
+    limpos = [e for e in (_ean_valido(x) for x in eans) if e]
+    if not limpos:
+        return {}
+    mapa = {}
+    async for doc in _db.produtos_fotos_aprendidas.find({"ean": {"$in": limpos}}, {"ean": 1, "url": 1}):
+        mapa[doc["ean"]] = doc["url"]
+    return mapa
+
+
+async def _aprender_foto_por_ean(ean, url: str, uid: str):
+    limpo = _ean_valido(ean)
+    if not limpo or not url:
+        return
+    now = datetime.now(timezone.utc)
+    await _db.produtos_fotos_aprendidas.update_one(
+        {"ean": limpo},
+        {
+            "$set": {"ean": limpo, "url": url, "updated_by": uid, "updated_at": now},
+            "$inc": {"selected_count": 1},
+            "$setOnInsert": {"created_at": now, "created_by": uid},
+        },
+        upsert=True,
+    )
+
+
 # ═══════════════════════════════════════
 # PUXAR DA TABELA (tabelas_mestre da Cotação Pronta)
 # ═══════════════════════════════════════
@@ -1441,15 +1481,26 @@ async def listar_itens_tabela_vitrine(tabela_id: str, prazo: int = 7, uid: str =
             pass
 
     itens = []
+    sem_foto_aprovada = []
     for item in precos_nome_lista:
         ean = item.get("ean") or None
+        foto = _foto_banco(ean)
+        if ean and not foto:
+            sem_foto_aprovada.append(ean)
         itens.append({
             "nome": item.get("orig") or "",
             "ean": ean,
             "preco": item.get("preco"),
             "qtd_caixa": item.get("fracionamento") or None,
-            "foto_url": _foto_banco(ean),
+            "foto_url": foto,
         })
+
+    # Completa com fotos aprendidas das escolhas anteriores dos RCAs
+    aprendidas = await _fotos_aprendidas_lote(sem_foto_aprovada)
+    if aprendidas:
+        for it in itens:
+            if not it["foto_url"] and it["ean"]:
+                it["foto_url"] = aprendidas.get(re.sub(r"\D", "", it["ean"]))
 
     return {
         "tabela": doc.get("nome"),
@@ -1838,10 +1889,13 @@ async def sugerir_imagem(product_name: str, ean: str = "", uid: str = Depends(ge
     if len(product_name) < 2 or len(product_name) > 120:
         raise HTTPException(400, "Nome do produto inválido")
 
-    # 0. Banco de fotos aprovadas — lookup direto por EAN (foto exata do produto)
+    # 0. Banco de fotos por EAN: aprovadas do Edson, depois aprendidas dos RCAs
     foto_banco = _foto_banco(ean)
     if foto_banco:
         return {"found": True, "image_url": foto_banco, "match": "banco_venpro"}
+    foto_aprendida = await _foto_aprendida(ean)
+    if foto_aprendida:
+        return {"found": True, "image_url": foto_aprendida, "match": "banco_aprendido"}
 
     nome_norm = normalizar(product_name)
     logger.info("[sugerir-imagem] query_len=%s norm=%r", len(product_name), nome_norm)
@@ -1942,6 +1996,8 @@ async def aprender_imagem(req: LearnImageRequest, uid: str = Depends(get_user_id
         },
         upsert=True,
     )
+    # Banco por EAN cresce com cada escolha do RCA: próxima vez a foto vem sozinha
+    await _aprender_foto_por_ean(req.ean, image_url, uid)
     await audit_event(
         "vitrine_item_image_learned",
         uid=uid,
@@ -1963,13 +2019,17 @@ async def sugerir_imagens(product_name: str, ean: str = "", uid: str = Depends(g
     result = await asyncio.to_thread(_serper_images, product_name, 8, False)
 
     foto_banco = _foto_banco(ean)
+    origem = "Banco Venpro (aprovada)"
+    if not foto_banco:
+        foto_banco = await _foto_aprendida(ean)
+        origem = "Foto usada antes"
     if foto_banco:
         images = [img for img in result.get("images", []) if img.get("image_url") != foto_banco]
         images.insert(0, {
             "image_url": foto_banco,
             "thumbnail_url": foto_banco,
             "title": product_name,
-            "source": "Banco Venpro (aprovada)",
+            "source": origem,
             "source_page": "",
             "needs_review": False,
         })

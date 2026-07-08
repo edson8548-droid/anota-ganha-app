@@ -302,6 +302,10 @@ async def startup_event():
         await db.tabelas_mestre.create_index(
             [("user_id", 1)]
         )
+        await db.produtos_fotos_aprendidas.create_index(
+            [("ean", 1)],
+            unique=True,
+        )
         logger.info("✅ Índices MongoDB criados")
     except Exception as e:
         logger.warning(f"⚠️  Índices MongoDB: {e}")

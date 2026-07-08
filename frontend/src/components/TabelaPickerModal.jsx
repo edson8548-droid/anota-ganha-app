@@ -233,7 +233,7 @@ export default function TabelaPickerModal({ onClose, onAdd }) {
                     <input type="checkbox" checked={marcado} onChange={() => toggle(it._idx)}
                       style={{ accentColor: '#3A85A8', width: 15, height: 15, flexShrink: 0 }} />
                     {it.foto_url ? (
-                      <img src={it.foto_url} alt="" loading="lazy"
+                      <img src={vitrineService.imagemUrl(it.foto_url)} alt="" loading="lazy"
                         style={{ width: 26, height: 26, objectFit: 'contain', borderRadius: 4, background: '#fff', flexShrink: 0 }} />
                     ) : (
                       <span style={{ width: 26, height: 26, flexShrink: 0 }} />

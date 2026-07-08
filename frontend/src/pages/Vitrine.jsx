@@ -198,7 +198,7 @@ export default function Vitrine() {
       unit: 'UN',
       units_per_package: p.qtd_caixa ? String(p.qtd_caixa) : '',
       _imageFile: null,
-      _imagePreview: p.foto_url || null,
+      _imagePreview: p.foto_url ? vitrineService.imagemUrl(p.foto_url) : null,
       _imageUrl: p.foto_url || null,
       _searching: !p.foto_url,
     }));
