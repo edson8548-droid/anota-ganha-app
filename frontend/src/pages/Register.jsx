@@ -157,11 +157,8 @@ const Register = () => {
       };
       
       // ⭐️ A chamada 'register' agora envia os dados adicionais
-      const createdUser = await register(email, password, additionalData);
-      navigate('/verificar-email', {
-        replace: true,
-        state: { email: createdUser?.email || email },
-      });
+      await register(email, password, additionalData);
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       console.error('Erro no registro:', err);
       const backendMessage = err?.response?.data?.detail || err?.message;
@@ -356,10 +353,6 @@ const Register = () => {
             {getFieldError('confirmPassword') && <span className="field-error">{getFieldError('confirmPassword')}</span>}
           </div>
 
-          <div className="register-email-confirmation-note">
-            Ao criar a conta, enviaremos um email de confirmação. Verifique também Spam, Lixo eletrônico e Promoções.
-          </div>
-          
           <button 
             type="submit" 
             className="btn-register"

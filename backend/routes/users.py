@@ -985,6 +985,7 @@ async def register(
             email=email,
             password=password,
             display_name=nome,
+            email_verified=True,
         )
         uid = user.uid
         logger.info("[REGISTER] Firebase user criado: uid=%s", uid)
@@ -1008,9 +1009,9 @@ async def register(
         "telefone": telefone_clean,
         "role": "user",
         "license_type": "trial",
-        "requiresEmailVerification": True,
-        "emailVerified": False,
-        "emailVerificationRequiredAt": firestore.SERVER_TIMESTAMP,
+        "requiresEmailVerification": False,
+        "emailVerified": True,
+        "emailVerifiedAt": firestore.SERVER_TIMESTAMP,
         "trial_ends_at": firestore.SERVER_TIMESTAMP,
         "created_at": firestore.SERVER_TIMESTAMP,
         "updated_at": firestore.SERVER_TIMESTAMP,

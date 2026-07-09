@@ -20,7 +20,6 @@ from typing import Optional
 import firebase_admin
 from firebase_admin import firestore, auth as firebase_auth
 from services.email_verification_access import (
-    EMAIL_NOT_VERIFIED_MESSAGE,
     ensure_email_verified_for_required_user,
 )
 
@@ -108,8 +107,6 @@ async def validate_license(payload: ValidateRequest):
     user_doc = users[0]
     user_id = user_doc.id
     user_data = user_doc.to_dict()
-    if user_data.get("requiresEmailVerification") and user_data.get("emailVerified") is not True:
-        return {"active": False, "message": EMAIL_NOT_VERIFIED_MESSAGE}
 
     # Verifica assinatura
     sub_ref = db.collection("subscriptions").document(user_id)

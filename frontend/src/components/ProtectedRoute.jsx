@@ -130,10 +130,6 @@ const ProtectedRoute = ({ children, requireSubscription = false }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (user.requiresEmailVerification && !user.emailVerified) {
-    return <Navigate to="/verificar-email" state={{ from: location }} replace />;
-  }
-
   if (requireSubscription) {
     if (subscriptionState.loading) {
       return <LoadingScreen text="Verificando assinatura..." />;

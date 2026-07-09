@@ -10,11 +10,11 @@ def test_does_not_block_existing_users_without_required_flag():
     assert not should_block_unverified_email({}, {"email_verified": False})
 
 
-def test_blocks_new_required_user_when_email_is_not_verified():
+def test_does_not_block_required_user_when_email_is_not_verified():
     user_data = {"requiresEmailVerification": True}
     decoded = {"email_verified": False}
 
-    assert should_block_unverified_email(user_data, decoded)
+    assert not should_block_unverified_email(user_data, decoded)
 
 
 def test_allows_required_user_after_email_verification():

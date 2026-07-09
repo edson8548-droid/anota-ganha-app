@@ -13,7 +13,6 @@ import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { isValidCPF, onlyDigits } from '../utils/documentValidators';
 import { registerDeviceSession } from '../utils/deviceSession';
-import { sendVerificationEmail } from '../utils/emailVerification';
 import { registerUser } from '../services/api';
 
 export const useAuth = () => {
@@ -45,11 +44,9 @@ export const useAuth = () => {
             isAdmin: isAdmin 
           });
 
-          if (!requiresEmailVerification || emailVerified) {
-            registerDeviceSession().catch((sessionErr) => {
-              console.warn('[Auth] Não foi possível registrar dispositivo:', sessionErr?.message || sessionErr);
-            });
-          }
+          registerDeviceSession().catch((sessionErr) => {
+            console.warn('[Auth] Não foi possível registrar dispositivo:', sessionErr?.message || sessionErr);
+          });
         } catch (err) {
           console.error('Erro ao buscar dados do usuário:', err);
           setUser({
@@ -122,12 +119,6 @@ export const useAuth = () => {
       if (additionalData.name && userCredential.user.displayName !== additionalData.name) {
         await updateProfile(userCredential.user, { displayName: additionalData.name });
       }
-      try {
-        await sendVerificationEmail(userCredential.user);
-      } catch (verificationErr) {
-        console.warn('[Register] Não foi possível enviar email de confirmação:', verificationErr?.message || verificationErr);
-      }
-
       return userCredential.user;
     } catch (err) {
       console.error('Erro no registro:', err);
