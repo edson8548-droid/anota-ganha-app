@@ -1363,7 +1363,13 @@ def _carregar_fotos_banco():
     caminho = Path(__file__).resolve().parent.parent / "data" / "produtos_fotos.json"
     try:
         with open(caminho, encoding="utf-8") as f:
-            _FOTOS_BANCO = json.load(f)
+            raw = json.load(f)
+        # Chaves na forma canônica (sem zero à esquerda) para casar com o limpar_ean do site
+        _FOTOS_BANCO = {}
+        for k, v in raw.items():
+            canon = re.sub(r"\D", "", str(k)).lstrip("0")
+            if 8 <= len(canon) <= 14:
+                _FOTOS_BANCO.setdefault(canon, v)
         logger.info("[fotos_banco] %d fotos por EAN carregadas", len(_FOTOS_BANCO))
     except FileNotFoundError:
         _FOTOS_BANCO = {}
@@ -1375,15 +1381,15 @@ def _carregar_fotos_banco():
 _carregar_fotos_banco()
 
 
-def _foto_banco(ean) -> Optional[str]:
-    if not ean:
-        return None
-    return _FOTOS_BANCO.get(str(ean).strip())
-
-
 def _ean_valido(ean) -> Optional[str]:
-    limpo = re.sub(r"\D", "", str(ean or ""))
+    # Forma canônica igual ao limpar_ean do site: só dígitos, sem zero à esquerda.
+    limpo = re.sub(r"\D", "", str(ean or "")).lstrip("0")
     return limpo if 8 <= len(limpo) <= 14 else None
+
+
+def _foto_banco(ean) -> Optional[str]:
+    canon = _ean_valido(ean)
+    return _FOTOS_BANCO.get(canon) if canon else None
 
 
 async def _foto_aprendida(ean) -> Optional[str]:
@@ -1551,8 +1557,9 @@ async def listar_itens_tabela_vitrine(tabela_id: str, prazo: int = 7, uid: str =
         ean = item.get("ean") or None
         foto = None
         if ean:
-            clean = re.sub(r"\D", "", ean)
-            foto = aprendidas.get(clean) or _foto_banco(ean) or candidatas.get(clean)
+            clean = _ean_valido(ean)
+            if clean:
+                foto = aprendidas.get(clean) or _foto_banco(ean) or candidatas.get(clean)
         itens.append({
             "nome": item.get("orig") or "",
             "ean": ean,

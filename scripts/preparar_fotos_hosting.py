@@ -72,7 +72,10 @@ for ean, origem in itens.items():
         puladas += 1
     # ?v= muda quando a foto muda — fura o cache de 1 ano em correções
     versao = hashlib.md5(open(destino, "rb").read()).hexdigest()[:8]
-    mapa[ean] = f"{URL_BASE}/{ean}.webp?v={versao}"
+    # chave na forma canônica (sem zero à esquerda) = mesma do limpar_ean do site;
+    # a URL/arquivo mantém o EAN original (o nome do .webp não muda)
+    chave = ean.lstrip("0") or ean
+    mapa.setdefault(chave, f"{URL_BASE}/{ean}.webp?v={versao}")
 
 os.makedirs(os.path.dirname(SAIDA), exist_ok=True)
 with open(SAIDA, "w", encoding="utf-8") as f:
