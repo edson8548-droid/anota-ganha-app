@@ -1421,6 +1421,67 @@ async def _aprender_foto_por_ean(ean, url: str, uid: str):
     )
 
 
+# --- Nível 3: fotos automáticas guardadas por EAN (nunca sobrepõem escolhidas/aprovadas) ---
+# produtos_fotos_candidatas: {ean, url (melhor, já baixada), opcoes:[{url,thumbnail_url,title,source}], ...}
+# São resultados de busca lembrados: evitam nova busca e dão 2-3 opções para o RCA trocar.
+
+async def _melhor_candidata(ean) -> Optional[str]:
+    limpo = _ean_valido(ean)
+    if not limpo:
+        return None
+    doc = await _db.produtos_fotos_candidatas.find_one({"ean": limpo}, {"url": 1})
+    return doc.get("url") if doc else None
+
+
+async def _candidatas_lote(eans: list) -> dict:
+    limpos = [e for e in (_ean_valido(x) for x in eans) if e]
+    if not limpos:
+        return {}
+    mapa = {}
+    async for doc in _db.produtos_fotos_candidatas.find({"ean": {"$in": limpos}}, {"ean": 1, "url": 1}):
+        if doc.get("url"):
+            mapa[doc["ean"]] = doc["url"]
+    return mapa
+
+
+async def _opcoes_candidatas(ean) -> list:
+    limpo = _ean_valido(ean)
+    if not limpo:
+        return []
+    doc = await _db.produtos_fotos_candidatas.find_one({"ean": limpo}, {"opcoes": 1})
+    return (doc or {}).get("opcoes") or []
+
+
+def _opcoes_de_imagens(imagens: list) -> list:
+    return [
+        {
+            "url": i["image_url"],
+            "thumbnail_url": i.get("thumbnail_url") or i["image_url"],
+            "title": i.get("title") or "",
+            "source": i.get("source") or "serper",
+        }
+        for i in (imagens or [])[:3]
+        if i.get("image_url")
+    ]
+
+
+async def _salvar_candidatas(ean, uid: str, url_melhor: Optional[str] = None, opcoes: Optional[list] = None):
+    limpo = _ean_valido(ean)
+    if not limpo:
+        return
+    now = datetime.now(timezone.utc)
+    campos = {"ean": limpo, "updated_by": uid, "updated_at": now}
+    if url_melhor:
+        campos["url"] = url_melhor
+    if opcoes is not None:
+        campos["opcoes"] = opcoes[:3]
+    await _db.produtos_fotos_candidatas.update_one(
+        {"ean": limpo},
+        {"$set": campos, "$setOnInsert": {"created_at": now}},
+        upsert=True,
+    )
+
+
 # ═══════════════════════════════════════
 # PUXAR DA TABELA (tabelas_mestre da Cotação Pronta)
 # ═══════════════════════════════════════
@@ -1480,16 +1541,18 @@ async def listar_itens_tabela_vitrine(tabela_id: str, prazo: int = 7, uid: str =
         except OSError:
             pass
 
-    # Escolha humana explícita (aprendida) corrige a aprovada em massa quando divergirem
+    # Prioridade das fotos: escolha humana (aprendida) > aprovada em massa > candidata automática
     todos_eans = [item.get("ean") for item in precos_nome_lista if item.get("ean")]
     aprendidas = await _fotos_aprendidas_lote(todos_eans)
+    candidatas = await _candidatas_lote(todos_eans)
 
     itens = []
     for item in precos_nome_lista:
         ean = item.get("ean") or None
         foto = None
         if ean:
-            foto = aprendidas.get(re.sub(r"\D", "", ean)) or _foto_banco(ean)
+            clean = re.sub(r"\D", "", ean)
+            foto = aprendidas.get(clean) or _foto_banco(ean) or candidatas.get(clean)
         itens.append({
             "nome": item.get("orig") or "",
             "ean": ean,
@@ -1893,6 +1956,10 @@ async def sugerir_imagem(product_name: str, ean: str = "", uid: str = Depends(ge
     foto_banco = _foto_banco(ean)
     if foto_banco:
         return {"found": True, "image_url": foto_banco, "match": "banco_venpro"}
+    # Candidata automática já lembrada para este EAN — evita nova busca
+    foto_candidata = await _melhor_candidata(ean)
+    if foto_candidata:
+        return {"found": True, "image_url": foto_candidata, "match": "candidata"}
 
     nome_norm = normalizar(product_name)
     logger.info("[sugerir-imagem] query_len=%s norm=%r", len(product_name), nome_norm)
@@ -1923,32 +1990,36 @@ async def sugerir_imagem(product_name: str, ean: str = "", uid: str = Depends(ge
                 return {"found": True, "image_url": url, "match": "similar"}
 
     # 3. Serper.dev — Google Images (via thread para não bloquear event loop)
-    result = await asyncio.to_thread(_serper_search, product_name)
-    if result.get("found") and result.get("image_url"):
-        local_url = await _store_remote_image_url(
-            result["image_url"],
-            uid=uid,
-            product_name=product_name,
-            source="serper_auto",
-        )
-        if local_url:
-            result["image_url"] = local_url
-        await _db.vitrine_product_images.update_one(
-            {"normalized_name": nome_norm},
-            {
-                "$set": {
-                    "product_name": product_name,
-                    "normalized_name": nome_norm,
-                    "image_url": result["image_url"],
-                    "source": result.get("match") or "serper",
-                    "updated_at": datetime.now(timezone.utc),
-                },
-                "$inc": {"selected_count": 1},
-                "$setOnInsert": {"created_at": datetime.now(timezone.utc)},
+    busca = await asyncio.to_thread(_serper_images, product_name, 6)
+    melhor = next((i for i in (busca.get("images") or []) if not i.get("needs_review")), None)
+    if not melhor:
+        return {"found": False, "image_url": None, "match": None, "error": busca.get("error")}
+
+    local_url = await _store_remote_image_url(
+        melhor["image_url"],
+        uid=uid,
+        product_name=product_name,
+        source="serper_auto",
+    ) or melhor["image_url"]
+
+    await _db.vitrine_product_images.update_one(
+        {"normalized_name": nome_norm},
+        {
+            "$set": {
+                "product_name": product_name,
+                "normalized_name": nome_norm,
+                "image_url": local_url,
+                "source": busca.get("match") or "serper",
+                "updated_at": datetime.now(timezone.utc),
             },
-            upsert=True,
-        )
-    return result
+            "$inc": {"selected_count": 1},
+            "$setOnInsert": {"created_at": datetime.now(timezone.utc)},
+        },
+        upsert=True,
+    )
+    # Guarda por EAN (nível 3): melhor foto + 2-3 opções para o RCA trocar depois sem re-buscar
+    await _salvar_candidatas(ean, uid, url_melhor=local_url, opcoes=_opcoes_de_imagens(busca.get("images")))
+    return {"found": True, "image_url": local_url, "match": "serper"}
 
 
 @router.post("/aprender-imagem")
@@ -2006,22 +2077,44 @@ async def aprender_imagem(req: LearnImageRequest, uid: str = Depends(get_user_id
 
 @router.get("/sugerir-imagens")
 async def sugerir_imagens(product_name: str, ean: str = "", uid: str = Depends(get_user_id)):
-    """Retorna até 8 opções para o RCA escolher outra foto.
-
-    Foto do banco aprovado (por EAN) vem primeiro; depois opções da internet
-    sem corte por nota mínima — aqui o RCA decide, duvidosas vêm marcadas."""
+    """Retorna as opções para o RCA escolher outra foto, nesta ordem:
+    foto escolhida/aprovada > opções já salvas para o EAN > novas da internet.
+    O RCA decide; se o Serper cair, ainda mostra as já salvas."""
     product_name = (product_name or "").strip()
     if len(product_name) < 2 or len(product_name) > 120:
         raise HTTPException(400, "Nome do produto inválido")
     result = await asyncio.to_thread(_serper_images, product_name, 8, False)
+    novas = result.get("images", [])
 
+    # Guarda as novas por EAN (nível 3) para o RCA reaproveitar sem re-buscar
+    if novas:
+        await _salvar_candidatas(ean, uid, opcoes=_opcoes_de_imagens(novas))
+
+    images = list(novas)
+    vistos = {img.get("image_url") for img in images}
+
+    # Opções já salvas antes para este EAN (aparecem mesmo sem internet)
+    for opc in await _opcoes_candidatas(ean):
+        url = opc.get("url")
+        if url and url not in vistos:
+            vistos.add(url)
+            images.append({
+                "image_url": url,
+                "thumbnail_url": opc.get("thumbnail_url") or url,
+                "title": opc.get("title") or product_name,
+                "source": opc.get("source") or "Já salva",
+                "source_page": "",
+                "needs_review": False,
+            })
+
+    # Foto escolhida por humano / aprovada Venpro sempre no topo
     foto_banco = await _foto_aprendida(ean)
-    origem = "Foto corrigida antes"
+    origem = "Foto escolhida antes"
     if not foto_banco:
         foto_banco = _foto_banco(ean)
         origem = "Banco Venpro (aprovada)"
     if foto_banco:
-        images = [img for img in result.get("images", []) if img.get("image_url") != foto_banco]
+        images = [img for img in images if img.get("image_url") != foto_banco]
         images.insert(0, {
             "image_url": foto_banco,
             "thumbnail_url": foto_banco,
@@ -2030,8 +2123,10 @@ async def sugerir_imagens(product_name: str, ean: str = "", uid: str = Depends(g
             "source_page": "",
             "needs_review": False,
         })
-        result = {"found": True, "image_url": foto_banco, "match": "banco_venpro", "images": images}
-    return result
+
+    if not images:
+        return result  # nenhuma opção; preserva error (ex.: sem_creditos)
+    return {"found": True, "image_url": images[0]["image_url"], "match": "com_opcoes", "images": images}
 
 
 # ═══════════════════════════════════════
