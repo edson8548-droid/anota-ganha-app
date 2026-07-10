@@ -568,6 +568,23 @@ def limpar_ean(ean):
 
         return ""
 
+def ean_unidade_de_dun14(ean_limpo):
+        """Converte código de caixa DUN-14/ITF-14 para o EAN-13 da unidade.
+
+        Mercados (ex.: SG Cotação) cadastram o código da embalagem de compra:
+        dígito indicador (1-9) + 12 primeiros dígitos do EAN-13 + novo DV.
+        A unidade é recuperada recalculando o dígito verificador dos 12 do meio.
+        Retorna "" se o código não tiver cara de DUN-14.
+        """
+        if not ean_limpo or len(ean_limpo) != 14 or not ean_limpo.isdigit():
+            return ""
+        if ean_limpo[0] == "0":
+            return ""
+        core = ean_limpo[1:13]
+        soma = sum(int(c) * (1 if i % 2 == 0 else 3) for i, c in enumerate(core))
+        dv = (10 - soma % 10) % 10
+        return core + str(dv)
+
 def normalizar_nome(nome):
         """Normalização completa v4.0 — Turbo + Ajustes v5.0 + HTML decode"""
         if not nome or not nome or str(nome).lower() == 'nan':
@@ -2182,6 +2199,11 @@ def encontrar_preco(ean, nome_original, precos_dict, precos_nome_lista, norms_ca
         if ean_limpo and ean_limpo in precos_dict:
             return precos_dict[ean_limpo], "EAN"
 
+        # 1b. Código de caixa (DUN-14) → EAN-13 da unidade
+        ean_unidade = ean_unidade_de_dun14(ean_limpo)
+        if ean_unidade and ean_unidade in precos_dict:
+            return precos_dict[ean_unidade], "EAN"
+
         # 2. Busca por Nome — MOTOR EM 3 CAMADAS
         n_site = normalizar_nome(nome_original)
         if not n_site:
@@ -2308,6 +2330,10 @@ def processar_cotacao(itens_cotacao, precos_dict, precos_nome_lista, modo="ean")
         if modo == "ean":
             ean_limpo = limpar_ean(item.get("ean", ""))
             preco = precos_dict.get(ean_limpo) if ean_limpo else None
+            if preco is None:
+                ean_unidade = ean_unidade_de_dun14(ean_limpo)
+                if ean_unidade:
+                    preco = precos_dict.get(ean_unidade)
             tipo = "EAN" if preco is not None else None
             results.append({"linha": item.get("linha", 0), "preco": preco, "tipo": tipo})
         else:
