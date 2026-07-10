@@ -2589,6 +2589,10 @@ async function fillQuotationPrices(prices, options = {}) {
       ? (type === 'number'
         ? [dot3, dot, noDecimalsDot, comma3, comma, raw]
         : [comma3, comma, dot3, dot, raw, noDecimalsDot])
+      : site === 'sg-cotacao'
+        ? (type === 'number'
+          ? [dot, noDecimalsDot, comma, comma3, raw]
+          : [comma, dot, comma3, dot3, raw, noDecimalsDot])
       : site === 'estancia-cotacao'
         ? (type === 'number'
           ? [dot, noDecimalsDot, comma, raw]
@@ -2977,8 +2981,40 @@ async function fillQuotationPrices(prices, options = {}) {
     return findBestEditorNear(input, beforeEditors);
   }
 
+  // SG Cotação usa ng2-currency-mask: o NgModel só atualiza pelo handler da
+  // máscara, e o único handler que relê o value do DOM é o de paste
+  // (handlePaste → setTimeout(1) → updateFieldValue lê rawValue=input.value,
+  // reaplica a máscara e chama onModelChange). Escrever o value e disparar
+  // "input" pinta a tela mas deixa o model em 0 — o Gravar do site salvava 0.
+  async function setSgCotacaoInputValue(input, value) {
+    for (const candidate of priceValueCandidates(value, input)) {
+      try {
+        input.focus?.();
+        if (typeof input.select === 'function') input.select();
+        writeNativeValue(input, candidate);
+        try {
+          input.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true }));
+        } catch {
+          input.dispatchEvent(new Event('paste', { bubbles: true, cancelable: true }));
+        }
+        await waitForGridRender(90);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.dispatchEvent(new Event('blur', { bubbles: true }));
+        input.dispatchEvent(new Event('focusout', { bubbles: true }));
+        await waitForGridRender(40);
+        if (samePriceLike(getControlValue(input), value)) return true;
+      } catch {}
+    }
+    return false;
+  }
+
   async function setInputValue(input, value) {
     input.scrollIntoView({ block: 'center', inline: 'nearest' });
+
+    if (site === 'sg-cotacao') {
+      return setSgCotacaoInputValue(input, value);
+    }
 
     if (!isEditableValueControl(input)) {
       if (site === 'cotacao-web-smus') {

@@ -193,6 +193,7 @@ describe('extensoes Chrome', () => {
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.53.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.54.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.55.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.56.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-whatsapp-extension.zip')));
   });
 
@@ -221,7 +222,7 @@ describe('extensoes Chrome', () => {
     const contentJs = readText('chrome-extension/content.js');
     const hipcomBridgeJs = readText('chrome-extension/hipcom-main-world.js');
 
-    assert.equal(manifest.version, '1.0.55');
+    assert.equal(manifest.version, '1.0.56');
     assert.ok(
       manifest.content_scripts.some(script => (script.js || []).includes('hipcom-main-world.js') && script.run_at === 'document_start' && script.world === 'MAIN'),
       'Hipcomerp precisa capturar a API antes do Flutter carregar'
@@ -398,7 +399,7 @@ describe('extensoes Chrome', () => {
     const contentJs = readText('chrome-extension/content.js');
     const cotacaoPy = readText('backend/routes/cotacao.py');
 
-    assert.equal(manifest.version, '1.0.55');
+    assert.equal(manifest.version, '1.0.56');
     assert.match(popupJs, /'easy-cotacao-web': 'Easy Cotação Web'/);
     assert.match(popupJs, /function isEasyCotacaoWebUrl/);
     assert.match(popupJs, /gepautomacao\.dyndns\.org/);
@@ -419,7 +420,7 @@ describe('extensoes Chrome', () => {
     const popupJs = readText('chrome-extension/popup.js');
     const contentJs = readText('chrome-extension/content.js');
 
-    assert.equal(manifest.version, '1.0.55');
+    assert.equal(manifest.version, '1.0.56');
     assert.match(popupJs, /'estancia-cotacao': 'Estância'/);
     assert.match(popupJs, /async function runEstanciaJob/);
     assert.match(popupJs, /loadEstanciaQuote/);
@@ -536,6 +537,24 @@ describe('extensoes Chrome', () => {
       </div>`;
     const dom = await createContentDom(html, 'http://cotacao.sghost.com.br/#/movimentacao/cotacao');
 
+    // Simula a ng2-currency-mask do site: o NgModel (item.preco) SÓ atualiza
+    // pelo handler de paste, que relê o value do DOM após setTimeout(1).
+    dom.window.eval(`
+      window.__sgModel = { preco: 0, confirmado: false };
+      const precoInput = document.getElementById('0-preco');
+      precoInput.addEventListener('paste', () => {
+        setTimeout(() => {
+          const digits = String(precoInput.value).replace(/\\D/g, '');
+          const n = Number(digits) / 100;
+          precoInput.value = 'R$ ' + n.toFixed(2).replace('.', ',');
+          window.__sgModel.preco = n;
+        }, 1);
+      });
+      precoInput.addEventListener('blur', () => {
+        window.__sgModel.confirmado = window.__sgModel.preco > 0;
+      });
+    `);
+
     assert.equal(dom.window.eval('detectQuotationSite()'), 'sg-cotacao');
     const items = await dom.window.eval('extractQuotationItems({})');
     assert.equal(items.length, 1);
@@ -550,6 +569,10 @@ describe('extensoes Chrome', () => {
     assert.equal(fillResult.site, 'sg-cotacao');
     assert.equal(fillResult.filled, 1);
     assert.match(dom.window.document.getElementById('0-preco').value, /8[.,]79/);
+    // O model Angular (o que o botão Gravar salva) precisa ter recebido o preço
+    const model = dom.window.eval('window.__sgModel');
+    assert.equal(model.preco, 8.79);
+    assert.equal(model.confirmado, true);
     assert.equal(dom.window.document.getElementById('0-precoEmb').value, '');
     assert.equal(dom.window.document.getElementById('0-percDesc').value, '');
   });
