@@ -4,6 +4,30 @@ const cotacaoWebSmusPriceCellMeta = new WeakMap();
 const bubbleCatalogRowMeta = new WeakMap();
 const hipcomerpRowMeta = new WeakMap();
 const easyCotacaoRowMeta = new WeakMap();
+const estanciaRowMeta = new WeakMap();
+const HIPCOMERP_BRIDGE_VERSION = '1.0.54';
+const hipcomerpApiState = {
+  ready: false,
+  baseCaptured: false,
+  bridgeVersion: '',
+  fornecedor: '',
+  loja: '',
+  numeroCotacao: '',
+  limit: 20,
+  hasAuth: false,
+  pages: new Map(),
+  total: 0,
+  lastSeenAt: 0,
+  pending: new Map(),
+};
+
+document.addEventListener('venpro:hipcom-api-captured', event => {
+  rememberHipcomerpApiCapture(event.detail || {});
+});
+
+document.addEventListener('venpro:hipcom-api-command-result', event => {
+  resolveHipcomerpApiCommand(event.detail || {});
+});
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -18,6 +42,30 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     if (msg.action === 'advanceHipcomerp') {
       return advanceHipcomerpPage();
+    }
+    if (msg.action === 'getHipcomerpApiState') {
+      return getHipcomerpApiStateLive();
+    }
+    if (msg.action === 'loadHipcomerpApiItems') {
+      return loadHipcomerpApiItems(msg.options || {});
+    }
+    if (msg.action === 'saveHipcomerpApiPrices') {
+      return saveHipcomerpApiPrices(msg.prices || []);
+    }
+    if (msg.action === 'openEstanciaCotacao') {
+      return openEstanciaCotacaoPage();
+    }
+    if (msg.action === 'saveEstanciaPage') {
+      return saveEstanciaPage();
+    }
+    if (msg.action === 'loadEstanciaPage') {
+      return loadEstanciaPage(msg.page);
+    }
+    if (msg.action === 'loadEstanciaQuote') {
+      return loadEstanciaQuote(msg.quoteIndex);
+    }
+    if (msg.action === 'getEstanciaState') {
+      return getEstanciaState();
     }
     if (msg.action === 'detectSite') {
       const site = detectQuotationSite();
@@ -346,6 +394,8 @@ function isBubbleCatalogFornecedorPage(hostname = window.location.hostname || ''
 
 function isHipcomerpCotacaoPage(hostname = window.location.hostname || '', bodyText = document.body?.innerText || '') {
   if (!/(^|\.)cotacao\.hipcomerp\.com\.br$/i.test(hostname)) return false;
+  const route = `${window.location.pathname || ''}${window.location.hash || ''}`;
+  if (/#\/?app\/(?:oferta|cotacoes|cotacao)/i.test(route) || hipcomerpUsesCanvasKit()) return true;
   const loose = normalizeLooseText(bodyText);
   return loose.includes('fornecedor')
     && loose.includes('digitados')
@@ -362,6 +412,193 @@ function isEasyCotacaoWebPage(hostname = window.location.hostname || '', path = 
       && (loose.includes('qtd. emb') || loose.includes('qtd emb'))
       && loose.includes('preco')
       && loose.includes('similar'));
+}
+
+function isEstanciaCotacaoPage(hostname = window.location.hostname || '', path = window.location.pathname || '', bodyText = document.body?.innerText || '') {
+  if (!/(^|\.)cotacao\.estanciasupermercados\.com\.br$/i.test(hostname)) return false;
+  const loose = normalizeLooseText(bodyText);
+  return /\/(home|cotacao)\.asp$/i.test(path)
+    || (loose.includes('cotacoes')
+      && loose.includes('qtd disponivel')
+      && loose.includes('referencia')
+      && loose.includes('valor da embalagem'));
+}
+
+function isSgCotacaoPage(hostname = window.location.hostname || '', bodyText = document.body?.innerText || '') {
+  if (/(^|\.)cotacao\.sghost\.com\.br$/i.test(hostname)) return true;
+  const loose = normalizeLooseText(bodyText);
+  return loose.includes('sg cotacao')
+    || (loose.includes('preco un. (r$)')
+      && loose.includes('cod. barra')
+      && loose.includes('qtde. emb'));
+}
+
+function getSgCotacaoCell(row, label) {
+  return row.querySelector?.(`td[data-label="${label}"]`) || null;
+}
+
+function getSgCotacaoEan(row) {
+  const cell = getSgCotacaoCell(row, 'Cod. Barra');
+  return cell ? limparEAN(cell.textContent || '') : '';
+}
+
+function getSgCotacaoPriceCandidates(row) {
+  // Preço unitário: input id "<índice>-preco" dentro do td "Preço Un. (R$)".
+  // O de embalagem termina em -precoEmb e o desconto em -percDesc, então
+  // [id$="-preco"] não colide com eles.
+  const scoped = Array.from(row.querySelectorAll('td[data-label="Preço Un. (R$)"] input'));
+  const byId = Array.from(row.querySelectorAll('input[id$="-preco"]'));
+  const inputs = scoped.length ? scoped : byId;
+  return inputs.filter(input => !input.disabled && !input.readOnly && isVisible(input));
+}
+
+function isSgCotacaoProductRow(row) {
+  if (!row.querySelector?.('td[data-label="Preço Un. (R$)"] input, input[id$="-preco"]')) return false;
+  return Boolean(getSgCotacaoEan(row) || normalizeCellText(getSgCotacaoCell(row, 'Produto')?.textContent || ''));
+}
+
+function getSgCotacaoRows() {
+  return Array.from(document.querySelectorAll('tr')).filter(isSgCotacaoProductRow);
+}
+
+function sgCotacaoRowShowsPrice(row, expectedPrice, samePriceLike) {
+  const inputs = Array.from(row.querySelectorAll('td[data-label="Preço Un. (R$)"] input, input[id$="-preco"]'));
+  return inputs.some(input => samePriceLike(getControlValue(input), expectedPrice));
+}
+
+function getEstanciaForm(root = document) {
+  return root.forms?.form1
+    || root.querySelector?.('form[name="form1"]')
+    || root.querySelector?.('form[action*="cotacao"]')
+    || root.querySelector?.('form')
+    || null;
+}
+
+function getEstanciaSelect(root = document) {
+  return root.querySelector?.('select[name="arquivo"], select#arquivo') || null;
+}
+
+function estanciaInput(root, name) {
+  return root.querySelector?.(`[name="${CSS.escape(name)}"]`) || null;
+}
+
+function estanciaRowIndexFromHidden(hidden) {
+  const match = String(hidden?.name || hidden?.id || '').match(/_(\d+)$/);
+  return match ? Number(match[1]) : null;
+}
+
+function normalizeEstanciaPackageQty(value) {
+  const n = Number(String(value ?? '').replace(',', '.').replace(/[^\d.]/g, ''));
+  if (!Number.isFinite(n) || n <= 0 || n > 9999) return 1;
+  return Math.round(n);
+}
+
+function getEstanciaPackageQtyFromText(text) {
+  const normalized = normalizeCellText(text).toUpperCase();
+  const patterns = [
+    /\b(?:CX|CAIXA|FD|FDO|FARDO|PCT|PACOTE|DISPLAY|DP|SC|SACO|UN|UND|UNID)\s*-?\s*(\d{1,4})\b/,
+    /\bC\/\s*(\d{1,4})\b/,
+  ];
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    if (!match) continue;
+    const qty = normalizeEstanciaPackageQty(match[1]);
+    if (qty > 0) return qty;
+  }
+  return 1;
+}
+
+function cleanupEstanciaProductName(value, ean = '') {
+  let text = normalizeCellText(value)
+    .replace(/\bObserva[çc][ãa]o:?.*$/i, '')
+    .replace(/\bQtd\.?\s*(Pedida|Dispon[ií]vel|Por Embalagem)?\b.*$/i, '')
+    .replace(/\bValor\s+da\s+Embalagem\b.*$/i, '')
+    .trim();
+  if (ean) text = text.replace(ean, '').trim();
+  return text
+    .replace(/\b\d{8,14}\b/g, '')
+    .replace(/\b(CX|FD|FDO|FARDO|PCT|PACOTE|UN|UND|UNID|SC)\s*-?\s*\d{1,4}\b/ig, '')
+    .replace(/^\d{1,10}\s+/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseEstanciaRowMeta(row) {
+  const fullText = normalizeCellText(row?.innerText || row?.textContent || '');
+  const ean = extractEANFromRow(row, 'estancia-cotacao') || limparEAN(fullText) || '';
+  if (!ean || !/[A-Za-zÀ-ú]{3}/.test(fullText)) return null;
+
+  let nome = cleanupEstanciaProductName(getCellTextByHeader(row, [
+    /descri[çc][ãa]o/i,
+    /produto/i,
+  ], [/qtd|valor|refer/i]), ean);
+
+  if (!nome) {
+    const lines = String(row.innerText || row.textContent || '')
+      .split(/\n+/)
+      .map(normalizeCellText)
+      .filter(Boolean);
+    for (const line of lines) {
+      const candidate = cleanupEstanciaProductName(line, ean);
+      const loose = normalizeLooseText(candidate);
+      if (!candidate || !/[A-Za-zÀ-ú]{3}/.test(candidate)) continue;
+      if (/^(cod barras|descricao|qtd|valor|referencia|paginas)$/i.test(loose)) continue;
+      if (/^(cx|fd|fardo|pct|pacote|un)\s*-?\s*\d+$/i.test(candidate)) continue;
+      nome = candidate;
+      break;
+    }
+  }
+
+  const hidden = row.querySelector('input[type="hidden"][name^="codigoplu_"], input[type="hidden"][id^="codigoplu_"]');
+  const idx = estanciaRowIndexFromHidden(hidden);
+  if (idx === null || !nome) return null;
+
+  const quantityInput = estanciaInput(row, `vlr1_${idx}`) || estanciaInput(document, `vlr1_${idx}`);
+  const referenceInput = estanciaInput(row, `vlr2_${idx}`) || estanciaInput(document, `vlr2_${idx}`);
+  const priceInput = estanciaInput(row, `vlr3_${idx}`) || estanciaInput(document, `vlr3_${idx}`);
+  const packageQty = getEstanciaPackageQtyFromText(fullText);
+
+  return {
+    idx,
+    codigo: hidden?.value || '',
+    ean,
+    nome,
+    packageQty,
+    quantityInput,
+    referenceInput,
+    priceInput,
+    signature: `${hidden?.value || ''}|${ean}|${normalizeRowKey(nome)}`,
+  };
+}
+
+function isEstanciaProductRow(row) {
+  const meta = parseEstanciaRowMeta(row);
+  if (!meta || !meta.priceInput || !meta.quantityInput || !meta.referenceInput) return false;
+  estanciaRowMeta.set(row, meta);
+  return true;
+}
+
+function getEstanciaRows() {
+  const rows = [];
+  const seen = new Set();
+  for (const hidden of Array.from(document.querySelectorAll('input[type="hidden"][name^="codigoplu_"], input[type="hidden"][id^="codigoplu_"]'))) {
+    const row = hidden.closest('tr');
+    if (!row || seen.has(row)) continue;
+    if (!isEstanciaProductRow(row)) continue;
+    rows.push(row);
+    seen.add(row);
+  }
+  return rows;
+}
+
+function getEstanciaPriceCandidates(row) {
+  const meta = estanciaRowMeta.get(row) || parseEstanciaRowMeta(row);
+  return meta?.priceInput ? [meta.priceInput] : [];
+}
+
+function estanciaRowShowsPrice(row, expectedPrice, samePriceLike) {
+  const meta = estanciaRowMeta.get(row) || parseEstanciaRowMeta(row);
+  return meta?.priceInput ? samePriceLike(getControlValue(meta.priceInput), expectedPrice) : false;
 }
 
 function getEasyCotacaoEditableControls(root = document.body) {
@@ -576,6 +813,320 @@ function getEasyCotacaoRows() {
 function easyCotacaoRowShowsPrice(row, expectedPrice, samePriceLike, empresaColuna = 0) {
   const target = getSelectedPriceInput(row, empresaColuna, 'easy-cotacao-web');
   return target ? samePriceLike(getControlValue(target), expectedPrice) : false;
+}
+
+function parsePositivePriceNumber(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  let normalized = raw.replace(/[^\d,.-]/g, '');
+  if (normalized.includes(',') && normalized.includes('.')) {
+    normalized = normalized.replace(/\./g, '').replace(',', '.');
+  } else if (normalized.includes(',')) {
+    normalized = normalized.replace(',', '.');
+  }
+  const n = Number(normalized);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function normalizeHipcomerpApiLimit(value) {
+  const n = Number.parseInt(value, 10);
+  return Number.isInteger(n) && n > 0 && n <= 500 ? n : 20;
+}
+
+function updateHipcomerpApiState(state = {}) {
+  if (state.baseCaptured != null) hipcomerpApiState.baseCaptured = Boolean(state.baseCaptured);
+  if (state.bridgeVersion != null) hipcomerpApiState.bridgeVersion = String(state.bridgeVersion || '');
+  if (state.fornecedor != null) hipcomerpApiState.fornecedor = String(state.fornecedor || '');
+  if (state.loja != null) hipcomerpApiState.loja = String(state.loja || '');
+  if (state.numeroCotacao != null) hipcomerpApiState.numeroCotacao = String(state.numeroCotacao || '');
+  if (state.limit != null) hipcomerpApiState.limit = normalizeHipcomerpApiLimit(state.limit);
+  if (state.hasAuth != null) hipcomerpApiState.hasAuth = Boolean(state.hasAuth);
+  hipcomerpApiState.ready = Boolean(
+    state.ready
+    || (hipcomerpApiState.baseCaptured
+      && hipcomerpApiState.fornecedor
+      && hipcomerpApiState.loja
+      && hipcomerpApiState.numeroCotacao
+      && hipcomerpApiState.hasAuth)
+  );
+  hipcomerpApiState.lastSeenAt = Date.now();
+}
+
+function hipcomerpApiPageFromRequest(request = {}) {
+  const page = Number.parseInt(request.page || '0', 10);
+  return Number.isInteger(page) && page >= 0 ? page : 0;
+}
+
+function rememberHipcomerpApiPage(page, response) {
+  if (!Number.isInteger(page) || page < 0 || !response || typeof response !== 'object') return;
+  const itens = Array.isArray(response.itens) ? response.itens : [];
+  if (!itens.length && response.quantidadeTotal == null) return;
+  hipcomerpApiState.pages.set(page, {
+    quantidadeTotal: Number.parseInt(response.quantidadeTotal || itens.length || '0', 10) || itens.length,
+    itens,
+  });
+  if (response.quantidadeTotal != null) {
+    hipcomerpApiState.total = Number.parseInt(response.quantidadeTotal || '0', 10) || hipcomerpApiState.total;
+  }
+}
+
+function isCurrentHipcomerpBridgeState(state = {}) {
+  return state?.bridgeVersion === HIPCOMERP_BRIDGE_VERSION;
+}
+
+function rememberHipcomerpApiCapture(detail = {}) {
+  if (!isCurrentHipcomerpBridgeState(detail.state || {})) return;
+  updateHipcomerpApiState(detail.state || {});
+  const request = detail.request || {};
+  const response = detail.response;
+  const path = String(request.path || '');
+  const cotacaoMatch = path.match(/\/cotacao\/(\d+)\/itens/i);
+  if (cotacaoMatch && !hipcomerpApiState.numeroCotacao) {
+    hipcomerpApiState.numeroCotacao = cotacaoMatch[1];
+  }
+  if (/\/cotacao\/\d+\/itens/i.test(path)) {
+    rememberHipcomerpApiPage(hipcomerpApiPageFromRequest(request), response);
+  }
+}
+
+function resolveHipcomerpApiCommand(detail = {}) {
+  const requestId = String(detail.requestId || '');
+  const pending = hipcomerpApiState.pending.get(requestId);
+  if (!pending) return;
+  if (pending.bridgeVersion && !isCurrentHipcomerpBridgeState(detail.state || {})) return;
+  updateHipcomerpApiState(detail.state || {});
+  hipcomerpApiState.pending.delete(requestId);
+  if (pending.timer) clearTimeout(pending.timer);
+  pending.resolve(detail);
+}
+
+function hipcomerpUsesCanvasKit() {
+  return Boolean(
+    document.body?.getAttribute?.('flt-renderer')?.includes('canvaskit')
+    || document.querySelector('flutter-view flt-glass-pane')
+    || document.querySelector('flt-canvas-container')
+  );
+}
+
+function getHipcomerpApiState() {
+  return {
+    ok: true,
+    site: 'hipcomerp-cotacao',
+    ready: hipcomerpApiState.ready,
+    baseCaptured: hipcomerpApiState.baseCaptured,
+    bridgeVersion: hipcomerpApiState.bridgeVersion,
+    fornecedor: hipcomerpApiState.fornecedor,
+    loja: hipcomerpApiState.loja,
+    numeroCotacao: hipcomerpApiState.numeroCotacao,
+    limit: normalizeHipcomerpApiLimit(hipcomerpApiState.limit),
+    hasAuth: hipcomerpApiState.hasAuth,
+    cachedPages: hipcomerpApiState.pages.size,
+    total: hipcomerpApiState.total,
+    usesCanvasKit: hipcomerpUsesCanvasKit(),
+    lastSeenAt: hipcomerpApiState.lastSeenAt,
+  };
+}
+
+async function waitForHipcomerpApiState(timeoutMs = 3500) {
+  if (hipcomerpApiState.ready) return getHipcomerpApiState();
+  await refreshHipcomerpApiState(700);
+  if (hipcomerpApiState.ready) return getHipcomerpApiState();
+  return new Promise(resolve => {
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      if (hipcomerpApiState.ready || Date.now() - startedAt >= timeoutMs) {
+        clearInterval(timer);
+        resolve(getHipcomerpApiState());
+      }
+    }, 100);
+  });
+}
+
+function hipcomerpApiCommand(command, timeoutMs = 15000) {
+  return new Promise(resolve => {
+    const requestId = `hipcom-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const bridgeVersion = command.bridgeVersion || HIPCOMERP_BRIDGE_VERSION;
+    const timer = setTimeout(() => {
+      hipcomerpApiState.pending.delete(requestId);
+      resolve({ ok: false, reason: 'api_command_timeout', state: getHipcomerpApiState() });
+    }, timeoutMs);
+    hipcomerpApiState.pending.set(requestId, { resolve, timer, bridgeVersion });
+    document.dispatchEvent(new CustomEvent('venpro:hipcom-api-command', {
+      detail: { requestId, ...command, minBridgeVersion: bridgeVersion },
+    }));
+  });
+}
+
+async function refreshHipcomerpApiState(timeoutMs = 900) {
+  const response = await hipcomerpApiCommand({ kind: 'state' }, timeoutMs);
+  if (response?.state) updateHipcomerpApiState(response.state);
+  return getHipcomerpApiState();
+}
+
+async function getHipcomerpApiStateLive() {
+  if (/(^|\.)cotacao\.hipcomerp\.com\.br$/i.test(window.location.hostname || '')) {
+    await refreshHipcomerpApiState(700);
+  }
+  return getHipcomerpApiState();
+}
+
+function normalizeHipcomerpApiItem(raw = {}, idx = 0, page = 1) {
+  const plu = String(raw.plu ?? raw.codigo ?? '').trim();
+  const ean = limparEAN(raw.codigoBarras ?? raw.codigoBarra ?? raw.ean ?? '') || '';
+  const nome = normalizeCellText(raw.descricao ?? raw.nome ?? '');
+  const price = parsePositivePriceNumber(raw.precoPreenchido ?? raw.preco ?? raw.valorUnitario ?? '');
+  const quantidadePorCaixa = Number.parseInt(raw.quantidadePorCaixaPreenchida ?? raw.quantidadePorCaixa ?? '1', 10);
+  return {
+    idx,
+    page,
+    id: raw.id ?? '',
+    numeroCotacao: hipcomerpApiState.numeroCotacao || '',
+    plu,
+    codigo: plu,
+    ean,
+    nome,
+    filled: price !== null,
+    quantidade: raw.quantidade ?? '',
+    quantidadePorCaixa: Number.isInteger(quantidadePorCaixa) && quantidadePorCaixa > 0 ? quantidadePorCaixa : 1,
+    signature: `${plu}|${ean}|${normalizeRowKey(nome)}`,
+  };
+}
+
+async function fetchHipcomerpApiPage(page, limit) {
+  const state = await waitForHipcomerpApiState();
+  if (!state.ready) return { ok: false, reason: 'api_context_not_ready', state };
+  const numeroCotacao = state.numeroCotacao;
+  const response = await hipcomerpApiCommand({
+    method: 'POST',
+    path: `/cotacao/${numeroCotacao}/itens`,
+    body: {
+      numeroPagina: page,
+      pesquisa: '',
+      limite: limit,
+    },
+  });
+  if (!response.ok) return response;
+  rememberHipcomerpApiPage(page, response.data);
+  return response;
+}
+
+async function loadHipcomerpApiItems(options = {}) {
+  const state = await waitForHipcomerpApiState(options.waitMs || 3500);
+  if (!state.ready) {
+    return {
+      ok: false,
+      site: 'hipcomerp-cotacao',
+      reason: state.usesCanvasKit ? 'api_context_not_ready_canvas' : 'api_context_not_ready',
+      state,
+      items: [],
+    };
+  }
+
+  const limit = normalizeHipcomerpApiLimit(options.limit || state.limit || 20);
+  const firstPage = hipcomerpApiState.pages.get(0)?.itens?.length
+    ? { ok: true, data: hipcomerpApiState.pages.get(0) }
+    : await fetchHipcomerpApiPage(0, limit);
+  if (!firstPage.ok) return { ...firstPage, site: 'hipcomerp-cotacao', items: [] };
+
+  const total = Number.parseInt(
+    firstPage.data?.quantidadeTotal
+    || hipcomerpApiState.total
+    || firstPage.data?.itens?.length
+    || '0',
+    10
+  ) || 0;
+  const pages = Math.max(1, Math.ceil(total / limit));
+
+  for (let page = 1; page < pages; page++) {
+    if (hipcomerpApiState.pages.get(page)?.itens?.length) continue;
+    const pageResult = await fetchHipcomerpApiPage(page, limit);
+    if (!pageResult.ok) return { ...pageResult, site: 'hipcomerp-cotacao', items: [] };
+  }
+
+  const items = [];
+  for (let page = 0; page < pages; page++) {
+    const pageData = hipcomerpApiState.pages.get(page);
+    for (const raw of pageData?.itens || []) {
+      items.push(normalizeHipcomerpApiItem(raw, items.length, page));
+    }
+  }
+
+  return {
+    ok: true,
+    site: 'hipcomerp-cotacao',
+    mode: 'api',
+    items,
+    total: total || items.length,
+    pages,
+    limit,
+    state: getHipcomerpApiState(),
+  };
+}
+
+function hipcomerpApiSavePayloadItem(item = {}) {
+  const price = parsePositivePriceNumber(item.price ?? item.preco ?? item.valorUnitario);
+  const plu = String(item.plu || item.codigo || '').trim();
+  if (!price || !plu) return null;
+  const numeroCotacao = String(item.numeroCotacao || hipcomerpApiState.numeroCotacao || '').trim();
+  if (!numeroCotacao) return null;
+  const quantidadePorCaixa = Number.parseInt(item.quantidadePorCaixa ?? item.qtdCaixa ?? '1', 10);
+  return {
+    numeroCotacao,
+    plu,
+    preco: price,
+    valorICMS: 0,
+    quantidadePorCaixa: Number.isInteger(quantidadePorCaixa) && quantidadePorCaixa > 0 ? quantidadePorCaixa : 1,
+  };
+}
+
+async function saveHipcomerpApiPrices(prices = []) {
+  const state = await waitForHipcomerpApiState(1000);
+  if (!state.ready) return { ok: false, site: 'hipcomerp-cotacao', reason: 'api_context_not_ready', saved: 0 };
+
+  const payload = [];
+  const seen = new Set();
+  for (const item of prices || []) {
+    const payloadItem = hipcomerpApiSavePayloadItem(item);
+    if (!payloadItem) continue;
+    const key = `${payloadItem.numeroCotacao}|${payloadItem.plu}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    payload.push(payloadItem);
+  }
+
+  if (!payload.length) {
+    return { ok: true, site: 'hipcomerp-cotacao', saved: 0, skipped: prices.length, reason: 'no_prices_to_save' };
+  }
+
+  let saved = 0;
+  const failed = [];
+  for (let start = 0; start < payload.length; start += 100) {
+    const chunk = payload.slice(start, start + 100);
+    const result = await hipcomerpApiCommand({
+      method: 'POST',
+      path: '/oferta/itens',
+      body: chunk,
+    }, 20000);
+    if (!result.ok) {
+      failed.push({
+        start,
+        count: chunk.length,
+        status: result.status || 0,
+        reason: result.reason || `http_${result.status || 'unknown'}`,
+      });
+      continue;
+    }
+    saved += chunk.length;
+  }
+
+  return {
+    ok: failed.length === 0,
+    site: 'hipcomerp-cotacao',
+    saved,
+    failed,
+    requested: prices.length,
+    payloadCount: payload.length,
+  };
 }
 
 function getHipcomerpEditableControls(root = document.body) {
@@ -866,6 +1417,163 @@ async function advanceHipcomerpPage() {
     rowCount: beforeCount,
     beforeSignature,
   };
+}
+
+function getEstanciaCurrentPage(root = document) {
+  const page = Number.parseInt(estanciaInput(root, 'pagina')?.value || '1', 10);
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function getEstanciaPages(root = document) {
+  const text = root.body?.innerText || root.body?.textContent || '';
+  const markerIndex = text.search(/P[áa]ginas:/i);
+  const tail = markerIndex >= 0 ? text.slice(markerIndex, markerIndex + 700) : '';
+  const pageNumbers = Array.from(tail.matchAll(/\b\d{1,3}\b/g))
+    .map(match => Number(match[0]))
+    .filter(value => Number.isInteger(value) && value > 0 && value <= 999);
+  const currentPage = getEstanciaCurrentPage(root);
+  return Math.max(1, currentPage, ...pageNumbers);
+}
+
+function getEstanciaState(root = document) {
+  const select = getEstanciaSelect(root);
+  const rows = root === document ? getEstanciaRows() : Array.from(root.querySelectorAll('input[type="hidden"][name^="codigoplu_"], input[type="hidden"][id^="codigoplu_"]'));
+  return {
+    ok: Boolean(getEstanciaForm(root)),
+    site: 'estancia-cotacao',
+    quoteIndex: select ? select.selectedIndex : -1,
+    quoteCount: select ? select.options.length : 0,
+    quoteValue: select ? select.value : '',
+    quoteText: select ? (select.options[select.selectedIndex]?.textContent || '').trim() : '',
+    page: getEstanciaCurrentPage(root),
+    pages: getEstanciaPages(root),
+    rowCount: rows.length,
+    hasSelect: Boolean(select),
+  };
+}
+
+function estanciaFormParams(root = document, overrides = {}, submitName = '') {
+  const form = getEstanciaForm(root);
+  if (!form) throw new Error('Formulário do Estância não encontrado.');
+
+  const params = new URLSearchParams();
+  for (const el of Array.from(form.elements || [])) {
+    if (!el.name || el.disabled) continue;
+    const tag = String(el.tagName || '').toLowerCase();
+    const type = String(el.type || '').toLowerCase();
+    if (type === 'submit' || type === 'button' || type === 'image' || type === 'reset' || tag === 'button') continue;
+    if ((type === 'checkbox' || type === 'radio') && !el.checked) continue;
+    params.append(el.name, el.value == null ? '' : String(el.value));
+  }
+
+  for (const [key, value] of Object.entries(overrides)) {
+    params.set(key, value == null ? '' : String(value));
+  }
+  if (submitName) params.set(submitName, 'Grava Alterações');
+  return params;
+}
+
+function applyEstanciaHtml(html, responseUrl = '') {
+  const parsed = new DOMParser().parseFromString(String(html || ''), 'text/html');
+  const bodyText = parsed.body?.innerText || '';
+  if (/Internal\s+server\s+error/i.test(bodyText)) {
+    return { ok: false, reason: 'server_500', state: getEstanciaState() };
+  }
+  if (/n[aã]o\s+tem\s+mais\s+cota[çc][aã]o|nenhuma\s+cota[çc][aã]o/i.test(bodyText)) {
+    return { ok: false, reason: 'quotation_unavailable', state: getEstanciaState(parsed) };
+  }
+  if (!getEstanciaForm(parsed)) {
+    return { ok: false, reason: 'form_not_found', state: getEstanciaState(parsed) };
+  }
+
+  document.body.innerHTML = parsed.body.innerHTML;
+  document.title = parsed.title || document.title;
+  if (responseUrl) {
+    try {
+      const nextUrl = new URL(responseUrl, location.href);
+      if (nextUrl.origin === location.origin) history.replaceState(null, '', nextUrl.href);
+    } catch {}
+  }
+  return { ok: true, state: getEstanciaState() };
+}
+
+async function postEstanciaForm(params, action = '') {
+  const form = getEstanciaForm();
+  const url = new URL(action || form?.getAttribute('action') || 'cotacao.asp', location.href).href;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+    body: params.toString(),
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
+  const text = await response.text();
+  if (!response.ok) return { ok: false, reason: `http_${response.status}`, state: getEstanciaState() };
+  return applyEstanciaHtml(text, response.url);
+}
+
+async function openEstanciaCotacaoPage() {
+  if (!isEstanciaCotacaoPage(window.location.hostname, window.location.pathname, document.body?.innerText || '')) {
+    return { ok: false, reason: 'not_estancia' };
+  }
+  if (/\/cotacao\.asp$/i.test(window.location.pathname) && getEstanciaSelect()) {
+    return { ok: true, state: getEstanciaState() };
+  }
+  const response = await fetch(new URL('cotacao.asp', location.href).href, {
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
+  const text = await response.text();
+  if (!response.ok) return { ok: false, reason: `http_${response.status}` };
+  const result = applyEstanciaHtml(text, response.url);
+  if (result.ok) {
+    try { history.replaceState(null, '', new URL('cotacao.asp', location.href).href); } catch {}
+  }
+  return result;
+}
+
+async function saveEstanciaPage() {
+  if (detectQuotationSite() !== 'estancia-cotacao') return { ok: false, reason: 'not_estancia' };
+  const page = getEstanciaCurrentPage();
+  const params = estanciaFormParams(document, {
+    pagina: String(page),
+    paginaAnt: String(page),
+    buscar: 'False',
+    gravar: 'true',
+  }, 'grava');
+  return postEstanciaForm(params);
+}
+
+async function loadEstanciaPage(page) {
+  if (detectQuotationSite() !== 'estancia-cotacao') return { ok: false, reason: 'not_estancia' };
+  const desiredPage = Number.parseInt(page, 10);
+  if (!Number.isInteger(desiredPage) || desiredPage < 1) return { ok: false, reason: 'invalid_page' };
+  const currentPage = getEstanciaCurrentPage();
+  const params = estanciaFormParams(document, {
+    pagina: String(desiredPage),
+    paginaAnt: String(currentPage),
+    buscar: 'False',
+    gravar: 'false',
+  });
+  return postEstanciaForm(params);
+}
+
+async function loadEstanciaQuote(quoteIndex) {
+  if (detectQuotationSite() !== 'estancia-cotacao') return { ok: false, reason: 'not_estancia' };
+  const select = getEstanciaSelect();
+  const index = Number.parseInt(quoteIndex, 10);
+  if (!select || !Number.isInteger(index) || index < 0 || index >= select.options.length) {
+    return { ok: false, reason: 'invalid_quote' };
+  }
+  const option = select.options[index];
+  const params = estanciaFormParams(document, {
+    arquivo: option.value,
+    pagina: '1',
+    paginaAnt: '',
+    buscar: 'false',
+    gravar: 'false',
+  });
+  return postEstanciaForm(params);
 }
 
 function bubbleCatalogTextItems() {
@@ -1383,6 +2091,8 @@ function getPriceCandidates(row, site = 'generic') {
   if (site === 'bubble-catalog-fornecedor') return getBubbleCatalogPriceCandidates(row);
   if (site === 'hipcomerp-cotacao') return getHipcomerpPriceCandidates(row);
   if (site === 'easy-cotacao-web') return getEasyCotacaoPriceCandidates(row);
+  if (site === 'estancia-cotacao') return getEstanciaPriceCandidates(row);
+  if (site === 'sg-cotacao') return getSgCotacaoPriceCandidates(row);
   const inputs = getEditableInputs(row);
   const priceLike = inputs.filter(isPriceLikeInput);
   return priceLike.length ? priceLike : inputs;
@@ -1413,8 +2123,10 @@ function detectQuotationSite() {
     && /\bMensagem\s+Fornecedor\b/i.test(bodyText);
 
   if (window.location.hostname.includes('cotatudo.com.br')) return 'cotatudo';
+  if (isSgCotacaoPage(hostname, bodyText)) return 'sg-cotacao';
   if (isHipcomerpCotacaoPage(hostname, bodyText)) return 'hipcomerp-cotacao';
   if (isEasyCotacaoWebPage(hostname, path, bodyText)) return 'easy-cotacao-web';
+  if (isEstanciaCotacaoPage(hostname, path, bodyText)) return 'estancia-cotacao';
   if (isBubbleCatalogFornecedorPage(hostname, path, bodyText)) return 'bubble-catalog-fornecedor';
   if (/(^|\.)cotacaoweb\.smus\.com\.br$/i.test(hostname)
     && (/cotacaoweb/i.test(`${hostname}${path}${window.location.hash || ''}`) || looksCotacaoWebSmus)) return 'cotacao-web-smus';
@@ -1437,6 +2149,10 @@ function detectQuotationSite() {
 function getQuotationRows(site) {
   if (site === 'cotatudo') {
     return Array.from(document.querySelectorAll('table#conteudo_gvItem tbody tr'));
+  }
+
+  if (site === 'sg-cotacao') {
+    return getSgCotacaoRows();
   }
 
   if (site === 'vr-cotacao') {
@@ -1488,6 +2204,10 @@ function getQuotationRows(site) {
 
   if (site === 'easy-cotacao-web') {
     return getEasyCotacaoRows();
+  }
+
+  if (site === 'estancia-cotacao') {
+    return getEstanciaRows();
   }
 
   return Array.from(document.querySelectorAll('tr')).filter(row => getEditableInputs(row).length > 0);
@@ -1707,6 +2427,21 @@ async function scanCotacaoWebSmusRows(onRow, options = {}) {
 }
 
 function extractItemFromRow(row, idx, site, empresaColuna) {
+  if (site === 'sg-cotacao') {
+    const ean = getSgCotacaoEan(row);
+    const nome = normalizeCellText(getSgCotacaoCell(row, 'Produto')?.textContent || '');
+    if (!ean && !nome) return null;
+    const priceTarget = getSelectedPriceInput(row, empresaColuna, site);
+    return {
+      idx,
+      ean,
+      nome,
+      codigo: '',
+      signature: '',
+      filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
+    };
+  }
+
   if (site === 'easy-cotacao-web') {
     const meta = easyCotacaoRowMeta.get(row) || parseEasyCotacaoRowMeta(row);
     if (!meta || (!meta.ean && !meta.nome)) return null;
@@ -1749,6 +2484,22 @@ function extractItemFromRow(row, idx, site, empresaColuna) {
     };
   }
 
+  if (site === 'estancia-cotacao') {
+    const meta = estanciaRowMeta.get(row) || parseEstanciaRowMeta(row);
+    if (!meta || (!meta.ean && !meta.nome)) return null;
+    estanciaRowMeta.set(row, meta);
+    return {
+      idx,
+      ean: meta.ean || '',
+      nome: meta.nome || '',
+      codigo: meta.codigo || '',
+      signature: meta.signature || '',
+      embalagem: String(meta.packageQty || 1),
+      qtdEmbalagem: meta.packageQty || 1,
+      filled: meta.priceInput ? isFilledPriceValue(getControlValue(meta.priceInput).trim()) : false,
+    };
+  }
+
   const priceInput = site === 'vr-cotacao'
     ? getEditableInputs(row)[0]
     : getSelectedPriceInput(row, empresaColuna, site);
@@ -1784,6 +2535,10 @@ async function extractQuotationItems(options = {}) {
   const site = detectQuotationSite();
   if (site === 'cotacao-web-smus') {
     return extractCotacaoWebSmusItems(options);
+  }
+  if (site === 'hipcomerp-cotacao' && hipcomerpApiState.ready) {
+    const apiResult = await loadHipcomerpApiItems({ waitMs: 500 });
+    if (apiResult.ok && apiResult.items?.length) return apiResult.items;
   }
 
   const rows = getQuotationRows(site);
@@ -1834,6 +2589,10 @@ async function fillQuotationPrices(prices, options = {}) {
       ? (type === 'number'
         ? [dot3, dot, noDecimalsDot, comma3, comma, raw]
         : [comma3, comma, dot3, dot, raw, noDecimalsDot])
+      : site === 'estancia-cotacao'
+        ? (type === 'number'
+          ? [dot, noDecimalsDot, comma, raw]
+          : [dot, comma, raw, noDecimalsDot])
       : site === 'hipcomerp-cotacao'
         ? (type === 'number'
           ? [dot, noDecimalsDot, comma, raw]
@@ -2341,6 +3100,124 @@ async function fillQuotationPrices(prices, options = {}) {
     return { ok, changed: ok, reason: ok ? 'quantity_filled' : 'quantity_rejected', fracionamento };
   }
 
+  function getEstanciaPackagePrice(item = {}, row = null) {
+    const unitPrice = parsePriceNumber(item.price);
+    if (unitPrice === null) return '';
+    const meta = row ? (estanciaRowMeta.get(row) || parseEstanciaRowMeta(row)) : null;
+    const packageQty = normalizeEstanciaPackageQty(
+      item.qtdEmbalagem
+      ?? item.embalagem
+      ?? item.packageQty
+      ?? meta?.packageQty
+      ?? 1
+    );
+    return (unitPrice * packageQty).toFixed(2);
+  }
+
+  function sameEstanciaFixedValue(current, desired) {
+    const a = parsePriceNumber(current);
+    const b = parsePriceNumber(desired);
+    return a !== null && b !== null && Math.abs(a - b) < 0.0001;
+  }
+
+  async function ensureEstanciaFixedFields(row) {
+    const meta = estanciaRowMeta.get(row) || parseEstanciaRowMeta(row);
+    if (!meta) return { ok: false, reason: 'row_meta_not_found' };
+    estanciaRowMeta.set(row, meta);
+
+    const desiredQuantity = '500';
+    const desiredReference = '1';
+    let quantityOk = Boolean(meta.quantityInput);
+    let referenceOk = Boolean(meta.referenceInput);
+
+    if (meta.quantityInput && !sameEstanciaFixedValue(getControlValue(meta.quantityInput), desiredQuantity)) {
+      quantityOk = await setPlainControlValue(meta.quantityInput, desiredQuantity);
+    }
+    if (meta.referenceInput && !sameEstanciaFixedValue(getControlValue(meta.referenceInput), desiredReference)) {
+      referenceOk = await setPlainControlValue(meta.referenceInput, desiredReference);
+    }
+
+    return {
+      ok: quantityOk && referenceOk,
+      reason: quantityOk && referenceOk ? 'fixed_fields_filled' : 'fixed_fields_rejected',
+      quantityOk,
+      referenceOk,
+    };
+  }
+
+  async function fillEstanciaPrices() {
+    const rowsByIdx = getEstanciaRows();
+    const pendingByIdx = new Map();
+    const pendingBySignature = new Map();
+    const pendingByEan = new Map();
+    for (const item of Array.isArray(prices) ? prices : []) {
+      const idx = Number(item?.idx);
+      if (Number.isInteger(idx) && idx >= 0) pendingByIdx.set(idx, item);
+      if (item?.signature) pendingBySignature.set(String(item.signature), item);
+      if (item?.ean) pendingByEan.set(String(item.ean).replace(/\D/g, ''), item);
+    }
+
+    for (let rowIndex = 0; rowIndex < rowsByIdx.length; rowIndex++) {
+      const row = rowsByIdx[rowIndex];
+      const meta = estanciaRowMeta.get(row) || parseEstanciaRowMeta(row);
+      if (!meta) continue;
+      estanciaRowMeta.set(row, meta);
+
+      const fixedResult = await ensureEstanciaFixedFields(row);
+      if (!fixedResult.ok) {
+        details.push({
+          idx: rowIndex,
+          reason: fixedResult.reason,
+          inputType: '',
+          before: '',
+          after: '',
+          attempted: 'Qtd 500 / Ref 1',
+        });
+      }
+
+      const item = pendingBySignature.get(meta.signature)
+        || pendingByEan.get(meta.ean)
+        || pendingByIdx.get(rowIndex);
+      if (!item) continue;
+
+      const input = meta.priceInput || getSelectedPriceInput(row, empresaColuna, site);
+      if (!input) {
+        failed.push(item.idx);
+        details.push({ idx: item.idx, reason: 'input_not_found' });
+        continue;
+      }
+
+      const packagePrice = getEstanciaPackagePrice(item, row);
+      const before = getControlValue(input);
+      const ok = packagePrice ? await setInputValue(input, packagePrice) : false;
+      await waitForGridRender(80);
+      const persisted = Boolean(ok && estanciaRowShowsPrice(row, packagePrice, samePriceLike));
+      if (persisted) count++;
+      else {
+        failed.push(item.idx);
+        details.push({
+          idx: item.idx,
+          reason: ok ? 'value_not_persisted' : 'value_rejected',
+          inputType: input.getAttribute('type') || '',
+          before,
+          after: getControlValue(input),
+          attempted: packagePrice || String(item.price ?? ''),
+          fracionamento: String(meta.packageQty || 1),
+        });
+      }
+    }
+
+    for (const item of pendingByIdx.values()) {
+      const idx = Number(item.idx);
+      if (!Number.isInteger(idx) || idx < 0 || idx >= rowsByIdx.length) {
+        failed.push(item.idx);
+        details.push({ idx: item.idx, reason: 'row_not_found' });
+      }
+    }
+
+    return { filled: count, failed, details, site, rowCount: rowsByIdx.length };
+  }
+
   async function fillCotacaoWebSmusPrices() {
     const pendingByIdx = new Map();
     const pendingBySignature = new Map();
@@ -2414,6 +3291,9 @@ async function fillQuotationPrices(prices, options = {}) {
 
   if (site === 'cotacao-web-smus') {
     return fillCotacaoWebSmusPrices();
+  }
+  if (site === 'estancia-cotacao') {
+    return fillEstanciaPrices();
   }
 
   const isBubbleCatalogFornecedor = site === 'bubble-catalog-fornecedor';
@@ -2503,6 +3383,9 @@ async function fillQuotationPrices(prices, options = {}) {
     } else if (site === 'hipcomerp-cotacao') {
       await waitForGridRender(160);
       persisted = Boolean(ok && hipcomerpRowShowsPrice(row, item.price, samePriceLike, empresaColuna));
+    } else if (site === 'sg-cotacao') {
+      await waitForGridRender(160);
+      persisted = Boolean(ok && sgCotacaoRowShowsPrice(row, item.price, samePriceLike));
     } else if (isEasyCotacaoWeb) {
       await waitForGridRender(160);
       persisted = Boolean(ok && easyCotacaoRowShowsPrice(row, item.price, samePriceLike, empresaColuna));

@@ -8,7 +8,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { apiUrl } from '../config/api';
 import { getPartnerCouponConfig, isActivePartnerCoupon, normalizePartnerCode } from '../utils/partnerProgram';
 
-const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.48.zip';
+const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.55.zip';
 
 const MinhaLicenca = () => {
   const navigate = useNavigate();

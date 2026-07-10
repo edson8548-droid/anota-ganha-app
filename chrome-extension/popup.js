@@ -3,7 +3,7 @@ const BATCH = 50;
 const STUCK_MS = 3 * 60 * 1000;
 const MAX_RESULT_DETAILS = 12;
 const BTN_LABEL = 'Preencher Cotação';
-const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor, Hipcomerp ou Easy Cotação Web primeiro.';
+const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor, Hipcomerp, Easy Cotação Web, Estância ou SG Cotação primeiro.';
 const SITE_LABELS = {
   cotatudo: 'Cotatudo',
   'vr-cotacao': 'VR Cotação',
@@ -15,6 +15,8 @@ const SITE_LABELS = {
   'bubble-catalog-fornecedor': 'Catalog Fornecedor',
   'hipcomerp-cotacao': 'Hipcomerp',
   'easy-cotacao-web': 'Easy Cotação Web',
+  'estancia-cotacao': 'Estância',
+  'sg-cotacao': 'SG Cotação',
   generic: 'Cotação compatível',
 };
 
@@ -84,6 +86,12 @@ function setDetectedSite(tab, pageInfo = null) {
     type = 'ok';
   } else if (isEasyCotacaoWebUrl(url)) {
     label = 'Site detectado: Easy Cotação Web';
+    type = 'ok';
+  } else if (isEstanciaCotacaoUrl(url)) {
+    label = 'Site detectado: Estância';
+    type = 'ok';
+  } else if (isSgCotacaoUrl(url)) {
+    label = 'Site detectado: SG Cotação';
     type = 'ok';
   }
 
@@ -362,7 +370,9 @@ function isSupportedQuotationUrl(url = '') {
     || isCotacaoWebSmusUrl(url)
     || isBubbleCatalogFornecedorUrl(url)
     || isHipcomerpCotacaoUrl(url)
-    || isEasyCotacaoWebUrl(url);
+    || isEasyCotacaoWebUrl(url)
+    || isEstanciaCotacaoUrl(url)
+    || isSgCotacaoUrl(url);
 }
 
 function isPotentialQuotationUrl(url = '') {
@@ -444,6 +454,25 @@ function isEasyCotacaoWebUrl(url = '') {
   }
 }
 
+function isEstanciaCotacaoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)cotacao\.estanciasupermercados\.com\.br$/i.test(parsed.hostname)
+      && /\/(home|cotacao)\.asp$/i.test(parsed.pathname);
+  } catch {
+    return /^(https?:\/\/)?cotacao\.estanciasupermercados\.com\.br\/(?:home|cotacao)\.asp/i.test(url);
+  }
+}
+
+function isSgCotacaoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)cotacao\.sghost\.com\.br$/i.test(parsed.hostname);
+  } catch {
+    return /^(https?:\/\/)?cotacao\.sghost\.com\.br(?:\/|#|$)/i.test(url);
+  }
+}
+
 async function getQuotationTab(options = {}) {
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (active?.id && isPotentialQuotationUrl(active.url || '')) return active;
@@ -473,6 +502,10 @@ async function getQuotationTab(options = {}) {
       'http://cotacao.hipcomerp.com.br/*',
       'https://gepautomacao.dyndns.org/*',
       'http://gepautomacao.dyndns.org/*',
+      'https://cotacao.estanciasupermercados.com.br/*',
+      'http://cotacao.estanciasupermercados.com.br/*',
+      'https://cotacao.sghost.com.br/*',
+      'http://cotacao.sghost.com.br/*',
       'https://*/fornecedores/*/cotacao/*',
       'http://*/fornecedores/*/cotacao/*',
       'https://*/cotacao/*',
@@ -502,6 +535,8 @@ function detectSiteFromUrl(url = '') {
   if (isBubbleCatalogFornecedorUrl(url)) return 'bubble-catalog-fornecedor';
   if (isHipcomerpCotacaoUrl(url)) return 'hipcomerp-cotacao';
   if (isEasyCotacaoWebUrl(url)) return 'easy-cotacao-web';
+  if (isEstanciaCotacaoUrl(url)) return 'estancia-cotacao';
+  if (isSgCotacaoUrl(url)) return 'sg-cotacao';
   return 'generic';
 }
 
@@ -517,7 +552,21 @@ function sendMessageToTab(tab, message) {
   });
 }
 
+async function ensureHipcomerpMainWorld(tab) {
+  if (isHipcomerpCotacaoUrl(tab?.url || '')) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['hipcom-main-world.js'],
+        world: 'MAIN',
+      });
+      await sleep(120);
+    } catch {}
+  }
+}
+
 async function ensureContentScript(tab) {
+  await ensureHipcomerpMainWorld(tab);
   await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
   await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ['content.css'] });
   await sleep(500);
@@ -541,6 +590,7 @@ async function sendToQuotationPage(message) {
   const tab = await getQuotationTab({ allowActiveFallback: true });
   if (!tab) throw new Error(SUPPORTED_SITE_MESSAGE);
 
+  await ensureHipcomerpMainWorld(tab);
   let response = await sendMessageToTab(tab, message);
   if (response) return response;
 
@@ -662,7 +712,13 @@ function enrichPricesForFill(precos, items) {
       ean: item.ean || '',
       nome: item.nome || '',
       codigo: item.codigo || '',
+      plu: item.plu || item.codigo || '',
+      page: item.page || '',
+      numeroCotacao: item.numeroCotacao || '',
+      quantidadePorCaixa: item.quantidadePorCaixa || '',
       signature: item.signature || '',
+      embalagem: item.embalagem || '',
+      qtdEmbalagem: item.qtdEmbalagem || item.packageQty || '',
     };
   });
 }
@@ -874,6 +930,225 @@ async function saveHipcomerpStopState(message, state) {
     pct: state.pct || 0,
     ts: Date.now(),
   });
+}
+
+async function waitForHipcomerpApiReady(timeoutMs = 7000) {
+  const startedAt = Date.now();
+  let lastState = null;
+  while (Date.now() - startedAt < timeoutMs) {
+    const response = await sendToQuotationPage({ action: 'getHipcomerpApiState' });
+    lastState = response || lastState;
+    if (response?.ready) return response;
+    await sleep(500);
+  }
+  return lastState || { ready: false };
+}
+
+async function ensureHipcomerpApiReady() {
+  const state = await waitForHipcomerpApiReady(3500);
+  if (state?.ready) return state;
+
+  if (state?.usesCanvasKit) {
+    throw new Error('Hipcomerp ainda não liberou os dados para a extensão. Não recarreguei a página para não derrubar o login. Abra a cotação, aguarde os itens aparecerem e clique em Preencher de novo. Se acabou de instalar a extensão nova, recarregue manualmente só depois de logar.');
+  }
+
+  throw new Error('Não consegui conectar com os dados da Hipcomerp. Abra a cotação logada, aguarde os itens aparecerem e tente novamente.');
+}
+
+async function runHipcomerpApiJob(job, initial = {}) {
+  running = true;
+  cancelRequested = false;
+  job.site = 'hipcomerp-cotacao';
+  job.hipcomerpMode = 'api';
+  await storageSet({ processingJob: job });
+
+  const token = await getToken();
+  if (!token) throw new Error('Login expirado. Abra o painel do Venpro e tente de novo.');
+
+  await ensureHipcomerpApiReady();
+  setStatus('Hipcomerp: carregando todos os itens pela API do site...', 'info');
+  const loadResult = await sendToQuotationPage({ action: 'loadHipcomerpApiItems', options: { waitMs: 6000 } });
+  if (!loadResult?.ok) {
+    throw new Error(loadResult?.reason === 'api_context_not_ready_canvas'
+      ? 'Hipcomerp ainda não liberou os dados para a extensão. Não recarreguei a página para não derrubar o login. Aguarde os itens aparecerem e clique em Preencher de novo.'
+      : `Não consegui carregar os itens da Hipcomerp (${loadResult?.reason || 'erro desconhecido'}).`);
+  }
+
+  const items = (loadResult.items || []).filter(item => !item.filled && (item.nome || item.ean));
+  job.items = items;
+  job.hipcomerpPages = loadResult.pages || 1;
+  job.hipcomerpTotal = loadResult.total || items.length;
+  await storageSet({ processingJob: job });
+
+  if (!items.length) {
+    await saveState({
+      status: 'done',
+      total: 0,
+      processados: 0,
+      preenchidos: 0,
+      naoEncontrados: 0,
+      falhas: 0,
+      pct: 100,
+    });
+    await storageRemove('processingJob');
+    return;
+  }
+
+  const totalBatches = Math.ceil(items.length / BATCH);
+  let preenchidos = initial.preenchidos || 0;
+  let naoEncontrados = initial.naoEncontrados || 0;
+  let falhasPreenchimento = initial.falhas || 0;
+  let processados = initial.processados || 0;
+  let naoEncontradosDetalhes = Array.isArray(initial.naoEncontradosDetalhes) ? [...initial.naoEncontradosDetalhes] : [];
+  let falhasDetalhes = Array.isArray(initial.falhasDetalhes) ? [...initial.falhasDetalhes] : [];
+  const startBatch = initial.batchIndex || 0;
+
+  for (let b = startBatch; b < totalBatches; b++) {
+    if (cancelRequested) {
+      await saveState({
+        status: 'paused',
+        total: items.length,
+        processados,
+        preenchidos,
+        naoEncontrados,
+        falhas: falhasPreenchimento,
+        naoEncontradosDetalhes,
+        falhasDetalhes,
+        pct: Math.round((b / totalBatches) * 100),
+        batchIndex: b,
+        ts: Date.now(),
+      });
+      return;
+    }
+
+    const batch = items.slice(b * BATCH, (b + 1) * BATCH);
+    const pct = Math.round((b / totalBatches) * 100);
+    setProgress(pct, `${processados} / ${items.length} itens`);
+    setStatus(`Hipcomerp: buscando preços do lote ${b + 1}/${totalBatches}...`, 'info');
+
+    const data = await matchBatch(token, job, batch, b + 1, totalBatches);
+    const precos = Array.isArray(data.precos) ? data.precos : [];
+    const missingDetails = missingDetailsForBatch(batch, precos);
+    const missingCount = missingDetails.length || Math.max(0, batch.length - precos.length);
+    naoEncontradosDetalhes = mergeResultDetails(naoEncontradosDetalhes, missingDetails);
+    naoEncontrados += missingCount;
+
+    const pricesToSave = enrichPricesForFill(precos, batch);
+    let savedCount = 0;
+    let saveResult = { ok: true, saved: 0 };
+    if (pricesToSave.length) {
+      setStatus(`Hipcomerp: gravando ${pricesToSave.length} preço(s) no site...`, 'info');
+      saveResult = await sendToQuotationPage({ action: 'saveHipcomerpApiPrices', prices: pricesToSave });
+      savedCount = Number(saveResult?.saved || 0);
+    }
+
+    if (!saveResult?.ok || savedCount !== pricesToSave.length) {
+      const failedCount = Math.max(1, pricesToSave.length - savedCount);
+      falhasPreenchimento += failedCount;
+      falhasDetalhes = mergeResultDetails(falhasDetalhes, pricesToSave.slice(savedCount).map(item => makeItemDetail(item, saveResult?.reason || 'falha_gravar_api')));
+      await reportFill(token, {
+        event_type: 'hipcomerp_api_batch',
+        status: 'error',
+        job_id: job.jobId,
+        tabela_id: job.tabelaId,
+        prazo: job.prazo,
+        modo: job.modo,
+        site: job.site,
+        batch_index: b + 1,
+        total_batches: totalBatches,
+        total_itens: items.length,
+        batch_total: batch.length,
+        precos_recebidos: precos.length,
+        preenchidos: savedCount,
+        falhas: failedCount,
+        nao_encontrados: missingCount,
+        debug: {
+          save_status: saveResult?.status || null,
+          save_reason: saveResult?.reason || null,
+          save_failed: saveResult?.failed || [],
+          nao_encontrados_detalhes: missingDetails.slice(0, 30),
+        },
+      });
+      await saveHipcomerpStopState('A Hipcomerp recusou parte dos preços encontrados. Parei sem tentar reenviar em loop.', {
+        total: items.length,
+        processados,
+        preenchidos,
+        naoEncontrados,
+        falhas: falhasPreenchimento,
+        naoEncontradosDetalhes,
+        falhasDetalhes,
+      });
+      return;
+    }
+
+    preenchidos += savedCount;
+    processados += batch.length;
+
+    await reportFill(token, {
+      event_type: 'hipcomerp_api_batch',
+      status: 'success',
+      job_id: job.jobId,
+      tabela_id: job.tabelaId,
+      prazo: job.prazo,
+      modo: job.modo,
+      site: job.site,
+      batch_index: b + 1,
+      total_batches: totalBatches,
+      total_itens: items.length,
+      batch_total: batch.length,
+      precos_recebidos: precos.length,
+      preenchidos: savedCount,
+      falhas: 0,
+      nao_encontrados: missingCount,
+      debug: {
+        hipcomerp_mode: 'api',
+        nao_encontrados_detalhes: missingDetails.slice(0, 30),
+      },
+    });
+
+    await saveState({
+      status: 'processing',
+      total: items.length,
+      processados,
+      preenchidos,
+      naoEncontrados,
+      falhas: falhasPreenchimento,
+      naoEncontradosDetalhes,
+      falhasDetalhes,
+      pct: Math.round(((b + 1) / totalBatches) * 100),
+      batchIndex: b + 1,
+      ts: Date.now(),
+    });
+  }
+
+  await reportFill(token, {
+    event_type: 'job',
+    status: 'done',
+    job_id: job.jobId,
+    tabela_id: job.tabelaId,
+    prazo: job.prazo,
+    modo: job.modo,
+    site: job.site,
+    total_itens: items.length,
+    batch_total: items.length,
+    preenchidos,
+    falhas: falhasPreenchimento,
+    nao_encontrados: naoEncontrados,
+    debug: { hipcomerp_mode: 'api' },
+  });
+
+  await saveState({
+    status: 'done',
+    total: items.length,
+    processados,
+    preenchidos,
+    naoEncontrados,
+    falhas: falhasPreenchimento,
+    naoEncontradosDetalhes,
+    falhasDetalhes,
+    pct: 100,
+  });
+  await storageRemove('processingJob');
 }
 
 async function runHipcomerpJob(job, initial = {}) {
@@ -1117,6 +1392,346 @@ async function runHipcomerpJob(job, initial = {}) {
   });
 }
 
+async function saveEstanciaStopState(message, state) {
+  await saveState({
+    status: 'error',
+    msg: message,
+    total: state.total || state.processados || 0,
+    processados: state.processados || 0,
+    preenchidos: state.preenchidos || 0,
+    naoEncontrados: state.naoEncontrados || 0,
+    falhas: state.falhas || 0,
+    naoEncontradosDetalhes: state.naoEncontradosDetalhes || [],
+    falhasDetalhes: state.falhasDetalhes || [],
+    pct: state.pct || 0,
+    quoteIndex: state.quoteIndex || 0,
+    page: state.page || 1,
+    ts: Date.now(),
+  });
+}
+
+function estanciaProgressPct(quoteIndex, quoteCount, page, pages) {
+  const quotes = Math.max(1, quoteCount || 1);
+  const currentPageRatio = Math.max(0, Math.min(1, ((page || 1) - 1) / Math.max(1, pages || 1)));
+  return Math.max(0, Math.min(99, Math.round(((quoteIndex + currentPageRatio) / quotes) * 100)));
+}
+
+async function ensureEstanciaCotacaoOpen() {
+  const result = await sendToQuotationPage({ action: 'openEstanciaCotacao' });
+  if (!result?.ok) {
+    throw new Error(`Não consegui abrir as cotações do Estância (${result?.reason || 'erro desconhecido'}).`);
+  }
+  return result.state || await sendToQuotationPage({ action: 'getEstanciaState' });
+}
+
+async function runEstanciaJob(job, initial = {}) {
+  running = true;
+  cancelRequested = false;
+  await storageSet({ processingJob: job });
+
+  const token = await getToken();
+  if (!token) throw new Error('Login expirado. Abra o painel do Venpro e tente de novo.');
+
+  let state = await ensureEstanciaCotacaoOpen();
+  if (!state?.hasSelect || !state.quoteCount) {
+    throw new Error('Não encontrei cotações disponíveis para esse fornecedor no Estância.');
+  }
+
+  const resumeQuoteIndex = Number.isInteger(Number(initial.quoteIndex))
+    ? Number(initial.quoteIndex)
+    : null;
+  let quoteIndex = resumeQuoteIndex !== null
+    ? resumeQuoteIndex
+    : Math.max(0, state.quoteIndex || 0);
+  let startPageForQuote = Number.isInteger(Number(initial.page)) ? Math.max(1, Number(initial.page)) : 1;
+  let preenchidos = initial.preenchidos || 0;
+  let naoEncontrados = initial.naoEncontrados || 0;
+  let falhasPreenchimento = initial.falhas || 0;
+  let processados = initial.processados || 0;
+  let naoEncontradosDetalhes = Array.isArray(initial.naoEncontradosDetalhes) ? [...initial.naoEncontradosDetalhes] : [];
+  let falhasDetalhes = Array.isArray(initial.falhasDetalhes) ? [...initial.falhasDetalhes] : [];
+  const quoteCount = state.quoteCount;
+
+  for (; quoteIndex < quoteCount; quoteIndex++) {
+    if (cancelRequested) {
+      await saveState({
+        status: 'paused',
+        total: processados,
+        processados,
+        preenchidos,
+        naoEncontrados,
+        falhas: falhasPreenchimento,
+        naoEncontradosDetalhes,
+        falhasDetalhes,
+        pct: estanciaProgressPct(quoteIndex, quoteCount, 1, 1),
+        quoteIndex,
+        page: startPageForQuote,
+        ts: Date.now(),
+      });
+      return;
+    }
+
+    state = await sendToQuotationPage({ action: 'getEstanciaState' });
+    if (state.quoteIndex !== quoteIndex) {
+      const loadedQuote = await sendToQuotationPage({ action: 'loadEstanciaQuote', quoteIndex });
+      if (!loadedQuote?.ok) {
+        await saveEstanciaStopState(`Não consegui abrir a cotação ${quoteIndex + 1} no Estância (${loadedQuote?.reason || 'erro desconhecido'}).`, {
+          processados, preenchidos, naoEncontrados, falhas: falhasPreenchimento, naoEncontradosDetalhes, falhasDetalhes, quoteIndex,
+        });
+        return;
+      }
+      state = loadedQuote.state || await sendToQuotationPage({ action: 'getEstanciaState' });
+    }
+
+    let page = quoteIndex === resumeQuoteIndex ? startPageForQuote : 1;
+    let pages = Math.max(1, state.pages || 1);
+    for (; page <= pages; page++) {
+      if (cancelRequested) {
+        await saveState({
+          status: 'paused',
+          total: processados,
+          processados,
+          preenchidos,
+          naoEncontrados,
+          falhas: falhasPreenchimento,
+          naoEncontradosDetalhes,
+          falhasDetalhes,
+          pct: estanciaProgressPct(quoteIndex, quoteCount, page, pages),
+          quoteIndex,
+          page,
+          ts: Date.now(),
+        });
+        return;
+      }
+
+      state = await sendToQuotationPage({ action: 'getEstanciaState' });
+      pages = Math.max(1, state.pages || pages || 1);
+      if (state.page !== page) {
+        const loadedPage = await sendToQuotationPage({ action: 'loadEstanciaPage', page });
+        if (!loadedPage?.ok) {
+          await saveEstanciaStopState(`Não consegui abrir a página ${page} da cotação Estância (${loadedPage?.reason || 'erro desconhecido'}).`, {
+            processados, preenchidos, naoEncontrados, falhas: falhasPreenchimento, naoEncontradosDetalhes, falhasDetalhes, quoteIndex, page,
+          });
+          return;
+        }
+        state = loadedPage.state || await sendToQuotationPage({ action: 'getEstanciaState' });
+        pages = Math.max(1, state.pages || pages || 1);
+      }
+
+      const quoteLabel = state.quoteText || `Cotação ${quoteIndex + 1}`;
+      const extractResult = await extractOpenQuotationItems(job.empresaColuna || 0);
+      const items = extractResult.items;
+      if (!items.length) {
+        setStatus(`Estância: sem itens na ${quoteLabel}, página ${page}.`, 'info');
+        continue;
+      }
+
+      const pct = estanciaProgressPct(quoteIndex, quoteCount, page, pages);
+      setProgress(pct, `Estância ${quoteIndex + 1}/${quoteCount} · pág. ${page}/${pages} · ${items.length} itens`);
+      setStatus(`Estância: buscando preços da ${quoteLabel}, página ${page}/${pages}...`, 'info');
+
+      job.items = items;
+      job.site = 'estancia-cotacao';
+      await storageSet({ processingJob: job });
+
+      const data = await matchBatch(token, job, items, page, pages);
+      const precos = Array.isArray(data.precos) ? data.precos : [];
+      const missingDetails = missingDetailsForBatch(items, precos);
+      const missingCount = missingDetails.length || Math.max(0, items.length - precos.length);
+      naoEncontradosDetalhes = mergeResultDetails(naoEncontradosDetalhes, missingDetails);
+      naoEncontrados += missingCount;
+
+      const pricesToFill = enrichPricesForFill(precos, items);
+      setStatus(
+        missingCount > 0
+          ? `Estância: preenchendo ${precos.length} preço(s); ${missingCount} sem preço ficam 0,00.`
+          : `Estância: preenchendo ${precos.length} preço(s) e campos fixos...`,
+        'info'
+      );
+
+      const fillResult = await sendToQuotationPage({
+        action: 'fillPrices',
+        prices: pricesToFill,
+        empresaColuna: job.empresaColuna || 0,
+      });
+      const filled = fillResult?.filled || 0;
+      const failedCount = Array.isArray(fillResult?.failed) ? fillResult.failed.length : 0;
+      const failureDetails = failureDetailsFromFill(fillResult, pricesToFill);
+      const fixedFailures = (fillResult?.details || []).filter(detail => /fixed_fields/.test(detail?.reason || ''));
+      falhasDetalhes = mergeResultDetails(falhasDetalhes, [...failureDetails, ...fixedFailures]);
+      const fillFailures = failedCount || Math.max(0, pricesToFill.length - filled) || fixedFailures.length;
+
+      if (fillFailures > 0) {
+        falhasPreenchimento += fillFailures;
+        await reportFill(token, {
+          event_type: 'estancia_page',
+          status: 'error',
+          job_id: job.jobId,
+          tabela_id: job.tabelaId,
+          prazo: job.prazo,
+          modo: job.modo,
+          site: 'estancia-cotacao',
+          batch_index: page,
+          total_batches: pages,
+          total_itens: processados + items.length,
+          batch_total: items.length,
+          precos_recebidos: precos.length,
+          preenchidos: filled,
+          falhas: fillFailures,
+          nao_encontrados: missingCount,
+          debug: {
+            quote_index: quoteIndex,
+            quote_text: quoteLabel,
+            detalhes: Array.isArray(fillResult?.details) ? fillResult.details.slice(0, 30) : [],
+            nao_encontrados_detalhes: missingDetails.slice(0, 30),
+            falhas_detalhes: falhasDetalhes.slice(0, 30),
+          },
+        });
+        await saveEstanciaStopState('Preço ou campo fixo não entrou no Estância. Não cliquei em gravar alterações.', {
+          total: processados + items.length,
+          processados,
+          preenchidos,
+          naoEncontrados,
+          falhas: falhasPreenchimento,
+          naoEncontradosDetalhes,
+          falhasDetalhes,
+          quoteIndex,
+          page,
+          pct,
+        });
+        return;
+      }
+
+      const saveResult = await sendToQuotationPage({ action: 'saveEstanciaPage' });
+      if (!saveResult?.ok) {
+        await saveEstanciaStopState(`Não consegui gravar a página do Estância (${saveResult?.reason || 'erro desconhecido'}).`, {
+          total: processados + items.length,
+          processados,
+          preenchidos,
+          naoEncontrados,
+          falhas: falhasPreenchimento,
+          naoEncontradosDetalhes,
+          falhasDetalhes,
+          quoteIndex,
+          page,
+          pct,
+        });
+        return;
+      }
+
+      preenchidos += filled;
+      processados += items.length;
+
+      await reportFill(token, {
+        event_type: 'estancia_page',
+        status: 'success',
+        job_id: job.jobId,
+        tabela_id: job.tabelaId,
+        prazo: job.prazo,
+        modo: job.modo,
+        site: 'estancia-cotacao',
+        batch_index: page,
+        total_batches: pages,
+        total_itens: processados,
+        batch_total: items.length,
+        precos_recebidos: precos.length,
+        preenchidos: filled,
+        falhas: 0,
+        nao_encontrados: missingCount,
+        debug: {
+          quote_index: quoteIndex,
+          quote_text: quoteLabel,
+          nao_encontrados_detalhes: missingDetails.slice(0, 30),
+        },
+      });
+
+      await saveState({
+        status: 'processing',
+        total: processados,
+        processados,
+        preenchidos,
+        naoEncontrados,
+        falhas: falhasPreenchimento,
+        naoEncontradosDetalhes,
+        falhasDetalhes,
+        pct,
+        quoteIndex,
+        page: page + 1,
+        ts: Date.now(),
+      });
+
+      if (page < pages) {
+        setStatus(`Estância: página ${page} gravada. Abrindo página ${page + 1}...`, 'info');
+        const nextPage = await sendToQuotationPage({ action: 'loadEstanciaPage', page: page + 1 });
+        if (!nextPage?.ok) {
+          await saveEstanciaStopState(`Página ${page} gravada, mas não consegui abrir a próxima (${nextPage?.reason || 'erro desconhecido'}).`, {
+            total: processados,
+            processados,
+            preenchidos,
+            naoEncontrados,
+            falhas: falhasPreenchimento,
+            naoEncontradosDetalhes,
+            falhasDetalhes,
+            quoteIndex,
+            page: page + 1,
+            pct,
+          });
+          return;
+        }
+      }
+    }
+
+    startPageForQuote = 1;
+    if (quoteIndex + 1 < quoteCount) {
+      setStatus(`Estância: cotação ${quoteIndex + 1}/${quoteCount} concluída. Abrindo próxima cotação...`, 'info');
+      const nextQuote = await sendToQuotationPage({ action: 'loadEstanciaQuote', quoteIndex: quoteIndex + 1 });
+      if (!nextQuote?.ok) {
+        await saveEstanciaStopState(`Cotação atual gravada, mas não consegui abrir a próxima (${nextQuote?.reason || 'erro desconhecido'}).`, {
+          total: processados,
+          processados,
+          preenchidos,
+          naoEncontrados,
+          falhas: falhasPreenchimento,
+          naoEncontradosDetalhes,
+          falhasDetalhes,
+          quoteIndex: quoteIndex + 1,
+          page: 1,
+          pct: estanciaProgressPct(quoteIndex + 1, quoteCount, 1, 1),
+        });
+        return;
+      }
+    }
+  }
+
+  await reportFill(token, {
+    event_type: 'job',
+    status: 'done',
+    job_id: job.jobId,
+    tabela_id: job.tabelaId,
+    prazo: job.prazo,
+    modo: job.modo,
+    site: 'estancia-cotacao',
+    total_itens: processados,
+    batch_total: processados,
+    preenchidos,
+    falhas: falhasPreenchimento,
+    nao_encontrados: naoEncontrados,
+  });
+
+  await saveState({
+    status: 'done',
+    total: processados,
+    processados,
+    preenchidos,
+    naoEncontrados,
+    falhas: falhasPreenchimento,
+    naoEncontradosDetalhes,
+    falhasDetalhes,
+    pct: 100,
+  });
+  await storageRemove('processingJob');
+}
+
 async function startProcessing() {
   const tabelaId = tabelasEl.value;
   const prazo = parseInt(prazoEl.value, 10);
@@ -1135,6 +1750,22 @@ async function startProcessing() {
 
   try {
     const tab = await getQuotationTab({ allowActiveFallback: true });
+    const siteFromUrl = detectSiteFromUrl(tab?.url || '');
+    if (siteFromUrl === 'estancia-cotacao') {
+      setStatus('Abrindo lista de cotações do Estância...', 'info');
+      await ensureEstanciaCotacaoOpen();
+    }
+    if (siteFromUrl === 'hipcomerp-cotacao') {
+      const apiState = await sendToQuotationPage({ action: 'getHipcomerpApiState' });
+      if (apiState?.ready || apiState?.usesCanvasKit) {
+        await storageRemove(['processingState', 'processingJob']);
+        const job = { jobId: createJobId(), items: [], tabelaId, prazo, modo, empresaColuna, site: 'hipcomerp-cotacao', hipcomerpMode: 'api' };
+        setProgress(0, 'Hipcomerp: preparando itens');
+        showRunning();
+        await runHipcomerpApiJob(job);
+        return;
+      }
+    }
     const extractResult = await sendToQuotationPage({ action: 'extractItems', empresaColuna });
     const site = extractResult.site || detectSiteFromUrl(tab?.url || '');
     const items = (extractResult.items || []).filter(item => !item.filled && (item.nome || item.ean));
@@ -1153,6 +1784,9 @@ async function startProcessing() {
     if (site === 'hipcomerp-cotacao') {
       setStatus(`Hipcomerp: iniciando com ${items.length} itens visíveis...`, 'info');
       await runHipcomerpJob(job);
+    } else if (site === 'estancia-cotacao') {
+      setStatus(`Estância: iniciando com ${items.length} itens na página atual...`, 'info');
+      await runEstanciaJob(job);
     } else {
       setStatus(`Processando ${items.length} itens...`, 'info');
       await runJob(job);
@@ -1166,7 +1800,7 @@ async function resumeProcessing() {
   const data = await storageGet(['processingJob', 'processingState']);
   const job = data.processingJob;
   const state = data.processingState || {};
-  if (!job || (job.site !== 'hipcomerp-cotacao' && !job.items?.length)) {
+  if (!job || (job.site !== 'hipcomerp-cotacao' && job.site !== 'estancia-cotacao' && !job.items?.length)) {
     resetUI();
     setStatus('Não encontrei processamento para retomar. Inicie novamente.', 'err');
     return;
@@ -1180,15 +1814,38 @@ async function resumeProcessing() {
 
   try {
     if (job.site === 'hipcomerp-cotacao') {
-      await runHipcomerpJob(job, {
-        tela: state.tela || 0,
+      if (job.hipcomerpMode === 'api') {
+        await runHipcomerpApiJob(job, {
+          batchIndex: state.batchIndex || 0,
+          preenchidos: state.preenchidos || 0,
+          naoEncontrados: state.naoEncontrados || 0,
+          falhas: state.falhas || 0,
+          processados: state.processados || 0,
+          naoEncontradosDetalhes: state.naoEncontradosDetalhes || [],
+          falhasDetalhes: state.falhasDetalhes || [],
+        });
+      } else {
+        await runHipcomerpJob(job, {
+          tela: state.tela || 0,
+          preenchidos: state.preenchidos || 0,
+          naoEncontrados: state.naoEncontrados || 0,
+          falhas: state.falhas || 0,
+          processados: state.processados || 0,
+          naoEncontradosDetalhes: state.naoEncontradosDetalhes || [],
+          falhasDetalhes: state.falhasDetalhes || [],
+          pageSignatures: state.pageSignatures || job.pageSignatures || [],
+        });
+      }
+    } else if (job.site === 'estancia-cotacao') {
+      await runEstanciaJob(job, {
+        quoteIndex: state.quoteIndex || 0,
+        page: state.page || 1,
         preenchidos: state.preenchidos || 0,
         naoEncontrados: state.naoEncontrados || 0,
         falhas: state.falhas || 0,
         processados: state.processados || 0,
         naoEncontradosDetalhes: state.naoEncontradosDetalhes || [],
         falhasDetalhes: state.falhasDetalhes || [],
-        pageSignatures: state.pageSignatures || job.pageSignatures || [],
       });
     } else {
       await runJob(job, state.batchIndex || 0, {

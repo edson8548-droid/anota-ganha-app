@@ -1,9 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Venpro — Preencher Cotação",
-  "version": "1.0.48",
-  "description": "Preenchedor de cotações do Venpro para Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor, Hipcomerp, Easy Cotação Web e novos portais compatíveis.",
-  "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel"],
+  "version": "1.0.55",
+  "description": "Preenchedor de cotações do Venpro para Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor, Hipcomerp, Easy Cotação Web, Estância, SG Cotação e novos portais compatíveis.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "tabs",
+    "storage",
+    "sidePanel"
+  ],
   "host_permissions": [
     "https://cotatudo.com.br/*",
     "https://www.cotatudo.com.br/*",
@@ -32,6 +38,10 @@
     "http://cotacao.hipcomerp.com.br/*",
     "https://gepautomacao.dyndns.org/*",
     "http://gepautomacao.dyndns.org/*",
+    "https://cotacao.estanciasupermercados.com.br/*",
+    "http://cotacao.estanciasupermercados.com.br/*",
+    "https://cotacao.sghost.com.br/*",
+    "http://cotacao.sghost.com.br/*",
     "https://api.venpro.com.br/*"
   ],
   "action": {
@@ -54,7 +64,9 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["smus-page-bridge.js"],
+      "resources": [
+        "smus-page-bridge.js"
+      ],
       "matches": [
         "https://cotacaoweb.smus.com.br/*",
         "http://cotacaoweb.smus.com.br/*"
@@ -62,6 +74,17 @@
     }
   ],
   "content_scripts": [
+    {
+      "matches": [
+        "https://cotacao.hipcomerp.com.br/*",
+        "http://cotacao.hipcomerp.com.br/*"
+      ],
+      "js": [
+        "hipcom-main-world.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
     {
       "matches": [
         "https://cotatudo.com.br/*",
@@ -87,13 +110,21 @@
         "http://cotacao.hipcomerp.com.br/*",
         "https://gepautomacao.dyndns.org/*",
         "http://gepautomacao.dyndns.org/*",
+        "https://cotacao.estanciasupermercados.com.br/*",
+        "http://cotacao.estanciasupermercados.com.br/*",
+        "https://cotacao.sghost.com.br/*",
+        "http://cotacao.sghost.com.br/*",
         "https://*/fornecedores/*/cotacao/*",
         "http://*/fornecedores/*/cotacao/*",
         "https://*/cotacao/*",
         "http://*/cotacao/*"
       ],
-      "js": ["content.js"],
-      "css": ["content.css"]
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ]
     },
     {
       "matches": [
@@ -103,7 +134,9 @@
         "https://anota-ganha-app.web.app/*",
         "https://anota-ganha-app.firebaseapp.com/*"
       ],
-      "js": ["venpro-content.js"],
+      "js": [
+        "venpro-content.js"
+      ],
       "run_at": "document_idle"
     }
   ]
