@@ -533,7 +533,10 @@ def detectar_prazos_disponiveis(caminho_arquivo) -> list:
             encontrados = []
             for prazo in [7, 14, 21, 28]:
                 for col in df.columns:
-                    nums = _re.findall(r'\b(\d+)\b', str(col))
+                    # Normaliza antes de buscar: "preco_14_dias" tem "_" dos
+                    # dois lados do numero, e "_" conta como \w no regex, entao
+                    # \b(\d+)\b nunca casava direto na coluna crua.
+                    nums = _re.findall(r'\b(\d+)\b', _normalizar_cabecalho(col))
                     if str(prazo) in nums:
                         encontrados.append(prazo)
                         break
