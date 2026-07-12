@@ -342,6 +342,11 @@ def _xlsx_safe_bytes(caminho_arquivo):
 
 PREENCHIMENTO_IA = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 MAX_BLANK_ROWS_AFTER_COTACAO_ITEMS = 200
+# Cotacao real sem codigo de barras existe (fica so com nome) — por isso a
+# falta de EAN/preco sozinha nao pode rejeitar a aba. So rejeita quando,
+# alem de faltar os dois, a aba tem linhas demais pra ser um pedido real
+# (catalogo/referencia interno costuma vir com milhares de linhas).
+COTACAO_SHEET_MAX_ROWS_SEM_EAN_PRECO = 500
 _PRECO_COTACAO_KW = (
     "PREÇO", "PRECO", "VALOR UNIT", "VALOR UNI", "VALOR", "R$",
     "PRECO UNIT", "PREÇO UNIT", "UNIT", "CUSTO", "VLR",
@@ -482,6 +487,20 @@ def _ler_cotacao_worksheet(ws, sheet_name=None, exigir_indicio_cotacao=False):
         col_preco = fallback_col_preco
 
     if exigir_indicio_cotacao and found_header is None:
+        return [], 1
+
+    # Cotacao de verdade sem EAN nem preco existe (fica so com nome) e nao
+    # pode ser rejeitada. O que rejeitamos e a aba de catalogo/referencia
+    # interna (ex.: "Codigo Produto/Produto/Comprador") que a planilha do
+    # RCA as vezes traz numa segunda aba com milhares de linhas — essa nao
+    # tem EAN nem preco E e grande demais pra ser um pedido real. So nesse
+    # caso (falta EAN e preco E aba enorme) que a aba e descartada.
+    if (
+        exigir_indicio_cotacao
+        and col_ean is None
+        and col_preco is None
+        and ws.max_row > COTACAO_SHEET_MAX_ROWS_SEM_EAN_PRECO
+    ):
         return [], 1
 
     header_row = found_header or 1
