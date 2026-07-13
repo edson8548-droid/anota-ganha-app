@@ -181,6 +181,11 @@ def _score_coluna_preco(nome_coluna, prazo=None) -> int:
         return 60
     if "PRECO" in c_norm or "VALOR" in c_norm:
         return 55
+    # "VR" e abreviacao de VALOR em ERPs (VR_VENDA, VR CUSTO, VR UNID). So casa
+    # como token isolado pra nao pegar dentro de palavras (LIVRO, ABRIR) e fica
+    # abaixo de UNIT/prazo/liquido, entao a coluna de preco certa ainda ganha.
+    if _re.search(r"\bVR\b", c_norm):
+        return 55
     return 0
 
 

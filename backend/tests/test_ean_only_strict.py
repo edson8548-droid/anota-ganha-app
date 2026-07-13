@@ -603,3 +603,23 @@ def test_cotacao_sbroggio_preenche_coluna_preco_e_inferir_ean_sem_cabecalho():
         os.unlink(path)
         if output:
             os.unlink(output)
+
+
+def test_tabela_mestre_reconhece_coluna_vr_venda():
+    """ERP que exporta preco como VR_VENDA (ex.: Flex) deve ser reconhecido.
+
+    Antes do fix, VR_VENDA nao pontuava como preco e o leitor caia no
+    fallback cego (nome=COD_PROD, preco=ESTOQUE), perdendo todos os EANs.
+    """
+    path = _xlsx([
+        ["COD_PROD", "DESCRICAO", "EAN", "PE_UNID", "PE_QTD", "VR_VENDA", "ESTOQUE"],
+        ["40016177", "ABACAXI OLE EM CALDA 300GR", "7891032016625", "CX", "12", "16.06", "48"],
+        ["40014105", "ACHOC EM PO NESCAU 2,0KG", "7891000432679", "CX", "4", "39.1", "640"],
+    ])
+    try:
+        precos, lista = ler_tabela_mestre(path, prazo=28)
+        assert precos.get("7891032016625") == 16.06
+        assert precos.get("7891000432679") == 39.1
+        assert any(it["orig"].startswith("ABACAXI") for it in lista)
+    finally:
+        os.unlink(path)
