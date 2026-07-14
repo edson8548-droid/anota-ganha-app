@@ -2,9 +2,10 @@
 // ADICIONADA LÓGICA PARA EDITAR INDÚSTRIA EXISTENTE
 
 import React, { useState, useEffect } from 'react';
-import { Trash2, X } from 'lucide-react';
+import { Trash2, X, Table2 } from 'lucide-react';
 import { toast } from 'sonner';
 import ConfirmDialog from './ConfirmDialog';
+import TabelaPickerModal from './TabelaPickerModal';
 import './CreateCampaignModal.css';
 
 const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
@@ -30,6 +31,14 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
   const [currentProduct, setCurrentProduct] = useState('');
   const [errors, setErrors] = useState({});
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null });
+  const [showTablePicker, setShowTablePicker] = useState(false);
+
+  // Produto pode vir como string (campanhas antigas) ou objeto {nome, ean}.
+  // normalizeProduct garante sempre {nome, ean, preco, qtd_caixa}.
+  const normalizeProduct = (p) =>
+    typeof p === 'string'
+      ? { nome: p, ean: '', preco: null, qtd_caixa: null }
+      : { nome: p?.nome || '', ean: p?.ean || '', preco: p?.preco ?? null, qtd_caixa: p?.qtd_caixa ?? null };
 
   const showConfirm = (title, description, onConfirm) =>
     setConfirmDialog({ open: true, title, description, onConfirm });
@@ -45,7 +54,14 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
             const industryData = campaign.industries[industryName];
             const targetValue = industryData.targetValue || 0;
             const alreadySoldValue = industryData.alreadySoldValue || 0;
-            const products = Object.keys(industryData).filter(key => !INDUSTRY_META_FIELDS.includes(key));
+            const products = Object.keys(industryData)
+              .filter(key => !INDUSTRY_META_FIELDS.includes(key))
+              .map(nome => ({
+                nome,
+                ean: industryData[nome]?.ean || '',
+                preco: industryData[nome]?.preco ?? null,
+                qtd_caixa: industryData[nome]?.qtd_caixa ?? null,
+              }));
             return {
               id: Date.now() + Math.random(), // ID local para o array
               name: industryName,
@@ -96,23 +112,52 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
   };
 
   const handleAddProduct = () => {
-    if (!currentProduct.trim()) return;
-    if (currentIndustry.products.includes(currentProduct.trim())) {
+    const nome = currentProduct.trim();
+    if (!nome) return;
+    if (currentIndustry.products.some(p => normalizeProduct(p).nome === nome)) {
       toast.warning('⚠️ Este produto já foi adicionado');
       return;
     }
     setCurrentIndustry(prev => ({
       ...prev,
-      products: [...prev.products, currentProduct.trim()]
+      products: [...prev.products, { nome, ean: '', preco: null, qtd_caixa: null }]
     }));
     setCurrentProduct('');
   };
 
-  const handleRemoveProduct = (product) => {
+  const handleRemoveProduct = (nome) => {
     setCurrentIndustry(prev => ({
       ...prev,
-      products: prev.products.filter(p => p !== product)
+      products: prev.products.filter(p => normalizeProduct(p).nome !== nome)
     }));
+  };
+
+  // Recebe os itens marcados no TabelaPickerModal ({nome, ean, preco, qtd_caixa})
+  // e adiciona à indústria atual, ignorando duplicados (por EAN, senão por nome).
+  const handleAddFromTable = (escolhidos) => {
+    setCurrentIndustry(prev => {
+      const existentes = prev.products.map(normalizeProduct);
+      const jaTem = (item) =>
+        existentes.some(p =>
+          (item.ean && p.ean && p.ean === item.ean) || p.nome === item.nome
+        );
+      const novos = [];
+      let ignorados = 0;
+      escolhidos.forEach(it => {
+        const item = normalizeProduct(it);
+        if (!item.nome) return;
+        if (jaTem(item) || novos.some(n => n.nome === item.nome)) { ignorados += 1; return; }
+        novos.push(item);
+      });
+      if (novos.length) {
+        toast.success(`✅ ${novos.length} produto${novos.length > 1 ? 's' : ''} da tabela adicionado${novos.length > 1 ? 's' : ''}`);
+      }
+      if (ignorados) {
+        toast.info(`${ignorados} já estava${ignorados > 1 ? 'm' : ''} na lista`);
+      }
+      return { ...prev, products: [...prev.products, ...novos] };
+    });
+    setShowTablePicker(false);
   };
 
   // FUNÇÃO ATUALIZADA (AGORA FAZ ADD OU UPDATE)
@@ -195,34 +240,44 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!validate()) return;
-
+  // Monta o objeto de campanha (industries no formato do Firestore) a partir
+  // do formulário. Usado tanto no salvar quanto no publicar-compartilhada.
+  const buildCampaignData = () => {
     const industriesObj = {};
     formData.industries.forEach(industry => {
       industriesObj[industry.name] = {
         targetValue: industry.targetValue,
         alreadySoldValue: industry.alreadySoldValue || 0
       };
-      industry.products.forEach(product => {
-        const existingProduct = campaign?.industries?.[industry.name]?.[product];
-        if (existingProduct) {
-          industriesObj[industry.name][product] = existingProduct;
-        } else {
-          industriesObj[industry.name][product] = { positivado: false, valor: 0 };
-        }
+      industry.products.forEach(prod => {
+        const product = normalizeProduct(prod);
+        if (!product.nome) return;
+        const existingProduct = campaign?.industries?.[industry.name]?.[product.nome];
+        // Preserva positivado/valor de quem já existia; sempre garante o EAN
+        // (para positivação automática por código de barras no futuro).
+        industriesObj[industry.name][product.nome] = {
+          positivado: existingProduct?.positivado ?? false,
+          valor: existingProduct?.valor ?? 0,
+          ean: product.ean || existingProduct?.ean || '',
+          ...(product.preco != null ? { preco: product.preco } : {}),
+          ...(product.qtd_caixa != null ? { qtd_caixa: product.qtd_caixa } : {}),
+        };
       });
     });
 
-    const campaignData = {
+    return {
       name: formData.name.trim(),
       startDate: formData.startDate,
       endDate: formData.endDate,
       status: formData.status,
       industries: industriesObj
     };
-    onSave(campaignData);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!validate()) return;
+    onSave(buildCampaignData());
   };
   
   const formatTargetValueInput = () => {
@@ -398,14 +453,20 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
                   <input type="text" value={currentProduct} onChange={(e) => setCurrentProduct(e.target.value)} placeholder="Ex: Skol" onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddProduct())}/>
                   <button type="button" className="btn-add-product" onClick={handleAddProduct}>➕ Adicionar</button>
                 </div>
+                <button type="button" className="btn-pull-table" onClick={() => setShowTablePicker(true)}>
+                  <Table2 size={15} strokeWidth={2.4} /> Puxar da tabela da empresa
+                </button>
                 {currentIndustry.products.length > 0 && (
                   <div className="products-tags">
-                    {currentIndustry.products.map((product, idx) => (
-                      <span key={idx} className="product-tag">
-                        {product}
-                        <button type="button" onClick={() => handleRemoveProduct(product)}>×</button>
-                      </span>
-                    ))}
+                    {currentIndustry.products.map((product, idx) => {
+                      const p = normalizeProduct(product);
+                      return (
+                        <span key={p.ean || p.nome || idx} className="product-tag" title={p.ean ? `EAN ${p.ean}` : 'Sem EAN'}>
+                          {p.nome}
+                          <button type="button" onClick={() => handleRemoveProduct(p.nome)}>×</button>
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -440,6 +501,15 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
         onCancel={closeConfirm}
       />
 
+      {showTablePicker && (
+        <TabelaPickerModal
+          onClose={() => setShowTablePicker(false)}
+          onAdd={handleAddFromTable}
+          ctaLabel="à campanha"
+        />
+      )}
+
+
       {editingIndustry && (
         <div className="industry-edit-overlay" onClick={handleIndustryEditOverlayClick}>
           <div className="industry-edit-modal" onClick={(e) => e.stopPropagation()}>
@@ -472,14 +542,20 @@ const CreateCampaignModal = ({ onClose, onSave, campaign = null }) => {
                   <input type="text" value={currentProduct} onChange={(e) => setCurrentProduct(e.target.value)} placeholder="Ex: Skol" onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddProduct())}/>
                   <button type="button" className="btn-add-product" onClick={handleAddProduct}>Adicionar</button>
                 </div>
+                <button type="button" className="btn-pull-table" onClick={() => setShowTablePicker(true)}>
+                  <Table2 size={15} strokeWidth={2.4} /> Puxar da tabela da empresa
+                </button>
                 {currentIndustry.products.length > 0 && (
                   <div className="products-tags">
-                    {currentIndustry.products.map((product, idx) => (
-                      <span key={idx} className="product-tag">
-                        {product}
-                        <button type="button" onClick={() => handleRemoveProduct(product)}>×</button>
-                      </span>
-                    ))}
+                    {currentIndustry.products.map((product, idx) => {
+                      const p = normalizeProduct(product);
+                      return (
+                        <span key={p.ean || p.nome || idx} className="product-tag" title={p.ean ? `EAN ${p.ean}` : 'Sem EAN'}>
+                          {p.nome}
+                          <button type="button" onClick={() => handleRemoveProduct(p.nome)}>×</button>
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { useAuthContext } from '../contexts/AuthContext';
 import api from '../services/api';
 import { canAccessAdminPanel } from '../utils/adminAccess';
+import MasterCampaignsAdmin from '../components/MasterCampaignsAdmin';
 import './AdminPanel.css';
 
 const DAY_OPTIONS = [4, 7, 30];
@@ -750,6 +751,8 @@ const AdminPanel = () => {
             </div>
           )}
         </section>
+
+        <MasterCampaignsAdmin />
       </main>
     </div>
   );

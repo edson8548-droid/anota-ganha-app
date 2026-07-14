@@ -7,6 +7,9 @@ import { useAuthContext } from '../contexts/AuthContext';
 import { useCampaigns } from '../hooks/useCampaigns';
 import { useClients } from '../hooks/useClients';
 import CreateCampaignModal from '../components/CreateCampaignModal';
+import CodePromptModal from '../components/CodePromptModal';
+import MasterCampaignMetasModal from '../components/MasterCampaignMetasModal';
+import { useMasterCampaigns } from '../hooks/useMasterCampaigns';
 import CreateClientModal from '../components/CreateClientModal';
 import EditClientModal from '../components/EditClientModal';
 import EditClientInfoModal from '../components/EditClientInfoModal';
@@ -42,11 +45,21 @@ const Dashboard = () => {
   const authData = useAuthContext();
   const user = authData?.user;
 
-  const { campaigns, loading: campaignsLoading, createCampaign, updateCampaign, deleteCampaign } = useCampaigns();
+  const { campaigns: personalCampaigns, loading: campaignsLoading, createCampaign, updateCampaign, deleteCampaign } = useCampaigns();
+  const { sharedCampaigns, unlock: unlockShared, saveMetas: saveSharedMetas, linkClient: linkSharedClient } = useMasterCampaigns();
+  // Campanhas próprias do RCA + campanhas mestre (Spani etc.) que ele desbloqueou.
+  // As mestre entram como "sintéticas" (estrutura da mestre + metas do RCA).
+  const campaigns = useMemo(
+    () => [...(personalCampaigns || []), ...(sharedCampaigns || [])],
+    [personalCampaigns, sharedCampaigns]
+  );
   const { clients, loading: clientsLoading, createClient, updateClient, deleteClient } = useClients();
 
   const [selectedCampaignId, setSelectedCampaignId] = useState(null);
   const [showCreateCampaign, setShowCreateCampaign] = useState(false);
+  const [showUnlockPrompt, setShowUnlockPrompt] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
+  const [metasCampaignId, setMetasCampaignId] = useState(null);
   const [showCreateClient, setShowCreateClient] = useState(false);
   const [showEditModal, setShowEditModal] = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
@@ -175,8 +188,30 @@ const Dashboard = () => {
   };
   const handleEditCampaign = (e, campaign) => {
     e.stopPropagation();
+    // Campanha mestre (oficial): o RCA não edita a estrutura, só as próprias metas.
+    if (campaign?.isShared) { setMetasCampaignId(campaign.id); return; }
     setEditingCampaign(campaign);
     setShowCreateCampaign(true);
+  };
+  // Desbloquear campanha compartilhada (ex.: Spani) com a senha e cloná-la
+  // para a conta do RCA — assim ele acompanha os próprios clientes.
+  const handleUnlockConfirm = async (code) => {
+    try {
+      setUnlocking(true);
+      const { master, overlayId } = await unlockShared(code);
+      setShowUnlockPrompt(false);
+      toast.success(`✅ Campanha "${master?.nome || ''}" liberada! Agora defina as suas metas.`);
+      if (overlayId) {
+        setSelectedCampaignId(overlayId);
+        setMetasCampaignId(overlayId); // abre o preenchimento de metas
+      }
+    } catch (err) {
+      const status = err?.response?.status;
+      if (status === 404) toast.error('Código inválido. Confira a senha com quem enviou.');
+      else toast.error('Erro ao liberar campanha: ' + (err?.response?.data?.detail || err.message));
+    } finally {
+      setUnlocking(false);
+    }
   };
   const handleOpenNewCampaign = (e) => {
     e?.stopPropagation();
@@ -208,6 +243,10 @@ const Dashboard = () => {
   };
   const handleDeleteCampaign = (e, campaignId) => {
     e.stopPropagation();
+    if (campaigns.find(c => c.id === campaignId)?.isShared) {
+      toast.info('Campanha oficial não pode ser apagada por aqui.');
+      return;
+    }
     showConfirm(
       'Apagar campanha',
       'Os clientes permanecem na sua base, mas os dados de positivação desta campanha serão perdidos.',
@@ -264,6 +303,10 @@ const Dashboard = () => {
   const handleCloseCampaign = (e) => {
     e.stopPropagation();
     if (!selectedCampaign) return;
+    if (selectedCampaign.isShared) {
+      toast.info('Campanha oficial é encerrada pelo administrador.');
+      return;
+    }
 
     showConfirm(
       'Encerrar campanha',
@@ -311,7 +354,10 @@ const Dashboard = () => {
             return updateClient(client.id, { industries: nextIndustries });
           }));
 
-          await updateCampaign(selectedCampaign.id, { industries: resetIndustries });
+          // Campanha mestre: a estrutura é do admin — só zeramos os clientes do RCA.
+          if (!selectedCampaign.isShared) {
+            await updateCampaign(selectedCampaign.id, { industries: resetIndustries });
+          }
 
           toast.success('Vendas e positivações zeradas para esta campanha.');
         } catch (error) {
@@ -327,7 +373,12 @@ const Dashboard = () => {
       if (!selectedCampaign) return;
       const newClientId = await createClient(clientData);
       if (newClientId) {
-        await campaignsService.linkClientToCampaign(selectedCampaign.id, newClientId);
+        if (selectedCampaign.isShared) {
+          // Campanha mestre: vincula no overlay do RCA (Firestore rca_campaigns)
+          await linkSharedClient(selectedCampaign.id, newClientId);
+        } else {
+          await campaignsService.linkClientToCampaign(selectedCampaign.id, newClientId);
+        }
         setShowCreateClient(false);
       } else {
         throw new Error('O serviço de criação de cliente não retornou um ID.');
@@ -879,6 +930,23 @@ const Dashboard = () => {
   const campaignClients = useMemo(() => {
     return getCampaignClients(selectedCampaign);
   }, [selectedCampaign, clients]);
+
+  // Para campanha mestre, a estrutura vem do admin (sem "vendido"); calculamos
+  // o vendido por indústria a partir da positivação dos clientes do RCA.
+  const campaignForAnalytics = useMemo(() => {
+    if (!selectedCampaign?.isShared) return selectedCampaign;
+    const industries = {};
+    Object.entries(selectedCampaign.industries || {}).forEach(([indName, cfg]) => {
+      const prods = Object.keys(cfg || {}).filter(k => !INDUSTRY_META_FIELDS.includes(k));
+      let sold = 0;
+      campaignClients.forEach(cl => {
+        const ci = cl.industries?.[indName] || {};
+        prods.forEach(p => { if (ci[p]?.positivado) sold += parseFloat(ci[p].valor) || 0; });
+      });
+      industries[indName] = { ...cfg, alreadySoldValue: sold };
+    });
+    return { ...selectedCampaign, industries };
+  }, [selectedCampaign, campaignClients]);
 
   const campaignIndustryNames = useMemo(() => (
     ['all', ...Object.keys(selectedCampaign?.industries || {})]
@@ -1673,6 +1741,9 @@ const Dashboard = () => {
                 <button type="button" onClick={handleOpenNewCampaign}>
                   <Plus size={16} /> Criar campanha
                 </button>
+                <button type="button" onClick={() => setShowUnlockPrompt(true)} title="Liberar uma campanha com senha (ex.: Spani)">
+                  <ShieldCheck size={16} /> Tenho um código
+                </button>
               </div>
             ) : (
               <>
@@ -1984,6 +2055,9 @@ const Dashboard = () => {
                 <button type="button" onClick={handleOpenNewCampaign}>
                   <Plus size={16} /> Criar campanha
                 </button>
+                <button type="button" onClick={() => setShowUnlockPrompt(true)} title="Liberar uma campanha com senha (ex.: Spani)">
+                  <ShieldCheck size={16} /> Tenho um código
+                </button>
               </div>
             ) : (
               <>
@@ -2092,7 +2166,14 @@ const Dashboard = () => {
                 <ArrowLeft size={18} />
               </button>
               <div className="campaign-view-info">
-                <h1>{selectedCampaign.name}</h1>
+                <h1>
+                  {selectedCampaign.name}
+                  {selectedCampaign.isShared && (
+                    <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 700, color: '#c2410c', background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 999, padding: '2px 10px', verticalAlign: 'middle' }}>
+                      🔒 Oficial{selectedCampaign.distribuidora ? ` · ${selectedCampaign.distribuidora}` : ''}
+                    </span>
+                  )}
+                </h1>
                 <p>{campaignPeriod} | {campaignClients.length} Clientes | {Object.keys(selectedCampaign.industries || {}).length} Indústrias</p>
               </div>
             </div>
@@ -2101,10 +2182,15 @@ const Dashboard = () => {
                 <button className="btn-campaign-action primary" onClick={handleOpenNewCampaign}>
                   <Plus size={16} /> Nova campanha
                 </button>
-                <button className="btn-campaign-action secondary" onClick={handleDuplicateCampaign}>
-                  <Copy size={16} /> Duplicar
+                <button className="btn-campaign-action secondary" onClick={() => setShowUnlockPrompt(true)} title="Liberar uma campanha com senha (ex.: Spani)">
+                  <ShieldCheck size={16} /> Tenho um código
                 </button>
-                {selectedCampaign.status !== 'inactive' && (
+                {!selectedCampaign.isShared && (
+                  <button className="btn-campaign-action secondary" onClick={handleDuplicateCampaign}>
+                    <Copy size={16} /> Duplicar
+                  </button>
+                )}
+                {!selectedCampaign.isShared && selectedCampaign.status !== 'inactive' && (
                   <button className="btn-campaign-action secondary" onClick={handleCloseCampaign}>
                     Encerrar
                   </button>
@@ -2116,14 +2202,16 @@ const Dashboard = () => {
                   <Printer size={16} /> Relatório PDF
                 </button>
                 <button className="btn-campaign-action secondary" onClick={(e) => handleEditCampaign(e, selectedCampaign)}>
-                  <Pencil size={16} /> Editar
+                  <Pencil size={16} /> {selectedCampaign.isShared ? 'Minhas metas' : 'Editar'}
                 </button>
                 <button className="btn-campaign-action warning" onClick={handleResetCampaignProgress}>
                   <RotateCcw size={16} /> Zerar vendas
                 </button>
-                <button className="btn-campaign-action danger" onClick={(e) => handleDeleteCampaign(e, selectedCampaign.id)}>
-                  <Trash2 size={16} /> Excluir
-                </button>
+                {!selectedCampaign.isShared && (
+                  <button className="btn-campaign-action danger" onClick={(e) => handleDeleteCampaign(e, selectedCampaign.id)}>
+                    <Trash2 size={16} /> Excluir
+                  </button>
+                )}
               </div>
 
               <div className="campaign-action-group campaign-action-group-account">
@@ -2508,7 +2596,7 @@ const Dashboard = () => {
           {activeTab === 'analytics' && (
             <section className="analytics-content">
               <Analytics
-                campaign={selectedCampaign}
+                campaign={campaignForAnalytics}
                 clients={campaignClients}
                 onClose={() => setActiveTab('clients')}
               />
@@ -2591,6 +2679,30 @@ const Dashboard = () => {
           campaign={editingCampaign}
         />
       )}
+
+      {showUnlockPrompt && (
+        <CodePromptModal
+          title="Tenho o código de uma campanha"
+          description="Digite a senha que você recebeu (ex.: da Spani). A campanha será liberada e adicionada à sua conta."
+          placeholder="Senha da campanha"
+          confirmLabel="Liberar campanha"
+          loading={unlocking}
+          onConfirm={handleUnlockConfirm}
+          onClose={() => !unlocking && setShowUnlockPrompt(false)}
+        />
+      )}
+
+      {metasCampaignId && (() => {
+        const metasCampaign = campaigns.find(c => c.id === metasCampaignId);
+        if (!metasCampaign) return null;
+        return (
+          <MasterCampaignMetasModal
+            campaign={metasCampaign}
+            onClose={() => setMetasCampaignId(null)}
+            onSave={(metas) => saveSharedMetas(metasCampaignId, metas)}
+          />
+        );
+      })()}
 
       {showCreateClient && (
         <CreateClientModal

@@ -144,9 +144,11 @@ export const useCampaigns = () => {
             Object.keys(campaignData.industries[industryName])
               .filter(productName => !INDUSTRY_META_FIELDS.includes(productName))
               .forEach(productName => {
+              const prodDef = campaignData.industries[industryName][productName] || {};
               newIndustries[industryName][productName] = {
                 positivado: false,
-                valor: 0
+                valor: 0,
+                ean: prodDef.ean || ''
               };
             });
           });

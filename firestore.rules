@@ -88,6 +88,14 @@ service cloud.firestore {
       allow create: if createsOwnDoc();
     }
 
+    // Camada individual do RCA para campanhas mestre (Spani etc.):
+    // metas próprias, clientes vinculados e progresso. Isolada por dono.
+    match /rca_campaigns/{id} {
+      allow read, delete: if ownsExistingDoc();
+      allow update: if keepsOwnership();
+      allow create: if createsOwnDoc();
+    }
+
     match /coupons/{couponId} {
       allow read, write: if false;
     }

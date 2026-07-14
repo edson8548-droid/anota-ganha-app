@@ -7,10 +7,49 @@ import {
 } from 'firebase/firestore';
 // ⭐️ CORREÇÃO: O caminho foi atualizado para apontar para o teu ficheiro
 import { db } from '../firebase/config';
+import api from './api';
 
 class CampaignsService {
   constructor() {
     this.collectionName = 'campaigns';
+  }
+
+  // ============================================
+  // CAMPANHAS MESTRE (ex.: Spani) — referência viva, protegidas por senha
+  // ============================================
+
+  // --- Admin (só você) ---
+  async listarMestreAdmin() {
+    const res = await api.get('/campanhas-compartilhadas/admin/mestre');
+    return res.data; // [ {id, nome, distribuidora, industries, active, ...} ]
+  }
+  async obterMestreAdmin(id) {
+    const res = await api.get(`/campanhas-compartilhadas/admin/mestre/${id}`);
+    return res.data;
+  }
+  async criarMestre(data) {
+    const res = await api.post('/campanhas-compartilhadas/admin/mestre', data);
+    return res.data;
+  }
+  async editarMestre(id, data) {
+    const res = await api.put(`/campanhas-compartilhadas/admin/mestre/${id}`, data);
+    return res.data;
+  }
+  async excluirMestre(id) {
+    const res = await api.delete(`/campanhas-compartilhadas/admin/mestre/${id}`);
+    return res.data;
+  }
+
+  // --- RCA ---
+  // Desbloqueia com a senha (1x) — o acesso fica gravado (permanente).
+  async desbloquearCampanha(code) {
+    const res = await api.post('/campanhas-compartilhadas/desbloquear', { code });
+    return res.data; // { acesso: true, campanha: {...} }
+  }
+  // Campanhas mestre que o RCA já liberou (acesso automático, sem senha).
+  async minhasCampanhasMestre() {
+    const res = await api.get('/campanhas-compartilhadas/minhas');
+    return res.data; // [ {id, nome, industries, ...} ]
   }
 
   // Criar nova campanha (Mantido da v3)

@@ -181,6 +181,45 @@ const Analytics = ({ campaign, clients, onClose }) => {
     };
   }, [campaign, clients, selectedCity, selectedNeighborhood]);
 
+  // Projeção (ritmo até o fim da campanha) + alertas — derivados do analytics.
+  const extras = useMemo(() => {
+    if (!analytics) return null;
+    const totalMeta = analytics.goalData.reduce((s, g) => s + (g.targetValue || 0), 0);
+    const totalSold = analytics.totalValue || 0;
+
+    const parseDate = (d) => (d ? new Date(`${d}T00:00:00`) : null);
+    const start = parseDate(campaign?.startDate);
+    const end = parseDate(campaign?.endDate);
+    const now = new Date();
+    let projection = null;
+    if (start && end && end > start) {
+      const msDay = 86400000;
+      const daysTotal = Math.max(1, Math.round((end - start) / msDay));
+      const daysElapsed = Math.min(daysTotal, Math.max(1, Math.round((now - start) / msDay)));
+      const daysRemaining = Math.max(0, daysTotal - daysElapsed);
+      const dailyRate = totalSold / daysElapsed;
+      const projected = totalSold + dailyRate * daysRemaining;
+      const willHitMeta = totalMeta > 0 ? projected >= totalMeta : null;
+      const neededPerDay = daysRemaining > 0 ? Math.max(0, totalMeta - totalSold) / daysRemaining : 0;
+      projection = {
+        daysTotal, daysElapsed, daysRemaining, dailyRate, projected,
+        totalMeta, totalSold, willHitMeta, neededPerDay,
+        pct: totalMeta > 0 ? Math.min(100, (totalSold / totalMeta) * 100) : 0,
+        acabou: daysRemaining === 0,
+      };
+    }
+
+    const produtosSemVenda = [];
+    analytics.industriesData.forEach(ind => {
+      Object.entries(ind.productsPositivated || {}).forEach(([prod, count]) => {
+        if (!count) produtosSemVenda.push({ industry: ind.name, product: prod });
+      });
+    });
+    const clientesParados = analytics.clientsAnalysis.filter(c => c.positivated === 0);
+
+    return { projection, produtosSemVenda, clientesParados, totalMeta, totalSold };
+  }, [analytics, campaign]);
+
   useEffect(() => {
     setSelectedNeighborhood('todos');
   }, [selectedCity]);
@@ -357,6 +396,31 @@ const Analytics = ({ campaign, clients, onClose }) => {
     currency: 'BRL'
   }).format(value || 0);
 
+  const shareWhatsApp = () => {
+    if (!analytics) return;
+    const L = [];
+    L.push(`*Raio-X — ${campaign.name}*`);
+    L.push(`Clientes: ${analytics.totalClients} | Positivados: ${analytics.totalPositivated} | Taxa: ${analytics.positivationRate.toFixed(1)}%`);
+    L.push(`Valor positivado: ${formatCurrency(analytics.totalValue)}`);
+    if (extras?.projection) {
+      const p = extras.projection;
+      L.push('');
+      L.push(`*Meta:* ${formatCurrency(p.totalMeta)} | *Realizado:* ${formatCurrency(p.totalSold)} (${p.pct.toFixed(0)}%)`);
+      if (!p.acabou) {
+        L.push(`Faltam ${p.daysRemaining} dia(s). Projeção: ${formatCurrency(p.projected)} — ${p.willHitMeta ? '✅ deve bater a meta' : '⚠️ abaixo da meta'}`);
+        if (!p.willHitMeta && p.neededPerDay > 0) L.push(`Precisa ~${formatCurrency(p.neededPerDay)}/dia para bater.`);
+      }
+    }
+    if (analytics.goalData.length > 0) {
+      L.push('');
+      L.push('*Por indústria:*');
+      analytics.goalData.forEach(g => L.push(`• ${g.name}: ${formatCurrency(g.totalSold)}/${formatCurrency(g.targetValue)} (falta ${formatCurrency(g.remaining)})`));
+    }
+    if (extras?.clientesParados?.length) L.push(`\n⚠️ ${extras.clientesParados.length} cliente(s) sem nenhuma positivação.`);
+    const url = `https://wa.me/?text=${encodeURIComponent(L.join('\n'))}`;
+    window.open(url, '_blank', 'noopener');
+  };
+
   return (
     <>
     <div className="analytics-container">
@@ -372,7 +436,8 @@ const Analytics = ({ campaign, clients, onClose }) => {
           </div>
         </div>
         <div className="analytics-header-right">
-          <button className="btn-export" onClick={exportToCsv}><span>📊</span><span>Exportar CSV</span></button>
+          <button className="btn-export" onClick={exportToCsv}><span>📊</span><span>Exportar Excel</span></button>
+          <button className="btn-export" onClick={shareWhatsApp}><span>💬</span><span>WhatsApp</span></button>
           <button className="btn-print" onClick={handlePrint}><span>🖨️</span><span>Imprimir</span></button>
         </div>
       </div>
@@ -433,6 +498,58 @@ const Analytics = ({ campaign, clients, onClose }) => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {extras?.projection && extras.totalMeta > 0 && (
+        <div className="section-card">
+          <h3 className="section-title">📈 Projeção da campanha</h3>
+          <div className="goals-grid" style={{ marginTop: 12 }}>
+            <div className="goal-card">
+              <div className="goal-card-header"><strong>Realizado x Meta</strong><span>{extras.projection.pct.toFixed(0)}%</span></div>
+              <div className="goal-progress"><div className="goal-progress-fill" style={{ width: `${extras.projection.pct}%` }}></div></div>
+              <div className="goal-values">
+                <div><span>Meta</span><strong>{formatCurrency(extras.projection.totalMeta)}</strong></div>
+                <div><span>Realizado</span><strong>{formatCurrency(extras.projection.totalSold)}</strong></div>
+                <div><span>Falta</span><strong>{formatCurrency(Math.max(0, extras.projection.totalMeta - extras.projection.totalSold))}</strong></div>
+              </div>
+            </div>
+            <div className={`goal-card ${extras.projection.willHitMeta ? 'complete' : ''}`}>
+              <div className="goal-card-header">
+                <strong>Projeção fim da campanha</strong>
+                <span>{extras.projection.acabou ? 'encerrada' : `${extras.projection.daysRemaining}d`}</span>
+              </div>
+              <div className="goal-values">
+                <div><span>Ritmo/dia</span><strong>{formatCurrency(extras.projection.dailyRate)}</strong></div>
+                <div><span>Projeção</span><strong>{formatCurrency(extras.projection.projected)}</strong></div>
+                <div><span>{extras.projection.willHitMeta ? 'Situação' : 'Precisa/dia'}</span><strong>
+                  {extras.projection.willHitMeta ? '✅ no ritmo' : (extras.projection.acabou ? '⚠️ encerrada' : `${formatCurrency(extras.projection.neededPerDay)}`)}
+                </strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {extras && (extras.produtosSemVenda.length > 0 || extras.clientesParados.length > 0) && (
+        <div className="section-card">
+          <h3 className="section-title">🚨 Alertas</h3>
+          <div className="goals-grid" style={{ marginTop: 12 }}>
+            <div className="goal-card">
+              <div className="goal-card-header"><strong>Clientes sem nenhuma compra</strong><span>{extras.clientesParados.length}</span></div>
+              <p className="goals-panel-subtitle" style={{ marginTop: 6 }}>
+                {extras.clientesParados.slice(0, 8).map(c => c.name).join(', ') || 'Nenhum'}
+                {extras.clientesParados.length > 8 ? ` +${extras.clientesParados.length - 8}` : ''}
+              </p>
+            </div>
+            <div className="goal-card">
+              <div className="goal-card-header"><strong>Produtos sem nenhuma venda</strong><span>{extras.produtosSemVenda.length}</span></div>
+              <p className="goals-panel-subtitle" style={{ marginTop: 6 }}>
+                {extras.produtosSemVenda.slice(0, 8).map(p => p.product).join(', ') || 'Nenhum'}
+                {extras.produtosSemVenda.length > 8 ? ` +${extras.produtosSemVenda.length - 8}` : ''}
+              </p>
+            </div>
           </div>
         </div>
       )}

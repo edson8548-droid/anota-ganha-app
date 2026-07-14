@@ -315,6 +315,16 @@
 }
 .btn-add-product:hover { opacity: 0.9; }
 
+.btn-pull-table {
+  width: 100%; margin-top: 10px; padding: 11px;
+  background: #eef2ff; color: #4338ca;
+  border: 1px dashed #a5b4fc; border-radius: 10px;
+  font-size: 13.5px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+}
+.btn-pull-table:hover { background: #e0e7ff; border-color: #818cf8; }
+
 .products-tags {
   display: flex; flex-wrap: wrap;
   gap: 8px; margin-top: 12px;
@@ -430,9 +440,17 @@
 /* Footer */
 .campaign-modal-footer {
   padding: 20px 24px; border-top: 2px solid #f3f4f6;
-  display: flex; justify-content: flex-end; gap: 12px;
-  background: #f9fafb; flex-shrink: 0;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  background: #f9fafb; flex-shrink: 0; flex-wrap: wrap;
 }
+.campaign-footer-main { display: flex; gap: 12px; margin-left: auto; }
+.btn-share-campaign {
+  padding: 12px 20px; border-radius: 10px;
+  font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s;
+  background: #fff7ed; color: #c2410c; border: 1px solid #fdba74;
+}
+.btn-share-campaign:hover { background: #ffedd5; border-color: #fb923c; }
 .btn-cancel-campaign, .btn-save-campaign {
   padding: 12px 28px; border: none; border-radius: 10px;
   font-size: 15px; font-weight: 600;

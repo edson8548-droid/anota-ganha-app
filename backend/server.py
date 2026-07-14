@@ -25,6 +25,7 @@ from routes.cotacao import router as cotacao_router, init_cotacao, resume_cotaca
 from routes.whatsapp import router as whatsapp_router, init_whatsapp
 from routes.users import router as users_router, init_users
 from routes.vitrine import router as vitrine_router, init_vitrine
+from routes.campanhas_compartilhadas import router as campanhas_compartilhadas_router, init_campanhas_compartilhadas
 import uuid
 from datetime import datetime, timezone
 import asyncio
@@ -254,6 +255,7 @@ app.include_router(cotacao_router, prefix="/api/cotacao", tags=["Cotação"])
 app.include_router(whatsapp_router, prefix="/api/whatsapp", tags=["WhatsApp"])
 app.include_router(users_router, prefix="/api/users", tags=["Usuários"])
 app.include_router(vitrine_router, prefix="/api/vitrine", tags=["Vitrine"])
+app.include_router(campanhas_compartilhadas_router, prefix="/api/campanhas-compartilhadas", tags=["Campanhas Compartilhadas"])
 
 # ==================== Mount Router & Lifecycle ====================
 app.include_router(api_router)
@@ -271,6 +273,7 @@ async def startup_event():
     init_whatsapp(db)
     init_users(db)
     init_vitrine(db)
+    init_campanhas_compartilhadas(db)
     try:
         await db.cotacao_aprendizado.create_index(
             [("user_id", 1), ("produto_cotacao_norm", 1)],
@@ -308,6 +311,11 @@ async def startup_event():
         )
         await db.produtos_fotos_candidatas.create_index(
             [("ean", 1)],
+            unique=True,
+        )
+        await db.master_campaigns.create_index([("code_hash", 1), ("active", 1)])
+        await db.campaign_access.create_index(
+            [("uid", 1), ("master_id", 1)],
             unique=True,
         )
         logger.info("✅ Índices MongoDB criados")

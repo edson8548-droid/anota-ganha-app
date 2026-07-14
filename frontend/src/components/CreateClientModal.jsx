@@ -67,9 +67,11 @@ const CreateClientModal = ({ onClose, onSave, campaign }) => {
         }
         
         products.forEach(productName => {
+          const prodDef = (typeof industry === 'object' && !Array.isArray(industry)) ? industry[productName] : null;
           initialPositivations[industryName].products[productName] = {
             checked: false,
-            value: 0
+            value: 0,
+            ean: (prodDef && prodDef.ean) || ''
           };
         });
       });
@@ -233,7 +235,8 @@ const CreateClientModal = ({ onClose, onSave, campaign }) => {
       Object.keys(products).forEach(productName => {
         industriesFormatted[industryName][productName] = {
           positivado: products[productName].checked,
-          valor: products[productName].value
+          valor: products[productName].value,
+          ean: products[productName].ean || ''
         };
       });
     });

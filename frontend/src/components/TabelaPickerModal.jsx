@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { X, Search, Table2, ArrowLeft } from 'lucide-react';
 import { vitrineService } from '../services/vitrine.service';
+import '../pages/Vitrine.css'; // estilos vt-* (self-contained: funciona fora da Vitrine)
 
 const MAX_VISIVEIS = 200;
 
@@ -18,7 +19,7 @@ const fmtPreco = (v) => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
  * o prazo de preço, marca os produtos e devolve os selecionados via onAdd.
  * onAdd recebe [{ nome, ean, preco, qtd_caixa }].
  */
-export default function TabelaPickerModal({ onClose, onAdd }) {
+export default function TabelaPickerModal({ onClose, onAdd, ctaLabel = 'à vitrine' }) {
   const [tabelas, setTabelas] = useState(null);       // null = carregando
   const [tabela, setTabela] = useState(null);          // tabela escolhida
   const [prazo, setPrazo] = useState(null);
@@ -264,7 +265,7 @@ export default function TabelaPickerModal({ onClose, onAdd }) {
                 {selecionados.size} selecionado{selecionados.size !== 1 ? 's' : ''}
               </span>
               <button className="vt-btn-primary" onClick={adicionar} disabled={!selecionados.size}>
-                Adicionar {selecionados.size || ''} à vitrine
+                Adicionar {selecionados.size || ''} {ctaLabel}
               </button>
             </div>
           </>
