@@ -3,7 +3,7 @@ const BATCH = 50;
 const STUCK_MS = 3 * 60 * 1000;
 const MAX_RESULT_DETAILS = 12;
 const BTN_LABEL = 'Preencher Cotação';
-const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor, Hipcomerp, Easy Cotação Web, Estância ou SG Cotação primeiro.';
+const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor, Hipcomerp, Easy Cotação Web, Estância, SG Cotação, HR Cotação, Arius Cotação ou Bluesoft Cotação primeiro.';
 const SITE_LABELS = {
   cotatudo: 'Cotatudo',
   'vr-cotacao': 'VR Cotação',
@@ -17,6 +17,9 @@ const SITE_LABELS = {
   'easy-cotacao-web': 'Easy Cotação Web',
   'estancia-cotacao': 'Estância',
   'sg-cotacao': 'SG Cotação',
+  'hr-cotacao': 'HR Cotação',
+  'arius-cotacao': 'Arius Cotação',
+  'bluesoft-cotacao': 'Bluesoft Cotação',
   generic: 'Cotação compatível',
 };
 
@@ -92,6 +95,15 @@ function setDetectedSite(tab, pageInfo = null) {
     type = 'ok';
   } else if (isSgCotacaoUrl(url)) {
     label = 'Site detectado: SG Cotação';
+    type = 'ok';
+  } else if (isHrCotacaoUrl(url)) {
+    label = 'Site detectado: HR Cotação';
+    type = 'ok';
+  } else if (isAriusCotacaoUrl(url)) {
+    label = 'Site detectado: Arius Cotação';
+    type = 'ok';
+  } else if (isBluesoftCotacaoUrl(url)) {
+    label = 'Site detectado: Bluesoft Cotação';
     type = 'ok';
   }
 
@@ -372,7 +384,10 @@ function isSupportedQuotationUrl(url = '') {
     || isHipcomerpCotacaoUrl(url)
     || isEasyCotacaoWebUrl(url)
     || isEstanciaCotacaoUrl(url)
-    || isSgCotacaoUrl(url);
+    || isSgCotacaoUrl(url)
+    || isHrCotacaoUrl(url)
+    || isAriusCotacaoUrl(url)
+    || isBluesoftCotacaoUrl(url);
 }
 
 function isPotentialQuotationUrl(url = '') {
@@ -473,6 +488,33 @@ function isSgCotacaoUrl(url = '') {
   }
 }
 
+function isHrCotacaoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)cotacao\.hrtech\.com\.br$/i.test(parsed.hostname);
+  } catch {
+    return /^(https?:\/\/)?cotacao\.hrtech\.com\.br(?:\/|#|$)/i.test(url);
+  }
+}
+
+function isAriusCotacaoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)arius-web\./i.test(parsed.hostname);
+  } catch {
+    return /^(https?:\/\/)?[^/]*\.arius-web\./i.test(url);
+  }
+}
+
+function isBluesoftCotacaoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)erp\.bluesoft\.com\.br$/i.test(parsed.hostname);
+  } catch {
+    return /^(https?:\/\/)?erp\.bluesoft\.com\.br(?:\/|$)/i.test(url);
+  }
+}
+
 async function getQuotationTab(options = {}) {
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (active?.id && isPotentialQuotationUrl(active.url || '')) return active;
@@ -506,6 +548,12 @@ async function getQuotationTab(options = {}) {
       'http://cotacao.estanciasupermercados.com.br/*',
       'https://cotacao.sghost.com.br/*',
       'http://cotacao.sghost.com.br/*',
+      'https://cotacao.hrtech.com.br/*',
+      'http://cotacao.hrtech.com.br/*',
+      'https://*.arius-web.harpocloud.com.br/*',
+      'http://*.arius-web.harpocloud.com.br/*',
+      'https://erp.bluesoft.com.br/*',
+      'http://erp.bluesoft.com.br/*',
       'https://*/fornecedores/*/cotacao/*',
       'http://*/fornecedores/*/cotacao/*',
       'https://*/cotacao/*',
@@ -537,6 +585,9 @@ function detectSiteFromUrl(url = '') {
   if (isEasyCotacaoWebUrl(url)) return 'easy-cotacao-web';
   if (isEstanciaCotacaoUrl(url)) return 'estancia-cotacao';
   if (isSgCotacaoUrl(url)) return 'sg-cotacao';
+  if (isHrCotacaoUrl(url)) return 'hr-cotacao';
+  if (isAriusCotacaoUrl(url)) return 'arius-cotacao';
+  if (isBluesoftCotacaoUrl(url)) return 'bluesoft-cotacao';
   return 'generic';
 }
 
@@ -565,8 +616,36 @@ async function ensureHipcomerpMainWorld(tab) {
   }
 }
 
+async function ensureAriusMainWorld(tab) {
+  if (isAriusCotacaoUrl(tab?.url || '')) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['arius-main-world.js'],
+        world: 'MAIN',
+      });
+      await sleep(120);
+    } catch {}
+  }
+}
+
+async function ensureBluesoftMainWorld(tab) {
+  if (isBluesoftCotacaoUrl(tab?.url || '')) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['bluesoft-main-world.js'],
+        world: 'MAIN',
+      });
+      await sleep(120);
+    } catch {}
+  }
+}
+
 async function ensureContentScript(tab) {
   await ensureHipcomerpMainWorld(tab);
+  await ensureAriusMainWorld(tab);
+  await ensureBluesoftMainWorld(tab);
   await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
   await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ['content.css'] });
   await sleep(500);
@@ -719,6 +798,8 @@ function enrichPricesForFill(precos, items) {
       signature: item.signature || '',
       embalagem: item.embalagem || '',
       qtdEmbalagem: item.qtdEmbalagem || item.packageQty || '',
+      idProduto: item.idProduto ?? '',
+      produtoKey: item.produtoKey ?? '',
     };
   });
 }

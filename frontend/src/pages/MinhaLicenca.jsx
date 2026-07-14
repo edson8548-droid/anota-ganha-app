@@ -8,7 +8,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { apiUrl } from '../config/api';
 import { getPartnerCouponConfig, isActivePartnerCoupon, normalizePartnerCode } from '../utils/partnerProgram';
 
-const COTACAO_EXTENSION_URL = '/venpro-cotatudo-extension-1.0.56.zip';
+const COTACAO_EXTENSION_URL = '/venpro-preencher-cotacao-1.0.59.zip';
 
 const MinhaLicenca = () => {
   const navigate = useNavigate();
@@ -231,7 +231,7 @@ const MinhaLicenca = () => {
               <div style={s.extIcon}>🧩</div>
               <div style={{ flex: 1 }}>
                 <div style={s.extName}>Preenchedor de Cotação</div>
-                <div style={s.extDesc}>Preenche cotações no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores e Infomag Cotação com os preços da sua tabela.</div>
+                <div style={s.extDesc}>Preenche cotações no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, HR Cotação e outros portais com os preços da sua tabela.</div>
               </div>
               <a href={COTACAO_EXTENSION_URL} download style={s.btnDownload}>
                 Baixar →

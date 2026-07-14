@@ -466,6 +466,164 @@ function sgCotacaoRowShowsPrice(row, expectedPrice, samePriceLike) {
   return inputs.some(input => samePriceLike(getControlValue(input), expectedPrice));
 }
 
+// HR Cotação (cotacao.hrtech.com.br): SPA Angular 8, tabela CDK com colunas
+// td.cdk-column-{codigoPlu,ean,ref,descricao,qtd,preco,total,status}. O input
+// de preço (input.ipt-price, type=tel, id = codigoPlu) usa máscara própria que
+// só constrói o valor por keydown confiável — mas o commit/salvamento lê
+// input.value cru no handler (keydown)="onKeyPressEvent" (Enter/Tab/Setas).
+// Então escrevemos o value nativo e disparamos um keydown "Tab" sintético para
+// forçar inputDown -> updateVlr(input.value) que salva no backend.
+function isHrCotacaoPage(hostname = window.location.hostname || '') {
+  if (/(^|\.)cotacao\.hrtech\.com\.br$/i.test(hostname)) return true;
+  return Boolean(
+    document.querySelector('td.cdk-column-preco input.ipt-price')
+    && document.querySelector('td.cdk-column-ean')
+  );
+}
+
+function getHrCotacaoCell(row, column) {
+  return row.querySelector?.(`td.cdk-column-${column}`) || null;
+}
+
+function getHrCotacaoEan(row) {
+  return limparEAN(getHrCotacaoCell(row, 'ean')?.textContent || '');
+}
+
+function getHrCotacaoNome(row) {
+  return normalizeCellText(getHrCotacaoCell(row, 'descricao')?.textContent || '');
+}
+
+function getHrCotacaoPriceCandidates(row) {
+  const inputs = Array.from(row.querySelectorAll('td.cdk-column-preco input'));
+  return inputs.filter(input => !input.disabled && !input.readOnly && isVisible(input));
+}
+
+function isHrCotacaoProductRow(row) {
+  if (!row.querySelector?.('td.cdk-column-preco input')) return false;
+  return Boolean(getHrCotacaoEan(row) || getHrCotacaoNome(row));
+}
+
+function getHrCotacaoRows() {
+  return Array.from(document.querySelectorAll('tr')).filter(isHrCotacaoProductRow);
+}
+
+function hrCotacaoRowShowsPrice(row, expectedPrice, samePriceLike) {
+  const inputs = Array.from(row.querySelectorAll('td.cdk-column-preco input'));
+  return inputs.some(input => samePriceLike(getControlValue(input), expectedPrice));
+}
+
+// Arius ERP / Cotação (SmartClient, ex.: *.arius-web.harpocloud.com.br):
+// a UI é canvas (widgets isc.*), sem inputs no DOM. Toda a extração/preenchimento
+// acontece no MAIN world via arius-main-world.js; aqui (mundo isolado) apenas
+// detectamos a página e conversamos com o bridge por CustomEvent.
+function isAriusCotacaoPage(hostname = window.location.hostname || '') {
+  if (/(^|\.)arius-web\./i.test(hostname)) return true;
+  const title = document.title || '';
+  return /Arius\s*ERP/i.test(title) && /Cota[çc][ãa]o/i.test(title);
+}
+
+function ariusSendCommand(kind, payload = {}, timeoutMs = 120000) {
+  return new Promise(resolve => {
+    const requestId = `arius-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    let settled = false;
+    const finish = result => {
+      if (settled) return;
+      settled = true;
+      document.removeEventListener('venpro:arius-command-result', onResult);
+      resolve(result);
+    };
+    const onResult = event => {
+      const detail = (event && event.detail) || {};
+      if (detail.requestId !== requestId) return;
+      finish(detail);
+    };
+    document.addEventListener('venpro:arius-command-result', onResult);
+    try {
+      document.dispatchEvent(new CustomEvent('venpro:arius-command', {
+        detail: { requestId, kind, ...payload },
+      }));
+    } catch (err) {
+      finish({ ok: false, reason: (err && err.message) || 'dispatch_falhou' });
+    }
+    setTimeout(() => finish({ ok: false, reason: 'timeout' }), timeoutMs);
+  });
+}
+
+async function extractAriusItems() {
+  const result = await ariusSendCommand('extract');
+  return Array.isArray(result?.items) ? result.items : [];
+}
+
+async function fillAriusPrices(prices) {
+  const result = await ariusSendCommand('fill', { prices: Array.isArray(prices) ? prices : [] });
+  return {
+    filled: Number(result?.filled) || 0,
+    failed: Array.isArray(result?.failed) ? result.failed : [],
+    details: Array.isArray(result?.details) ? result.details : [],
+    site: 'arius-cotacao',
+    rowCount: Number(result?.recordCount) || 0,
+  };
+}
+
+// Bluesoft ERP - Portal do Fornecedor / Preencher Cotação (erp.bluesoft.com.br):
+// AngularJS + ui-grid dentro do iframe same-origin id="corpo". A extração/gravação
+// roda no MAIN world (bluesoft-main-world.js, que alcança o iframe); aqui apenas
+// detectamos a página e falamos com o bridge por CustomEvent.
+function isBluesoftCotacaoPage(hostname = window.location.hostname || '') {
+  if (!/(^|\.)bluesoft\.com\.br$/i.test(hostname)) return false;
+  const corpo = document.getElementById('corpo');
+  if (!corpo) return false;
+  let url = '';
+  try {
+    url = corpo.contentWindow?.location?.pathname || '';
+  } catch {}
+  if (!url) url = corpo.getAttribute('src') || corpo.src || '';
+  return /cotacoes\/fornecedor/i.test(url);
+}
+
+function bluesoftSendCommand(kind, payload = {}, timeoutMs = 120000) {
+  return new Promise(resolve => {
+    const requestId = `bluesoft-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    let settled = false;
+    const finish = result => {
+      if (settled) return;
+      settled = true;
+      document.removeEventListener('venpro:bluesoft-command-result', onResult);
+      resolve(result);
+    };
+    const onResult = event => {
+      const detail = (event && event.detail) || {};
+      if (detail.requestId !== requestId) return;
+      finish(detail);
+    };
+    document.addEventListener('venpro:bluesoft-command-result', onResult);
+    try {
+      document.dispatchEvent(new CustomEvent('venpro:bluesoft-command', {
+        detail: { requestId, kind, ...payload },
+      }));
+    } catch (err) {
+      finish({ ok: false, reason: (err && err.message) || 'dispatch_falhou' });
+    }
+    setTimeout(() => finish({ ok: false, reason: 'timeout' }), timeoutMs);
+  });
+}
+
+async function extractBluesoftItems() {
+  const result = await bluesoftSendCommand('extract');
+  return Array.isArray(result?.items) ? result.items : [];
+}
+
+async function fillBluesoftPrices(prices) {
+  const result = await bluesoftSendCommand('fill', { prices: Array.isArray(prices) ? prices : [] });
+  return {
+    filled: Number(result?.filled) || 0,
+    failed: Array.isArray(result?.failed) ? result.failed : [],
+    details: Array.isArray(result?.details) ? result.details : [],
+    site: 'bluesoft-cotacao',
+    rowCount: Number(result?.recordCount) || 0,
+  };
+}
+
 function getEstanciaForm(root = document) {
   return root.forms?.form1
     || root.querySelector?.('form[name="form1"]')
@@ -2084,6 +2242,12 @@ function getCotacaoWebSmusPriceCell(row) {
   return null;
 }
 
+function getVrCotacaoPriceCandidates(row) {
+  const custoInputs = Array.from(row.querySelectorAll('input[name^="custo["]'))
+    .filter(input => !input.disabled && !input.readOnly && isVisible(input));
+  return custoInputs.length ? custoInputs : getEditableInputs(row);
+}
+
 function getPriceCandidates(row, site = 'generic') {
   if (site === 'rede-fornecedores') return getRedeFornecedoresPriceCandidates(row);
   if (site === 'intersolid-cotacao') return getIntersolidPriceCandidates(row);
@@ -2093,6 +2257,8 @@ function getPriceCandidates(row, site = 'generic') {
   if (site === 'easy-cotacao-web') return getEasyCotacaoPriceCandidates(row);
   if (site === 'estancia-cotacao') return getEstanciaPriceCandidates(row);
   if (site === 'sg-cotacao') return getSgCotacaoPriceCandidates(row);
+  if (site === 'hr-cotacao') return getHrCotacaoPriceCandidates(row);
+  if (site === 'vr-cotacao') return getVrCotacaoPriceCandidates(row);
   const inputs = getEditableInputs(row);
   const priceLike = inputs.filter(isPriceLikeInput);
   return priceLike.length ? priceLike : inputs;
@@ -2124,6 +2290,9 @@ function detectQuotationSite() {
 
   if (window.location.hostname.includes('cotatudo.com.br')) return 'cotatudo';
   if (isSgCotacaoPage(hostname, bodyText)) return 'sg-cotacao';
+  if (isHrCotacaoPage(hostname)) return 'hr-cotacao';
+  if (isAriusCotacaoPage(hostname)) return 'arius-cotacao';
+  if (isBluesoftCotacaoPage(hostname)) return 'bluesoft-cotacao';
   if (isHipcomerpCotacaoPage(hostname, bodyText)) return 'hipcomerp-cotacao';
   if (isEasyCotacaoWebPage(hostname, path, bodyText)) return 'easy-cotacao-web';
   if (isEstanciaCotacaoPage(hostname, path, bodyText)) return 'estancia-cotacao';
@@ -2153,6 +2322,10 @@ function getQuotationRows(site) {
 
   if (site === 'sg-cotacao') {
     return getSgCotacaoRows();
+  }
+
+  if (site === 'hr-cotacao') {
+    return getHrCotacaoRows();
   }
 
   if (site === 'vr-cotacao') {
@@ -2442,6 +2615,21 @@ function extractItemFromRow(row, idx, site, empresaColuna) {
     };
   }
 
+  if (site === 'hr-cotacao') {
+    const ean = getHrCotacaoEan(row);
+    const nome = getHrCotacaoNome(row);
+    if (!ean && !nome) return null;
+    const priceTarget = getSelectedPriceInput(row, empresaColuna, site);
+    return {
+      idx,
+      ean,
+      nome,
+      codigo: normalizeCellText(getHrCotacaoCell(row, 'codigoPlu')?.textContent || ''),
+      signature: '',
+      filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
+    };
+  }
+
   if (site === 'easy-cotacao-web') {
     const meta = easyCotacaoRowMeta.get(row) || parseEasyCotacaoRowMeta(row);
     if (!meta || (!meta.ean && !meta.nome)) return null;
@@ -2500,9 +2688,7 @@ function extractItemFromRow(row, idx, site, empresaColuna) {
     };
   }
 
-  const priceInput = site === 'vr-cotacao'
-    ? getEditableInputs(row)[0]
-    : getSelectedPriceInput(row, empresaColuna, site);
+  const priceInput = getSelectedPriceInput(row, empresaColuna, site);
   if (!priceInput && site !== 'cotacao-web-smus') return null;
 
   const ean = extractEANFromRow(row, site);
@@ -2533,6 +2719,12 @@ async function extractCotacaoWebSmusItems(options = {}) {
 
 async function extractQuotationItems(options = {}) {
   const site = detectQuotationSite();
+  if (site === 'arius-cotacao') {
+    return extractAriusItems();
+  }
+  if (site === 'bluesoft-cotacao') {
+    return extractBluesoftItems();
+  }
   if (site === 'cotacao-web-smus') {
     return extractCotacaoWebSmusItems(options);
   }
@@ -2555,6 +2747,12 @@ async function extractQuotationItems(options = {}) {
 
 async function fillQuotationPrices(prices, options = {}) {
   const site = detectQuotationSite();
+  if (site === 'arius-cotacao') {
+    return fillAriusPrices(prices);
+  }
+  if (site === 'bluesoft-cotacao') {
+    return fillBluesoftPrices(prices);
+  }
   const rows = getQuotationRows(site);
   let count = 0;
   const failed = [];
@@ -2593,6 +2791,8 @@ async function fillQuotationPrices(prices, options = {}) {
         ? (type === 'number'
           ? [dot, noDecimalsDot, comma, comma3, raw]
           : [comma, dot, comma3, dot3, raw, noDecimalsDot])
+      : site === 'hr-cotacao'
+        ? [comma, dot, comma3, dot3, raw, noDecimalsDot]
       : site === 'estancia-cotacao'
         ? (type === 'number'
           ? [dot, noDecimalsDot, comma, raw]
@@ -3009,11 +3209,39 @@ async function fillQuotationPrices(prices, options = {}) {
     return false;
   }
 
+  // HR Cotação: a máscara ignora set programático de value, mas o commit
+  // (keydown)="onKeyPressEvent" lê input.value cru em Enter/Tab/Setas e chama
+  // updateVlr(input.value) -> salva no backend. Escrevemos o value nativo e
+  // disparamos um keydown "Tab" sintético para forçar esse caminho.
+  async function setHrCotacaoInputValue(input, value) {
+    for (const candidate of priceValueCandidates(value, input)) {
+      try {
+        input.focus?.();
+        if (typeof input.select === 'function') input.select();
+        writeNativeValue(input, candidate);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          key: 'Tab',
+          code: 'Tab',
+        }));
+        await waitForGridRender(160);
+        if (samePriceLike(getControlValue(input), value)) return true;
+      } catch {}
+    }
+    return false;
+  }
+
   async function setInputValue(input, value) {
     input.scrollIntoView({ block: 'center', inline: 'nearest' });
 
     if (site === 'sg-cotacao') {
       return setSgCotacaoInputValue(input, value);
+    }
+
+    if (site === 'hr-cotacao') {
+      return setHrCotacaoInputValue(input, value);
     }
 
     if (!isEditableValueControl(input)) {
@@ -3352,9 +3580,7 @@ async function fillQuotationPrices(prices, options = {}) {
       continue;
     }
 
-    let input = site === 'vr-cotacao'
-      ? getEditableInputs(row)[0]
-      : getSelectedPriceInput(row, empresaColuna, site);
+    let input = getSelectedPriceInput(row, empresaColuna, site);
 
     let fractionResult = null;
     if (isBubbleCatalogFornecedor) {
@@ -3422,6 +3648,9 @@ async function fillQuotationPrices(prices, options = {}) {
     } else if (site === 'sg-cotacao') {
       await waitForGridRender(160);
       persisted = Boolean(ok && sgCotacaoRowShowsPrice(row, item.price, samePriceLike));
+    } else if (site === 'hr-cotacao') {
+      await waitForGridRender(200);
+      persisted = Boolean(ok && hrCotacaoRowShowsPrice(row, item.price, samePriceLike));
     } else if (isEasyCotacaoWeb) {
       await waitForGridRender(160);
       persisted = Boolean(ok && easyCotacaoRowShowsPrice(row, item.price, samePriceLike, empresaColuna));
