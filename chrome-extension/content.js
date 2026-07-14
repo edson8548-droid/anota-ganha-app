@@ -624,6 +624,58 @@ async function fillBluesoftPrices(prices) {
   };
 }
 
+// "Cotação Web" da Guia Sistemas - Precificar do fornecedor (ex.:
+// cg.jrsupermercados.com.br/Fornecedores/Precificar). Syncfusion ej2 Grid no
+// contexto da página; a extração/gravação roda no MAIN world
+// (guiacotacao-main-world.js). Aqui só detectamos e conversamos por CustomEvent.
+function isGuiaCotacaoPage(hostname = window.location.hostname || '', path = window.location.pathname || '') {
+  if (!/\/Fornecedores\/Precificar/i.test(path)) return false;
+  return Boolean(document.querySelector('.e-grid') || document.getElementById('Grid'));
+}
+
+function guiaSendCommand(kind, payload = {}, timeoutMs = 120000) {
+  return new Promise(resolve => {
+    const requestId = `guia-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    let settled = false;
+    const finish = result => {
+      if (settled) return;
+      settled = true;
+      document.removeEventListener('venpro:guia-command-result', onResult);
+      resolve(result);
+    };
+    const onResult = event => {
+      const detail = (event && event.detail) || {};
+      if (detail.requestId !== requestId) return;
+      finish(detail);
+    };
+    document.addEventListener('venpro:guia-command-result', onResult);
+    try {
+      document.dispatchEvent(new CustomEvent('venpro:guia-command', {
+        detail: { requestId, kind, ...payload },
+      }));
+    } catch (err) {
+      finish({ ok: false, reason: (err && err.message) || 'dispatch_falhou' });
+    }
+    setTimeout(() => finish({ ok: false, reason: 'timeout' }), timeoutMs);
+  });
+}
+
+async function extractGuiaItems() {
+  const result = await guiaSendCommand('extract');
+  return Array.isArray(result?.items) ? result.items : [];
+}
+
+async function fillGuiaPrices(prices) {
+  const result = await guiaSendCommand('fill', { prices: Array.isArray(prices) ? prices : [] });
+  return {
+    filled: Number(result?.filled) || 0,
+    failed: Array.isArray(result?.failed) ? result.failed : [],
+    details: Array.isArray(result?.details) ? result.details : [],
+    site: 'guia-cotacao',
+    rowCount: Number(result?.recordCount) || 0,
+  };
+}
+
 function getEstanciaForm(root = document) {
   return root.forms?.form1
     || root.querySelector?.('form[name="form1"]')
@@ -2293,6 +2345,7 @@ function detectQuotationSite() {
   if (isHrCotacaoPage(hostname)) return 'hr-cotacao';
   if (isAriusCotacaoPage(hostname)) return 'arius-cotacao';
   if (isBluesoftCotacaoPage(hostname)) return 'bluesoft-cotacao';
+  if (isGuiaCotacaoPage(hostname, path)) return 'guia-cotacao';
   if (isHipcomerpCotacaoPage(hostname, bodyText)) return 'hipcomerp-cotacao';
   if (isEasyCotacaoWebPage(hostname, path, bodyText)) return 'easy-cotacao-web';
   if (isEstanciaCotacaoPage(hostname, path, bodyText)) return 'estancia-cotacao';
@@ -2725,6 +2778,9 @@ async function extractQuotationItems(options = {}) {
   if (site === 'bluesoft-cotacao') {
     return extractBluesoftItems();
   }
+  if (site === 'guia-cotacao') {
+    return extractGuiaItems();
+  }
   if (site === 'cotacao-web-smus') {
     return extractCotacaoWebSmusItems(options);
   }
@@ -2752,6 +2808,9 @@ async function fillQuotationPrices(prices, options = {}) {
   }
   if (site === 'bluesoft-cotacao') {
     return fillBluesoftPrices(prices);
+  }
+  if (site === 'guia-cotacao') {
+    return fillGuiaPrices(prices);
   }
   const rows = getQuotationRows(site);
   let count = 0;

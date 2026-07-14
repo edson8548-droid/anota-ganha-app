@@ -3,7 +3,7 @@ const BATCH = 50;
 const STUCK_MS = 3 * 60 * 1000;
 const MAX_RESULT_DETAILS = 12;
 const BTN_LABEL = 'Preencher Cotação';
-const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor, Hipcomerp, Easy Cotação Web, Estância, SG Cotação, HR Cotação, Arius Cotação ou Bluesoft Cotação primeiro.';
+const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor, Hipcomerp, Easy Cotação Web, Estância, SG Cotação, HR Cotação, Arius Cotação, Bluesoft Cotação ou Guia Cotação primeiro.';
 const SITE_LABELS = {
   cotatudo: 'Cotatudo',
   'vr-cotacao': 'VR Cotação',
@@ -20,6 +20,7 @@ const SITE_LABELS = {
   'hr-cotacao': 'HR Cotação',
   'arius-cotacao': 'Arius Cotação',
   'bluesoft-cotacao': 'Bluesoft Cotação',
+  'guia-cotacao': 'Guia Cotação',
   generic: 'Cotação compatível',
 };
 
@@ -104,6 +105,9 @@ function setDetectedSite(tab, pageInfo = null) {
     type = 'ok';
   } else if (isBluesoftCotacaoUrl(url)) {
     label = 'Site detectado: Bluesoft Cotação';
+    type = 'ok';
+  } else if (isGuiaCotacaoUrl(url)) {
+    label = 'Site detectado: Guia Cotação';
     type = 'ok';
   }
 
@@ -387,7 +391,8 @@ function isSupportedQuotationUrl(url = '') {
     || isSgCotacaoUrl(url)
     || isHrCotacaoUrl(url)
     || isAriusCotacaoUrl(url)
-    || isBluesoftCotacaoUrl(url);
+    || isBluesoftCotacaoUrl(url)
+    || isGuiaCotacaoUrl(url);
 }
 
 function isPotentialQuotationUrl(url = '') {
@@ -515,6 +520,16 @@ function isBluesoftCotacaoUrl(url = '') {
   }
 }
 
+function isGuiaCotacaoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)cg\.jrsupermercados\.com\.br$/i.test(parsed.hostname)
+      && /\/Fornecedores\/Precificar/i.test(parsed.pathname);
+  } catch {
+    return /cg\.jrsupermercados\.com\.br\/Fornecedores\/Precificar/i.test(url);
+  }
+}
+
 async function getQuotationTab(options = {}) {
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (active?.id && isPotentialQuotationUrl(active.url || '')) return active;
@@ -554,6 +569,8 @@ async function getQuotationTab(options = {}) {
       'http://*.arius-web.harpocloud.com.br/*',
       'https://erp.bluesoft.com.br/*',
       'http://erp.bluesoft.com.br/*',
+      'https://cg.jrsupermercados.com.br/*',
+      'http://cg.jrsupermercados.com.br/*',
       'https://*/fornecedores/*/cotacao/*',
       'http://*/fornecedores/*/cotacao/*',
       'https://*/cotacao/*',
@@ -588,6 +605,7 @@ function detectSiteFromUrl(url = '') {
   if (isHrCotacaoUrl(url)) return 'hr-cotacao';
   if (isAriusCotacaoUrl(url)) return 'arius-cotacao';
   if (isBluesoftCotacaoUrl(url)) return 'bluesoft-cotacao';
+  if (isGuiaCotacaoUrl(url)) return 'guia-cotacao';
   return 'generic';
 }
 
@@ -642,10 +660,24 @@ async function ensureBluesoftMainWorld(tab) {
   }
 }
 
+async function ensureGuiaMainWorld(tab) {
+  if (isGuiaCotacaoUrl(tab?.url || '')) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['guiacotacao-main-world.js'],
+        world: 'MAIN',
+      });
+      await sleep(120);
+    } catch {}
+  }
+}
+
 async function ensureContentScript(tab) {
   await ensureHipcomerpMainWorld(tab);
   await ensureAriusMainWorld(tab);
   await ensureBluesoftMainWorld(tab);
+  await ensureGuiaMainWorld(tab);
   await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
   await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ['content.css'] });
   await sleep(500);
@@ -800,6 +832,7 @@ function enrichPricesForFill(precos, items) {
       qtdEmbalagem: item.qtdEmbalagem || item.packageQty || '',
       idProduto: item.idProduto ?? '',
       produtoKey: item.produtoKey ?? '',
+      produtoId: item.produtoId ?? '',
     };
   });
 }
