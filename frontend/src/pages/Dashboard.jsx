@@ -46,7 +46,7 @@ const Dashboard = () => {
   const user = authData?.user;
 
   const { campaigns: personalCampaigns, loading: campaignsLoading, createCampaign, updateCampaign, deleteCampaign } = useCampaigns();
-  const { sharedCampaigns, unlock: unlockShared, saveMetas: saveSharedMetas, linkClient: linkSharedClient } = useMasterCampaigns();
+  const { sharedCampaigns, unlock: unlockShared, saveMetas: saveSharedMetas, linkClient: linkSharedClient, linkClients: linkSharedClients } = useMasterCampaigns();
   // Campanhas próprias do RCA + campanhas mestre (Spani etc.) que ele desbloqueou.
   // As mestre entram como "sintéticas" (estrutura da mestre + metas do RCA).
   const campaigns = useMemo(
@@ -202,6 +202,25 @@ const Dashboard = () => {
       setShowUnlockPrompt(false);
       toast.success(`✅ Campanha "${master?.nome || ''}" liberada! Agora defina as suas metas.`);
       if (overlayId) {
+        // Vincula a carteira existente do RCA (dedupe por CNPJ), como já
+        // acontece automaticamente ao criar campanha própria.
+        try {
+          const vistos = new Set();
+          const ids = [];
+          clients.forEach(c => {
+            const key = String(c.CNPJ || '').replace(/\D/g, '')
+              || (c.CLIENTE ? `nome:${c.CLIENTE.trim().toUpperCase()}` : c.id);
+            if (vistos.has(key)) return;
+            vistos.add(key);
+            ids.push(c.id);
+          });
+          if (ids.length) {
+            await linkSharedClients(overlayId, ids);
+            toast.success(`👥 ${ids.length} cliente(s) da sua carteira vinculados à campanha.`);
+          }
+        } catch (linkErr) {
+          console.warn('Falha ao vincular carteira:', linkErr?.message);
+        }
         setSelectedCampaignId(overlayId);
         setMetasCampaignId(overlayId); // abre o preenchimento de metas
       }
@@ -2225,6 +2244,21 @@ const Dashboard = () => {
             </div>
           </div>
         </header>
+
+        {/* Regras/descrição da campanha oficial (cadastradas pelo administrador) */}
+        {selectedCampaign.isShared && (selectedCampaign.regulamento || selectedCampaign.descricao) && (
+          <div style={{ margin: '12px 16px 0', background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 12, padding: '12px 16px' }}>
+            <strong style={{ fontSize: 13.5, color: '#9a3412', display: 'block', marginBottom: 4 }}>
+              📋 Regras da campanha {selectedCampaign.distribuidora ? `· ${selectedCampaign.distribuidora}` : ''}
+            </strong>
+            {selectedCampaign.descricao && (
+              <p style={{ fontSize: 13, color: '#7c2d12', margin: '0 0 6px', whiteSpace: 'pre-wrap' }}>{selectedCampaign.descricao}</p>
+            )}
+            {selectedCampaign.regulamento && (
+              <p style={{ fontSize: 12.5, color: '#7c2d12', margin: 0, whiteSpace: 'pre-wrap' }}>{selectedCampaign.regulamento}</p>
+            )}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="tabs-container">

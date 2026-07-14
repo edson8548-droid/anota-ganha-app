@@ -134,8 +134,8 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
   const validate = () => {
     const e = {};
     if (!formData.nome.trim()) e.nome = 'Nome é obrigatório';
-    if (!isEdit && code.trim().length < 4) e.code = 'Senha de ao menos 4 caracteres';
-    if (code.trim() && code.trim().length < 4) e.code = 'Senha de ao menos 4 caracteres';
+    if (!isEdit && code.trim().length < 6) e.code = 'Senha de ao menos 6 caracteres';
+    if (code.trim() && code.trim().length < 6) e.code = 'Senha de ao menos 6 caracteres';
     if (formData.industries.length === 0) e.industries = 'Adicione ao menos uma indústria';
     setErrors(e);
     return Object.keys(e).length === 0;

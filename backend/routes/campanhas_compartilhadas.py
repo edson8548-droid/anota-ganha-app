@@ -44,7 +44,8 @@ _SALT = (
     or "venpro-shared-campaign-salt"
 )
 
-CODE_MIN_LEN = 4
+# Mínimo 6: senha curta demais fica vulnerável a chute mesmo com rate limit.
+CODE_MIN_LEN = 6
 
 
 def init_campanhas_compartilhadas(database):

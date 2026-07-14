@@ -198,3 +198,6 @@ def test_excluir_mestre_remove_acessos():
 def test_criar_exige_senha_minima():
     client = _make_client()
     assert _criar(client, {"code": "ab"}).status_code == 400
+    # Mínimo agora é 6 (proteção contra chute de senha)
+    assert _criar(client, {"code": "abcde"}).status_code == 400
+    assert _criar(client, {"code": "abcdef"}).status_code == 200

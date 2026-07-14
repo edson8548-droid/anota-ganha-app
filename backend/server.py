@@ -126,6 +126,9 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
             return (30, 60, "/api/license/validate")
         if path == "/api/license/validate-by-cpf":
             return (20, 60, "/api/license/validate-by-cpf")
+        if path == "/api/campanhas-compartilhadas/desbloquear":
+            # Senha de campanha: balde apertado contra chute de senha (brute-force)
+            return (10, 60, "/api/campanhas-compartilhadas/desbloquear")
         if path.startswith("/api/vitrine/publica/"):
             return (180, 60, "/api/vitrine/publica")
         if path.startswith("/api/vitrine/imagens/") or path.startswith("/api/whatsapp/fotos/") or path.startswith("/api/users/avatars/"):

@@ -185,7 +185,13 @@ const Analytics = ({ campaign, clients, onClose }) => {
   const extras = useMemo(() => {
     if (!analytics) return null;
     const totalMeta = analytics.goalData.reduce((s, g) => s + (g.targetValue || 0), 0);
-    const totalSold = analytics.totalValue || 0;
+    // Mesmo "vendido" do painel de metas: o cadastrado na indústria (manual ou,
+    // nas campanhas oficiais, calculado dos clientes) — com fallback no valor
+    // positivado no app quando ele for maior. Evita projeção zerada para quem
+    // controla só pelo campo manual e não oscila com o filtro de cidade.
+    const totalSold = analytics.goalData.reduce(
+      (s, g) => s + Math.max(g.totalSold || 0, g.venproValue || 0), 0
+    );
 
     const parseDate = (d) => (d ? new Date(`${d}T00:00:00`) : null);
     const start = parseDate(campaign?.startDate);

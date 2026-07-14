@@ -159,5 +159,13 @@ export const useMasterCampaigns = () => {
     });
   }, [db]);
 
-  return { sharedCampaigns, masters, loading, unlock, saveMetas, linkClient, refreshMasters };
+  // Vincula vários clientes de uma vez (usado ao desbloquear: carteira existente).
+  const linkClients = useCallback(async (overlayId, clientIds) => {
+    if (!overlayId || !clientIds?.length) return;
+    await updateDoc(doc(db, 'rca_campaigns', overlayId), {
+      clientIds: arrayUnion(...clientIds), updated_at: serverTimestamp(),
+    });
+  }, [db]);
+
+  return { sharedCampaigns, masters, loading, unlock, saveMetas, linkClient, linkClients, refreshMasters };
 };
