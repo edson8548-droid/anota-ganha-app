@@ -15,7 +15,7 @@
 // Conversa com o content.js (mundo isolado do top frame) por CustomEvent, igual
 // aos demais bridges (hipcom/arius/bluesoft).
 (() => {
-  const BRIDGE_VERSION = '1.0.60';
+  const BRIDGE_VERSION = '1.0.61';
   if (window.__venproGuiaBridgeVersion === BRIDGE_VERSION) return;
   window.__venproGuiaBridgeInstalled = true;
   window.__venproGuiaBridgeVersion = BRIDGE_VERSION;
@@ -77,11 +77,12 @@
     const items = [];
     let idx = 0;
     for (const rec of data) {
-      const filled = parsePriceNumber(rec.PrecoUnitario) > 0;
+      const current_price = parsePriceNumber(rec.PrecoUnitario);
+      const filled = current_price > 0;
       const nome = String(rec.Descricao || '');
       const codigo = rec.CodReferencia == null ? '' : String(rec.CodReferencia);
       const ean = limpaEan(rec.CodBarras);
-      items.push({ idx: idx++, ean, nome, codigo, signature: '', produtoId: rec.ProdutoId, filled });
+      items.push({ idx: idx++, ean, nome, codigo, signature: '', produtoId: rec.ProdutoId, filled, current_price });
     }
     return { ok: true, items, recordCount: data.length };
   }

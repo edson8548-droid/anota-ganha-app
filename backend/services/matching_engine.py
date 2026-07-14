@@ -2326,6 +2326,16 @@ def processar_cotacao(itens_cotacao, precos_dict, precos_nome_lista, modo="ean")
     modo = str(modo or "ean").strip().lower()
     norms_cache = [item['norm'] for item in precos_nome_lista]
 
+    def menor_preco(preco_novo, item):
+        if preco_novo is None:
+            return None
+        atual = item.get("current_price")
+        try:
+            atual = float(str(atual).replace("R$", "").replace(" ", "").replace(",", "."))
+        except (TypeError, ValueError):
+            atual = None
+        return min(preco_novo, atual) if atual is not None and atual > 0 else preco_novo
+
     for item in itens_cotacao:
         if modo == "ean":
             ean_limpo = limpar_ean(item.get("ean", ""))
@@ -2334,6 +2344,7 @@ def processar_cotacao(itens_cotacao, precos_dict, precos_nome_lista, modo="ean")
                 ean_unidade = ean_unidade_de_dun14(ean_limpo)
                 if ean_unidade:
                     preco = precos_dict.get(ean_unidade)
+            preco = menor_preco(preco, item)
             tipo = "EAN" if preco is not None else None
             results.append({"linha": item.get("linha", 0), "preco": preco, "tipo": tipo})
         else:
@@ -2341,6 +2352,7 @@ def processar_cotacao(itens_cotacao, precos_dict, precos_nome_lista, modo="ean")
                 item.get("ean", ""), item.get("nome", ""),
                 precos_dict, precos_nome_lista, norms_cache
             )
+            preco = menor_preco(preco, item)
             results.append({"linha": item.get("linha", 0), "preco": preco, "tipo": tipo})
 
     return results

@@ -38,3 +38,13 @@ def test_audit_event_sync_does_not_fail_without_firebase(monkeypatch):
     monkeypatch.setattr(firebase_admin, "_apps", {}, raising=False)
 
     audit_event_sync("test_event", uid="user-1", status="success", metadata={"ok": True})
+
+
+def test_diagnosticos_compactos_nao_sao_truncados():
+    value = _clean_value({
+        "diagnostics": [
+            "idx=1|ean=7891032016625|atual=1.70|candidato=1.65|match=EAN|decisao=atualizar"
+        ]
+    })
+
+    assert value["diagnostics"][0].endswith("decisao=atualizar")

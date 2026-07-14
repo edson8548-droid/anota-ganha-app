@@ -207,8 +207,11 @@ function mergeResultDetails(existing = [], additions = [], limit = 40) {
   return merged;
 }
 
-function missingDetailsForBatch(batch = [], precos = []) {
-  const pricedIdx = new Set((precos || []).map(preco => Number(preco.idx)));
+function missingDetailsForBatch(batch = [], precos = [], mantidos = []) {
+  const pricedIdx = new Set([
+    ...(precos || []).map(preco => Number(preco.idx)),
+    ...(mantidos || []).map(idx => Number(idx)),
+  ]);
   return (batch || [])
     .filter(item => !pricedIdx.has(Number(item.idx)))
     .map(item => makeItemDetail(item, 'sem_preco_na_tabela'));
@@ -231,6 +234,20 @@ function failureDetailsFromFill(fillResult, prices = []) {
   }
 
   return failed.map(idx => makeItemDetail(pricesByIdx.get(Number(idx)) || { idx }, 'falha_preenchimento'));
+}
+
+function fillDiagnosticLines(fillResult, prices = [], limit = 20) {
+  const pricesByIdx = new Map((prices || []).map(item => [Number(item.idx), item]));
+  return (fillResult?.details || []).slice(0, limit).map(detail => {
+    const item = pricesByIdx.get(Number(detail.idx)) || {};
+    return [
+      `idx=${detail.idx ?? item.idx ?? ''}`,
+      `ean=${item.ean || ''}`,
+      `tentado=${item.price || ''}`,
+      `motivo=${detail.reason || detail.bridge?.reason || 'falha_preenchimento'}`,
+      `depois=${compactText(detail.after || detail.cellAfter || '', 30)}`,
+    ].join('|');
+  });
 }
 
 function renderResultDetails(title, details) {
@@ -868,12 +885,13 @@ async function runJob(job, startBatch = 0, initial = {}) {
     const batch = job.items.slice(b * BATCH, (b + 1) * BATCH);
     const data = await matchBatch(token, job, batch, b + 1, totalBatches);
     const precos = Array.isArray(data.precos) ? data.precos : [];
-    const batchMissingDetails = missingDetailsForBatch(batch, precos);
+    const batchMissingDetails = missingDetailsForBatch(batch, precos, data.mantidos);
     naoEncontradosDetalhes = mergeResultDetails(naoEncontradosDetalhes, batchMissingDetails);
     job.naoEncontradosDetalhes = naoEncontradosDetalhes;
 
     let filled = 0;
     let failedCount = 0;
+    let batchFillDiagnostics = [];
     if (precos.length > 0) {
       const pricesToFill = enrichPricesForFill(precos, job.items);
       if (deferFillUntilEnd) {
@@ -889,6 +907,7 @@ async function runJob(job, startBatch = 0, initial = {}) {
         });
         filled = fillResult?.filled || 0;
         failedCount = Array.isArray(fillResult?.failed) ? fillResult.failed.length : 0;
+        batchFillDiagnostics = fillDiagnosticLines(fillResult, pricesToFill);
         const batchFailureDetails = failureDetailsFromFill(fillResult, pricesToFill);
         falhasDetalhes = mergeResultDetails(falhasDetalhes, batchFailureDetails);
         job.falhasDetalhes = falhasDetalhes;
@@ -916,6 +935,10 @@ async function runJob(job, startBatch = 0, initial = {}) {
               nao_encontrados_detalhes: batchMissingDetails.slice(0, 20),
               falhas_detalhes: batchFailureDetails.slice(0, 20),
             },
+            diagnostics: [
+              ...(data.diagnostics || []),
+              ...fillDiagnosticLines(fillResult, pricesToFill),
+            ].slice(0, 20),
           });
           throw new Error('Encontrei preços, mas não consegui preencher os campos da cotação. Atualize a página e tente novamente.');
         }
@@ -946,6 +969,10 @@ async function runJob(job, startBatch = 0, initial = {}) {
       debug: {
         nao_encontrados_detalhes: batchMissingDetails.slice(0, 20),
       },
+      diagnostics: [
+        ...(data.diagnostics || []),
+        ...batchFillDiagnostics,
+      ].slice(0, 20),
     });
 
     const pct = Math.round(((b + 1) / totalBatches) * 100);
@@ -1026,7 +1053,7 @@ function hipcomerpPageSignature(items = []) {
 
 async function extractOpenQuotationItems(empresaColuna) {
   const extractResult = await sendToQuotationPage({ action: 'extractItems', empresaColuna });
-  const items = (extractResult.items || []).filter(item => !item.filled && (item.nome || item.ean));
+  const items = (extractResult.items || []).filter(item => (item.nome || item.ean) && (!item.filled || Number(item.current_price) > 0));
   return { ...extractResult, items };
 }
 
@@ -1088,7 +1115,7 @@ async function runHipcomerpApiJob(job, initial = {}) {
       : `Não consegui carregar os itens da Hipcomerp (${loadResult?.reason || 'erro desconhecido'}).`);
   }
 
-  const items = (loadResult.items || []).filter(item => !item.filled && (item.nome || item.ean));
+  const items = (loadResult.items || []).filter(item => (item.nome || item.ean) && (!item.filled || Number(item.current_price) > 0));
   job.items = items;
   job.hipcomerpPages = loadResult.pages || 1;
   job.hipcomerpTotal = loadResult.total || items.length;
@@ -1142,7 +1169,7 @@ async function runHipcomerpApiJob(job, initial = {}) {
 
     const data = await matchBatch(token, job, batch, b + 1, totalBatches);
     const precos = Array.isArray(data.precos) ? data.precos : [];
-    const missingDetails = missingDetailsForBatch(batch, precos);
+    const missingDetails = missingDetailsForBatch(batch, precos, data.mantidos);
     const missingCount = missingDetails.length || Math.max(0, batch.length - precos.length);
     naoEncontradosDetalhes = mergeResultDetails(naoEncontradosDetalhes, missingDetails);
     naoEncontrados += missingCount;
@@ -1346,7 +1373,7 @@ async function runHipcomerpJob(job, initial = {}) {
 
     const data = await matchBatch(token, job, items, telaNumero, null);
     const precos = Array.isArray(data.precos) ? data.precos : [];
-    const missingDetails = missingDetailsForBatch(items, precos);
+    const missingDetails = missingDetailsForBatch(items, precos, data.mantidos);
     const missingCount = missingDetails.length || Math.max(0, items.length - precos.length);
     naoEncontradosDetalhes = mergeResultDetails(naoEncontradosDetalhes, missingDetails);
     naoEncontrados += missingCount;
@@ -1650,7 +1677,7 @@ async function runEstanciaJob(job, initial = {}) {
 
       const data = await matchBatch(token, job, items, page, pages);
       const precos = Array.isArray(data.precos) ? data.precos : [];
-      const missingDetails = missingDetailsForBatch(items, precos);
+      const missingDetails = missingDetailsForBatch(items, precos, data.mantidos);
       const missingCount = missingDetails.length || Math.max(0, items.length - precos.length);
       naoEncontradosDetalhes = mergeResultDetails(naoEncontradosDetalhes, missingDetails);
       naoEncontrados += missingCount;
@@ -1882,7 +1909,7 @@ async function startProcessing() {
     }
     const extractResult = await sendToQuotationPage({ action: 'extractItems', empresaColuna });
     const site = extractResult.site || detectSiteFromUrl(tab?.url || '');
-    const items = (extractResult.items || []).filter(item => !item.filled && (item.nome || item.ean));
+    const items = (extractResult.items || []).filter(item => (item.nome || item.ean) && (!item.filled || Number(item.current_price) > 0));
 
     if (items.length === 0) {
       btnEl.textContent = BTN_LABEL;

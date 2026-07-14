@@ -12,7 +12,7 @@
 // Comunicação com o content.js (mundo isolado do top frame) por CustomEvent,
 // igual ao hipcom-main-world.js / arius-main-world.js.
 (() => {
-  const BRIDGE_VERSION = '1.0.59';
+  const BRIDGE_VERSION = '1.0.61';
   if (window.__venproBluesoftBridgeVersion === BRIDGE_VERSION) return;
   window.__venproBluesoftBridgeInstalled = true;
   window.__venproBluesoftBridgeVersion = BRIDGE_VERSION;
@@ -94,16 +94,17 @@
     const items = [];
     let idx = 0;
     for (const rec of data) {
-      const filled = parsePriceNumber(rec.precoUnitario) > 0;
+      const current_price = parsePriceNumber(rec.precoUnitario);
+      const filled = current_price > 0;
       const nome = String(rec.descricao || '');
       const codigo = rec.codigoReferencia == null ? '' : String(rec.codigoReferencia);
       const eans = [...new Set((rec.gtins || []).map(g => limpaEan(g && g.gtin)).filter(Boolean))];
       if (eans.length === 0) {
-        items.push({ idx: idx++, ean: '', nome, codigo, signature: '', produtoKey: rec.produtoKey, filled });
+        items.push({ idx: idx++, ean: '', nome, codigo, signature: '', produtoKey: rec.produtoKey, filled, current_price });
         continue;
       }
       for (const ean of eans) {
-        items.push({ idx: idx++, ean, nome, codigo, signature: '', produtoKey: rec.produtoKey, filled });
+        items.push({ idx: idx++, ean, nome, codigo, signature: '', produtoKey: rec.produtoKey, filled, current_price });
       }
     }
     return { ok: true, items, recordCount: data.length };

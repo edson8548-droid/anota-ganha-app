@@ -223,11 +223,34 @@ def _stats_resultados(itens, resultados):
     return stats
 
 
-def _cotacao_audit_metadata(*, source, tabela_id, prazo=None, modo=None, session_id=None, job_id=None, stats=None):
+def _cotacao_diagnostics(itens, resultados, limit=20):
+    diagnostics = []
+    for item, res in zip(itens or [], resultados or []):
+        if len(diagnostics) >= limit:
+            break
+        atual = item.get("current_price")
+        final = res.get("preco")
+        try:
+            atual_num = float(str(atual).replace("R$", "").replace(" ", "").replace(",", "."))
+        except (TypeError, ValueError):
+            atual_num = None
+        if final is None:
+            decisao = "nao_encontrado"
+        elif atual_num is not None and final >= atual_num:
+            decisao = "manter"
+        else:
+            decisao = "atualizar"
+        diagnostics.append(
+            f"linha={item.get('linha', '')}|ean={limpar_ean(item.get('ean'))}|atual={atual if atual is not None else 'vazio'}|final={final if final is not None else 'vazio'}|match={res.get('tipo') or 'nenhum'}|decisao={decisao}"
+        )
+    return diagnostics
+
+
+def _cotacao_audit_metadata(*, source, tabela_id, prazo=None, modo=None, session_id=None, job_id=None, stats=None, diagnostics=None):
     stats = stats or {}
     total = int(stats.get("total") or 0)
     sem_match = int(stats.get("sem_match") or 0)
-    return {
+    metadata = {
         "source": source,
         "sessionId": session_id,
         "jobId": job_id,
@@ -243,6 +266,9 @@ def _cotacao_audit_metadata(*, source, tabela_id, prazo=None, modo=None, session
         "aprendido": stats.get("aprendido"),
         "manual": stats.get("manual"),
     }
+    if diagnostics:
+        metadata["diagnostics"] = list(diagnostics)[:20]
+    return metadata
 
 
 def _bucket():
@@ -1065,6 +1091,7 @@ async def _processar_preview_job(job_id):
                 session_id=session_id,
                 job_id=job_id,
                 stats=stats,
+                diagnostics=_cotacao_diagnostics(itens, resultados),
             ),
         )
 
@@ -1606,6 +1633,7 @@ async def confirmar_cotacao(
             modo=sessao.get("modo"),
             session_id=payload.session_id,
             stats=stats,
+            diagnostics=_cotacao_diagnostics(itens, resultados_confirmados),
         ),
         request=request,
     )
@@ -1628,6 +1656,7 @@ class CotatudoItem(BaseModel):
     ean: str | None = None
     nome: str = ""
     filled: bool = False
+    current_price: float | None = Field(default=None, gt=0)
 
 
 class CotatudoPayload(BaseModel):
@@ -1639,6 +1668,24 @@ class CotatudoPayload(BaseModel):
     batch_index: int | None = Field(default=None, ge=0, le=10000)
     total_batches: int | None = Field(default=None, ge=0, le=10000)
     site: str | None = Field(default=None, max_length=40)
+
+
+def _cotatudo_itens_para_match(payload: CotatudoPayload):
+    """Inclui vazios e preenchidos comparáveis, preservando clientes antigos."""
+    return [
+        {
+            "nome": it.nome,
+            "ean": it.ean or "",
+            "linha": it.idx,
+            "current_price": it.current_price,
+        }
+        for it in payload.itens
+        if (not it.filled or it.current_price is not None) and (it.nome or limpar_ean(it.ean))
+    ]
+
+
+def _deve_atualizar_menor_preco(preco_novo: float, current_price: float | None) -> bool:
+    return current_price is None or preco_novo < current_price
 
 
 class CotatudoFillReport(BaseModel):
@@ -1657,6 +1704,7 @@ class CotatudoFillReport(BaseModel):
     preenchidos: int = Field(default=0, ge=0, le=10000)
     falhas: int = Field(default=0, ge=0, le=10000)
     nao_encontrados: int = Field(default=0, ge=0, le=10000)
+    diagnostics: List[str] = Field(default_factory=list, max_length=20)
     debug: dict | None = None
 
 
@@ -1699,6 +1747,7 @@ async def report_cotatudo_fill(
             "preenchidos": payload.preenchidos,
             "falhas": payload.falhas,
             "naoEncontrados": payload.nao_encontrados,
+            "diagnostics": payload.diagnostics,
             "debug": payload.debug,
         },
         request=request,
@@ -1740,11 +1789,7 @@ async def match_cotatudo(
         site = str(payload.site or "").strip()
         usa_fracionamento = site in COTACAO_EXTENSION_SITES_COM_FRACIONAMENTO
 
-        itens_para_match = [
-            {"nome": it.nome, "ean": it.ean or "", "linha": it.idx}
-            for it in payload.itens
-            if not it.filled and it.nome
-        ]
+        itens_para_match = _cotatudo_itens_para_match(payload)
 
         if not itens_para_match:
             stats = {"preenchidos": 0, "total": 0, "nao_encontrados": 0}
@@ -1755,7 +1800,7 @@ async def match_cotatudo(
                 metadata={**audit_meta, **stats, "precosRetornados": 0},
                 request=request,
             )
-            return {"precos": [], "stats": stats}
+            return {"precos": [], "mantidos": [], "stats": stats}
 
         def _match_sync():
             if usa_fracionamento:
@@ -1774,6 +1819,8 @@ async def match_cotatudo(
             aprendizado_map = {d["produto_cotacao_norm"]: d async for d in cursor}
 
         precos = []
+        mantidos = []
+        diagnostics = []
         preenchidos = 0
         nao_encontrados = 0
 
@@ -1786,6 +1833,14 @@ async def match_cotatudo(
                     res["tipo"] = "APRENDIDO"
 
             if res.get("preco") is not None:
+                current_price = item.get("current_price")
+                if not _deve_atualizar_menor_preco(res["preco"], current_price):
+                    mantidos.append(item["linha"])
+                    if len(diagnostics) < 20:
+                        diagnostics.append(
+                            f"idx={item['linha']}|ean={limpar_ean(item.get('ean'))}|atual={current_price:.2f}|candidato={res['preco']:.2f}|match={res.get('tipo') or ''}|decisao=manter"
+                        )
+                    continue
                 preco_str = f"{res['preco']:.2f}".replace(".", ",")
                 preco_item = {"idx": item["linha"], "price": preco_str}
                 if usa_fracionamento:
@@ -1796,24 +1851,36 @@ async def match_cotatudo(
                         preco_item["fracionamento"] = fracionamento
                 precos.append(preco_item)
                 preenchidos += 1
+                if len(diagnostics) < 20:
+                    atual = f"{current_price:.2f}" if current_price is not None else "vazio"
+                    diagnostics.append(
+                        f"idx={item['linha']}|ean={limpar_ean(item.get('ean'))}|atual={atual}|candidato={res['preco']:.2f}|match={res.get('tipo') or ''}|decisao=atualizar"
+                    )
             else:
                 nao_encontrados += 1
+                if len(diagnostics) < 20:
+                    diagnostics.append(
+                        f"idx={item['linha']}|ean={limpar_ean(item.get('ean'))}|atual={item.get('current_price') or 'vazio'}|candidato=vazio|match=nenhum|decisao=nao_encontrado"
+                    )
 
         stats = {
             "preenchidos": preenchidos,
             "total": len(itens_para_match),
             "nao_encontrados": nao_encontrados,
+            "mantidos_menor_preco": len(mantidos),
         }
         await audit_event(
             "cotatudo_extension_match_completed",
             uid=uid,
             status="success",
-            metadata={**audit_meta, **stats, "precosRetornados": len(precos)},
+            metadata={**audit_meta, **stats, "precosRetornados": len(precos), "diagnostics": diagnostics},
             request=request,
         )
 
         return {
             "precos": precos,
+            "mantidos": mantidos,
+            "diagnostics": diagnostics,
             "stats": stats,
         }
 

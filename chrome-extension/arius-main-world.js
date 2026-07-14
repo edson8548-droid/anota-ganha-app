@@ -7,7 +7,7 @@
 //   content.js  --('venpro:arius-command')-->  este bridge
 //   este bridge --('venpro:arius-command-result')-->  content.js
 (() => {
-  const BRIDGE_VERSION = '1.0.58';
+  const BRIDGE_VERSION = '1.0.61';
   if (window.__venproAriusBridgeVersion === BRIDGE_VERSION) return;
   window.__venproAriusBridgeInstalled = true;
   window.__venproAriusBridgeVersion = BRIDGE_VERSION;
@@ -130,16 +130,17 @@
     const items = [];
     let idx = 0;
     records.forEach((rec, i) => {
-      const filled = parsePriceNumber(rec.custo) > 0;
+      const current_price = parsePriceNumber(rec.custo);
+      const filled = current_price > 0;
       const nome = String(rec.descricaoProduto || '');
       const codigo = rec.referencia == null ? '' : String(rec.referencia);
       const eans = [...new Set((eansPerRecord[i] || []).map(e => limpaEan(e && e.idEan)).filter(Boolean))];
       if (eans.length === 0) {
-        items.push({ idx: idx++, ean: '', nome, codigo, signature: '', idProduto: rec.idProduto, filled });
+        items.push({ idx: idx++, ean: '', nome, codigo, signature: '', idProduto: rec.idProduto, filled, current_price });
         return;
       }
       for (const ean of eans) {
-        items.push({ idx: idx++, ean, nome, codigo, signature: '', idProduto: rec.idProduto, filled });
+        items.push({ idx: idx++, ean, nome, codigo, signature: '', idProduto: rec.idProduto, filled, current_price });
       }
     });
     return { ok: true, items, recordCount: records.length };

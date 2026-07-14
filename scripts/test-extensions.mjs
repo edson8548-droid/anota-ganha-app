@@ -50,6 +50,40 @@ async function createContentDom(html, url) {
 }
 
 describe('extensoes Chrome', () => {
+  it('extracao generica nao confunde codigo interno curto com EAN', async () => {
+    const dom = await createContentDom(`
+      <table>
+        <thead><tr><th>Codigo</th><th>Produto</th><th>Preco</th></tr></thead>
+        <tbody><tr><td>12345678</td><td>Produto sem EAN</td><td><input /></td></tr></tbody>
+      </table>
+    `, 'https://fornecedor.exemplo.com.br/cotacao/1');
+    try {
+      const items = await dom.window.eval('extractQuotationItems()');
+      assert.equal(items.length, 1);
+      assert.equal(items[0].ean, null);
+    } finally {
+      dom.window.close();
+    }
+  });
+
+  it('extracao generica preserva EAN identificado pelo cabecalho', async () => {
+    const dom = await createContentDom(`
+      <table>
+        <thead><tr><th>Codigo</th><th>EAN</th><th>Produto</th><th>Preco</th></tr></thead>
+        <tbody><tr><td>12345678</td><td>7891032016625</td><td>Produto com EAN</td><td><input value="1,70" /></td></tr></tbody>
+      </table>
+    `, 'https://fornecedor.exemplo.com.br/cotacao/1');
+    try {
+      const items = await dom.window.eval('extractQuotationItems()');
+      assert.equal(items.length, 1);
+      assert.equal(items[0].ean, '7891032016625');
+      assert.equal(items[0].filled, true);
+      assert.equal(items[0].current_price, 1.70);
+    } finally {
+      dom.window.close();
+    }
+  });
+
   it('manifest da extensao Cotatudo referencia arquivos existentes', () => {
     const manifest = readJson('chrome-extension/manifest.json');
 
@@ -194,6 +228,8 @@ describe('extensoes Chrome', () => {
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.54.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.55.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.56.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.61.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.61.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-whatsapp-extension.zip')));
   });
 
@@ -222,7 +258,7 @@ describe('extensoes Chrome', () => {
     const contentJs = readText('chrome-extension/content.js');
     const hipcomBridgeJs = readText('chrome-extension/hipcom-main-world.js');
 
-    assert.equal(manifest.version, '1.0.56');
+    assert.equal(manifest.version, '1.0.61');
     assert.ok(
       manifest.content_scripts.some(script => (script.js || []).includes('hipcom-main-world.js') && script.run_at === 'document_start' && script.world === 'MAIN'),
       'Hipcomerp precisa capturar a API antes do Flutter carregar'
@@ -399,7 +435,7 @@ describe('extensoes Chrome', () => {
     const contentJs = readText('chrome-extension/content.js');
     const cotacaoPy = readText('backend/routes/cotacao.py');
 
-    assert.equal(manifest.version, '1.0.56');
+    assert.equal(manifest.version, '1.0.61');
     assert.match(popupJs, /'easy-cotacao-web': 'Easy Cotação Web'/);
     assert.match(popupJs, /function isEasyCotacaoWebUrl/);
     assert.match(popupJs, /gepautomacao\.dyndns\.org/);
@@ -420,7 +456,7 @@ describe('extensoes Chrome', () => {
     const popupJs = readText('chrome-extension/popup.js');
     const contentJs = readText('chrome-extension/content.js');
 
-    assert.equal(manifest.version, '1.0.56');
+    assert.equal(manifest.version, '1.0.61');
     assert.match(popupJs, /'estancia-cotacao': 'Estância'/);
     assert.match(popupJs, /async function runEstanciaJob/);
     assert.match(popupJs, /loadEstanciaQuote/);

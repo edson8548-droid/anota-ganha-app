@@ -380,8 +380,8 @@ def _extrair_ean_prefixo_nome(nome_val):
     return ean, nome_sem_ean
 
 
-def _cotacao_item(ean_val, nome_val, linha, col_preco, sheet_name=None):
-    nome_texto = str(nome_val).strip()
+def _cotacao_item(ean_val, nome_val, linha, col_preco, sheet_name=None, current_price=None):
+    nome_texto = "" if nome_val is None or str(nome_val).strip().lower() in ("nan", "none") else str(nome_val).strip()
     ean_texto = str(ean_val) if ean_val and str(ean_val) != "nan" else ""
 
     if not ean_texto:
@@ -396,6 +396,8 @@ def _cotacao_item(ean_val, nome_val, linha, col_preco, sheet_name=None):
         "linha": linha,
         "col_preco": col_preco,
     }
+    if current_price is not None and str(current_price).strip().lower() not in ("", "nan", "none"):
+        item["current_price"] = current_price
     if sheet_name:
         item["sheet_name"] = sheet_name
     return item
@@ -406,12 +408,16 @@ def _append_cotacao_items_from_dataframe(itens, df, header_row, col_nome, col_ea
     for idx, row in df.iterrows():
         nome_val = row.iloc[col_nome]
         ean_val = row.iloc[col_ean] if col_ean is not None and col_ean < len(row) else ""
-        if nome_val and str(nome_val).strip() and str(nome_val).strip() != "nan":
+        current_price = row.iloc[col_preco] if col_preco is not None and col_preco < len(row) else None
+        nome_presente = bool(nome_val and str(nome_val).strip() and str(nome_val).strip().lower() != "nan")
+        ean_presente = bool(limpar_ean(ean_val))
+        if nome_presente or ean_presente:
             itens.append(_cotacao_item(
                 ean_val,
                 nome_val,
                 header_row + idx + 1,
                 col_preco,
+                current_price=current_price,
             ))
 
 
@@ -531,8 +537,21 @@ def _ler_cotacao_worksheet(ws, sheet_name=None, exigir_indicio_cotacao=False):
         row = ws[row_idx]
         ean_val = row[col_ean].value if col_ean is not None and col_ean < len(row) else None
         nome_val = row[col_nome].value if col_nome < len(row) else None
-        if nome_val and str(nome_val).strip() and str(nome_val).strip().upper() not in ("NONE", "NAN"):
-            itens.append(_cotacao_item(ean_val, nome_val, row_idx, col_preco, sheet_name=sheet_name))
+        current_price = row[col_preco].value if col_preco is not None and col_preco < len(row) else None
+        nome_presente = bool(
+            nome_val
+            and str(nome_val).strip()
+            and str(nome_val).strip().upper() not in ("NONE", "NAN")
+        )
+        if nome_presente or limpar_ean(ean_val):
+            itens.append(_cotacao_item(
+                ean_val,
+                nome_val,
+                row_idx,
+                col_preco,
+                sheet_name=sheet_name,
+                current_price=current_price,
+            ))
             blank_rows_after_items = 0
         elif itens:
             row_has_value = any(
@@ -656,12 +675,12 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
     meta_por_ean = {}
 
     for _, row in df_final.iterrows():
-        nome_bruto = str(row[col_nome_final]) if col_nome_final is not None else ""
-        if not nome_bruto or nome_bruto.strip().upper() in ("NONE", "NAN", ""):
-            continue
-
         ean_raw = row[col_ean_final] if col_ean_final is not None else None
         ean = limpar_ean(ean_raw)
+        nome_bruto = str(row[col_nome_final]) if col_nome_final is not None else ""
+        nome_presente = bool(nome_bruto and nome_bruto.strip().upper() not in ("NONE", "NAN", ""))
+        if not nome_presente and not ean:
+            continue
         fracionamento = _parse_fracionamento(row[col_fracionamento_final]) if col_fracionamento_final is not None else None
         if not fracionamento and col_embalagem_final is not None:
             fracionamento = _qtd_caixa_de_embalagem(row[col_embalagem_final])
@@ -677,18 +696,19 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
             precos[ean] = preco
             if fracionamento:
                 meta_por_ean[ean] = {"fracionamento": fracionamento}
-        nome_norm = normalizar_nome(nome_bruto)
-        item_nome = {
-            'norm': nome_norm,
-            'ord': ordenar_palavras(nome_norm),
-            'preco': preco,
-            'orig': nome_bruto,
-        }
-        if fracionamento:
-            item_nome['fracionamento'] = fracionamento
-        if ean:
-            item_nome['ean'] = ean
-        precos_nome_lista.append(item_nome)
+        if nome_presente:
+            nome_norm = normalizar_nome(nome_bruto)
+            item_nome = {
+                'norm': nome_norm,
+                'ord': ordenar_palavras(nome_norm),
+                'preco': preco,
+                'orig': nome_bruto,
+            }
+            if fracionamento:
+                item_nome['fracionamento'] = fracionamento
+            if ean:
+                item_nome['ean'] = ean
+            precos_nome_lista.append(item_nome)
 
     if incluir_meta:
         return precos, precos_nome_lista, meta_por_ean

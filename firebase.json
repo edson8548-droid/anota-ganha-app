@@ -436,6 +436,33 @@
         ]
       },
       {
+        "source": "/venpro-preencher-cotacao.zip",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/venpro-preencher-cotacao-1.0.61.zip",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/venpro-cotatudo-extension-1.0.61.zip",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
         "source": "/venpro-whatsapp-extension.zip",
         "headers": [
           {

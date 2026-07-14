@@ -311,12 +311,15 @@ function extractEANFromRow(row, site) {
       if (v2) return v2;
     }
   }
+  // Sem cabeçalho/metadado, códigos internos de 8-11 dígitos são ambíguos.
+  // O fallback visual aceita apenas GTIN-12/13/14; EAN-8 continua aceito quando
+  // a coluna ou o atributo identifica explicitamente o valor como EAN.
   for (const td of row.querySelectorAll('td')) {
     const txt = limparEAN(td.textContent);
-    if (txt) return txt;
+    if (/^\d{12,14}$/.test(txt)) return txt;
   }
   const fullText = row.textContent.trim();
-  const m = fullText.match(/\d{8,14}/);
+  const m = fullText.match(/\d{12,14}/);
   return m ? m[0] : null;
 }
 
@@ -346,6 +349,10 @@ function isFilledPriceValue(value) {
   const normalized = raw.replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
   const n = Number(normalized);
   return Number.isFinite(n) && n > 0;
+}
+
+function currentPriceValue(control) {
+  return control ? parsePositivePriceNumber(getControlValue(control).trim()) : null;
 }
 
 function getCotacaoWebSmusCodigo(row) {
@@ -1196,6 +1203,7 @@ function normalizeHipcomerpApiItem(raw = {}, idx = 0, page = 1) {
     ean,
     nome,
     filled: price !== null,
+    current_price: price,
     quantidade: raw.quantidade ?? '',
     quantidadePorCaixa: Number.isInteger(quantidadePorCaixa) && quantidadePorCaixa > 0 ? quantidadePorCaixa : 1,
     signature: `${plu}|${ean}|${normalizeRowKey(nome)}`,
@@ -2665,6 +2673,7 @@ function extractItemFromRow(row, idx, site, empresaColuna) {
       codigo: '',
       signature: '',
       filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
+      current_price: currentPriceValue(priceTarget),
     };
   }
 
@@ -2680,6 +2689,7 @@ function extractItemFromRow(row, idx, site, empresaColuna) {
       codigo: normalizeCellText(getHrCotacaoCell(row, 'codigoPlu')?.textContent || ''),
       signature: '',
       filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
+      current_price: currentPriceValue(priceTarget),
     };
   }
 
@@ -2694,6 +2704,7 @@ function extractItemFromRow(row, idx, site, empresaColuna) {
       codigo: meta.codigo || '',
       signature: meta.signature || '',
       filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
+      current_price: currentPriceValue(priceTarget),
     };
   }
 
@@ -2708,6 +2719,7 @@ function extractItemFromRow(row, idx, site, empresaColuna) {
       codigo: meta.codigo || '',
       signature: meta.signature || '',
       filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
+      current_price: currentPriceValue(priceTarget),
     };
   }
 
@@ -2722,6 +2734,7 @@ function extractItemFromRow(row, idx, site, empresaColuna) {
       codigo: '',
       signature: meta.signature || '',
       filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
+      current_price: currentPriceValue(priceTarget),
     };
   }
 
@@ -2738,6 +2751,7 @@ function extractItemFromRow(row, idx, site, empresaColuna) {
       embalagem: String(meta.packageQty || 1),
       qtdEmbalagem: meta.packageQty || 1,
       filled: meta.priceInput ? isFilledPriceValue(getControlValue(meta.priceInput).trim()) : false,
+      current_price: currentPriceValue(meta.priceInput),
     };
   }
 
@@ -2754,6 +2768,7 @@ function extractItemFromRow(row, idx, site, empresaColuna) {
     codigo: site === 'cotacao-web-smus' ? getCotacaoWebSmusCodigo(row) : '',
     signature: site === 'cotacao-web-smus' ? getCotacaoWebSmusRowSignature(row) : '',
     filled: priceInput ? isFilledPriceValue(getControlValue(priceInput).trim()) : false,
+    current_price: currentPriceValue(priceInput),
   };
 }
 

@@ -623,3 +623,53 @@ def test_tabela_mestre_reconhece_coluna_vr_venda():
         assert any(it["orig"].startswith("ABACAXI") for it in lista)
     finally:
         os.unlink(path)
+
+
+def test_tabela_mestre_preserva_ean_com_nome_vazio():
+    path = _xlsx([
+        ["PRODUTO", "EAN", "7 dias"],
+        [None, "7891032016625", 16.06],
+    ])
+    try:
+        precos, lista = ler_tabela_mestre(path, prazo=7)
+        assert precos == {"7891032016625": 16.06}
+        assert lista == []
+    finally:
+        os.unlink(path)
+
+
+def test_cotacao_preserva_ean_com_nome_vazio():
+    path = _xlsx([
+        ["PRODUTO", "EAN", "PRECO"],
+        [None, "7891032016625", None],
+    ])
+    try:
+        itens, _ = ler_cotacao(path)
+        assert len(itens) == 1
+        assert itens[0]["ean"] == "7891032016625"
+        assert itens[0]["nome"] == ""
+        assert processar_cotacao(
+            itens,
+            {"7891032016625": 16.06},
+            [],
+            modo="ean",
+        )[0]["preco"] == 16.06
+    finally:
+        os.unlink(path)
+
+
+def test_cotacao_excel_respeita_menor_preco_entre_atacados():
+    path = _xlsx([
+        ["PRODUTO", "EAN", "PRECO"],
+        ["ACUCAR UNIAO", "7891032016625", 1.70],
+    ])
+    try:
+        itens, _ = ler_cotacao(path)
+
+        mais_barato = processar_cotacao(itens, {"7891032016625": 1.65}, [], modo="ean")
+        mais_caro = processar_cotacao(itens, {"7891032016625": 1.76}, [], modo="ean")
+
+        assert mais_barato[0]["preco"] == 1.65
+        assert mais_caro[0]["preco"] == 1.70
+    finally:
+        os.unlink(path)

@@ -8,6 +8,46 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from routes import cotacao
 
 
+def test_segunda_tabela_so_substitui_por_preco_menor():
+    assert cotacao._deve_atualizar_menor_preco(1.65, 1.70) is True
+    assert cotacao._deve_atualizar_menor_preco(1.70, 1.70) is False
+    assert cotacao._deve_atualizar_menor_preco(1.76, 1.70) is False
+    assert cotacao._deve_atualizar_menor_preco(1.70, None) is True
+
+
+def test_item_preenchido_so_reprocessa_quando_informa_preco_atual():
+    payload = cotacao.CotatudoPayload(
+        tabela_id="507f1f77bcf86cd799439011",
+        itens=[
+            cotacao.CotatudoItem(idx=0, ean="7891032016625", filled=True, current_price=1.70),
+            cotacao.CotatudoItem(idx=1, ean="7891032016626", filled=True),
+            cotacao.CotatudoItem(idx=2, ean="7891032016627", filled=False),
+        ],
+    )
+
+    itens = cotacao._cotatudo_itens_para_match(payload)
+
+    assert [item["linha"] for item in itens] == [0, 2]
+    assert itens[0]["current_price"] == 1.70
+
+
+def test_diagnostico_cotacao_registra_decisao_sem_nome_do_produto():
+    diagnostics = cotacao._cotacao_diagnostics(
+        [
+            {"linha": 2, "ean": "7891032016625", "nome": "ACUCAR UNIAO", "current_price": 1.70},
+            {"linha": 3, "ean": "7891032016626", "nome": "OUTRO PRODUTO"},
+        ],
+        [
+            {"preco": 1.65, "tipo": "EAN"},
+            {"preco": None, "tipo": None},
+        ],
+    )
+
+    assert diagnostics[0].endswith("match=EAN|decisao=atualizar")
+    assert diagnostics[1].endswith("match=nenhum|decisao=nao_encontrado")
+    assert all("ACUCAR" not in line and "OUTRO" not in line for line in diagnostics)
+
+
 def test_tabela_prazos_job_start_is_background_and_deduplicated(monkeypatch):
     calls = []
     job_id = "job-tabela-prazos-test"
