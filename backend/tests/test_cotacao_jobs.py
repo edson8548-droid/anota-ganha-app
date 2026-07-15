@@ -19,7 +19,13 @@ def test_item_preenchido_so_reprocessa_quando_informa_preco_atual():
     payload = cotacao.CotatudoPayload(
         tabela_id="507f1f77bcf86cd799439011",
         itens=[
-            cotacao.CotatudoItem(idx=0, ean="7891032016625", filled=True, current_price=1.70),
+            cotacao.CotatudoItem(
+                idx=0,
+                ean="7891032016625",
+                filled=True,
+                current_price=1.70,
+                price_input_debug="inputs=1|pos=0|name=custo[1]",
+            ),
             cotacao.CotatudoItem(idx=1, ean="7891032016626", filled=True),
             cotacao.CotatudoItem(idx=2, ean="7891032016627", filled=False),
         ],
@@ -29,6 +35,7 @@ def test_item_preenchido_so_reprocessa_quando_informa_preco_atual():
 
     assert [item["linha"] for item in itens] == [0, 2]
     assert itens[0]["current_price"] == 1.70
+    assert itens[0]["price_input_debug"] == "inputs=1|pos=0|name=custo[1]"
 
 
 def test_diagnostico_cotacao_registra_decisao_sem_nome_do_produto():

@@ -2308,6 +2308,20 @@ function getVrCotacaoPriceCandidates(row) {
   return custoInputs.length ? custoInputs : getEditableInputs(row);
 }
 
+function getVrCotacaoInputDebug(row, input) {
+  const candidates = getVrCotacaoPriceCandidates(row);
+  if (!input) return `inputs=${candidates.length}|campo=ausente`;
+  const position = candidates.indexOf(input);
+  return [
+    `inputs=${candidates.length}`,
+    `pos=${position >= 0 ? position : 'fora'}`,
+    `name=${String(input.name || '').slice(0, 80)}`,
+    `id=${String(input.id || '').slice(0, 50)}`,
+    `type=${String(input.getAttribute('type') || '').slice(0, 20)}`,
+    `visible=${isVisible(input) ? 'sim' : 'nao'}`,
+  ].join('|');
+}
+
 function getPriceCandidates(row, site = 'generic') {
   if (site === 'rede-fornecedores') return getRedeFornecedoresPriceCandidates(row);
   if (site === 'intersolid-cotacao') return getIntersolidPriceCandidates(row);
@@ -2326,6 +2340,7 @@ function getPriceCandidates(row, site = 'generic') {
 
 function getSelectedPriceInput(row, empresaColuna, site = 'generic') {
   const candidates = getPriceCandidates(row, site);
+  if (site === 'vr-cotacao') return candidates[0] || null;
   return candidates[normalizeEmpresaColuna(empresaColuna)] || null;
 }
 
@@ -2769,6 +2784,7 @@ function extractItemFromRow(row, idx, site, empresaColuna) {
     signature: site === 'cotacao-web-smus' ? getCotacaoWebSmusRowSignature(row) : '',
     filled: priceInput ? isFilledPriceValue(getControlValue(priceInput).trim()) : false,
     current_price: currentPriceValue(priceInput),
+    price_input_debug: site === 'vr-cotacao' ? getVrCotacaoInputDebug(row, priceInput) : '',
   };
 }
 
@@ -3636,6 +3652,8 @@ async function fillQuotationPrices(prices, options = {}) {
 
   const isBubbleCatalogFornecedor = site === 'bubble-catalog-fornecedor';
   const isEasyCotacaoWeb = site === 'easy-cotacao-web';
+  const isVrCotacao = site === 'vr-cotacao';
+  const diagnostics = [];
 
   for (const item of prices) {
     let row = rows[item.idx];
@@ -3728,6 +3746,18 @@ async function fillQuotationPrices(prices, options = {}) {
     } else if (isEasyCotacaoWeb) {
       await waitForGridRender(160);
       persisted = Boolean(ok && easyCotacaoRowShowsPrice(row, item.price, samePriceLike, empresaColuna));
+    } else if (isVrCotacao) {
+      await waitForGridRender(700);
+      const currentInput = getSelectedPriceInput(row, 0, site);
+      persisted = Boolean(ok && currentInput && samePriceLike(getControlValue(currentInput), item.price));
+      diagnostics.push({
+        idx: item.idx,
+        reason: persisted ? 'vr_value_confirmed' : 'vr_value_not_confirmed',
+        before,
+        after: currentInput ? getControlValue(currentInput) : '',
+        attempted: String(item.price ?? ''),
+        inputDebug: getVrCotacaoInputDebug(row, currentInput),
+      });
     }
 
     if (persisted) count++;
@@ -3744,5 +3774,5 @@ async function fillQuotationPrices(prices, options = {}) {
       });
     }
   }
-  return { filled: count, failed, details, site, rowCount: rows.length };
+  return { filled: count, failed, details, diagnostics, site, rowCount: rows.length };
 }

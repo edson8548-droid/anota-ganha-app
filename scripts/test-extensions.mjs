@@ -84,6 +84,44 @@ describe('extensoes Chrome', () => {
     }
   });
 
+  it('VR Cotacao ignora coluna A/B/C e diagnostica o unico campo de preco', async () => {
+    const dom = await createContentDom(`
+      <h1>VR Cotação</h1>
+      <table>
+        <thead><tr><th>EAN</th><th>Produto</th><th>Preço</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>7891021006071</td>
+            <td>CAFE MELITTA 250G TRADICIONAL VACUO</td>
+            <td><input name="custo[7891021006071]" type="text" value="11,78" /></td>
+          </tr>
+        </tbody>
+      </table>
+    `, 'http://179.0.124.205/php/vrcotacao/cotacao.php');
+    try {
+      assert.equal(dom.window.eval('detectQuotationSite()'), 'vr-cotacao');
+      const items = await dom.window.eval('extractQuotationItems({ empresaColuna: 4 })');
+      assert.equal(items.length, 1);
+      assert.equal(items[0].ean, '7891021006071');
+      assert.equal(items[0].current_price, 11.78);
+      assert.match(items[0].price_input_debug, /inputs=1\|pos=0/);
+      assert.match(items[0].price_input_debug, /name=custo\[7891021006071\]/);
+
+      const result = await dom.window.eval(`fillQuotationPrices([{
+        idx: 0,
+        ean: '7891021006071',
+        nome: 'CAFE MELITTA 250G TRADICIONAL VACUO',
+        price: '11,50'
+      }], { empresaColuna: 4 })`);
+      assert.equal(result.filled, 1);
+      assert.equal(result.failed.length, 0);
+      assert.equal(result.diagnostics[0].reason, 'vr_value_confirmed');
+      assert.match(result.diagnostics[0].inputDebug, /inputs=1\|pos=0/);
+    } finally {
+      dom.window.close();
+    }
+  });
+
   it('manifest da extensao Cotatudo referencia arquivos existentes', () => {
     const manifest = readJson('chrome-extension/manifest.json');
 
@@ -230,6 +268,8 @@ describe('extensoes Chrome', () => {
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.56.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.61.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.61.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.62.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.62.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-whatsapp-extension.zip')));
   });
 
@@ -258,7 +298,7 @@ describe('extensoes Chrome', () => {
     const contentJs = readText('chrome-extension/content.js');
     const hipcomBridgeJs = readText('chrome-extension/hipcom-main-world.js');
 
-    assert.equal(manifest.version, '1.0.61');
+    assert.equal(manifest.version, '1.0.62');
     assert.ok(
       manifest.content_scripts.some(script => (script.js || []).includes('hipcom-main-world.js') && script.run_at === 'document_start' && script.world === 'MAIN'),
       'Hipcomerp precisa capturar a API antes do Flutter carregar'
@@ -435,7 +475,7 @@ describe('extensoes Chrome', () => {
     const contentJs = readText('chrome-extension/content.js');
     const cotacaoPy = readText('backend/routes/cotacao.py');
 
-    assert.equal(manifest.version, '1.0.61');
+    assert.equal(manifest.version, '1.0.62');
     assert.match(popupJs, /'easy-cotacao-web': 'Easy Cotação Web'/);
     assert.match(popupJs, /function isEasyCotacaoWebUrl/);
     assert.match(popupJs, /gepautomacao\.dyndns\.org/);
@@ -456,7 +496,7 @@ describe('extensoes Chrome', () => {
     const popupJs = readText('chrome-extension/popup.js');
     const contentJs = readText('chrome-extension/content.js');
 
-    assert.equal(manifest.version, '1.0.61');
+    assert.equal(manifest.version, '1.0.62');
     assert.match(popupJs, /'estancia-cotacao': 'Estância'/);
     assert.match(popupJs, /async function runEstanciaJob/);
     assert.match(popupJs, /loadEstanciaQuote/);

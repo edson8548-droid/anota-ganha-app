@@ -1657,6 +1657,7 @@ class CotatudoItem(BaseModel):
     nome: str = ""
     filled: bool = False
     current_price: float | None = Field(default=None, gt=0)
+    price_input_debug: str = Field(default="", max_length=220)
 
 
 class CotatudoPayload(BaseModel):
@@ -1678,6 +1679,7 @@ def _cotatudo_itens_para_match(payload: CotatudoPayload):
             "ean": it.ean or "",
             "linha": it.idx,
             "current_price": it.current_price,
+            "price_input_debug": it.price_input_debug,
         }
         for it in payload.itens
         if (not it.filled or it.current_price is not None) and (it.nome or limpar_ean(it.ean))
@@ -1838,7 +1840,7 @@ async def match_cotatudo(
                     mantidos.append(item["linha"])
                     if len(diagnostics) < 20:
                         diagnostics.append(
-                            f"idx={item['linha']}|ean={limpar_ean(item.get('ean'))}|atual={current_price:.2f}|candidato={res['preco']:.2f}|match={res.get('tipo') or ''}|decisao=manter"
+                            f"idx={item['linha']}|ean={limpar_ean(item.get('ean'))}|atual={current_price:.2f}|candidato={res['preco']:.2f}|match={res.get('tipo') or ''}|decisao=manter|campo={item.get('price_input_debug') or ''}"
                         )
                     continue
                 preco_str = f"{res['preco']:.2f}".replace(".", ",")
@@ -1854,13 +1856,13 @@ async def match_cotatudo(
                 if len(diagnostics) < 20:
                     atual = f"{current_price:.2f}" if current_price is not None else "vazio"
                     diagnostics.append(
-                        f"idx={item['linha']}|ean={limpar_ean(item.get('ean'))}|atual={atual}|candidato={res['preco']:.2f}|match={res.get('tipo') or ''}|decisao=atualizar"
+                        f"idx={item['linha']}|ean={limpar_ean(item.get('ean'))}|atual={atual}|candidato={res['preco']:.2f}|match={res.get('tipo') or ''}|decisao=atualizar|campo={item.get('price_input_debug') or ''}"
                     )
             else:
                 nao_encontrados += 1
                 if len(diagnostics) < 20:
                     diagnostics.append(
-                        f"idx={item['linha']}|ean={limpar_ean(item.get('ean'))}|atual={item.get('current_price') or 'vazio'}|candidato=vazio|match=nenhum|decisao=nao_encontrado"
+                        f"idx={item['linha']}|ean={limpar_ean(item.get('ean'))}|atual={item.get('current_price') or 'vazio'}|candidato=vazio|match=nenhum|decisao=nao_encontrado|campo={item.get('price_input_debug') or ''}"
                     )
 
         stats = {

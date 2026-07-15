@@ -238,14 +238,20 @@ function failureDetailsFromFill(fillResult, prices = []) {
 
 function fillDiagnosticLines(fillResult, prices = [], limit = 20) {
   const pricesByIdx = new Map((prices || []).map(item => [Number(item.idx), item]));
-  return (fillResult?.details || []).slice(0, limit).map(detail => {
+  const diagnostics = [
+    ...(Array.isArray(fillResult?.diagnostics) ? fillResult.diagnostics : []),
+    ...(Array.isArray(fillResult?.details) ? fillResult.details : []),
+  ];
+  return diagnostics.slice(0, limit).map(detail => {
     const item = pricesByIdx.get(Number(detail.idx)) || {};
     return [
       `idx=${detail.idx ?? item.idx ?? ''}`,
       `ean=${item.ean || ''}`,
       `tentado=${item.price || ''}`,
       `motivo=${detail.reason || detail.bridge?.reason || 'falha_preenchimento'}`,
+      `antes=${compactText(detail.before || '', 30)}`,
       `depois=${compactText(detail.after || detail.cellAfter || '', 30)}`,
+      `campo=${compactText(detail.inputDebug || '', 120)}`,
     ].join('|');
   });
 }
