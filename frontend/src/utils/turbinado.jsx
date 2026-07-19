@@ -1,6 +1,6 @@
 import React from 'react';
 
-const TURBINADO_NAMES = ['camil', 'falcon', 'jde', 'm dias', 'mondelez', 'vigor', 'ype'];
+const TURBINADO_NAMES = ['camil', 'falcon', 'jde', 'm dias', 'mondelez', 'softys', 'vigor', 'ype'];
 
 const normalize = (value) => String(value || '')
   .normalize('NFD')

@@ -106,9 +106,17 @@ export const useMasterCampaigns = () => {
         targetValue: Number(metas[indName]) || 0,
         alreadySoldValue: 0, // progresso real é calculado a partir dos clientes
       };
-      Object.keys(produtos).forEach(nome => {
-        entry[nome] = { positivado: false, valor: 0, ean: produtos[nome]?.ean || '' };
-      });
+      Object.keys(produtos)
+        .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base', numeric: true }))
+        .forEach(nome => {
+          entry[nome] = {
+            positivado: false,
+            valor: 0,
+            ean: produtos[nome]?.ean || '',
+            premioPorCaixa: Number(produtos[nome]?.premioPorCaixa) || 0,
+            limiteMaximo: Number(produtos[nome]?.limiteMaximo) || 0,
+          };
+        });
       out[indName] = entry;
     });
     return out;
@@ -124,9 +132,12 @@ export const useMasterCampaigns = () => {
           isShared: true,
           masterId: master.id,
           sharedSlug: master.slug || '',
+          rcaCode: master.rcaCode || '',
           distribuidora: master.distribuidora || '',
           regulamento: master.regulamento || '',
           descricao: master.descricao || '',
+          weeklySummary: master.weeklySummary || {},
+          rcaResult: master.rcaResult || {},
           name: master.nome,
           startDate: master.startDate || '',
           endDate: master.endDate || '',

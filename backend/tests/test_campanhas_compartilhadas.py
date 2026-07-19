@@ -1,12 +1,15 @@
 import os
 import sys
 import asyncio
+from datetime import datetime
+from io import BytesIO
 
 from bson import ObjectId
 from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
+from openpyxl import Workbook
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -62,7 +65,12 @@ class _Collection:
     async def update_one(self, flt, update, upsert=False):
         for d in self.docs:
             if self._match(d, flt):
-                d.update(update.get("$set", {}))
+                for key, value in update.get("$set", {}).items():
+                    target = d
+                    parts = key.split(".")
+                    for part in parts[:-1]:
+                        target = target.setdefault(part, {})
+                    target[parts[-1]] = value
                 return type("R", (), {"matched_count": 1})()
         if upsert:
             novo = {}
@@ -121,6 +129,31 @@ def _criar(client, over=None):
     return client.post("/api/cc/admin/mestre", json={**_MESTRE, **(over or {})})
 
 
+def _desbloquear(client, code="spani2026"):
+    return client.post("/api/cc/desbloquear", json={"code": code})
+
+
+def _spreadsheet_bytes(code=607, name="JOSE", period=None):
+    period = period or datetime(2026, 7, 14)
+    workbook = Workbook()
+    workbook.active.title = "Camil"
+    awarded = workbook.create_sheet("Itens Premiados")
+    awarded.cell(4, 10, period)
+    awarded.cell(6, 5, "Baston")
+    awarded.cell(7, 6, 120000)
+    awarded.cell(8, 6, 600000)
+    awarded.cell(9, 1, "RCA")
+    awarded.cell(10, 1, code)
+    awarded.cell(10, 2, name)
+    awarded.cell(10, 4, 50)
+    awarded.cell(10, 5, 50)
+    awarded.cell(10, 6, 900)
+    awarded.cell(10, 7, 10)
+    output = BytesIO()
+    workbook.save(output)
+    return output.getvalue()
+
+
 def test_admin_cria_mestre_sem_meta_e_com_produtos():
     client = _make_client()
     r = _criar(client)
@@ -140,9 +173,10 @@ def test_admin_cria_mestre_sem_meta_e_com_produtos():
 def test_rca_desbloqueia_e_ve_em_minhas():
     client = _make_client()
     _criar(client)
-    r = client.post("/api/cc/desbloquear", json={"code": "spani2026"})
+    r = _desbloquear(client)
     assert r.status_code == 200, r.text
     assert r.json()["acesso"] is True
+    assert r.json()["campanha"]["rcaCode"] == ""
 
     minhas = client.get("/api/cc/minhas")
     assert minhas.status_code == 200
@@ -153,14 +187,14 @@ def test_rca_desbloqueia_e_ve_em_minhas():
 def test_desbloquear_senha_errada_falha():
     client = _make_client()
     _criar(client)
-    assert client.post("/api/cc/desbloquear", json={"code": "errada"}).status_code == 404
+    assert _desbloquear(client, code="errada").status_code == 404
 
 
 def test_acesso_e_permanente_sem_duplicar():
     client = _make_client()
     _criar(client)
-    client.post("/api/cc/desbloquear", json={"code": "spani2026"})
-    client.post("/api/cc/desbloquear", json={"code": "spani2026"})  # 2a vez
+    _desbloquear(client)
+    _desbloquear(client)  # 2a vez
     assert len(cc._db.campaign_access.docs) == 1  # não duplicou
     assert len(client.get("/api/cc/minhas").json()) == 1
 
@@ -168,7 +202,7 @@ def test_acesso_e_permanente_sem_duplicar():
 def test_admin_edita_mestre_reflete_para_rca():
     client = _make_client()
     mid = _criar(client).json()["id"]
-    client.post("/api/cc/desbloquear", json={"code": "spani2026"})
+    _desbloquear(client)
 
     # Admin adiciona indústria — RCA deve ver na hora (lê a mestre viva)
     r = client.put(f"/api/cc/admin/mestre/{mid}", json={
@@ -185,14 +219,14 @@ def test_admin_troca_senha_invalida_a_antiga():
     client = _make_client()
     mid = _criar(client).json()["id"]
     client.put(f"/api/cc/admin/mestre/{mid}", json={"code": "novasenha"})
-    assert client.post("/api/cc/desbloquear", json={"code": "spani2026"}).status_code == 404
-    assert client.post("/api/cc/desbloquear", json={"code": "novasenha"}).status_code == 200
+    assert _desbloquear(client, code="spani2026").status_code == 404
+    assert _desbloquear(client, code="novasenha").status_code == 200
 
 
 def test_excluir_mestre_remove_acessos():
     client = _make_client()
     mid = _criar(client).json()["id"]
-    client.post("/api/cc/desbloquear", json={"code": "spani2026"})
+    _desbloquear(client)
     assert client.delete(f"/api/cc/admin/mestre/{mid}").status_code == 200
     assert cc._db.campaign_access.docs == []
     assert client.get("/api/cc/minhas").json() == []
@@ -290,9 +324,101 @@ def test_listagem_admin_mostra_quantos_rcas_desbloquearam():
     lista_antes = client.get("/api/cc/admin/mestre").json()
     assert all(item["desbloqueios"] == 0 for item in lista_antes)
 
-    client.post("/api/cc/desbloquear", json={"code": "spani2026"})
+    _desbloquear(client)
 
     lista = client.get("/api/cc/admin/mestre").json()
     por_nome = {item["nome"]: item["desbloqueios"] for item in lista}
     assert por_nome["Spani Julho 2026"] == 1
     assert por_nome["Outra Campanha"] == 0
+
+
+def test_codigo_rca_nao_e_exigido_ao_desbloquear():
+    client = _make_client()
+    _criar(client)
+
+    assert _desbloquear(client).status_code == 200
+
+
+def test_primeiro_upload_mostra_previa_e_depois_vincula_codigo():
+    client = _make_client()
+    mid = _criar(client).json()["id"]
+    _desbloquear(client)
+    file = {"arquivo": ("apuracao.xlsx", _spreadsheet_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+
+    preview = client.post(
+        f"/api/cc/mestre/{mid}/apuracao",
+        files=file,
+        data={"rca_code": "607", "confirmar": "false"},
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["requiresConfirmation"] is True
+    assert preview.json()["profile"] == {"code": "607", "name": "JOSE"}
+    assert cc._db.campaign_access.docs[0].get("rca_code") is None
+
+    confirmed = client.post(
+        f"/api/cc/mestre/{mid}/apuracao",
+        files=file,
+        data={"rca_code": "607", "confirmar": "true"},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    assert cc._db.campaign_access.docs[0]["rca_code"] == "607"
+
+    minhas = client.get("/api/cc/minhas").json()
+    assert minhas[0]["rcaCode"] == "607"
+    assert minhas[0]["rcaResult"]["name"] == "JOSE"
+
+
+def test_primeiro_upload_rejeita_codigo_ausente_na_planilha():
+    client = _make_client()
+    mid = _criar(client).json()["id"]
+    _desbloquear(client)
+
+    response = client.post(
+        f"/api/cc/mestre/{mid}/apuracao",
+        files={"arquivo": ("apuracao.xlsx", _spreadsheet_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        data={"rca_code": "614", "confirmar": "false"},
+    )
+
+    assert response.status_code == 404
+    assert "614" in response.json()["detail"]
+
+
+def test_upload_rejeita_codigo_ja_vinculado_a_outra_conta():
+    client = _make_client(rca_uid="rca-1")
+    mid = _criar(client).json()["id"]
+    _desbloquear(client)
+    file = {"arquivo": ("apuracao.xlsx", _spreadsheet_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    assert client.post(
+        f"/api/cc/mestre/{mid}/apuracao", files=file,
+        data={"rca_code": "607", "confirmar": "true"},
+    ).status_code == 200
+
+    client.app.dependency_overrides[cc._rca_uid] = lambda: "rca-2"
+    _desbloquear(client)
+    conflict = client.post(
+        f"/api/cc/mestre/{mid}/apuracao", files=file,
+        data={"rca_code": "607", "confirmar": "true"},
+    )
+
+    assert conflict.status_code == 409
+    assert "outra conta" in conflict.json()["detail"]
+
+
+def test_upload_nao_substitui_apuracao_por_arquivo_mais_antigo():
+    client = _make_client()
+    mid = _criar(client).json()["id"]
+    _desbloquear(client)
+    newer = {"arquivo": ("nova.xlsx", _spreadsheet_bytes(period=datetime(2026, 7, 21)), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    older = {"arquivo": ("antiga.xlsx", _spreadsheet_bytes(period=datetime(2026, 7, 14)), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    assert client.post(
+        f"/api/cc/mestre/{mid}/apuracao", files=newer,
+        data={"rca_code": "607", "confirmar": "true"},
+    ).status_code == 200
+
+    response = client.post(
+        f"/api/cc/mestre/{mid}/apuracao", files=older,
+        data={"confirmar": "true"},
+    )
+
+    assert response.status_code == 409
+    assert "mais recente" in response.json()["detail"]

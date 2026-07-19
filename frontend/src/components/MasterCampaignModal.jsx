@@ -19,6 +19,27 @@ const categoriasParaTexto = (value) => {
   return textoSeguro(value);
 };
 
+export const ordenarProdutosPorNome = (products = []) => [...products].sort((a, b) =>
+  textoSeguro(a?.nome).localeCompare(textoSeguro(b?.nome), 'pt-BR', {
+    sensitivity: 'base',
+    numeric: true,
+  }));
+
+export const aplicarEdicaoPendente = (industries, currentIndustry, editingIndustryId) => {
+  const nome = textoSeguro(currentIndustry?.name).trim();
+  const products = ordenarProdutosPorNome(currentIndustry?.products || []);
+  const temRascunho = editingIndustryId !== null || nome || products.length > 0;
+  if (!temRascunho) return industries;
+  if (!nome || products.length === 0) return null;
+
+  if (editingIndustryId !== null) {
+    return industries.map(ind => ind.id === editingIndustryId
+      ? { ...currentIndustry, id: ind.id, name: nome, products }
+      : ind);
+  }
+  return [...industries, { ...currentIndustry, id: Date.now(), name: nome, products }];
+};
+
 export const normalizarMestreParaFormulario = (mestre) => {
   const industries = mestre?.industries && typeof mestre.industries === 'object' && !Array.isArray(mestre.industries)
     ? mestre.industries
@@ -29,11 +50,13 @@ export const normalizarMestreParaFormulario = (mestre) => {
     return {
       id: Date.now() + i,
       name: textoSeguro(name),
-      products: Object.keys(produtosValidos).map(k => ({
+      products: ordenarProdutosPorNome(Object.keys(produtosValidos).map(k => ({
         nome: textoSeguro(produtosValidos[k]?.nome || k),
         codigo: textoSeguro(produtosValidos[k]?.codigo),
         ean: textoSeguro(produtosValidos[k]?.ean),
-      })),
+        premioPorCaixa: textoSeguro(produtosValidos[k]?.premioPorCaixa),
+        limiteMaximo: textoSeguro(produtosValidos[k]?.limiteMaximo),
+      }))),
     };
   });
   return {
@@ -64,7 +87,7 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
 
   const [currentIndustry, setCurrentIndustry] = useState({ name: '', products: [] });
   const [editingIndustryId, setEditingIndustryId] = useState(null);
-  const [prod, setProd] = useState({ nome: '', codigo: '', ean: '' });
+  const [prod, setProd] = useState({ nome: '', codigo: '', ean: '', premioPorCaixa: '', limiteMaximo: '' });
   const [showTablePicker, setShowTablePicker] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, onConfirm: null, title: '', description: '' });
   const industryEditorRef = useRef(null);
@@ -97,9 +120,18 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
     }
     setCurrentIndustry(prev => ({
       ...prev,
-      products: [...prev.products, { nome, codigo: prod.codigo.trim(), ean: prod.ean.trim() }],
+      products: ordenarProdutosPorNome([
+        ...prev.products,
+        {
+          nome,
+          codigo: prod.codigo.trim(),
+          ean: prod.ean.trim(),
+          premioPorCaixa: prod.premioPorCaixa,
+          limiteMaximo: prod.limiteMaximo,
+        },
+      ]),
     }));
-    setProd({ nome: '', codigo: '', ean: '' });
+    setProd({ nome: '', codigo: '', ean: '', premioPorCaixa: '', limiteMaximo: '' });
   };
 
   const removeProduct = (nome) => setCurrentIndustry(prev => ({
@@ -113,14 +145,14 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
       const novos = [];
       let ign = 0;
       escolhidos.forEach(it => {
-        const item = { nome: (it.nome || '').trim(), codigo: '', ean: it.ean || '' };
+        const item = { nome: (it.nome || '').trim(), codigo: '', ean: it.ean || '', premioPorCaixa: '', limiteMaximo: '' };
         if (!item.nome) return;
         if (existe(item) || novos.some(n => n.nome === item.nome)) { ign += 1; return; }
         novos.push(item);
       });
       if (novos.length) toast.success(`✅ ${novos.length} produto(s) da tabela adicionado(s)`);
       if (ign) toast.info(`${ign} já estava(m) na lista`);
-      return { ...prev, products: [...prev.products, ...novos] };
+      return { ...prev, products: ordenarProdutosPorNome([...prev.products, ...novos]) };
     });
     setShowTablePicker(false);
   };
@@ -133,19 +165,26 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
       setFormData(prev => ({
         ...prev,
         industries: prev.industries.map(ind =>
-          ind.id === editingIndustryId ? { ...currentIndustry, id: ind.id, name: currentIndustry.name.trim() } : ind),
+          ind.id === editingIndustryId
+            ? { ...currentIndustry, products: ordenarProdutosPorNome(currentIndustry.products), id: ind.id, name: currentIndustry.name.trim() }
+            : ind),
       }));
     } else {
       setFormData(prev => ({
         ...prev,
-        industries: [...prev.industries, { ...currentIndustry, id: Date.now(), name: currentIndustry.name.trim() }],
+        industries: [...prev.industries, {
+          ...currentIndustry,
+          products: ordenarProdutosPorNome(currentIndustry.products),
+          id: Date.now(),
+          name: currentIndustry.name.trim(),
+        }],
       }));
     }
     cancelIndustryEdit();
   };
 
   const editIndustry = (ind) => { setEditingIndustryId(ind.id); setCurrentIndustry({ name: ind.name, products: ind.products }); };
-  const cancelIndustryEdit = () => { setEditingIndustryId(null); setCurrentIndustry({ name: '', products: [] }); setProd({ nome: '', codigo: '', ean: '' }); };
+  const cancelIndustryEdit = () => { setEditingIndustryId(null); setCurrentIndustry({ name: '', products: [] }); setProd({ nome: '', codigo: '', ean: '', premioPorCaixa: '', limiteMaximo: '' }); };
 
   const removeIndustry = (id) => {
     const ind = formData.industries.find(i => i.id === id);
@@ -160,24 +199,35 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
   };
 
   // ---- Salvar ----
-  const validate = () => {
+  const industriesComEdicaoPendente = () => {
+    return aplicarEdicaoPendente(formData.industries, currentIndustry, editingIndustryId);
+  };
+
+  const validate = (industries) => {
     const e = {};
     if (!formData.nome.trim()) e.nome = 'Nome é obrigatório';
     if (!isEdit && code.trim().length < 6) e.code = 'Senha de ao menos 6 caracteres';
     if (code.trim() && code.trim().length < 6) e.code = 'Senha de ao menos 6 caracteres';
-    if (formData.industries.length === 0) e.industries = 'Adicione ao menos uma indústria';
+    if (!industries) e.industries = 'Conclua a indústria em edição: informe o nome e ao menos um produto';
+    else if (industries.length === 0) e.industries = 'Adicione ao menos uma indústria';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const buildIndustries = () => {
+  const buildIndustries = (industries) => {
     const obj = {};
-    formData.industries.forEach(ind => {
+    industries.forEach(ind => {
       const produtos = {};
-      ind.products.forEach(p => {
+      ordenarProdutosPorNome(ind.products).forEach(p => {
         const nome = (p.nome || '').trim();
         if (!nome) return;
-        produtos[nome] = { codigo: (p.codigo || '').trim(), nome, ean: (p.ean || '').trim() };
+        produtos[nome] = {
+          codigo: (p.codigo || '').trim(),
+          nome,
+          ean: (p.ean || '').trim(),
+          premioPorCaixa: Math.max(Number(p.premioPorCaixa) || 0, 0),
+          limiteMaximo: Math.max(Number(p.limiteMaximo) || 0, 0),
+        };
       });
       obj[ind.name] = { produtos };
     });
@@ -185,7 +235,8 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
   };
 
   const handleSave = async () => {
-    if (!validate()) return;
+    const industries = industriesComEdicaoPendente();
+    if (!validate(industries)) return;
     const payload = {
       nome: formData.nome.trim(),
       distribuidora: formData.distribuidora.trim(),
@@ -196,7 +247,7 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
       endDate: formData.endDate || null,
       categorias: formData.categorias.split(',').map(c => c.trim()).filter(Boolean),
       active: !!formData.active,
-      industries: buildIndustries(),
+      industries: buildIndustries(industries),
     };
     if (code.trim()) payload.code = code.trim();
     try {
@@ -325,6 +376,8 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
                 <input type="text" style={{ flex: '2 1 140px' }} value={prod.nome} onChange={e => setProd(p => ({ ...p, nome: e.target.value }))} placeholder="Nome do produto" onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), addProduct())} />
                 <input type="text" style={{ flex: '1 1 80px' }} value={prod.codigo} onChange={e => setProd(p => ({ ...p, codigo: e.target.value }))} placeholder="Código" />
                 <input type="text" style={{ flex: '1 1 110px' }} value={prod.ean} onChange={e => setProd(p => ({ ...p, ean: e.target.value }))} placeholder="EAN" />
+                <input type="number" min="0" step="0.01" style={{ flex: '1 1 110px' }} value={prod.premioPorCaixa} onChange={e => setProd(p => ({ ...p, premioPorCaixa: e.target.value }))} placeholder="R$ por caixa" />
+                <input type="number" min="0" step="0.01" style={{ flex: '1 1 110px' }} value={prod.limiteMaximo} onChange={e => setProd(p => ({ ...p, limiteMaximo: e.target.value }))} placeholder="Limite R$" />
                 <button type="button" className="btn-add-product" onClick={addProduct}>➕</button>
               </div>
               <button type="button" className="btn-pull-table" onClick={() => setShowTablePicker(true)}>
@@ -333,7 +386,7 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
               {currentIndustry.products.length > 0 && (
                 <div className="products-tags">
                   {currentIndustry.products.map((p, i) => (
-                    <span key={p.ean || p.nome || i} className="product-tag" title={p.ean ? `EAN ${p.ean}` : (p.codigo ? `Cód ${p.codigo}` : 'Sem código')}>
+                    <span key={p.ean || p.nome || i} className="product-tag" title={Number(p.premioPorCaixa) > 0 ? `R$ ${Number(p.premioPorCaixa).toFixed(2)} por caixa` : (p.ean ? `EAN ${p.ean}` : (p.codigo ? `Cód ${p.codigo}` : 'Sem código'))}>
                       {p.nome}
                       <button type="button" onClick={() => removeProduct(p.nome)}>×</button>
                     </span>

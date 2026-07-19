@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw, Megaphone } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, Megaphone, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { campaignsService } from '../services/campaigns.service';
 import MasterCampaignModal from './MasterCampaignModal';
@@ -11,6 +11,7 @@ export default function MasterCampaignsAdmin() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, id: null, nome: '' });
+  const [uploadingId, setUploadingId] = useState(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -44,6 +45,20 @@ export default function MasterCampaignsAdmin() {
 
   const contarProdutos = (m) =>
     Object.values(m.industries || {}).reduce((acc, ind) => acc + Object.keys(ind?.produtos || {}).length, 0);
+
+  const importarApuracao = async (campaign, file) => {
+    if (!file) return;
+    try {
+      setUploadingId(campaign.id);
+      const result = await campaignsService.importarApuracaoAdmin(campaign.id, file);
+      toast.success(`Planilha atualizada: ${result.rcas} RCAs e ${result.suppliers} indústrias premiadas.`);
+      await carregar();
+    } catch (err) {
+      toast.error('Erro ao importar planilha: ' + (err?.response?.data?.detail || err.message));
+    } finally {
+      setUploadingId(null);
+    }
+  };
 
   return (
     <section className="admin-section">
@@ -87,8 +102,25 @@ export default function MasterCampaignsAdmin() {
                 <span className={`admin-status-badge ${m.active ? 'ok' : 'warn'}`}>
                   {m.active ? 'Ativa' : 'Inativa'}{m.temSenha ? ' · com senha' : ' · sem senha'}
                 </span>
+                {m.weeklySummary?.periodEnd && (
+                  <span>Última apuração: {new Date(`${m.weeklySummary.periodEnd}T12:00:00`).toLocaleDateString('pt-BR')}</span>
+                )}
               </div>
               <div className="admin-trial-actions">
+                <label className="admin-refresh" style={{ cursor: uploadingId ? 'wait' : 'pointer' }}>
+                  <Upload size={14} /> {uploadingId === m.id ? 'Importando...' : 'Subir Excel semanal'}
+                  <input
+                    type="file"
+                    accept=".xlsx"
+                    hidden
+                    disabled={!!uploadingId}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = '';
+                      importarApuracao(m, file);
+                    }}
+                  />
+                </label>
                 <button type="button" className="admin-refresh" onClick={() => abrirEdicao(m)}>
                   <Pencil size={14} /> Editar
                 </button>

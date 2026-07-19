@@ -18,7 +18,7 @@ import logging
 import asyncio
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from bson import ObjectId
@@ -29,6 +29,7 @@ from firebase_admin import auth as firebase_auth
 from routes.admin import _admin_allowed_emails
 from services.email_verification_access import ensure_email_verified_for_required_user
 from services.subscription_access import ensure_subscription_access
+from services.campaign_spreadsheet import parse_campaign_workbook
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -77,6 +78,13 @@ def _oid(value: str) -> ObjectId:
 _META_FIELDS = ("targetValue", "alreadySoldValue", "meta", "metaSugerida")
 
 
+def _numero_nao_negativo(value) -> float:
+    try:
+        return max(float(value or 0), 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _normalizar_industries(industries: dict) -> dict:
     """Estrutura da mestre: indústrias → produtos {codigo, nome, ean}.
 
@@ -98,10 +106,12 @@ def _normalizar_industries(industries: dict) -> dict:
                     "codigo": str(prod.get("codigo") or "").strip(),
                     "nome": nome,
                     "ean": str(prod.get("ean") or "").strip(),
+                    "premioPorCaixa": _numero_nao_negativo(prod.get("premioPorCaixa")),
+                    "limiteMaximo": _numero_nao_negativo(prod.get("limiteMaximo")),
                 }
             else:
                 nome = str(chave).strip()
-                produtos[nome] = {"codigo": "", "nome": nome, "ean": ""}
+                produtos[nome] = {"codigo": "", "nome": nome, "ean": "", "premioPorCaixa": 0, "limiteMaximo": 0}
         limpo[str(ind_nome).strip()] = {"produtos": produtos}
     return limpo
 
@@ -147,6 +157,7 @@ def _mestre_publica(doc: dict) -> dict:
         "categorias": _valor_publico(doc.get("categorias") or []),
         "materiaisApoio": _valor_publico(doc.get("materiaisApoio") or []),
         "industries": _valor_publico(doc.get("industries") or {}),
+        "weeklySummary": _valor_publico(doc.get("weekly_summary") or {}),
         "active": bool(doc.get("active", True)),
         "temSenha": bool(doc.get("code_hash")),
         "updated_at": _data_publica(doc),
@@ -291,6 +302,56 @@ async def detalhe_mestre_admin(mestre_id: str, admin_uid: str = Depends(_require
     return _mestre_publica(doc)
 
 
+async def _read_campaign_workbook(arquivo: UploadFile) -> dict:
+    filename = (arquivo.filename or "").lower()
+    if not filename.endswith(".xlsx"):
+        raise HTTPException(400, "Envie uma planilha no formato .xlsx")
+    content = await arquivo.read(10 * 1024 * 1024 + 1)
+    if not content:
+        raise HTTPException(400, "A planilha está vazia")
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(413, "A planilha excede o limite de 10 MB")
+    try:
+        return await asyncio.to_thread(parse_campaign_workbook, content)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except Exception:
+        logger.exception("Falha ao interpretar planilha semanal da campanha")
+        raise HTTPException(400, "Não foi possível interpretar a planilha enviada")
+
+
+@router.post("/admin/mestre/{mestre_id}/apuracao")
+async def importar_apuracao_admin(
+    mestre_id: str,
+    arquivo: UploadFile = File(...),
+    _admin_uid: str = Depends(_require_admin),
+):
+    oid = _oid(mestre_id)
+    if not await _db.master_campaigns.find_one({"_id": oid}):
+        raise HTTPException(404, "Campanha mestre não encontrada")
+    parsed = await _read_campaign_workbook(arquivo)
+    agora = datetime.now(timezone.utc)
+    summary = {
+        "periodEnd": parsed.get("periodEnd"),
+        "suppliers": parsed.get("suppliers") or [],
+        "updatedAt": agora,
+    }
+    await _db.master_campaigns.update_one(
+        {"_id": oid},
+        {"$set": {
+            "weekly_summary": summary,
+            "weekly_rca_results": parsed.get("rcaResults") or {},
+            "updated_at": agora,
+        }},
+    )
+    return {
+        "ok": True,
+        "periodEnd": parsed.get("periodEnd"),
+        "suppliers": len(summary["suppliers"]),
+        "rcas": len(parsed.get("rcaResults") or {}),
+    }
+
+
 @router.put("/admin/mestre/{mestre_id}")
 async def editar_mestre(mestre_id: str, payload: MestreUpdate, admin_uid: str = Depends(_require_admin)):
     oid = _oid(mestre_id)
@@ -356,16 +417,89 @@ async def desbloquear(payload: DesbloquearPayload, uid: str = Depends(_rca_uid))
         {"$setOnInsert": {"uid": uid, "master_id": master_id, "granted_at": datetime.now(timezone.utc)}},
         upsert=True,
     )
-    return {"acesso": True, "campanha": _mestre_publica(doc)}
+    access = await _db.campaign_access.find_one({"uid": uid, "master_id": master_id})
+    rca_code = str((access or {}).get("rca_code") or "")
+    campanha = _mestre_publica(doc)
+    campanha["rcaCode"] = rca_code
+    return {"acesso": True, "campanha": campanha}
+
+
+@router.post("/mestre/{mestre_id}/apuracao")
+async def importar_apuracao_rca(
+    mestre_id: str,
+    arquivo: UploadFile = File(...),
+    rca_code: str | None = Form(None),
+    confirmar: bool = Form(False),
+    uid: str = Depends(_rca_uid),
+):
+    oid = _oid(mestre_id)
+    access = await _db.campaign_access.find_one({"uid": uid, "master_id": str(oid)})
+    if not access:
+        raise HTTPException(403, "Campanha não liberada para esta conta")
+    codigo_vinculado = str(access.get("rca_code") or "")
+    codigo_informado = str(rca_code or "").strip()
+    if codigo_vinculado and codigo_informado and codigo_informado != codigo_vinculado:
+        raise HTTPException(409, "Esta conta já possui outro código RCA vinculado")
+    codigo_escolhido = codigo_vinculado or codigo_informado
+    if not re.fullmatch(r"\d{1,12}", codigo_escolhido):
+        raise HTTPException(400, "Informe seu código RCA usando somente números")
+
+    parsed = await _read_campaign_workbook(arquivo)
+    result = (parsed.get("rcaResults") or {}).get(codigo_escolhido)
+    if not result:
+        raise HTTPException(404, f"Código RCA {codigo_escolhido} não encontrado na planilha")
+    result["periodEnd"] = parsed.get("periodEnd")
+
+    if not codigo_vinculado and not confirmar:
+        return {
+            "ok": True,
+            "requiresConfirmation": True,
+            "periodEnd": parsed.get("periodEnd"),
+            "profile": {"code": codigo_escolhido, "name": result.get("name") or ""},
+        }
+
+    codigo_em_uso = await _db.campaign_access.find_one({
+        "master_id": str(oid),
+        "rca_code": codigo_escolhido,
+    })
+    if codigo_em_uso and codigo_em_uso.get("uid") != uid:
+        raise HTTPException(409, "Este código RCA já está vinculado a outra conta")
+
+    master_doc = await _db.master_campaigns.find_one({"_id": oid})
+    if not master_doc:
+        raise HTTPException(404, "Campanha mestre não encontrada")
+    current_result = (master_doc.get("weekly_rca_results") or {}).get(codigo_escolhido)
+    current_period = str((current_result or {}).get("periodEnd") or "")
+    new_period = str(parsed.get("periodEnd") or "")
+    if current_period and new_period and new_period < current_period:
+        raise HTTPException(409, f"Já existe uma apuração mais recente ({current_period})")
+
+    agora = datetime.now(timezone.utc)
+    if not codigo_vinculado:
+        await _db.campaign_access.update_one(
+            {"uid": uid, "master_id": str(oid)},
+            {"$set": {"rca_code": codigo_escolhido, "rca_code_linked_at": agora}},
+        )
+    await _db.master_campaigns.update_one(
+        {"_id": oid},
+        {"$set": {
+            f"weekly_rca_results.{codigo_escolhido}": result,
+            "updated_at": agora,
+        }},
+    )
+    return {"ok": True, "periodEnd": parsed.get("periodEnd"), "result": result}
 
 
 @router.get("/minhas")
 async def minhas_campanhas(uid: str = Depends(_rca_uid)):
     """Campanhas mestre que o RCA já liberou — acesso automático, sem senha."""
     ids = []
+    rca_codes = {}
     async for acc in _db.campaign_access.find({"uid": uid}):
         try:
-            ids.append(ObjectId(acc["master_id"]))
+            master_id = str(acc["master_id"])
+            ids.append(ObjectId(master_id))
+            rca_codes[master_id] = str(acc.get("rca_code") or "")
         except (InvalidId, TypeError, KeyError):
             continue
     if not ids:
@@ -373,5 +507,9 @@ async def minhas_campanhas(uid: str = Depends(_rca_uid)):
 
     out = []
     async for doc in _db.master_campaigns.find({"_id": {"$in": ids}, "active": True}).sort("created_at", -1):
-        out.append(_mestre_publica(doc))
+        item = _mestre_publica(doc)
+        rca_code = rca_codes.get(item["id"], "")
+        item["rcaCode"] = rca_code
+        item["rcaResult"] = _valor_publico((doc.get("weekly_rca_results") or {}).get(rca_code) or {})
+        out.append(item)
     return out

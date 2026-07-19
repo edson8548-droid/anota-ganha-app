@@ -39,6 +39,12 @@ class CampaignsService {
     const res = await api.delete(`/campanhas-compartilhadas/admin/mestre/${id}`);
     return res.data;
   }
+  async importarApuracaoAdmin(id, file) {
+    const form = new FormData();
+    form.append('arquivo', file);
+    const res = await api.post(`/campanhas-compartilhadas/admin/mestre/${id}/apuracao`, form);
+    return res.data;
+  }
 
   // --- RCA ---
   // Desbloqueia com a senha (1x) — o acesso fica gravado (permanente).
@@ -50,6 +56,14 @@ class CampaignsService {
   async minhasCampanhasMestre() {
     const res = await api.get('/campanhas-compartilhadas/minhas');
     return res.data; // [ {id, nome, industries, ...} ]
+  }
+  async importarMinhaApuracao(id, file, rcaCode = '', confirmar = false) {
+    const form = new FormData();
+    form.append('arquivo', file);
+    if (rcaCode) form.append('rca_code', rcaCode);
+    form.append('confirmar', confirmar ? 'true' : 'false');
+    const res = await api.post(`/campanhas-compartilhadas/mestre/${id}/apuracao`, form);
+    return res.data;
   }
 
   // Criar nova campanha (Mantido da v3)

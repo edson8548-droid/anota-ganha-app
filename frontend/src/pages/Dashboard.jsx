@@ -22,6 +22,7 @@ import { backendUrl } from '../config/api';
 import { canAccessAdminPanel } from '../utils/adminAccess';
 import { getPartnerConfig } from '../utils/partnerProgram';
 import { isTurbinadoIndustry, TurbinadoBadge } from '../utils/turbinado';
+import CampaignWeeklyResults from '../components/CampaignWeeklyResults';
 import './Dashboard.css';
 
 const INDUSTRY_META_FIELDS = ['targetValue', 'alreadySoldValue'];
@@ -47,7 +48,7 @@ const Dashboard = () => {
   const user = authData?.user;
 
   const { campaigns: personalCampaigns, loading: campaignsLoading, createCampaign, updateCampaign, deleteCampaign } = useCampaigns();
-  const { sharedCampaigns, unlock: unlockShared, saveMetas: saveSharedMetas, linkClient: linkSharedClient, linkClients: linkSharedClients } = useMasterCampaigns();
+  const { sharedCampaigns, unlock: unlockShared, saveMetas: saveSharedMetas, linkClient: linkSharedClient, linkClients: linkSharedClients, refreshMasters: refreshSharedMasters } = useMasterCampaigns();
   // Campanhas próprias do RCA + campanhas mestre (Spani etc.) que ele desbloqueou.
   // As mestre entram como "sintéticas" (estrutura da mestre + metas do RCA).
   const campaigns = useMemo(
@@ -2260,6 +2261,11 @@ const Dashboard = () => {
             )}
           </div>
         )}
+
+        <CampaignWeeklyResults
+          campaign={selectedCampaign}
+          onUploaded={refreshSharedMasters}
+        />
 
         {/* Tabs */}
         <div className="tabs-container">

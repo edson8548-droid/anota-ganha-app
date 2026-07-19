@@ -66,7 +66,6 @@ export default function TabelaPickerModal({ onClose, onAdd, ctaLabel = 'à vitri
 
   useEffect(() => {
     if (tabela && prazo != null) carregarItens(tabela, prazo);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabela, prazo]);
 
   const filtrados = useMemo(() => {
