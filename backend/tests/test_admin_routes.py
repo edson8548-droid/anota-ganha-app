@@ -473,6 +473,35 @@ def test_admin_gate_usa_allowlist_quando_firestore_falha(monkeypatch):
     assert uid == "admin-uid"
 
 
+def test_relatorio_fallback_lista_usuarios_do_firebase_auth(monkeypatch):
+    class _Metadata:
+        creation_timestamp = 1782907200000
+        last_sign_in_timestamp = 1782993600000
+
+    class _AuthUser:
+        uid = "rca-auth-1"
+        email = "rca.auth@example.com"
+        display_name = "RCA Auth"
+        phone_number = "+5513999990000"
+        user_metadata = _Metadata()
+
+    class _Page:
+        def iterate_all(self):
+            return iter([_AuthUser()])
+
+    monkeypatch.setattr(admin.firebase_auth, "list_users", lambda max_results: _Page())
+
+    report = admin._build_auth_users_fallback_report(
+        days=4,
+        limit=200,
+        now=datetime(2026, 7, 3, 12, tzinfo=timezone.utc),
+    )
+
+    assert report["sourceMode"] == "firebase_auth_fallback"
+    assert report["totals"]["registeredUsers"] == 1
+    assert report["segments"]["allRegistered"][0]["name"] == "RCA Auth"
+
+
 def test_admin_billing_overview_returns_report(monkeypatch):
     client = _client(monkeypatch, uid="admin-uid")
 

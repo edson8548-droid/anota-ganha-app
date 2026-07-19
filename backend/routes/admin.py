@@ -1212,6 +1212,63 @@ def _build_recent_users_report(db, *, days: int, limit: int, now: datetime | Non
     return report
 
 
+def _build_auth_users_fallback_report(*, days: int, limit: int, now: datetime | None = None) -> dict:
+    """Lista cadastros pelo Firebase Auth quando a cota do Firestore esgota."""
+    current = now or datetime.now(timezone.utc)
+    since = current - timedelta(days=days)
+    activity_since = current - timedelta(days=MAX_LOOKBACK_DAYS)
+    users = []
+    page = firebase_auth.list_users(max_results=1000)
+    for record in page.iterate_all():
+        email = str(record.email or "").strip().lower()
+        if email in _admin_allowed_emails():
+            continue
+        metadata = record.user_metadata
+        created_ms = getattr(metadata, "creation_timestamp", None)
+        sign_in_ms = getattr(metadata, "last_sign_in_timestamp", None)
+        created_at = datetime.fromtimestamp(created_ms / 1000, tz=timezone.utc) if created_ms else None
+        last_seen_at = datetime.fromtimestamp(sign_in_ms / 1000, tz=timezone.utc) if sign_in_ms else None
+        users.append({
+            "uid": record.uid,
+            "email": record.email,
+            "name": record.display_name,
+            "phone": record.phone_number,
+            "role": None,
+            "licenseType": None,
+            "createdAt": _iso(created_at),
+            "updatedAt": None,
+            "referralCode": None,
+            "referredByPartnerName": None,
+            "subscription": None,
+            "activity": {
+                "hasToolUsage": False,
+                "lastSeenAt": _iso(last_seen_at),
+                "lastToolUseAt": None,
+                "recentEvents": [],
+                "recentToolEvents": [],
+            },
+        })
+
+    _apply_follow_up_status(users, current)
+    segments = _build_segments(users, since=since, now=current, limit=limit)
+    return {
+        "ok": True,
+        "sourceMode": "firebase_auth_fallback",
+        "warning": "Cota do Firestore esgotada; exibindo cadastros básicos do Firebase Authentication.",
+        "generatedAt": _iso(current),
+        "window": {
+            "days": days,
+            "since": _iso(since),
+            "activitySince": _iso(activity_since),
+            "until": _iso(current),
+            "limit": limit,
+        },
+        "totals": _compute_report_totals(users, segments["newUsers"], current),
+        "segments": segments,
+        "users": segments["newUsers"],
+    }
+
+
 async def _require_admin(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
     if not credentials:
         logger.warning("[SECURITY] auth_missing route=admin")
@@ -1424,7 +1481,15 @@ async def recent_users(
     admin_uid: str = Depends(_require_admin),
 ):
     db = _fs()
-    report = await asyncio.to_thread(_build_recent_users_report, db, days=days, limit=limit)
+    try:
+        report = await asyncio.to_thread(_build_recent_users_report, db, days=days, limit=limit)
+    except Exception:
+        logger.exception("[ADMIN] Firestore indisponível; usando cadastros do Firebase Auth")
+        report = await asyncio.to_thread(
+            _build_auth_users_fallback_report,
+            days=days,
+            limit=limit,
+        )
     window = report.get("window") or {}
     since = _as_utc_datetime(window.get("activitySince") or window.get("since")) or (datetime.now(timezone.utc) - timedelta(days=MAX_LOOKBACK_DAYS))
     segments = report.get("segments") if isinstance(report.get("segments"), dict) else {}
