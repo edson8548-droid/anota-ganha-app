@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import ConfirmDialog from './ConfirmDialog';
 import TabelaPickerModal from './TabelaPickerModal';
 import { campaignsService } from '../services/campaigns.service';
+import { isTurbinadoIndustry, TurbinadoBadge } from '../utils/turbinado';
 import './CreateCampaignModal.css';
 
 const textoSeguro = (value) => value == null ? '' : String(value);
@@ -276,7 +277,7 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
                     <div className="industry-header">
                       <div className="industry-header-info">
                         <span className="industry-label">Indústria</span>
-                        <strong>{ind.name}</strong>
+                        <strong>{ind.name} {isTurbinadoIndustry(ind.name) && <TurbinadoBadge />}</strong>
                         <small>{ind.products.length} produto{ind.products.length !== 1 ? 's' : ''}</small>
                       </div>
                       <div className="industry-header-actions">

@@ -21,6 +21,7 @@ import { getDailyMotivationMessage } from '../data/dailyMotivationMessages';
 import { backendUrl } from '../config/api';
 import { canAccessAdminPanel } from '../utils/adminAccess';
 import { getPartnerConfig } from '../utils/partnerProgram';
+import { isTurbinadoIndustry, TurbinadoBadge } from '../utils/turbinado';
 import './Dashboard.css';
 
 const INDUSTRY_META_FIELDS = ['targetValue', 'alreadySoldValue'];
@@ -2517,7 +2518,7 @@ const Dashboard = () => {
                                 onClick={(e) => handleOpenEditProducts(e, client)}
                                 title={industry.missingProducts.length > 0 ? `Faltam: ${industry.missingProducts.join(', ')}` : 'Industria completa'}
                               >
-                                <span>{industry.name}</span>
+                                <span>{industry.name} {isTurbinadoIndustry(industry.name) && <TurbinadoBadge />}</span>
                                 <strong>{industry.sold}/{industry.total}</strong>
                               </button>
                             ))}
@@ -2571,7 +2572,7 @@ const Dashboard = () => {
                                   if (!industry) return null;
                                   return (
                                     <div key={industryName} className="industry-section" onClick={(e) => handleOpenEditProducts(e, client)} style={{ cursor: 'pointer' }}>
-                                      <strong className="industry-name">🏭 {industryName}</strong>
+                                      <strong className="industry-name">🏭 {industryName} {isTurbinadoIndustry(industryName) && <TurbinadoBadge />}</strong>
                                       <div className="progress-bar"><div className="progress-fill" style={{ width: `${industry.percentage}%` }} /></div>
                                       <div className="industry-total">
                                         <span>{industry.sold}/{industry.total} produtos</span>

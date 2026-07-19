@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { isTurbinadoIndustry, TurbinadoBadge } from '../utils/turbinado';
 import './CreateClientModal.css';
 
 const INDUSTRY_META_FIELDS = ['targetValue', 'alreadySoldValue'];
@@ -418,7 +419,7 @@ const CreateClientModal = ({ onClose, onSave, campaign }) => {
                         <div className={`industry-check-circle ${isPositivated ? 'checked' : ''}`}>
                           {isPositivated && '✓'}
                         </div>
-                        <span>🏭 {industryName}</span>
+                        <span>🏭 {industryName} {isTurbinadoIndustry(industryName) && <TurbinadoBadge />}</span>
                       </div>
                       <span className={`positivation-badge-client ${isPositivated ? 'positivated' : 'not-positivated'}`}>
                         {isPositivated ? '✓ Positivado' : 'Não Positivado'}
