@@ -767,3 +767,33 @@ def test_billing_overview_sem_trials_finalizados_nao_tem_taxa():
     assert report["totals"]["trialConversions"] == 0
     assert report["totals"]["trialRescues"] == 0
     assert report["totals"]["trialConversionRate"] is None
+
+
+def test_billing_overview_lista_cancelamentos_recentes():
+    now = datetime.now(timezone.utc)
+    db = _FakeDb()
+    db.users.update({
+        "cancelou-uid": {"email": "cancelou@example.com", "name": "Cancelou", "role": "user", "telefone": "13999000002"},
+        "cancelou-antigo-uid": {"email": "antigo-cancel@example.com", "name": "Cancelou Antigo", "role": "user"},
+    })
+    db.subscriptions.update({
+        "cancelou-uid": {
+            "status": "canceling",
+            "planId": "monthly",
+            "canceledAt": now - timedelta(days=2),
+            "accessEndsAt": now + timedelta(days=20),
+        },
+        "cancelou-antigo-uid": {
+            "status": "canceled",
+            "planId": "monthly",
+            "canceledAt": now - timedelta(days=30),
+        },
+    })
+
+    report = admin._build_billing_overview(db, days=7, now=now)
+
+    assert report["totals"]["cancellations"] == 1
+    assert report["cancellations"][0]["email"] == "cancelou@example.com"
+    assert report["cancellations"][0]["canceledAt"] is not None
+    emails = {item["email"] for item in report["cancellations"]}
+    assert "antigo-cancel@example.com" not in emails

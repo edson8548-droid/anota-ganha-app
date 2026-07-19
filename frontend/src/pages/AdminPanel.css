@@ -830,3 +830,27 @@
 .admin-status-badge.ok { color: #4ade80; }
 .admin-status-badge.warn { color: #facc15; }
 .admin-status-badge.danger { color: #f87171; }
+
+.admin-health-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.admin-health-badge.ok {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.35);
+  background: rgba(74, 222, 128, 0.08);
+}
+
+.admin-health-badge.bad {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.1);
+}

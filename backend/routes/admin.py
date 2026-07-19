@@ -1413,6 +1413,7 @@ def _build_billing_overview(db, *, days: int, now: datetime | None = None) -> di
     payment_issues = []
     trial_conversions = []
     trial_rescues = []
+    cancellations = []
 
     for doc in db.collection("subscriptions").stream():
         subscription = doc.to_dict() or {}
@@ -1471,12 +1472,20 @@ def _build_billing_overview(db, *, days: int, now: datetime | None = None) -> di
             entry = _billing_user_entry(db, uid, subscription, user_cache)
             trial_rescues.append(entry)
 
+        # Cancelamentos recentes: contato para entender o motivo ou reverter.
+        canceled_at = _as_utc_datetime(subscription.get("canceledAt"))
+        if status in {"canceling", "canceled"} and canceled_at and canceled_at >= since:
+            entry = _billing_user_entry(db, uid, subscription, user_cache)
+            entry["canceledAt"] = _iso(canceled_at)
+            cancellations.append(entry)
+
     webhook_alerts = _webhook_alerts(db, since)
 
     active_subscribers.sort(key=lambda item: item.get("nextDueDate") or "9999")
     upcoming_renewals.sort(key=lambda item: item.get("nextDueDate") or "9999")
     trial_conversions.sort(key=lambda item: item.get("firstPaymentDate") or "", reverse=True)
     trial_rescues.sort(key=lambda item: item.get("trialEndsAt") or "", reverse=True)
+    cancellations.sort(key=lambda item: item.get("canceledAt") or "", reverse=True)
 
     finished_trials = len(trial_conversions) + len(trial_rescues)
     conversion_rate = round(len(trial_conversions) * 100 / finished_trials) if finished_trials else None
@@ -1502,6 +1511,7 @@ def _build_billing_overview(db, *, days: int, now: datetime | None = None) -> di
             "trialConversions": len(trial_conversions),
             "trialRescues": len(trial_rescues),
             "trialConversionRate": conversion_rate,
+            "cancellations": len(cancellations),
         },
         "activeSubscribers": active_subscribers,
         "upcomingRenewals": upcoming_renewals,
@@ -1509,6 +1519,7 @@ def _build_billing_overview(db, *, days: int, now: datetime | None = None) -> di
         "webhookAlerts": webhook_alerts,
         "trialConversions": trial_conversions[:BILLING_LIST_LIMIT],
         "trialRescues": trial_rescues[:BILLING_LIST_LIMIT],
+        "cancellations": cancellations[:BILLING_LIST_LIMIT],
     }
 
 

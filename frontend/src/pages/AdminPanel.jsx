@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner';
 import { useAuthContext } from '../contexts/AuthContext';
 import api from '../services/api';
+import { backendUrl } from '../config/api';
 import { canAccessAdminPanel } from '../utils/adminAccess';
 import MasterCampaignsAdmin from '../components/MasterCampaignsAdmin';
 import './AdminPanel.css';
@@ -75,6 +76,11 @@ const FILTERS = {
     title: 'Trials vencendo em ate 7 dias',
     empty: 'Nenhum trial vencendo em ate 7 dias nesse filtro.',
   },
+  payingInactive: {
+    label: 'Pagando sem usar',
+    title: 'Assinantes ativos sem uso ha 5+ dias (risco de cancelamento)',
+    empty: 'Nenhum assinante ativo parado. Otimo sinal!',
+  },
 };
 
 const WEBHOOK_ALERT_LABELS = {
@@ -129,10 +135,23 @@ const daysUntil = (value) => {
 };
 
 const TRIAL_EXPIRING_WINDOW_DAYS = 7;
+const PAYING_INACTIVE_DAYS = 5;
 
 const isTrialExpiringSoon = (item) => {
   const remaining = daysUntil(item.subscription?.trialEndsAt);
   return remaining !== null && remaining >= 0 && remaining <= TRIAL_EXPIRING_WINDOW_DAYS;
+};
+
+// Assinante ativo que não usa a ferramenta há dias = cancelamento em gestação.
+const isPayingInactive = (item) => {
+  if (item.subscription?.status !== 'active') return false;
+  const lastUse = item.followUp?.lastToolUseAt
+    || item.activity?.lastToolUseAt
+    || item.activity?.lastSeenAt;
+  if (!lastUse) return true;
+  const lastDate = new Date(lastUse);
+  if (Number.isNaN(lastDate.getTime())) return true;
+  return Date.now() - lastDate.getTime() > PAYING_INACTIVE_DAYS * 86400000;
 };
 
 const phoneDigits = (value) => String(value || '').replace(/\D/g, '');
@@ -214,8 +233,17 @@ const AdminPanel = () => {
   const [trialResults, setTrialResults] = useState(null);
   const [trialLoading, setTrialLoading] = useState(false);
   const [trialGranting, setTrialGranting] = useState('');
+  const [health, setHealth] = useState(null);
 
   const canViewAdmin = canAccessAdminPanel(user);
+
+  useEffect(() => {
+    if (!canViewAdmin) return;
+    fetch(backendUrl('/health'))
+      .then((res) => res.json())
+      .then(setHealth)
+      .catch(() => setHealth({ status: 'unreachable' }));
+  }, [canViewAdmin]);
 
   const loadReport = useCallback(async () => {
     if (!canViewAdmin) return;
@@ -246,6 +274,31 @@ const AdminPanel = () => {
   const users = segments.allRegistered || report?.users || [];
 
   const expiringSoon = useMemo(() => users.filter(isTrialExpiringSoon).length, [users]);
+  const payingInactive = useMemo(() => users.filter(isPayingInactive).length, [users]);
+
+  const healthBadge = useMemo(() => {
+    if (!health) return null;
+    if (health.status === 'unreachable') return { ok: false, label: 'API fora do ar' };
+    const issues = [];
+    if (health.database !== 'connected') issues.push('Mongo');
+    if (health.firestore && health.firestore !== 'connected') issues.push('Firestore');
+    if (health.auth_directory && health.auth_directory !== 'connected') issues.push('Login');
+    if (health.status !== 'healthy') issues.push('API');
+    if (issues.length === 0) return { ok: true, label: 'Sistemas ok' };
+    return { ok: false, label: `Problema: ${issues.join(' · ')}` };
+  }, [health]);
+
+  // Uso agregado por ferramenta (janela de atividade de 30 dias do relatório).
+  const toolTotals = useMemo(() => users.reduce((acc, item) => {
+    acc.cotatudo += item.activity?.uniqueCotatudoJobs || 0;
+    acc.cotacaoReady += item.activity?.cotacaoReadyCount || 0;
+    const actions = item.activity?.actions || {};
+    Object.entries(actions).forEach(([action, count]) => {
+      if (action.startsWith('vitrine_')) acc.vitrine += Number(count) || 0;
+      else if (action.startsWith('whatsapp_')) acc.whatsapp += Number(count) || 0;
+    });
+    return acc;
+  }, { cotatudo: 0, cotacaoReady: 0, vitrine: 0, whatsapp: 0 }), [users]);
   const filteredUsers = useMemo(() => {
     if (Array.isArray(segments[activeFilter])) {
       return segments[activeFilter];
@@ -264,6 +317,9 @@ const AdminPanel = () => {
         .filter(isTrialExpiringSoon)
         .sort((a, b) => new Date(a.subscription?.trialEndsAt) - new Date(b.subscription?.trialEndsAt));
     }
+    if (activeFilter === 'payingInactive') {
+      return users.filter(isPayingInactive);
+    }
     return users;
   }, [activeFilter, segments, users]);
   const activeFilterInfo = FILTERS[activeFilter] || FILTERS.allRegistered;
@@ -278,6 +334,7 @@ const AdminPanel = () => {
     { key: 'needsContact', icon: MessageCircle, label: FILTERS.needsContact.label, value: totals.needsContact ?? 0 },
     { key: 'neverUsed', icon: Clock3, label: FILTERS.neverUsed.label, value: totals.neverUsed ?? totals.noUsage ?? 0 },
     { key: 'expiringSoon', icon: AlertTriangle, label: FILTERS.expiringSoon.label, value: expiringSoon },
+    { key: 'payingInactive', icon: AlertTriangle, label: FILTERS.payingInactive.label, value: payingInactive },
   ];
 
   const copyUid = async (uid) => {
@@ -345,6 +402,12 @@ const AdminPanel = () => {
             <div>
               <div className="admin-kicker"><ShieldCheck size={15} /> Admin</div>
               <h1>Painel operacional</h1>
+              {healthBadge && (
+                <span className={`admin-health-badge ${healthBadge.ok ? 'ok' : 'bad'}`}>
+                  {healthBadge.ok ? <ShieldCheck size={13} /> : <AlertTriangle size={13} />}
+                  {healthBadge.label}
+                </span>
+              )}
             </div>
           </div>
           <div className="admin-header-actions">
@@ -414,6 +477,13 @@ const AdminPanel = () => {
                 <div>
                   <div className="admin-metric-value">{billing.totals?.trialRescues ?? 0}</div>
                   <div className="admin-metric-label">Trials p/ resgatar (7 dias)</div>
+                </div>
+              </div>
+              <div className={`admin-metric static${(billing.totals?.cancellations ?? 0) > 0 ? ' warn' : ''}`}>
+                <div className="admin-metric-icon"><X size={18} /></div>
+                <div>
+                  <div className="admin-metric-value">{billing.totals?.cancellations ?? 0}</div>
+                  <div className="admin-metric-label">Cancelamentos (7 dias)</div>
                 </div>
               </div>
             </section>
@@ -523,6 +593,38 @@ const AdminPanel = () => {
               </section>
             )}
 
+            {billing.cancellations?.length > 0 && (
+              <section className="admin-list-section admin-billing-block">
+                <div className="admin-section-header">
+                  <div>
+                    <h2>Cancelamentos recentes</h2>
+                    <p>Vale um contato para entender o motivo — às vezes dá para reverter</p>
+                  </div>
+                </div>
+                <div className="admin-job-list">
+                  {billing.cancellations.map((cancel) => {
+                    const waUrl = whatsappUrl(cancel.phone);
+                    return (
+                      <div className="admin-job" key={`cancel-${cancel.uid}`}>
+                        <span>{cancel.name || 'Sem nome'} · {cancel.email || 'Sem email'}</span>
+                        <strong>
+                          Cancelou {formatDateOnly(cancel.canceledAt)}
+                          {cancel.accessEndsAt ? ` · acesso até ${formatDateOnly(cancel.accessEndsAt)}` : ''}
+                        </strong>
+                        {waUrl ? (
+                          <a className="admin-contact-link" href={waUrl} target="_blank" rel="noreferrer">
+                            <MessageCircle size={14} /> WhatsApp
+                          </a>
+                        ) : (
+                          <em>Sem telefone</em>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
             {billing.upcomingRenewals?.length > 0 && (
               <section className="admin-list-section admin-billing-block">
                 <div className="admin-section-header">
@@ -556,6 +658,45 @@ const AdminPanel = () => {
               onClick={() => setActiveFilter(metric.key)}
             />
           ))}
+        </section>
+
+        <section className="admin-list-section">
+          <div className="admin-section-header">
+            <div>
+              <h2>Uso por ferramenta</h2>
+              <p>Últimos 30 dias — mostra o que segura os RCAs na plataforma</p>
+            </div>
+          </div>
+          <div className="admin-metrics-grid">
+            <div className="admin-metric static">
+              <div className="admin-metric-icon"><Activity size={18} /></div>
+              <div>
+                <div className="admin-metric-value">{toolTotals.cotatudo}</div>
+                <div className="admin-metric-label">Jobs Cotatudo</div>
+              </div>
+            </div>
+            <div className="admin-metric static">
+              <div className="admin-metric-icon"><Activity size={18} /></div>
+              <div>
+                <div className="admin-metric-value">{toolTotals.cotacaoReady}</div>
+                <div className="admin-metric-label">Cotações Prontas</div>
+              </div>
+            </div>
+            <div className="admin-metric static">
+              <div className="admin-metric-icon"><Activity size={18} /></div>
+              <div>
+                <div className="admin-metric-value">{toolTotals.vitrine}</div>
+                <div className="admin-metric-label">Eventos Vitrine</div>
+              </div>
+            </div>
+            <div className="admin-metric static">
+              <div className="admin-metric-icon"><MessageCircle size={18} /></div>
+              <div>
+                <div className="admin-metric-value">{toolTotals.whatsapp}</div>
+                <div className="admin-metric-label">Eventos WhatsApp</div>
+              </div>
+            </div>
+          </div>
         </section>
 
         {error && (
