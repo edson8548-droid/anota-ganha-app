@@ -20,6 +20,7 @@ import { useAuthContext } from '../contexts/AuthContext';
 import api from '../services/api';
 import { backendUrl } from '../config/api';
 import { canAccessAdminPanel } from '../utils/adminAccess';
+import ConfirmDialog from '../components/ConfirmDialog';
 import MasterCampaignsAdmin from '../components/MasterCampaignsAdmin';
 import './AdminPanel.css';
 
@@ -233,6 +234,7 @@ const AdminPanel = () => {
   const [trialResults, setTrialResults] = useState(null);
   const [trialLoading, setTrialLoading] = useState(false);
   const [trialGranting, setTrialGranting] = useState('');
+  const [endTrialConfirm, setEndTrialConfirm] = useState({ open: false, uid: '', name: '' });
   const [health, setHealth] = useState(null);
 
   const canViewAdmin = canAccessAdminPanel(user);
@@ -357,6 +359,21 @@ const AdminPanel = () => {
       toast.error('Erro ao buscar usuário.');
     } finally {
       setTrialLoading(false);
+    }
+  };
+
+  const endTrial = async () => {
+    const { uid, name } = endTrialConfirm;
+    setEndTrialConfirm({ open: false, uid: '', name: '' });
+    try {
+      await api.post('/admin/end-trial', { uid, motivo: 'duplicate_trial' });
+      toast.success(`Trial de ${name || 'RCA'} encerrado com aviso de teste duplicado.`);
+      setTrialResults((prev) => prev?.map((u) => u.uid === uid
+        ? { ...u, subscriptionStatus: 'trial_expired', trialEndsAt: new Date().toISOString() }
+        : u
+      ));
+    } catch (err) {
+      toast.error('Erro ao encerrar trial: ' + (err?.response?.data?.detail || err.message));
     }
   };
 
@@ -975,6 +992,15 @@ const AdminPanel = () => {
                     >
                       30 dias
                     </button>
+                    {u.subscriptionStatus === 'trialing' && (
+                      <button
+                        type="button"
+                        className="admin-refresh admin-end-trial"
+                        onClick={() => setEndTrialConfirm({ open: true, uid: u.uid, name: u.name })}
+                      >
+                        <X size={14} /> Encerrar trial
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -983,6 +1009,14 @@ const AdminPanel = () => {
         </section>
 
         <MasterCampaignsAdmin />
+
+        <ConfirmDialog
+          open={endTrialConfirm.open}
+          title="Encerrar trial (teste duplicado)"
+          description={`Encerrar agora o trial de "${endTrialConfirm.name || 'RCA'}"? A pessoa verá o aviso de período de teste duplicado e só volta a usar assinando um plano.`}
+          onConfirm={endTrial}
+          onCancel={() => setEndTrialConfirm({ open: false, uid: '', name: '' })}
+        />
       </main>
     </div>
   );
