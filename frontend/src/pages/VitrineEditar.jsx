@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, Store, Plus, X, Image, Search, Table2 } from 'lucide-react';
+import { ArrowLeft, Store, Plus, X, Image, Search, Table2, RefreshCw } from 'lucide-react';
 import { vitrineService } from '../services/vitrine.service';
+import { updateVitrinePrices } from '../utils/vitrinePriceUpdate';
 import TabelaPickerModal from '../components/TabelaPickerModal';
 import { backendUrl } from '../config/api';
 import './Vitrine.css';
@@ -74,6 +75,7 @@ export default function VitrineEditar() {
   const [itens, setItens] = useState([]);
   const [imagePicker, setImagePicker] = useState(null);
   const [tabelaPickerAberto, setTabelaPickerAberto] = useState(false);
+  const [priceUpdatePickerOpen, setPriceUpdatePickerOpen] = useState(false);
 
   const logoInputRef = useRef(null);
 
@@ -209,6 +211,23 @@ export default function VitrineEditar() {
     buscarImagensAutomaticamente(novos.filter(n => !n._imageUrl));
   };
 
+  const atualizarPrecosDaTabela = (produtos, meta) => {
+    const result = updateVitrinePrices(itens, produtos);
+    setPriceUpdatePickerOpen(false);
+    if (!result.matched.length) {
+      toast.warning('Nenhum produto da vitrine encontrou correspondência segura nessa tabela.');
+      return;
+    }
+    const confirmed = window.confirm(
+      `${result.matched.length} preço(s) encontrado(s) na tabela ${meta?.tabela || ''} (${meta?.prazo || ''} dias).\n`
+      + `${result.unmatched.length} produto(s) ficarão com o preço atual.\n\n`
+      + 'Aplicar os novos preços? A mudança só será publicada quando você salvar a vitrine.'
+    );
+    if (!confirmed) return;
+    setItens(result.items);
+    toast.success(`${result.matched.length} preço(s) atualizado(s). Revise e clique em Salvar alterações.`);
+  };
+
   const parsearLista = async () => {
     if (!listaTexto.trim()) { toast.warning('Cole uma lista primeiro'); return; }
     setParsing(true);
@@ -299,7 +318,9 @@ export default function VitrineEditar() {
       });
 
       if (logoFile) {
-        try { await vitrineService.uploadLogo(id, logoFile); } catch {}
+        try { await vitrineService.uploadLogo(id, logoFile); } catch (error) {
+          console.warn('[VitrineEditar] Falha ao atualizar logo:', error?.message);
+        }
       }
 
       const itensParaSalvar = itensAtivos.map((it, index) => buildBulkItemPayload(it, index));
@@ -310,7 +331,9 @@ export default function VitrineEditar() {
         const it = itensAtivos[index];
         const itemSalvo = itensSalvos[index];
         if (it._imageFile && itemSalvo?.id) {
-          try { await vitrineService.uploadImagem(id, itemSalvo.id, it._imageFile); } catch {}
+          try { await vitrineService.uploadImagem(id, itemSalvo.id, it._imageFile); } catch (error) {
+            console.warn('[VitrineEditar] Falha ao atualizar imagem:', error?.message);
+          }
         }
       }
 
@@ -439,6 +462,10 @@ export default function VitrineEditar() {
             )}
 
             <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button className="vt-btn-primary" onClick={() => setPriceUpdatePickerOpen(true)}>
+                <RefreshCw size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                Atualizar somente preços
+              </button>
               <button className="vt-btn-primary" onClick={() => setTabelaPickerAberto(true)}>
                 <Table2 size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
                 Puxar da tabela
@@ -493,6 +520,13 @@ export default function VitrineEditar() {
               <TabelaPickerModal
                 onClose={() => setTabelaPickerAberto(false)}
                 onAdd={adicionarDaTabela}
+              />
+            )}
+            {priceUpdatePickerOpen && (
+              <TabelaPickerModal
+                mode="updatePrices"
+                onClose={() => setPriceUpdatePickerOpen(false)}
+                onAdd={atualizarPrecosDaTabela}
               />
             )}
           </div>

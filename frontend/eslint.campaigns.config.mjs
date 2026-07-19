@@ -12,6 +12,7 @@ const campaignFiles = [
   'src/components/CampaignWeeklyResults.jsx',
   'src/components/CampaignOverviewDashboard.jsx',
   'src/components/TabelaPickerModal.jsx',
+  'src/pages/VitrineEditar.jsx',
   'src/hooks/useMasterCampaigns.jsx',
   'src/services/campaigns.service.jsx',
   'src/utils/campaignIndustryMatch.js',
@@ -20,6 +21,8 @@ const campaignFiles = [
   'src/utils/campaignProgress.test.js',
   'src/utils/productSearch.js',
   'src/utils/productSearch.test.js',
+  'src/utils/vitrinePriceUpdate.js',
+  'src/utils/vitrinePriceUpdate.test.js',
   'src/utils/turbinado.jsx',
   'src/utils/turbinado.test.jsx',
 ];

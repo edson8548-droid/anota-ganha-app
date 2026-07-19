@@ -19,7 +19,8 @@ const fmtPreco = (v) => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
  * o prazo de preço, marca os produtos e devolve os selecionados via onAdd.
  * onAdd recebe [{ nome, ean, preco, qtd_caixa }].
  */
-export default function TabelaPickerModal({ onClose, onAdd, ctaLabel = 'à vitrine', overlayZIndex }) {
+export default function TabelaPickerModal({ onClose, onAdd, ctaLabel = 'à vitrine', overlayZIndex, mode = 'add' }) {
+  const updatingPrices = mode === 'updatePrices';
   const [tabelas, setTabelas] = useState(null);       // null = carregando
   const [tabela, setTabela] = useState(null);          // tabela escolhida
   const [prazo, setPrazo] = useState(null);
@@ -109,6 +110,11 @@ export default function TabelaPickerModal({ onClose, onAdd, ctaLabel = 'à vitri
   const limparSelecao = () => setSelecionados(new Set());
 
   const adicionar = () => {
+    if (updatingPrices) {
+      if (!itens?.length) { toast.warning('A tabela escolhida não possui produtos'); return; }
+      onAdd(itens, { tabela: tabela?.nome, prazo });
+      return;
+    }
     if (!selecionados.size) { toast.warning('Marque pelo menos um produto'); return; }
     const escolhidos = [...selecionados].sort((a, b) => a - b).map(idx => itens[idx]);
     onAdd(escolhidos, { tabela: tabela?.nome, prazo });
@@ -130,7 +136,7 @@ export default function TabelaPickerModal({ onClose, onAdd, ctaLabel = 'à vitri
             )}
             <div>
               <div style={{ fontSize: 15, fontWeight: 750, color: '#E1E1E1', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Table2 size={16} /> {tabela ? tabela.nome : 'Puxar produtos da tabela'}
+                <Table2 size={16} /> {tabela ? tabela.nome : (updatingPrices ? 'Atualizar preços pela tabela' : 'Puxar produtos da tabela')}
               </div>
               <div style={{ fontSize: 12, color: '#A0A3A8', marginTop: 2 }}>
                 {tabela
@@ -207,7 +213,7 @@ export default function TabelaPickerModal({ onClose, onAdd, ctaLabel = 'à vitri
                   ? 'Carregando produtos...'
                   : `${filtrados.length} produto${filtrados.length !== 1 ? 's' : ''}${limite < filtrados.length ? ` — mostrando ${visiveis.length}, role para ver mais` : ''}`}
               </span>
-              <span style={{ display: 'flex', gap: 10 }}>
+              {!updatingPrices && <span style={{ display: 'flex', gap: 10 }}>
                 <button onClick={selecionarFiltrados} disabled={carregandoItens || !filtrados.length}
                   style={{ background: 'none', border: 'none', color: '#3A85A8', cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: 0 }}>
                   Marcar filtrados
@@ -216,7 +222,7 @@ export default function TabelaPickerModal({ onClose, onAdd, ctaLabel = 'à vitri
                   style={{ background: 'none', border: 'none', color: selecionados.size ? '#A0A3A8' : '#4A4D52', cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: 0 }}>
                   Limpar
                 </button>
-              </span>
+              </span>}
             </div>
 
             <div onScroll={carregarMaisAoRolar}
@@ -230,8 +236,8 @@ export default function TabelaPickerModal({ onClose, onAdd, ctaLabel = 'à vitri
                       padding: '9px 12px', borderBottom: '1px solid #363940',
                       background: marcado ? 'rgba(58,133,168,.12)' : 'transparent',
                     }}>
-                    <input type="checkbox" checked={marcado} onChange={() => toggle(it._idx)}
-                      style={{ accentColor: '#3A85A8', width: 15, height: 15, flexShrink: 0 }} />
+                    {!updatingPrices && <input type="checkbox" checked={marcado} onChange={() => toggle(it._idx)}
+                      style={{ accentColor: '#3A85A8', width: 15, height: 15, flexShrink: 0 }} />}
                     {it.foto_url ? (
                       <img src={vitrineService.imagemUrl(it.foto_url)} alt="" loading="lazy"
                         style={{ width: 26, height: 26, objectFit: 'contain', borderRadius: 4, background: '#fff', flexShrink: 0 }} />
@@ -261,10 +267,12 @@ export default function TabelaPickerModal({ onClose, onAdd, ctaLabel = 'à vitri
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 12 }}>
               <span style={{ fontSize: 12, color: '#A0A3A8' }}>
-                {selecionados.size} selecionado{selecionados.size !== 1 ? 's' : ''}
+                {updatingPrices
+                  ? 'Somente preços com correspondência segura serão alterados'
+                  : `${selecionados.size} selecionado${selecionados.size !== 1 ? 's' : ''}`}
               </span>
-              <button className="vt-btn-primary" onClick={adicionar} disabled={!selecionados.size}>
-                Adicionar {selecionados.size || ''} {ctaLabel}
+              <button className="vt-btn-primary" onClick={adicionar} disabled={updatingPrices ? carregandoItens || !itens?.length : !selecionados.size}>
+                {updatingPrices ? 'Usar esta tabela para atualizar' : `Adicionar ${selecionados.size || ''} ${ctaLabel}`}
               </button>
             </div>
           </>
