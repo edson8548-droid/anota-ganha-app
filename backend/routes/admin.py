@@ -1697,3 +1697,53 @@ async def apk_set_trial(
         "trialEndsAt": trial_end.isoformat(),
         "days": payload.days,
     }
+
+
+class EndTrialRequest(pydantic_BaseModel):
+    uid: str
+    motivo: str = "duplicate_trial"
+
+
+@router.post("/end-trial")
+async def end_trial(
+    payload: EndTrialRequest,
+    admin_uid: str = Depends(_require_admin),
+):
+    """Encerra o trial de um RCA na hora, gravando o motivo do bloqueio.
+
+    Só age sobre contas em trial — nunca derruba assinante pagante. O campo
+    blockNotice é lido pelo app para exibir o aviso específico (ex.: trial
+    duplicado) na tela de assinatura necessária.
+    """
+    db = _fs()
+    sub_ref = db.collection("subscriptions").document(payload.uid)
+    sub_doc = await asyncio.to_thread(sub_ref.get)
+    if not getattr(sub_doc, "exists", False):
+        raise HTTPException(404, "Assinatura não encontrada")
+
+    sub_data = sub_doc.to_dict() or {}
+    if sub_data.get("status") not in {"trialing", "trial_expired"}:
+        raise HTTPException(400, "Só é possível encerrar contas em trial")
+
+    now = datetime.now(timezone.utc)
+    await asyncio.to_thread(
+        sub_ref.set,
+        {
+            "status": "trial_expired",
+            "trialEndsAt": now,
+            "blockNotice": payload.motivo,
+            "blockNoticeAt": now,
+            "updatedAt": now,
+            "endedBy": admin_uid,
+        },
+        True,  # merge=True
+    )
+
+    logger.info(f"Trial encerrado: uid={payload.uid} motivo={payload.motivo} admin={admin_uid}")
+    await audit_event(
+        "admin_trial_ended",
+        uid=admin_uid,
+        status="success",
+        metadata={"target_uid": payload.uid, "motivo": payload.motivo},
+    )
+    return {"success": True, "uid": payload.uid, "status": "trial_expired", "motivo": payload.motivo}

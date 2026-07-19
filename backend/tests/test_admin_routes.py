@@ -30,6 +30,12 @@ class _FakeDoc:
     def get(self):
         return self
 
+    def set(self, data, merge=False):
+        if self._data is None or not merge:
+            self._data = {}
+        self._data.update(data)
+        self.exists = True
+
     def to_dict(self):
         return dict(self._data or {})
 
@@ -797,3 +803,49 @@ def test_billing_overview_lista_cancelamentos_recentes():
     assert report["cancellations"][0]["canceledAt"] is not None
     emails = {item["email"] for item in report["cancellations"]}
     assert "antigo-cancel@example.com" not in emails
+
+
+def test_end_trial_encerra_e_grava_motivo(monkeypatch):
+    client = _client(monkeypatch, uid="admin-uid")
+    fake_db = admin._fs()
+
+    response = client.post(
+        "/api/admin/end-trial",
+        json={"uid": "rca-uid", "motivo": "duplicate_trial"},
+        headers={"Authorization": "Bearer token"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "trial_expired"
+
+    sub = fake_db.subscriptions["rca-uid"]
+    assert sub["status"] == "trial_expired"
+    assert sub["blockNotice"] == "duplicate_trial"
+    assert sub["trialEndsAt"] <= datetime.now(timezone.utc)
+
+
+def test_end_trial_nao_derruba_assinante_ativo(monkeypatch):
+    client = _client(monkeypatch, uid="admin-uid")
+    fake_db = admin._fs()
+    fake_db.subscriptions["pagante-uid"] = {"status": "active", "planId": "monthly"}
+
+    response = client.post(
+        "/api/admin/end-trial",
+        json={"uid": "pagante-uid"},
+        headers={"Authorization": "Bearer token"},
+    )
+
+    assert response.status_code == 400
+    assert fake_db.subscriptions["pagante-uid"]["status"] == "active"
+
+
+def test_end_trial_uid_inexistente_retorna_404(monkeypatch):
+    client = _client(monkeypatch, uid="admin-uid")
+
+    response = client.post(
+        "/api/admin/end-trial",
+        json={"uid": "nao-existe"},
+        headers={"Authorization": "Bearer token"},
+    )
+
+    assert response.status_code == 404

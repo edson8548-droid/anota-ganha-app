@@ -32,8 +32,83 @@ const LoadingScreen = ({ text }) => (
   </div>
 );
 
-const SubscriptionRequired = () => {
+const SUPPORT_WHATSAPP_URL = 'https://wa.me/5513996382430?text=Ol%C3%A1%2C%20recebi%20um%20aviso%20sobre%20meu%20per%C3%ADodo%20de%20teste%20no%20Venpro%20e%20gostaria%20de%20verificar.';
+
+const SubscriptionRequired = ({ subscription }) => {
   const navigate = useNavigate();
+  const duplicateTrial = subscription?.blockNotice === 'duplicate_trial';
+
+  if (duplicateTrial) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: '#2B2D31',
+        color: '#E1E1E1',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+        fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
+      }}>
+        <div style={{
+          width: '100%',
+          maxWidth: 480,
+          background: '#363940',
+          border: '1px solid #4A4D52',
+          borderRadius: 14,
+          padding: 28,
+          textAlign: 'center',
+          boxShadow: '0 18px 50px rgba(0,0,0,.22)'
+        }}>
+          <div style={{ fontSize: 34, marginBottom: 12 }}>⏰</div>
+          <h2 style={{ margin: '0 0 10px', color: '#fff', fontSize: 22 }}>Período de teste encerrado</h2>
+          <p style={{ margin: '0 0 14px', color: '#A0A3A8', lineHeight: 1.6, fontSize: 14 }}>
+            Nosso sistema identificou mais de um período de teste utilizado neste mesmo
+            dispositivo, o que não é permitido pelos nossos termos de uso. Por isso, este
+            teste foi encerrado.
+          </p>
+          <p style={{ margin: '0 0 22px', color: '#A0A3A8', lineHeight: 1.6, fontSize: 14 }}>
+            Para continuar usando o Venpro, escolha um dos planos disponíveis. Se você
+            acredita que houve um engano, entre em contato com o suporte da Venpro —
+            teremos prazer em verificar.
+          </p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => navigate('/plans')}
+              style={{
+                background: '#3A85A8',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                padding: '11px 18px',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              Ver planos
+            </button>
+            <a
+              href={SUPPORT_WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                background: 'transparent',
+                color: '#A0A3A8',
+                border: '1px solid #4A4D52',
+                borderRadius: 8,
+                padding: '11px 18px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                textDecoration: 'none'
+              }}
+            >
+              Falar com o suporte
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -141,7 +216,7 @@ const ProtectedRoute = ({ children, requireSubscription = false }) => {
     const hasPaidAccess = paidAccessStatuses.includes(subscription?.status) && accessEndsAt && accessEndsAt > new Date();
     const hasAccess = subscription?.status === 'active' || subscriptionState.isTrialActive || hasPaidAccess;
     if (!hasAccess) {
-      return <SubscriptionRequired />;
+      return <SubscriptionRequired subscription={subscription} />;
     }
   }
 
