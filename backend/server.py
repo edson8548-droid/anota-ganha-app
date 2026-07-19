@@ -223,9 +223,24 @@ async def root():
 async def health_check():
     try:
         await db.command("ping")
+        firebase_status = "disconnected"
+        firebase_error = None
+        firebase_project = None
+        try:
+            firebase_project = getattr(firebase_admin.get_app(), "project_id", None)
+            await asyncio.to_thread(
+                lambda: next(firestore.client().collection("users").limit(1).stream(timeout=5), None)
+            )
+            firebase_status = "connected"
+        except Exception as exc:
+            firebase_error = type(exc).__name__
+            logger.exception("[HEALTH] Firestore indisponível")
         return {
             "status": "healthy",
             "database": "connected",
+            "firestore": firebase_status,
+            "firebase_project": firebase_project,
+            "firebase_error": firebase_error,
             "build": BUILD_VERSION,
             "commit": BUILD_COMMIT[:12],
         }
