@@ -3,6 +3,7 @@ import sys
 import asyncio
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from fastapi import FastAPI
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
@@ -10,6 +11,13 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from routes import admin
+
+
+@pytest.fixture(autouse=True)
+def _limpar_cache_de_relatorios():
+    admin._report_cache.clear()
+    yield
+    admin._report_cache.clear()
 
 
 class _FakeDoc:
@@ -628,3 +636,73 @@ def test_billing_overview_uses_fallback_price_when_amount_missing():
     report = admin._build_billing_overview(db, days=7, now=now)
 
     assert report["totals"]["monthlyRevenueEstimate"] == admin.BILLING_MONTHLY_PRICE_FALLBACK
+
+
+def test_recent_users_usa_cache_e_nao_reconsulta_firestore(monkeypatch):
+    client = _client(monkeypatch, uid="admin-uid")
+    chamadas = {"n": 0}
+    original = admin._build_recent_users_report
+
+    def _contando(db, **kwargs):
+        chamadas["n"] += 1
+        return original(db, **kwargs)
+
+    monkeypatch.setattr(admin, "_build_recent_users_report", _contando)
+
+    first = client.get("/api/admin/recent-users", headers={"Authorization": "Bearer token"})
+    second = client.get("/api/admin/recent-users", headers={"Authorization": "Bearer token"})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert chamadas["n"] == 1
+    assert second.json()["cachedAt"] == first.json()["cachedAt"]
+
+
+def test_recent_users_cache_separa_por_parametros(monkeypatch):
+    client = _client(monkeypatch, uid="admin-uid")
+    chamadas = {"n": 0}
+    original = admin._build_recent_users_report
+
+    def _contando(db, **kwargs):
+        chamadas["n"] += 1
+        return original(db, **kwargs)
+
+    monkeypatch.setattr(admin, "_build_recent_users_report", _contando)
+
+    client.get("/api/admin/recent-users?days=4", headers={"Authorization": "Bearer token"})
+    client.get("/api/admin/recent-users?days=7", headers={"Authorization": "Bearer token"})
+
+    assert chamadas["n"] == 2
+
+
+def test_billing_overview_usa_cache(monkeypatch):
+    client = _client(monkeypatch, uid="admin-uid")
+    chamadas = {"n": 0}
+    original = admin._build_billing_overview
+
+    def _contando(db, **kwargs):
+        chamadas["n"] += 1
+        return original(db, **kwargs)
+
+    monkeypatch.setattr(admin, "_build_billing_overview", _contando)
+
+    first = client.get("/api/admin/billing-overview", headers={"Authorization": "Bearer token"})
+    second = client.get("/api/admin/billing-overview", headers={"Authorization": "Bearer token"})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert chamadas["n"] == 1
+
+
+def test_billing_overview_responde_503_quando_firestore_falha(monkeypatch):
+    client = _client(monkeypatch, uid="admin-uid")
+
+    def _quota_esgotada(_db, **_kwargs):
+        raise RuntimeError("ResourceExhausted")
+
+    monkeypatch.setattr(admin, "_build_billing_overview", _quota_esgotada)
+
+    response = client.get("/api/admin/billing-overview", headers={"Authorization": "Bearer token"})
+
+    assert response.status_code == 503
+    assert "faturamento" in response.json()["detail"].lower()

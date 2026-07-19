@@ -604,6 +604,35 @@
   font-style: normal;
 }
 
+.admin-job-diagnostics {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: #A0A3A8;
+}
+
+.admin-job-diagnostics summary {
+  cursor: pointer;
+  color: #7FB2CC;
+}
+
+.admin-job-diagnostics ul {
+  margin: 6px 0 0;
+  padding: 0 0 0 4px;
+  list-style: none;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.admin-job-diagnostics li {
+  padding: 2px 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-job-diagnostics code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #C9CCD1;
+}
+
 .admin-event-list {
   display: grid;
   gap: 7px;

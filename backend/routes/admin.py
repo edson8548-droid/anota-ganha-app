@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import time
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 import re
@@ -19,7 +20,15 @@ security = HTTPBearer(auto_error=False)
 
 MAX_LOOKBACK_DAYS = 30
 MAX_RECENT_USERS_LIMIT = 200
-AUDIT_EVENT_LIMIT = 300
+# 60 eventos bastam para os resumos exibidos (8 eventos + 6 jobs por usuário) e
+# cortam ~80% das leituras de Firestore por carga do painel (era 300 por RCA).
+AUDIT_EVENT_LIMIT = 60
+# Cache em memória dos relatórios administrativos: o painel é usado por um
+# único admin e cada recarga custa milhares de leituras de Firestore (já
+# esgotou a cota diária do plano gratuito). Dados de acompanhamento não
+# precisam de frescor menor que alguns minutos.
+REPORT_CACHE_TTL_SECONDS = 300
+REPORT_CACHE_DEGRADED_TTL_SECONDS = 60
 FOLLOW_UP_STALE_DAYS = 3
 FOLLOW_UP_WATCH_DAYS = 1
 SUSPICIOUS_TRIAL_WINDOW_DAYS = 2
@@ -70,6 +79,24 @@ _mongo_db = None
 def init_admin(database):
     global _mongo_db
     _mongo_db = database
+
+
+_report_cache: dict[str, tuple[float, dict]] = {}
+
+
+def _report_cache_get(key: str) -> dict | None:
+    entry = _report_cache.get(key)
+    if not entry:
+        return None
+    expires_at, payload = entry
+    if time.monotonic() >= expires_at:
+        _report_cache.pop(key, None)
+        return None
+    return payload
+
+
+def _report_cache_set(key: str, payload: dict, ttl_seconds: float) -> None:
+    _report_cache[key] = (time.monotonic() + ttl_seconds, payload)
 
 
 def _fs():
@@ -251,6 +278,7 @@ def _compact_job_event(event: dict) -> dict:
         "precosRecebidos": metadata.get("precosRecebidos"),
         "naoEncontrados": metadata.get("naoEncontrados") or metadata.get("nao_encontrados"),
         "falhas": metadata.get("falhas"),
+        "diagnostics": (metadata.get("diagnostics") or [])[:20],
     }
 
 
@@ -1455,8 +1483,22 @@ async def billing_overview(
     days: int = Query(7, ge=1, le=MAX_LOOKBACK_DAYS),
     admin_uid: str = Depends(_require_admin),
 ):
+    cache_key = f"billing-overview:{days}"
+    cached = _report_cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     db = _fs()
-    report = await asyncio.to_thread(_build_billing_overview, db, days=days)
+    try:
+        report = await asyncio.to_thread(_build_billing_overview, db, days=days)
+    except Exception:
+        logger.exception("[ADMIN] Falha ao montar visão de faturamento")
+        raise HTTPException(
+            status_code=503,
+            detail="Visão de faturamento indisponível (Firestore fora do ar ou cota esgotada)",
+        )
+    report["cachedAt"] = _iso(datetime.now(timezone.utc))
+    _report_cache_set(cache_key, report, REPORT_CACHE_TTL_SECONDS)
     await audit_event(
         "admin_billing_viewed",
         uid=admin_uid,
@@ -1476,6 +1518,11 @@ async def recent_users(
     limit: int = Query(25, ge=1, le=MAX_RECENT_USERS_LIMIT),
     admin_uid: str = Depends(_require_admin),
 ):
+    cache_key = f"recent-users:{days}:{limit}"
+    cached = _report_cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     db = _fs()
     try:
         report = await asyncio.to_thread(_build_recent_users_report, db, days=days, limit=limit)
@@ -1494,6 +1541,11 @@ async def recent_users(
     cotacao_activity = await _mongo_cotacao_activity_for_users(_mongo_db, uid_list, since)
     if cotacao_activity:
         report = _merge_cotacao_activity(report, cotacao_activity)
+    report["cachedAt"] = _iso(datetime.now(timezone.utc))
+    # Relatório degradado (fallback do Auth) expira mais rápido para o painel
+    # voltar ao normal logo depois que o Firestore se recuperar.
+    ttl = REPORT_CACHE_DEGRADED_TTL_SECONDS if report.get("sourceMode") else REPORT_CACHE_TTL_SECONDS
+    _report_cache_set(cache_key, report, ttl)
     await audit_event(
         "admin_recent_users_viewed",
         uid=admin_uid,

@@ -494,11 +494,20 @@ const AdminPanel = () => {
           </div>
         )}
 
+        {report?.warning && (
+          <div className="admin-alert">
+            <AlertTriangle size={17} /> {report.warning}
+          </div>
+        )}
+
         <section className="admin-list-section">
           <div className="admin-section-header">
             <div>
               <h2>{activeFilterInfo.title}</h2>
-              <p>{report?.window?.since ? `Desde ${formatDateTime(report.window.since)}` : 'Carregando janela de consulta'}</p>
+              <p>
+                {report?.window?.since ? `Desde ${formatDateTime(report.window.since)}` : 'Carregando janela de consulta'}
+                {report?.cachedAt ? ` · dados de ${formatDateTime(report.cachedAt)}` : ''}
+              </p>
             </div>
             <div className="admin-section-actions">
               <span>
@@ -640,7 +649,17 @@ const AdminPanel = () => {
                         <div className="admin-job" key={job.jobId || `${job.createdAt}-${job.prazo}`}>
                           <span>{formatDateTime(job.createdAt)} · {job.site || 'site'} · {job.modo || 'modo'} · {job.prazo || '-'} dias</span>
                           <strong>{job.preenchidos ?? 0}/{job.totalItens ?? 0} preenchidos</strong>
-                          <em>{job.naoEncontrados ?? 0} não encontrados</em>
+                          <em>{job.naoEncontrados ?? 0} não encontrados · {job.falhas ?? 0} falhas</em>
+                          {job.diagnostics?.length > 0 && (
+                            <details className="admin-job-diagnostics">
+                              <summary>Diagnóstico ({job.diagnostics.length})</summary>
+                              <ul>
+                                {job.diagnostics.slice(0, 20).map((line, i) => (
+                                  <li key={i}><code>{line}</code></li>
+                                ))}
+                              </ul>
+                            </details>
+                          )}
                         </div>
                       ))}
                     </div>
