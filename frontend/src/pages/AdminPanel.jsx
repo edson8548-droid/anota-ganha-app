@@ -71,9 +71,9 @@ const FILTERS = {
     empty: 'Nenhum RCA sem uso registrado nesse filtro.',
   },
   expiringSoon: {
-    label: 'Trial vence em 3 dias',
-    title: 'Trials vencendo em ate 3 dias',
-    empty: 'Nenhum trial vencendo em ate 3 dias nesse filtro.',
+    label: 'Trial vence em 7 dias',
+    title: 'Trials vencendo em ate 7 dias',
+    empty: 'Nenhum trial vencendo em ate 7 dias nesse filtro.',
   },
 };
 
@@ -128,9 +128,11 @@ const daysUntil = (value) => {
   return Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 };
 
+const TRIAL_EXPIRING_WINDOW_DAYS = 7;
+
 const isTrialExpiringSoon = (item) => {
   const remaining = daysUntil(item.subscription?.trialEndsAt);
-  return remaining !== null && remaining >= 0 && remaining <= 3;
+  return remaining !== null && remaining >= 0 && remaining <= TRIAL_EXPIRING_WINDOW_DAYS;
 };
 
 const phoneDigits = (value) => String(value || '').replace(/\D/g, '');
@@ -258,7 +260,9 @@ const AdminPanel = () => {
       return users.filter((item) => !item.activity?.hasToolUsage);
     }
     if (activeFilter === 'expiringSoon') {
-      return users.filter(isTrialExpiringSoon);
+      return users
+        .filter(isTrialExpiringSoon)
+        .sort((a, b) => new Date(a.subscription?.trialEndsAt) - new Date(b.subscription?.trialEndsAt));
     }
     return users;
   }, [activeFilter, segments, users]);
