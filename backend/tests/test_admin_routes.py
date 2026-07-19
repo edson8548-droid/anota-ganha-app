@@ -502,6 +502,42 @@ def test_relatorio_fallback_lista_usuarios_do_firebase_auth(monkeypatch):
     assert report["segments"]["allRegistered"][0]["name"] == "RCA Auth"
 
 
+def test_recent_users_aciona_fallback_quando_firestore_esgota(monkeypatch):
+    client = _client(monkeypatch, uid="admin-uid")
+
+    class _Metadata:
+        creation_timestamp = 1782907200000
+        last_sign_in_timestamp = 1782993600000
+
+    class _AuthUser:
+        uid = "rca-fallback-1"
+        email = "rca.fallback@example.com"
+        display_name = "RCA Fallback"
+        phone_number = None
+        user_metadata = _Metadata()
+
+    class _Page:
+        def iterate_all(self):
+            return iter([_AuthUser()])
+
+    def _quota_esgotada(_db):
+        raise RuntimeError("ResourceExhausted")
+
+    monkeypatch.setattr(admin, "_stream_user_docs", _quota_esgotada)
+    monkeypatch.setattr(admin.firebase_auth, "list_users", lambda max_results: _Page())
+
+    response = client.get(
+        "/api/admin/recent-users?days=4&limit=200",
+        headers={"Authorization": "Bearer token"},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["sourceMode"] == "firebase_auth_fallback"
+    assert payload["totals"]["registeredUsers"] == 1
+    assert payload["segments"]["allRegistered"][0]["name"] == "RCA Fallback"
+
+
 def test_admin_billing_overview_returns_report(monkeypatch):
     client = _client(monkeypatch, uid="admin-uid")
 

@@ -470,11 +470,7 @@ def _audit_activity(db, uid: str, since: datetime) -> dict:
 
 
 def _stream_user_docs(db):
-    try:
-        return list(db.collection("users").stream())
-    except Exception:
-        logger.warning("[ADMIN] Falha ao consultar users", exc_info=True)
-        return []
+    return list(db.collection("users").stream())
 
 
 def _user_created_at(user: dict) -> datetime | None:
