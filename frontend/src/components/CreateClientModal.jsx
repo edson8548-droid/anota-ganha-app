@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { Search } from 'lucide-react';
 import { isTurbinadoIndustry, TurbinadoBadge } from '../utils/turbinado';
+import { matchesProductSearch } from '../utils/productSearch';
 import './CreateClientModal.css';
 
 const INDUSTRY_META_FIELDS = ['targetValue', 'alreadySoldValue'];
@@ -40,6 +42,7 @@ const CreateClientModal = ({ onClose, onSave, campaign }) => {
   const [positivations, setPositivations] = useState({});
   const [observations, setObservations] = useState('');
   const [loading, setLoading] = useState(false);
+  const [productSearches, setProductSearches] = useState({});
 
   // Inicializar produtos quando a campanha carregar
   useEffect(() => {
@@ -79,6 +82,7 @@ const CreateClientModal = ({ onClose, onSave, campaign }) => {
       
       console.log('📦 Positivações inicializadas:', initialPositivations);
       setPositivations(initialPositivations);
+      setProductSearches({});
     }
   }, [campaign]);
 
@@ -409,8 +413,12 @@ const CreateClientModal = ({ onClose, onSave, campaign }) => {
                   products = industry;
                 }
                 
-                const status = getIndustryStatus(industryName);
                 const isPositivated = isIndustryPositivated(industryName);
+                const search = productSearches[industryName] || '';
+                const visibleProducts = products.filter(productName => {
+                  const product = positivations[industryName]?.products[productName];
+                  return matchesProductSearch(productName, product?.ean, search);
+                });
 
                 return (
                   <div key={industryName} className={`industry-client-card ${isPositivated ? 'positivated' : ''}`}>
@@ -426,8 +434,20 @@ const CreateClientModal = ({ onClose, onSave, campaign }) => {
                       </span>
                     </div>
 
+                    <label className="product-search-field">
+                      <Search size={17} aria-hidden="true" />
+                      <input
+                        type="search"
+                        value={search}
+                        onChange={(event) => setProductSearches(prev => ({ ...prev, [industryName]: event.target.value }))}
+                        placeholder={`Buscar item em ${industryName} (ex.: bisc tort)`}
+                        aria-label={`Buscar produto da indústria ${industryName}`}
+                      />
+                      <span>{visibleProducts.length}/{products.length}</span>
+                    </label>
+
                     <div className="products-client-list">
-                      {products.map(productName => {
+                      {visibleProducts.map(productName => {
                         const product = positivations[industryName]?.products[productName] || { checked: false, value: 0 };
                         
                         return (
@@ -456,6 +476,9 @@ const CreateClientModal = ({ onClose, onSave, campaign }) => {
                           </div>
                         );
                       })}
+                      {visibleProducts.length === 0 && (
+                        <p className="product-search-empty">Nenhum produto encontrado. Tente outro nome ou EAN.</p>
+                      )}
                     </div>
                   </div>
                 );

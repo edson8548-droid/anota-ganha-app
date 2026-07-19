@@ -7,6 +7,8 @@ const campaignFiles = [
   'src/components/MasterCampaignModal.test.jsx',
   'src/components/MasterCampaignsAdmin.jsx',
   'src/components/CodePromptModal.jsx',
+  'src/components/CreateClientModal.jsx',
+  'src/components/EditClientModal.jsx',
   'src/components/CampaignWeeklyResults.jsx',
   'src/components/CampaignOverviewDashboard.jsx',
   'src/components/TabelaPickerModal.jsx',
@@ -16,6 +18,8 @@ const campaignFiles = [
   'src/utils/campaignIndustryMatch.test.js',
   'src/utils/campaignProgress.js',
   'src/utils/campaignProgress.test.js',
+  'src/utils/productSearch.js',
+  'src/utils/productSearch.test.js',
   'src/utils/turbinado.jsx',
   'src/utils/turbinado.test.jsx',
 ];

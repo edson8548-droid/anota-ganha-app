@@ -337,6 +337,37 @@
 }
 
 /* ==================== PRODUCTS GRID ==================== */
+.product-search-field-edit {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  margin: 0 0 1rem;
+  padding: 0 13px;
+  border: 2px solid #d1d5db;
+  border-radius: 11px;
+  background: #fff;
+  color: #6b7280;
+}
+
+.product-search-field-edit:focus-within {
+  border-color: #3A85A8;
+  box-shadow: 0 0 0 3px rgba(58,133,168,.12);
+}
+
+.product-search-field-edit input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #111827;
+  font: inherit;
+}
+
+.product-search-field-edit span { font-size: 12px; font-weight: 700; white-space: nowrap; }
+.product-search-empty-edit { grid-column: 1 / -1; margin: 0; padding: 18px; text-align: center; color: #6b7280; }
+
 .products-grid-edit {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

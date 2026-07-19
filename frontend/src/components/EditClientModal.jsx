@@ -2,6 +2,8 @@
 // ALTERADO: O título agora é "Positivar Produtos"
 
 import React, { useState, useEffect } from 'react';
+import { Search } from 'lucide-react';
+import { matchesProductSearch } from '../utils/productSearch';
 import './EditClientModal.css'; 
 
 const INDUSTRY_META_FIELDS = ['targetValue', 'alreadySoldValue'];
@@ -16,6 +18,7 @@ const EditClientModal = ({ isOpen, onClose, client, onSave, campaign }) => {
   const [selectAll, setSelectAll] = useState({});
   const [totalValue, setTotalValue] = useState(0);
   const [progressByIndustry, setProgressByIndustry] = useState({});
+  const [productSearches, setProductSearches] = useState({});
 
   // Hook para carregar e mesclar dados (Lógica mantida)
   useEffect(() => {
@@ -30,11 +33,13 @@ const EditClientModal = ({ isOpen, onClose, client, onSave, campaign }) => {
               hydratedIndustries[industryName][productName] = {
                 valor: clientProductData.valor || 0,
                 positivado: clientProductData.positivado || false,
+                ean: clientProductData.ean || products[productName]?.ean || '',
               };
             } else {
               hydratedIndustries[industryName][productName] = {
                 valor: 0,
                 positivado: false,
+                ean: products[productName]?.ean || '',
               };
             }
           });
@@ -48,6 +53,7 @@ const EditClientModal = ({ isOpen, onClose, client, onSave, campaign }) => {
         EMAIL: client.EMAIL || '', notes: client.notes || '',
         industries: hydratedIndustries,
       });
+      setProductSearches({});
     }
   }, [client, campaign, isOpen]);
 
@@ -60,7 +66,7 @@ const EditClientModal = ({ isOpen, onClose, client, onSave, campaign }) => {
         let industryTotal = 0;
         let positivatedCount = 0;
         let totalProducts = 0;
-        Object.entries(products).forEach(([productName, productData]) => {
+        Object.values(products).forEach((productData) => {
           totalProducts++;
           if (productData.positivado) {
             positivatedCount++;
@@ -182,7 +188,12 @@ const EditClientModal = ({ isOpen, onClose, client, onSave, campaign }) => {
               Produtos e Valores
             </h3>
 
-            {formData.industries && Object.entries(formData.industries).map(([industryName, products]) => (
+            {formData.industries && Object.entries(formData.industries).map(([industryName, products]) => {
+              const search = productSearches[industryName] || '';
+              const visibleProducts = Object.entries(products || {}).filter(([productName, productData]) => (
+                matchesProductSearch(productName, productData.ean, search)
+              ));
+              return (
               <div key={industryName} className="industry-card-edit">
                 <div className="industry-header-edit">
                   <div className="industry-info-edit">
@@ -210,8 +221,20 @@ const EditClientModal = ({ isOpen, onClose, client, onSave, campaign }) => {
                   {Math.round(progressByIndustry[industryName]?.percentage || 0)}% concluído
                 </p>
 
+                <label className="product-search-field-edit">
+                  <Search size={17} aria-hidden="true" />
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(event) => setProductSearches(prev => ({ ...prev, [industryName]: event.target.value }))}
+                    placeholder={`Buscar item em ${industryName} (ex.: bisc tort)`}
+                    aria-label={`Buscar produto da indústria ${industryName}`}
+                  />
+                  <span>{visibleProducts.length}/{Object.keys(products || {}).length}</span>
+                </label>
+
                 <div className="products-grid-edit">
-                  {products && Object.entries(products).map(([productName, productData]) => (
+                  {visibleProducts.map(([productName, productData]) => (
                     <div
                       key={productName}
                       className={`product-card-edit ${productData.positivado ? 'positivated' : ''}`}
@@ -254,6 +277,9 @@ const EditClientModal = ({ isOpen, onClose, client, onSave, campaign }) => {
                       )}
                     </div>
                   ))}
+                  {visibleProducts.length === 0 && (
+                    <p className="product-search-empty-edit">Nenhum produto encontrado. Tente outro nome ou EAN.</p>
+                  )}
                 </div>
 
                 <div className="industry-total-edit">
@@ -263,7 +289,8 @@ const EditClientModal = ({ isOpen, onClose, client, onSave, campaign }) => {
                   </span>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
           
           {/* Observações (agora escondidas, mas mantidas para dados) */}

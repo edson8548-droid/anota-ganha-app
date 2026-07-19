@@ -223,6 +223,37 @@
 }
 
 /* Products List */
+.product-search-field {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+  padding: 0 12px;
+  min-height: 42px;
+  border: 2px solid #d1d5db;
+  border-radius: 10px;
+  background: #fff;
+  color: #6b7280;
+}
+
+.product-search-field:focus-within {
+  border-color: #3A85A8;
+  box-shadow: 0 0 0 3px rgba(58,133,168,.12);
+}
+
+.product-search-field input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #111827;
+  font: inherit;
+}
+
+.product-search-field span { font-size: 12px; font-weight: 700; white-space: nowrap; }
+.product-search-empty { margin: 0; padding: 18px; text-align: center; color: #6b7280; }
+
 .products-client-list {
   display: flex;
   flex-direction: column;
