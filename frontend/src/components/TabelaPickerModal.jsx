@@ -19,7 +19,7 @@ const fmtPreco = (v) => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
  * o prazo de preço, marca os produtos e devolve os selecionados via onAdd.
  * onAdd recebe [{ nome, ean, preco, qtd_caixa }].
  */
-export default function TabelaPickerModal({ onClose, onAdd, ctaLabel = 'à vitrine' }) {
+export default function TabelaPickerModal({ onClose, onAdd, ctaLabel = 'à vitrine', overlayZIndex }) {
   const [tabelas, setTabelas] = useState(null);       // null = carregando
   const [tabela, setTabela] = useState(null);          // tabela escolhida
   const [prazo, setPrazo] = useState(null);
@@ -116,7 +116,7 @@ export default function TabelaPickerModal({ onClose, onAdd, ctaLabel = 'à vitri
   };
 
   return (
-    <div className="vt-image-picker-overlay" onClick={onClose}>
+    <div className="vt-image-picker-overlay" onClick={onClose} style={overlayZIndex ? { zIndex: overlayZIndex } : undefined}>
       <div className="vt-image-picker" onClick={e => e.stopPropagation()}
         style={{ display: 'flex', flexDirection: 'column', maxHeight: '86vh', overflow: 'hidden' }}>
 

@@ -359,7 +359,12 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
       </div>
 
       {showTablePicker && (
-        <TabelaPickerModal onClose={() => setShowTablePicker(false)} onAdd={addFromTable} ctaLabel="à campanha" />
+        <TabelaPickerModal
+          onClose={() => setShowTablePicker(false)}
+          onAdd={addFromTable}
+          ctaLabel="à campanha"
+          overlayZIndex={10020}
+        />
       )}
 
       <ConfirmDialog
