@@ -26,7 +26,7 @@ from bson.errors import InvalidId
 import firebase_admin  # noqa: F401  (garante init do app antes do verify)
 from firebase_admin import auth as firebase_auth
 
-from routes.admin import _require_admin  # reusa o gate admin já existente
+from routes.admin import _admin_allowed_emails
 from services.email_verification_access import ensure_email_verified_for_required_user
 from services.subscription_access import ensure_subscription_access
 
@@ -151,6 +151,33 @@ def _mestre_publica(doc: dict) -> dict:
         "temSenha": bool(doc.get("code_hash")),
         "updated_at": _data_publica(doc),
     }
+
+
+async def _require_admin(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> str:
+    """Gate da campanha sem depender de uma leitura adicional no Firestore.
+
+    O token Firebase já é assinado e a permissão continua limitada à allowlist
+    administrativa. Isso evita indisponibilizar a campanha quando o Firestore
+    usado pelo relatório operacional estiver lento ou indisponível.
+    """
+    if not credentials or not credentials.credentials:
+        raise HTTPException(401, "Token obrigatório")
+    try:
+        decoded = await asyncio.to_thread(firebase_auth.verify_id_token, credentials.credentials)
+    except Exception:
+        logger.warning("[SECURITY] auth_invalid route=campanhas_admin")
+        raise HTTPException(401, "Token inválido")
+
+    uid = str(decoded.get("uid") or "").strip()
+    email = str(decoded.get("email") or "").strip().lower()
+    if not uid or decoded.get("email_verified") is not True:
+        raise HTTPException(401, "Token inválido ou e-mail não verificado")
+    if email not in _admin_allowed_emails():
+        logger.warning("[SECURITY] access_denied route=campanhas_admin uid=%s", uid)
+        raise HTTPException(403, "Apenas admins podem acessar este painel")
+    return uid
 
 
 async def _rca_uid(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:

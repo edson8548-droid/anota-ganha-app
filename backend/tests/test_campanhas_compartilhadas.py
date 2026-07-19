@@ -1,8 +1,11 @@
 import os
 import sys
+import asyncio
 
 from bson import ObjectId
 from fastapi import FastAPI
+from fastapi import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -227,3 +230,38 @@ def test_listagem_tolera_campos_legados_e_bson():
     assert data["nome"] == "Campanha SP — Turbinado"
     assert data["updated_at"] == "2026-07-18T12:00:00Z"
     assert data["industries"]["Camil — Turbinado"]["produtos"]["Arroz"]["referencia"] == str(nested_id)
+
+
+def test_admin_da_campanha_usa_token_verificado_e_allowlist(monkeypatch):
+    monkeypatch.setenv("ADMIN_ALLOWED_EMAILS", "edson854_8@hotmail.com")
+    monkeypatch.setattr(cc.firebase_auth, "verify_id_token", lambda _token: {
+        "uid": "admin-1",
+        "email": "edson854_8@hotmail.com",
+        "email_verified": True,
+    })
+
+    uid = asyncio.run(cc._require_admin(HTTPAuthorizationCredentials(
+        scheme="Bearer",
+        credentials="token-valido",
+    )))
+
+    assert uid == "admin-1"
+
+
+def test_admin_da_campanha_bloqueia_email_fora_da_allowlist(monkeypatch):
+    monkeypatch.setenv("ADMIN_ALLOWED_EMAILS", "edson854_8@hotmail.com")
+    monkeypatch.setattr(cc.firebase_auth, "verify_id_token", lambda _token: {
+        "uid": "outro-1",
+        "email": "outro@example.com",
+        "email_verified": True,
+    })
+
+    try:
+        asyncio.run(cc._require_admin(HTTPAuthorizationCredentials(
+            scheme="Bearer",
+            credentials="token-valido",
+        )))
+    except HTTPException as exc:
+        assert exc.status_code == 403
+    else:
+        raise AssertionError("E-mail fora da allowlist deveria ser bloqueado")
