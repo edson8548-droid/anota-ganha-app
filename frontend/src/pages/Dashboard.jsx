@@ -66,6 +66,7 @@ const Dashboard = () => {
   const [showCreateClient, setShowCreateClient] = useState(false);
   const [showEditModal, setShowEditModal] = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
+  const [selectedClientIndustry, setSelectedClientIndustry] = useState('');
   const [editingCampaign, setEditingCampaign] = useState(null);
   const [activeTab, setActiveTab] = useState('clients');
   const [selectedCity, setSelectedCity] = useState('all');
@@ -426,9 +427,10 @@ const Dashboard = () => {
     setSelectedClient(client);
     setShowEditModal('INFO');
   };
-  const handleOpenEditProducts = (e, client) => {
+  const handleOpenEditProducts = (e, client, industryName = '') => {
     e.stopPropagation();
     setSelectedClient(client);
+    setSelectedClientIndustry(industryName);
     setShowEditModal('PRODUCTS');
   };
   const handleUpdateClient = async (updatedClient) => {
@@ -437,11 +439,13 @@ const Dashboard = () => {
       await updateClient(id, clientData);
       setShowEditModal(null);
       setSelectedClient(null);
+      setSelectedClientIndustry('');
     } catch (error) { console.error('Erro ao atualizar cliente:', error); }
   };
   const handleCloseModals = () => {
     setShowEditModal(null);
     setSelectedClient(null);
+    setSelectedClientIndustry('');
   };
   const handleWhatsAppSupport = () => {
     const phoneNumber = '5513996382430';
@@ -2529,7 +2533,7 @@ const Dashboard = () => {
                                 key={industry.name}
                                 type="button"
                                 className={`client-industry-pill ${industry.sold === industry.total && industry.total > 0 ? 'complete' : industry.sold > 0 ? 'partial' : 'empty'}`}
-                                onClick={(e) => handleOpenEditProducts(e, client)}
+                                onClick={(e) => handleOpenEditProducts(e, client, industry.name)}
                                 title={industry.missingProducts.length > 0 ? `Faltam: ${industry.missingProducts.join(', ')}` : 'Industria completa'}
                               >
                                 <span>{industry.name} {isTurbinadoIndustry(industry.name) && <TurbinadoBadge />}</span>
@@ -2585,7 +2589,7 @@ const Dashboard = () => {
                                   const industry = industrySummaries.find(item => item.name === industryName);
                                   if (!industry) return null;
                                   return (
-                                    <div key={industryName} className="industry-section" onClick={(e) => handleOpenEditProducts(e, client)} style={{ cursor: 'pointer' }}>
+                                    <div key={industryName} className="industry-section" onClick={(e) => handleOpenEditProducts(e, client, industryName)} style={{ cursor: 'pointer' }}>
                                       <strong className="industry-name">🏭 {industryName} {isTurbinadoIndustry(industryName) && <TurbinadoBadge />}</strong>
                                       <div className="progress-bar"><div className="progress-fill" style={{ width: `${industry.percentage}%` }} /></div>
                                       <div className="industry-total">
@@ -2777,6 +2781,7 @@ const Dashboard = () => {
           onSave={handleUpdateClient}
           client={selectedClient}
           campaign={selectedCampaign}
+          initialIndustryName={selectedClientIndustry}
         />
       )}
 

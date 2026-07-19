@@ -8,7 +8,7 @@ import './EditClientModal.css';
 
 const INDUSTRY_META_FIELDS = ['targetValue', 'alreadySoldValue'];
 
-const EditClientModal = ({ isOpen, onClose, client, onSave, campaign }) => {
+const EditClientModal = ({ isOpen, onClose, client, onSave, campaign, initialIndustryName = '' }) => {
   const [formData, setFormData] = useState({
     CNPJ: '', CLIENTE: '', CIDADE: '', ESTADO: '',
     ENDERECO: '', BAIRRO: '', CEP: '', TELEFONE: '',
@@ -188,11 +188,22 @@ const EditClientModal = ({ isOpen, onClose, client, onSave, campaign }) => {
               Produtos e Valores
             </h3>
 
-            {formData.industries && Object.entries(formData.industries).map(([industryName, products]) => {
+            {initialIndustryName && (
+              <p className="selected-industry-edit-note">
+                Mostrando somente <strong>{initialIndustryName}</strong>. Os produtos já positivados aparecem primeiro.
+              </p>
+            )}
+
+            {formData.industries && Object.entries(formData.industries)
+              .filter(([industryName]) => !initialIndustryName || industryName === initialIndustryName)
+              .map(([industryName, products]) => {
               const search = productSearches[industryName] || '';
-              const visibleProducts = Object.entries(products || {}).filter(([productName, productData]) => (
-                matchesProductSearch(productName, productData.ean, search)
-              ));
+              const visibleProducts = Object.entries(products || {})
+                .filter(([productName, productData]) => matchesProductSearch(productName, productData.ean, search))
+                .sort(([nameA, productA], [nameB, productB]) => {
+                  if (!!productA.positivado !== !!productB.positivado) return productA.positivado ? -1 : 1;
+                  return nameA.localeCompare(nameB, 'pt-BR', { sensitivity: 'base', numeric: true });
+                });
               return (
               <div key={industryName} className="industry-card-edit">
                 <div className="industry-header-edit">

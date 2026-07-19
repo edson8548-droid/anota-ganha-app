@@ -337,6 +337,18 @@
 }
 
 /* ==================== PRODUCTS GRID ==================== */
+.selected-industry-edit-note {
+  margin: 0 0 14px;
+  padding: 11px 13px;
+  border: 1px solid rgba(58,133,168,.32);
+  border-radius: 10px;
+  background: rgba(58,133,168,.08);
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.selected-industry-edit-note strong { color: #31708E; }
+
 .product-search-field-edit {
   display: flex;
   align-items: center;
