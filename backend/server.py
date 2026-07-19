@@ -238,7 +238,7 @@ async def health_check():
             firebase_error = type(exc).__name__
             logger.exception("[HEALTH] Firestore indisponível")
         try:
-            await asyncio.to_thread(firebase_auth.list_users, 1)
+            await asyncio.to_thread(lambda: firebase_auth.list_users(max_results=1))
             auth_directory_status = "connected"
         except Exception as exc:
             auth_directory_error = type(exc).__name__
