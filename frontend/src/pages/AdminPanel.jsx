@@ -399,6 +399,23 @@ const AdminPanel = () => {
                   <div className="admin-metric-label">Problemas de pagamento</div>
                 </div>
               </div>
+              <div className="admin-metric static">
+                <div className="admin-metric-icon"><Activity size={18} /></div>
+                <div>
+                  <div className="admin-metric-value">
+                    {billing.totals?.trialConversions ?? 0}
+                    {billing.totals?.trialConversionRate != null ? ` (${billing.totals.trialConversionRate}%)` : ''}
+                  </div>
+                  <div className="admin-metric-label">Trials convertidos (7 dias)</div>
+                </div>
+              </div>
+              <div className={`admin-metric static${(billing.totals?.trialRescues ?? 0) > 0 ? ' warn' : ''}`}>
+                <div className="admin-metric-icon"><PhoneCall size={18} /></div>
+                <div>
+                  <div className="admin-metric-value">{billing.totals?.trialRescues ?? 0}</div>
+                  <div className="admin-metric-label">Trials p/ resgatar (7 dias)</div>
+                </div>
+              </div>
             </section>
 
             {billing.webhookAlerts?.length > 0 && (
@@ -453,6 +470,55 @@ const AdminPanel = () => {
                       </div>
                     );
                   })}
+                </div>
+              </section>
+            )}
+
+            {billing.trialRescues?.length > 0 && (
+              <section className="admin-list-section admin-billing-block">
+                <div className="admin-section-header">
+                  <div>
+                    <h2>Resgate de trials</h2>
+                    <p>Venceram há até 7 dias e ainda não assinaram — contato mais quente</p>
+                  </div>
+                </div>
+                <div className="admin-job-list">
+                  {billing.trialRescues.map((rescue) => {
+                    const waUrl = whatsappUrl(rescue.phone);
+                    return (
+                      <div className="admin-job" key={`rescue-${rescue.uid}`}>
+                        <span>{rescue.name || 'Sem nome'} · {rescue.email || 'Sem email'}</span>
+                        <strong>Trial venceu {formatDateOnly(rescue.trialEndsAt)}</strong>
+                        {waUrl ? (
+                          <a className="admin-contact-link" href={waUrl} target="_blank" rel="noreferrer">
+                            <MessageCircle size={14} /> WhatsApp
+                          </a>
+                        ) : (
+                          <em>Sem telefone</em>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {billing.trialConversions?.length > 0 && (
+              <section className="admin-list-section admin-billing-block">
+                <div className="admin-section-header">
+                  <div>
+                    <h2>Novos assinantes</h2>
+                    <p>Primeiro pagamento confirmado no período</p>
+                  </div>
+                </div>
+                <div className="admin-job-list">
+                  {billing.trialConversions.map((conv) => (
+                    <div className="admin-job" key={`conv-${conv.uid}`}>
+                      <span>{conv.name || 'Sem nome'} · {conv.email || 'Sem email'}</span>
+                      <strong>Assinou {formatDateOnly(conv.firstPaymentDate)}</strong>
+                      <em>{formatCurrency(conv.amount)}{conv.convertedFromTrial ? ' · veio do trial' : ''}</em>
+                    </div>
+                  ))}
                 </div>
               </section>
             )}

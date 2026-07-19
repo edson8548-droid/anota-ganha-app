@@ -81,6 +81,9 @@ export default function MasterCampaignsAdmin() {
                   {Object.keys(m.industries || {}).length} indústria(s) · {contarProdutos(m)} produto(s)
                   {m.startDate ? ` · ${m.startDate}${m.endDate ? ` → ${m.endDate}` : ''}` : ''}
                 </span>
+                <span className={`admin-status-badge ${(m.desbloqueios ?? 0) > 0 ? 'ok' : 'warn'}`}>
+                  {m.desbloqueios ?? 0} RCA{(m.desbloqueios ?? 0) === 1 ? '' : 's'} desbloquearam
+                </span>
                 <span className={`admin-status-badge ${m.active ? 'ok' : 'warn'}`}>
                   {m.active ? 'Ativa' : 'Inativa'}{m.temSenha ? ' · com senha' : ' · sem senha'}
                 </span>

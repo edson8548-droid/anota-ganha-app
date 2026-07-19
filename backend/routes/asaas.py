@@ -765,6 +765,12 @@ async def asaas_webhook(
                 "trialEndsAt": None,
             }
         )
+        # Primeira ativação (conversão): o trialEndsAt é apagado acima, então o
+        # momento e a origem da conversão precisam ficar registrados aqui para o
+        # relatório de conversão de trial do painel admin.
+        if existing_data.get("status") != "active" and not existing_data.get("firstPaymentDate"):
+            update["firstPaymentDate"] = now
+            update["convertedFromTrial"] = bool(existing_data.get("trialEndsAt"))
     elif event in {"PAYMENT_OVERDUE", "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED"}:
         if _has_paid_access(existing_data, now):
             update.update(

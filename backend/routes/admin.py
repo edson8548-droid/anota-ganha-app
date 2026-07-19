@@ -65,6 +65,8 @@ TOOL_ACTION_PREFIXES = (
 )
 BILLING_UPCOMING_DAYS = 7
 BILLING_MONTHLY_PRICE_FALLBACK = 99.90
+TRIAL_RESCUE_WINDOW_DAYS = 7
+BILLING_LIST_LIMIT = 50
 WEBHOOK_ALERT_ACTIONS = (
     "asaas_webhook_unmapped",
     "asaas_webhook_invalid_token",
@@ -1401,6 +1403,7 @@ def _build_billing_overview(db, *, days: int, now: datetime | None = None) -> di
     current = now or datetime.now(timezone.utc)
     since = current - timedelta(days=days)
     upcoming_until = current + timedelta(days=BILLING_UPCOMING_DAYS)
+    rescue_since = current - timedelta(days=TRIAL_RESCUE_WINDOW_DAYS)
 
     counts = Counter()
     mrr = 0.0
@@ -1408,6 +1411,8 @@ def _build_billing_overview(db, *, days: int, now: datetime | None = None) -> di
     active_subscribers = []
     upcoming_renewals = []
     payment_issues = []
+    trial_conversions = []
+    trial_rescues = []
 
     for doc in db.collection("subscriptions").stream():
         subscription = doc.to_dict() or {}
@@ -1447,10 +1452,34 @@ def _build_billing_overview(db, *, days: int, now: datetime | None = None) -> di
             entry["paymentIssueAt"] = _iso(issue_at)
             payment_issues.append(entry)
 
+        # Conversão: primeiro pagamento registrado dentro da janela.
+        first_payment = _as_utc_datetime(subscription.get("firstPaymentDate"))
+        if status == "active" and first_payment and first_payment >= since:
+            entry = _billing_user_entry(db, uid, subscription, user_cache)
+            entry["firstPaymentDate"] = _iso(first_payment)
+            entry["convertedFromTrial"] = bool(subscription.get("convertedFromTrial"))
+            trial_conversions.append(entry)
+
+        # Resgate: trial venceu há poucos dias e o RCA ainda não assinou —
+        # é o lead mais quente para contato.
+        trial_end = _as_utc_datetime(subscription.get("trialEndsAt"))
+        if (
+            status in {"trialing", "trial_expired"}
+            and trial_end
+            and rescue_since <= trial_end <= current
+        ):
+            entry = _billing_user_entry(db, uid, subscription, user_cache)
+            trial_rescues.append(entry)
+
     webhook_alerts = _webhook_alerts(db, since)
 
     active_subscribers.sort(key=lambda item: item.get("nextDueDate") or "9999")
     upcoming_renewals.sort(key=lambda item: item.get("nextDueDate") or "9999")
+    trial_conversions.sort(key=lambda item: item.get("firstPaymentDate") or "", reverse=True)
+    trial_rescues.sort(key=lambda item: item.get("trialEndsAt") or "", reverse=True)
+
+    finished_trials = len(trial_conversions) + len(trial_rescues)
+    conversion_rate = round(len(trial_conversions) * 100 / finished_trials) if finished_trials else None
 
     return {
         "window": {
@@ -1470,11 +1499,16 @@ def _build_billing_overview(db, *, days: int, now: datetime | None = None) -> di
             "paymentIssues": len(payment_issues),
             "webhookAlerts": len(webhook_alerts),
             "upcomingRenewals": len(upcoming_renewals),
+            "trialConversions": len(trial_conversions),
+            "trialRescues": len(trial_rescues),
+            "trialConversionRate": conversion_rate,
         },
         "activeSubscribers": active_subscribers,
         "upcomingRenewals": upcoming_renewals,
         "paymentIssues": payment_issues,
         "webhookAlerts": webhook_alerts,
+        "trialConversions": trial_conversions[:BILLING_LIST_LIMIT],
+        "trialRescues": trial_rescues[:BILLING_LIST_LIMIT],
     }
 
 

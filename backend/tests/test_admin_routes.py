@@ -706,3 +706,64 @@ def test_billing_overview_responde_503_quando_firestore_falha(monkeypatch):
 
     assert response.status_code == 503
     assert "faturamento" in response.json()["detail"].lower()
+
+
+def test_billing_overview_conta_conversoes_e_resgates_de_trial():
+    now = datetime.now(timezone.utc)
+    db = _FakeDb()
+    db.users.update({
+        "convertido-uid": {"email": "convertido@example.com", "name": "Convertido", "role": "user"},
+        "resgate-uid": {"email": "resgate@example.com", "name": "Resgate", "role": "user", "telefone": "13999000001"},
+        "trial-futuro-uid": {"email": "futuro@example.com", "name": "Futuro", "role": "user"},
+        "vencido-antigo-uid": {"email": "antigo@example.com", "name": "Antigo", "role": "user"},
+    })
+    db.subscriptions.update({
+        "convertido-uid": {
+            "status": "active",
+            "planId": "monthly",
+            "amount": 99.9,
+            "firstPaymentDate": now - timedelta(days=1),
+            "convertedFromTrial": True,
+            "lastPaymentDate": now - timedelta(days=1),
+        },
+        "resgate-uid": {
+            "status": "trial_expired",
+            "planId": "trial",
+            "trialEndsAt": now - timedelta(days=2),
+        },
+        "trial-futuro-uid": {
+            "status": "trialing",
+            "planId": "trial",
+            "trialEndsAt": now + timedelta(days=5),
+        },
+        "vencido-antigo-uid": {
+            "status": "trial_expired",
+            "planId": "trial",
+            "trialEndsAt": now - timedelta(days=20),
+        },
+    })
+
+    report = admin._build_billing_overview(db, days=7, now=now)
+
+    assert report["totals"]["trialConversions"] == 1
+    assert report["totals"]["trialRescues"] == 1
+    assert report["totals"]["trialConversionRate"] == 50
+
+    assert report["trialConversions"][0]["email"] == "convertido@example.com"
+    assert report["trialConversions"][0]["convertedFromTrial"] is True
+    assert report["trialRescues"][0]["email"] == "resgate@example.com"
+
+    emails_resgate = {item["email"] for item in report["trialRescues"]}
+    assert "futuro@example.com" not in emails_resgate
+    assert "antigo@example.com" not in emails_resgate
+
+
+def test_billing_overview_sem_trials_finalizados_nao_tem_taxa():
+    now = datetime.now(timezone.utc)
+    db = _FakeDb()
+
+    report = admin._build_billing_overview(db, days=7, now=now)
+
+    assert report["totals"]["trialConversions"] == 0
+    assert report["totals"]["trialRescues"] == 0
+    assert report["totals"]["trialConversionRate"] is None

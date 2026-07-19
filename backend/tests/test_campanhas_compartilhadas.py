@@ -280,3 +280,19 @@ def test_admin_da_campanha_bloqueia_email_fora_da_allowlist(monkeypatch):
         assert exc.status_code == 403
     else:
         raise AssertionError("E-mail fora da allowlist deveria ser bloqueado")
+
+
+def test_listagem_admin_mostra_quantos_rcas_desbloquearam():
+    client = _make_client()
+    _criar(client)
+    _criar(client, {"nome": "Outra Campanha", "code": "outra2026"})
+
+    lista_antes = client.get("/api/cc/admin/mestre").json()
+    assert all(item["desbloqueios"] == 0 for item in lista_antes)
+
+    client.post("/api/cc/desbloquear", json={"code": "spani2026"})
+
+    lista = client.get("/api/cc/admin/mestre").json()
+    por_nome = {item["nome"]: item["desbloqueios"] for item in lista}
+    assert por_nome["Spani Julho 2026"] == 1
+    assert por_nome["Outra Campanha"] == 0

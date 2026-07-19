@@ -269,9 +269,17 @@ async def criar_mestre(payload: MestreCreate, admin_uid: str = Depends(_require_
 
 @router.get("/admin/mestre")
 async def listar_mestre_admin(admin_uid: str = Depends(_require_admin)):
+    desbloqueios: dict[str, int] = {}
+    async for acesso in _db.campaign_access.find({}):
+        master_id = str(acesso.get("master_id") or "")
+        if master_id:
+            desbloqueios[master_id] = desbloqueios.get(master_id, 0) + 1
+
     out = []
     async for doc in _db.master_campaigns.find().sort("created_at", -1):
-        out.append(_mestre_publica(doc))
+        item = _mestre_publica(doc)
+        item["desbloqueios"] = desbloqueios.get(item["id"], 0)
+        out.append(item)
     return out
 
 
