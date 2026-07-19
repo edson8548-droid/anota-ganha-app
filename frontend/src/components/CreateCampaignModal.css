@@ -299,6 +299,11 @@
   border-top: 2px solid #f3f4f6;
   margin-top: 24px; padding-top: 24px;
 }
+
+.add-industry-section.editing-industry-active {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, .18);
+}
 .add-industry-section h3 {
   font-size: 18px; font-weight: 600;
   color: #1f2937; margin-bottom: 16px;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Trash2, X, Table2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import ConfirmDialog from './ConfirmDialog';
@@ -67,6 +67,8 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
   const [prod, setProd] = useState({ nome: '', codigo: '', ean: '' });
   const [showTablePicker, setShowTablePicker] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, onConfirm: null, title: '', description: '' });
+  const industryEditorRef = useRef(null);
+  const industryNameInputRef = useRef(null);
 
   const isEdit = !!mestre;
 
@@ -74,6 +76,12 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
     if (!mestre) return;
     setFormData(normalizarMestreParaFormulario(mestre));
   }, [mestre]);
+
+  useEffect(() => {
+    if (editingIndustryId === null) return;
+    industryEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    industryNameInputRef.current?.focus({ preventScroll: true });
+  }, [editingIndustryId]);
 
   const setField = (name, value) => {
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -121,7 +129,7 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
   const saveIndustry = () => {
     if (!currentIndustry.name.trim()) { toast.warning('⚠️ Nome da indústria'); return; }
     if (currentIndustry.products.length === 0) { toast.warning('⚠️ Adicione ao menos 1 produto'); return; }
-    if (editingIndustryId) {
+    if (editingIndustryId !== null) {
       setFormData(prev => ({
         ...prev,
         industries: prev.industries.map(ind =>
@@ -302,11 +310,14 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
           {errors.industries && <span className="error-message">{errors.industries}</span>}
 
           {/* Adicionar/editar indústria */}
-          <div className="add-industry-section">
+          <div
+            ref={industryEditorRef}
+            className={`add-industry-section ${editingIndustryId !== null ? 'editing-industry-active' : ''}`}
+          >
             <h3>{editingIndustryId ? '✏️ Editar indústria' : '➕ Adicionar indústria'}</h3>
             <div className="campaign-form-group">
               <label>Nome da Indústria</label>
-              <input type="text" value={currentIndustry.name} onChange={e => setCurrentIndustry(p => ({ ...p, name: e.target.value }))} placeholder="Ex: Mondelez" />
+              <input ref={industryNameInputRef} type="text" value={currentIndustry.name} onChange={e => setCurrentIndustry(p => ({ ...p, name: e.target.value }))} placeholder="Ex: Mondelez" />
             </div>
             <div className="campaign-form-group">
               <label>Produtos (nome + código/EAN opcionais)</label>
