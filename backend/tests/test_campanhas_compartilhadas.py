@@ -248,6 +248,21 @@ def test_admin_da_campanha_usa_token_verificado_e_allowlist(monkeypatch):
     assert uid == "admin-1"
 
 
+def test_admin_da_campanha_aceita_token_legado_sem_email_verified(monkeypatch):
+    monkeypatch.setenv("ADMIN_ALLOWED_EMAILS", "edson854_8@hotmail.com")
+    monkeypatch.setattr(cc.firebase_auth, "verify_id_token", lambda _token: {
+        "uid": "admin-1",
+        "email": "edson854_8@hotmail.com",
+    })
+
+    uid = asyncio.run(cc._require_admin(HTTPAuthorizationCredentials(
+        scheme="Bearer",
+        credentials="token-legado-valido",
+    )))
+
+    assert uid == "admin-1"
+
+
 def test_admin_da_campanha_bloqueia_email_fora_da_allowlist(monkeypatch):
     monkeypatch.setenv("ADMIN_ALLOWED_EMAILS", "edson854_8@hotmail.com")
     monkeypatch.setattr(cc.firebase_auth, "verify_id_token", lambda _token: {

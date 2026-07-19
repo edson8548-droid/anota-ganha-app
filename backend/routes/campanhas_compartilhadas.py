@@ -172,8 +172,8 @@ async def _require_admin(
 
     uid = str(decoded.get("uid") or "").strip()
     email = str(decoded.get("email") or "").strip().lower()
-    if not uid or decoded.get("email_verified") is not True:
-        raise HTTPException(401, "Token inválido ou e-mail não verificado")
+    if not uid or not email:
+        raise HTTPException(401, "Token inválido")
     if email not in _admin_allowed_emails():
         logger.warning("[SECURITY] access_denied route=campanhas_admin uid=%s", uid)
         raise HTTPException(403, "Apenas admins podem acessar este painel")
