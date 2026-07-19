@@ -1907,6 +1907,117 @@
 .campaign-weekly-confirmation-note { margin: 0 0 10px; }
 .campaign-weekly-footnote { margin: 12px 0 0; }
 
+.campaign-overview {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid rgba(58,133,168,.32);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(49,112,142,.13), rgba(43,45,49,.72));
+}
+
+.campaign-overview-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.campaign-overview-eyebrow {
+  color: #7db7cc;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .09em;
+}
+
+.campaign-overview-heading h2 {
+  margin: 4px 0;
+  color: var(--texto);
+  font-size: 19px;
+}
+
+.campaign-overview-heading p {
+  margin: 0;
+  color: var(--sub);
+  font-size: 12px;
+}
+
+.campaign-overview-shortcuts { display: flex; gap: 8px; flex-wrap: wrap; }
+.campaign-overview-shortcuts button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--borda2);
+  border-radius: 8px;
+  background: var(--bg3);
+  color: var(--texto);
+  cursor: pointer;
+  font-weight: 750;
+}
+.campaign-overview-shortcuts button:hover { border-color: var(--acento2); color: #bfe4f2; }
+
+.campaign-overview-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.campaign-overview-kpis article {
+  padding: 12px;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.campaign-overview-kpis span,
+.campaign-overview-kpis small { display: block; color: var(--sub); font-size: 11px; }
+.campaign-overview-kpis strong { display: block; margin: 5px 0 3px; color: var(--texto); font-size: 18px; }
+.campaign-overview-kpis strong.positive { color: #b7f2d8; }
+.campaign-overview-kpis strong.negative { color: #ff9aa5; }
+
+.campaign-overview-next-action {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--amarelo);
+  border-radius: 8px;
+  background: rgba(232,168,48,.09);
+  color: var(--amarelo);
+}
+.campaign-overview-next-action div { display: grid; gap: 3px; }
+.campaign-overview-next-action strong { color: var(--texto); font-size: 13px; }
+.campaign-overview-next-action span { color: var(--sub); font-size: 12px; }
+
+.campaign-overview-industries {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(235px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.campaign-overview-industries > article {
+  padding: 12px;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.campaign-overview-industries > article.qualified { border-color: rgba(46,204,138,.48); }
+.campaign-overview-industries header { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.campaign-overview-industries header strong { color: var(--texto); }
+.campaign-overview-industries header span { display: inline-flex; align-items: center; gap: 4px; color: var(--sub); font-size: 10px; }
+.campaign-overview-industries .qualified header span { color: #b7f2d8; }
+.campaign-overview-progress-label { display: flex; justify-content: space-between; margin: 10px 0 4px; color: var(--sub); font-size: 11px; }
+.campaign-overview-progress-label b { color: var(--texto); }
+.campaign-overview-progress { height: 7px; overflow: hidden; border-radius: 999px; background: var(--bg3); }
+.campaign-overview-progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--acento), var(--acento2)); }
+.campaign-overview-progress.clients i { background: linear-gradient(90deg, #239b6c, var(--verde)); }
+.campaign-overview-industries small { display: block; margin-top: 4px; color: var(--sub2); }
+.campaign-overview-industries footer { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--borda); color: #b7f2d8; font-size: 11px; }
+.campaign-overview-industries footer.attention { color: var(--amarelo); }
+
 .campaign-weekly-suppliers {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -1965,6 +2076,10 @@
 .campaign-weekly-achievement-card small { color: var(--sub); }
 
 @media (max-width: 640px) {
+  .campaign-overview-heading { flex-direction: column; }
+  .campaign-overview-shortcuts,
+  .campaign-overview-shortcuts button { width: 100%; }
+  .campaign-overview-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .campaign-weekly-actions,
   .campaign-weekly-code-input,
   .campaign-weekly-actions .btn-campaign-action { width: 100%; }

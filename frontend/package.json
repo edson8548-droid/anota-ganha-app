@@ -57,7 +57,7 @@
   "scripts": {
     "start": "vite",
     "build": "node ../scripts/validate-frontend-env.mjs && vite build && node ../scripts/update-csp.mjs",
-    "lint:campaigns": "eslint --config eslint.campaigns.config.mjs src/components/CampaignWeeklyResults.jsx src/components/CodePromptModal.jsx src/components/MasterCampaignModal.jsx src/components/MasterCampaignModal.test.jsx src/components/MasterCampaignsAdmin.jsx src/components/TabelaPickerModal.jsx src/hooks/useMasterCampaigns.jsx src/services/campaigns.service.jsx src/utils/campaignIndustryMatch.js src/utils/campaignIndustryMatch.test.js src/utils/turbinado.jsx src/utils/turbinado.test.jsx",
+    "lint:campaigns": "eslint --config eslint.campaigns.config.mjs src/components/CampaignOverviewDashboard.jsx src/components/CampaignWeeklyResults.jsx src/components/CodePromptModal.jsx src/components/MasterCampaignModal.jsx src/components/MasterCampaignModal.test.jsx src/components/MasterCampaignsAdmin.jsx src/components/TabelaPickerModal.jsx src/hooks/useMasterCampaigns.jsx src/services/campaigns.service.jsx src/utils/campaignIndustryMatch.js src/utils/campaignIndustryMatch.test.js src/utils/campaignProgress.js src/utils/campaignProgress.test.js src/utils/turbinado.jsx src/utils/turbinado.test.jsx",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "preview": "vite preview --host 0.0.0.0"

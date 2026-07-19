@@ -2269,7 +2269,10 @@ const Dashboard = () => {
 
         <CampaignWeeklyResults
           campaign={selectedCampaign}
+          clients={campaignClients}
           onUploaded={refreshSharedMasters}
+          onOpenAnalytics={() => setActiveTab('analytics')}
+          onOpenRaioX={() => setActiveTab('clients')}
         />
 
         {/* Tabs */}

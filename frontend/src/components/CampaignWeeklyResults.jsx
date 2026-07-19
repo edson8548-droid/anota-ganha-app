@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { campaignsService } from '../services/campaigns.service';
+import { buildCampaignProgress } from '../utils/campaignProgress';
+import CampaignOverviewDashboard from './CampaignOverviewDashboard';
 
 const currency = (value) => new Intl.NumberFormat('pt-BR', {
   style: 'currency',
   currency: 'BRL',
 }).format(Number(value) || 0);
 
-export default function CampaignWeeklyResults({ campaign, onUploaded }) {
+export default function CampaignWeeklyResults({ campaign, clients, onUploaded, onOpenAnalytics, onOpenRaioX }) {
   const [uploading, setUploading] = useState(false);
   const [rcaCode, setRcaCode] = useState('');
   const [pendingFile, setPendingFile] = useState(null);
@@ -17,14 +19,7 @@ export default function CampaignWeeklyResults({ campaign, onUploaded }) {
 
   const summary = campaign.weeklySummary || {};
   const result = campaign.rcaResult || {};
-  const achievedIndustries = Object.entries(result.industries || {})
-    .filter(([, item]) => (
-      Number(item.minimumSales) > 0
-      && Number(item.sales) >= Number(item.minimumSales)
-      && Number(item.targetQuantity) > 0
-      && Number(item.quantity) >= Number(item.targetQuantity)
-    ))
-    .sort(([nameA], [nameB]) => nameA.localeCompare(nameB, 'pt-BR', { sensitivity: 'base' }));
+  const achievedIndustries = buildCampaignProgress(result).industries.filter(item => item.qualified);
   const prizeRules = Object.entries(campaign.industries || {}).flatMap(([industryName, industry]) =>
     Object.entries(industry || {})
       .filter(([, product]) => product && typeof product === 'object' && Number(product.premioPorCaixa) > 0)
@@ -101,6 +96,13 @@ export default function CampaignWeeklyResults({ campaign, onUploaded }) {
           </label>
         </div>
       </div>
+
+      <CampaignOverviewDashboard
+        campaign={campaign}
+        clients={clients}
+        onOpenAnalytics={onOpenAnalytics}
+        onOpenRaioX={onOpenRaioX}
+      />
 
       {preview?.requiresConfirmation && (
         <div className="campaign-weekly-confirmation">
@@ -186,14 +188,14 @@ export default function CampaignWeeklyResults({ campaign, onUploaded }) {
 
       {achievedIndustries.length > 0 && (
         <div className="campaign-weekly-achievements" aria-live="polite">
-          {achievedIndustries.map(([name, item]) => (
-            <article key={name} className="campaign-weekly-achievement-card">
+          {achievedIndustries.map(item => (
+            <article key={item.name} className="campaign-weekly-achievement-card">
               <span className="campaign-weekly-achievement-icon" aria-hidden="true">🏆</span>
               <div>
-                <strong>Parabéns! Requisitos mínimos cumpridos em {name}</strong>
-                <p>Você é fera! Vendeu {currency(item.sales)} e atendeu {Number(item.quantity)} clientes.</p>
+                <strong>Parabéns! Requisitos mínimos cumpridos em {item.name}</strong>
+                <p>Você é fera! Vendeu {currency(item.sales)} e atendeu {item.clients} clientes.</p>
                 <small>
-                  Mínimos: {currency(item.minimumSales)} em vendas e {Number(item.targetQuantity)} clientes.
+                  Mínimos: superar {currency(item.minimumSales)} em vendas e atingir {item.clientTarget} clientes.
                 </small>
               </div>
             </article>
