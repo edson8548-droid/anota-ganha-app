@@ -1,8 +1,10 @@
 import os
 import sys
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI
+from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -453,6 +455,22 @@ def test_admin_billing_overview_blocks_non_admin(monkeypatch):
     response = client.get("/api/admin/billing-overview", headers={"Authorization": "Bearer token"})
 
     assert response.status_code == 403
+
+
+def test_admin_gate_usa_allowlist_quando_firestore_falha(monkeypatch):
+    monkeypatch.setenv("ADMIN_ALLOWED_EMAILS", "edson854_8@hotmail.com")
+    monkeypatch.setattr(admin.firebase_auth, "verify_id_token", lambda _token: {
+        "uid": "admin-uid",
+        "email": "edson854_8@hotmail.com",
+    })
+    monkeypatch.setattr(admin, "_fs", lambda: (_ for _ in ()).throw(RuntimeError("firestore offline")))
+
+    uid = asyncio.run(admin._require_admin(HTTPAuthorizationCredentials(
+        scheme="Bearer",
+        credentials="token-valido",
+    )))
+
+    assert uid == "admin-uid"
 
 
 def test_admin_billing_overview_returns_report(monkeypatch):

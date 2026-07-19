@@ -1228,8 +1228,20 @@ async def _require_admin(credentials: HTTPAuthorizationCredentials = Depends(sec
         logger.warning("[SECURITY] auth_invalid route=admin reason=missing_uid")
         raise HTTPException(status_code=401, detail="Token inválido")
 
-    user_doc = await asyncio.to_thread(_fs().collection("users").document(uid).get)
-    user_data = user_doc.to_dict() if user_doc.exists else {}
+    try:
+        user_doc = await asyncio.to_thread(_fs().collection("users").document(uid).get)
+        user_data = user_doc.to_dict() if user_doc.exists else {}
+    except Exception:
+        email = str(decoded.get("email") or "").strip().lower()
+        if email in _admin_allowed_emails():
+            logger.exception(
+                "[SECURITY] firestore_unavailable route=admin fallback=verified_allowlist uid=%s",
+                uid,
+            )
+            return uid
+        logger.exception("[SECURITY] firestore_unavailable route=admin fallback=denied uid=%s", uid)
+        raise HTTPException(status_code=503, detail="Serviço administrativo temporariamente indisponível")
+
     if not user_doc.exists or not _is_allowed_admin_identity(decoded, user_data or {}):
         logger.warning("[SECURITY] access_denied route=admin reason=not_admin uid=%s", uid)
         raise HTTPException(status_code=403, detail="Apenas admins podem acessar este painel")
