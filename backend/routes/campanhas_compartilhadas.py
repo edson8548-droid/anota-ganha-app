@@ -106,6 +106,32 @@ def _normalizar_industries(industries: dict) -> dict:
     return limpo
 
 
+def _valor_publico(value):
+    """Converte valores legados/BSON para tipos seguros no JSON da API."""
+    if isinstance(value, dict):
+        return {str(key): _valor_publico(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_valor_publico(item) for item in value]
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, ObjectId):
+        return str(value)
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    return str(value)
+
+
+def _data_publica(doc: dict) -> str | None:
+    value = doc.get("updated_at") or doc.get("created_at")
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, str):
+        return value
+    return str(value)
+
+
 def _mestre_publica(doc: dict) -> dict:
     """Forma devolvida ao RCA/admin (sem o hash da senha)."""
     return {
@@ -118,13 +144,12 @@ def _mestre_publica(doc: dict) -> dict:
         "objetivosGerais": doc.get("objetivosGerais") or "",
         "startDate": doc.get("startDate"),
         "endDate": doc.get("endDate"),
-        "categorias": doc.get("categorias") or [],
-        "materiaisApoio": doc.get("materiaisApoio") or [],
-        "industries": doc.get("industries") or {},
+        "categorias": _valor_publico(doc.get("categorias") or []),
+        "materiaisApoio": _valor_publico(doc.get("materiaisApoio") or []),
+        "industries": _valor_publico(doc.get("industries") or {}),
         "active": bool(doc.get("active", True)),
         "temSenha": bool(doc.get("code_hash")),
-        "updated_at": (doc.get("updated_at") or doc.get("created_at")).isoformat()
-        if doc.get("updated_at") or doc.get("created_at") else None,
+        "updated_at": _data_publica(doc),
     }
 
 

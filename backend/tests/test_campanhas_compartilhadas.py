@@ -201,3 +201,29 @@ def test_criar_exige_senha_minima():
     # Mínimo agora é 6 (proteção contra chute de senha)
     assert _criar(client, {"code": "abcde"}).status_code == 400
     assert _criar(client, {"code": "abcdef"}).status_code == 200
+
+
+def test_listagem_tolera_campos_legados_e_bson():
+    client = _make_client()
+    mid = ObjectId()
+    nested_id = ObjectId()
+    cc._db.master_campaigns.docs.append({
+        "_id": mid,
+        "nome": "Campanha SP — Turbinado",
+        "updated_at": "2026-07-18T12:00:00Z",
+        "industries": {
+            "Camil — Turbinado": {
+                "produtos": {
+                    "Arroz": {"nome": "Arroz", "referencia": nested_id},
+                },
+            },
+        },
+    })
+
+    response = client.get("/api/cc/admin/mestre")
+
+    assert response.status_code == 200, response.text
+    data = response.json()[0]
+    assert data["nome"] == "Campanha SP — Turbinado"
+    assert data["updated_at"] == "2026-07-18T12:00:00Z"
+    assert data["industries"]["Camil — Turbinado"]["produtos"]["Arroz"]["referencia"] == str(nested_id)
