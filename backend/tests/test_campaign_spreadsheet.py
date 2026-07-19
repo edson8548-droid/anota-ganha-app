@@ -11,9 +11,12 @@ def _workbook_bytes():
     sheet.title = "Camil"
     sheet.cell(6, 3, "RCA")
     sheet.cell(6, 7, "Faturado")
+    sheet.cell(6, 8, "Objetivo")
     sheet.cell(6, 9, "Realizado")
     sheet.cell(7, 3, 607)
+    sheet.cell(7, 6, 1000)
     sheet.cell(7, 7, 1234.5)
+    sheet.cell(7, 8, 20)
     sheet.cell(7, 9, 22)
 
     awarded = workbook.create_sheet("Itens Premiados")
@@ -47,7 +50,12 @@ def test_parser_extrai_meta_geral_e_resultado_individual():
     rca = result["rcaResults"]["607"]
     assert rca["totalPrize"] == 50
     assert rca["awardedItems"][0]["boxes"] == 10
-    assert rca["industries"]["Camil"] == {"sales": 1234.5, "quantity": 22.0}
+    assert rca["industries"]["Camil"] == {
+        "minimumSales": 1000.0,
+        "sales": 1234.5,
+        "targetQuantity": 20.0,
+        "quantity": 22.0,
+    }
 
 
 def test_parser_ignora_bloco_na_quebrado():

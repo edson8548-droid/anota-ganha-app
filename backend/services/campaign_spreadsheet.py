@@ -94,7 +94,9 @@ def parse_campaign_workbook(content: bytes) -> dict:
             if not code or code not in rca_results:
                 continue
             rca_results[code]["industries"][sheet_name] = {
+                "minimumSales": _number(sheet.cell(row, 6).value),
                 "sales": _number(sheet.cell(row, 7).value),
+                "targetQuantity": _number(sheet.cell(row, 8).value),
                 "quantity": _number(sheet.cell(row, 9).value),
             }
 

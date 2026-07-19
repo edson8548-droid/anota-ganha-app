@@ -1843,6 +1843,135 @@
 }
 .btn-campaign-action.ghost:hover { background: rgba(58,133,168,.10); color: #bfe4f2; }
 
+/* ==================== WEEKLY CAMPAIGN RESULTS ==================== */
+.campaign-weekly-results {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--borda);
+  border-radius: 14px;
+  background: var(--bg3);
+  color: var(--texto);
+  box-shadow: 0 10px 28px rgba(0,0,0,.16);
+}
+
+.campaign-weekly-header,
+.campaign-weekly-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.campaign-weekly-header { justify-content: space-between; }
+.campaign-weekly-actions { gap: 8px; }
+
+.campaign-weekly-title { color: var(--texto); }
+
+.campaign-weekly-meta {
+  margin-top: 3px;
+  color: var(--sub);
+  font-size: 12px;
+}
+
+.campaign-weekly-code-input {
+  min-width: 190px;
+  padding: 9px 10px;
+  border: 1px solid var(--borda2);
+  border-radius: 8px;
+  outline: none;
+  background: var(--bg);
+  color: var(--texto);
+  font: inherit;
+}
+
+.campaign-weekly-code-input::placeholder { color: var(--sub2); }
+.campaign-weekly-code-input:focus {
+  border-color: var(--acento2);
+  box-shadow: 0 0 0 3px rgba(58,133,168,.18);
+}
+
+.campaign-weekly-confirmation {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(58,133,168,.55);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.campaign-weekly-confirmation-note,
+.campaign-weekly-footnote {
+  color: var(--sub);
+  font-size: 12px;
+}
+
+.campaign-weekly-confirmation-note { margin: 0 0 10px; }
+.campaign-weekly-footnote { margin: 12px 0 0; }
+
+.campaign-weekly-suppliers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.campaign-weekly-supplier-card {
+  padding: 12px;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.campaign-weekly-supplier-card strong,
+.campaign-weekly-section > strong { color: #bfe4f2; }
+
+.campaign-weekly-section { margin-top: 14px; }
+
+.campaign-weekly-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--borda);
+  color: var(--texto);
+  font-size: 13px;
+}
+
+.campaign-weekly-row span:last-child { color: var(--sub); }
+
+.campaign-weekly-achievements {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.campaign-weekly-achievement-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(46,204,138,.52);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(46,204,138,.13), rgba(58,133,168,.13));
+  color: var(--texto);
+}
+
+.campaign-weekly-achievement-icon { font-size: 28px; }
+.campaign-weekly-achievement-card strong { color: #b7f2d8; }
+.campaign-weekly-achievement-card p {
+  margin: 4px 0 2px;
+  color: var(--texto);
+  font-size: 13px;
+}
+.campaign-weekly-achievement-card small { color: var(--sub); }
+
+@media (max-width: 640px) {
+  .campaign-weekly-actions,
+  .campaign-weekly-code-input,
+  .campaign-weekly-actions .btn-campaign-action { width: 100%; }
+
+  .campaign-weekly-row { flex-direction: column; gap: 3px; }
+}
+
 /* ==================== TABS ==================== */
 .tabs-container {
   max-width: 1400px;

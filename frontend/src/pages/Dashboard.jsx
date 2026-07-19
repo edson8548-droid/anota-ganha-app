@@ -22,6 +22,7 @@ import { backendUrl } from '../config/api';
 import { canAccessAdminPanel } from '../utils/adminAccess';
 import { getPartnerConfig } from '../utils/partnerProgram';
 import { isTurbinadoIndustry, TurbinadoBadge } from '../utils/turbinado';
+import { findImportedIndustry } from '../utils/campaignIndustryMatch';
 import CampaignWeeklyResults from '../components/CampaignWeeklyResults';
 import './Dashboard.css';
 
@@ -190,8 +191,7 @@ const Dashboard = () => {
   };
   const handleEditCampaign = (e, campaign) => {
     e.stopPropagation();
-    // Campanha mestre (oficial): o RCA não edita a estrutura, só as próprias metas.
-    if (campaign?.isShared) { setMetasCampaignId(campaign.id); return; }
+    if (campaign?.isShared) return;
     setEditingCampaign(campaign);
     setShowCreateCampaign(true);
   };
@@ -202,7 +202,7 @@ const Dashboard = () => {
       setUnlocking(true);
       const { master, overlayId } = await unlockShared(code);
       setShowUnlockPrompt(false);
-      toast.success(`✅ Campanha "${master?.nome || ''}" liberada! Agora defina as suas metas.`);
+      toast.success(`✅ Campanha "${master?.nome || ''}" liberada! Envie o Excel para atualizar seus resultados.`);
       if (overlayId) {
         // Vincula a carteira existente do RCA (dedupe por CNPJ), como já
         // acontece automaticamente ao criar campanha própria.
@@ -224,7 +224,6 @@ const Dashboard = () => {
           console.warn('Falha ao vincular carteira:', linkErr?.message);
         }
         setSelectedCampaignId(overlayId);
-        setMetasCampaignId(overlayId); // abre o preenchimento de metas
       }
     } catch (err) {
       const status = err?.response?.status;
@@ -964,7 +963,11 @@ const Dashboard = () => {
         const ci = cl.industries?.[indName] || {};
         prods.forEach(p => { if (ci[p]?.positivado) sold += parseFloat(ci[p].valor) || 0; });
       });
-      industries[indName] = { ...cfg, alreadySoldValue: sold };
+      const imported = findImportedIndustry(indName, selectedCampaign.rcaResult?.industries);
+      industries[indName] = {
+        ...cfg,
+        alreadySoldValue: imported ? Number(imported.sales) || 0 : sold,
+      };
     });
     return { ...selectedCampaign, industries };
   }, [selectedCampaign, campaignClients]);
@@ -2190,7 +2193,7 @@ const Dashboard = () => {
                 <h1>
                   {selectedCampaign.name}
                   {selectedCampaign.isShared && (
-                    <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 700, color: '#c2410c', background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 999, padding: '2px 10px', verticalAlign: 'middle' }}>
+                    <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 700, color: '#bfe4f2', background: 'rgba(58,133,168,.16)', border: '1px solid rgba(58,133,168,.42)', borderRadius: 999, padding: '2px 10px', verticalAlign: 'middle' }}>
                       🔒 Oficial{selectedCampaign.distribuidora ? ` · ${selectedCampaign.distribuidora}` : ''}
                     </span>
                   )}
@@ -2222,9 +2225,11 @@ const Dashboard = () => {
                 <button className="btn-campaign-action secondary" onClick={handlePrintCampaignReport}>
                   <Printer size={16} /> Relatório PDF
                 </button>
-                <button className="btn-campaign-action secondary" onClick={(e) => handleEditCampaign(e, selectedCampaign)}>
-                  <Pencil size={16} /> {selectedCampaign.isShared ? 'Minhas metas' : 'Editar'}
-                </button>
+                {!selectedCampaign.isShared && (
+                  <button className="btn-campaign-action secondary" onClick={(e) => handleEditCampaign(e, selectedCampaign)}>
+                    <Pencil size={16} /> Editar
+                  </button>
+                )}
                 <button className="btn-campaign-action warning" onClick={handleResetCampaignProgress}>
                   <RotateCcw size={16} /> Zerar vendas
                 </button>
@@ -2249,15 +2254,15 @@ const Dashboard = () => {
 
         {/* Regras/descrição da campanha oficial (cadastradas pelo administrador) */}
         {selectedCampaign.isShared && (selectedCampaign.regulamento || selectedCampaign.descricao) && (
-          <div style={{ margin: '12px 16px 0', background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 12, padding: '12px 16px' }}>
-            <strong style={{ fontSize: 13.5, color: '#9a3412', display: 'block', marginBottom: 4 }}>
+          <div style={{ margin: '12px 16px 0', background: '#363940', border: '1px solid #4A4D52', borderRadius: 12, padding: '12px 16px', color: '#E1E1E1' }}>
+            <strong style={{ fontSize: 13.5, color: '#bfe4f2', display: 'block', marginBottom: 4 }}>
               📋 Regras da campanha {selectedCampaign.distribuidora ? `· ${selectedCampaign.distribuidora}` : ''}
             </strong>
             {selectedCampaign.descricao && (
-              <p style={{ fontSize: 13, color: '#7c2d12', margin: '0 0 6px', whiteSpace: 'pre-wrap' }}>{selectedCampaign.descricao}</p>
+              <p style={{ fontSize: 13, color: '#A0A3A8', margin: '0 0 6px', whiteSpace: 'pre-wrap' }}>{selectedCampaign.descricao}</p>
             )}
             {selectedCampaign.regulamento && (
-              <p style={{ fontSize: 12.5, color: '#7c2d12', margin: 0, whiteSpace: 'pre-wrap' }}>{selectedCampaign.regulamento}</p>
+              <p style={{ fontSize: 12.5, color: '#A0A3A8', margin: 0, whiteSpace: 'pre-wrap' }}>{selectedCampaign.regulamento}</p>
             )}
           </div>
         )}

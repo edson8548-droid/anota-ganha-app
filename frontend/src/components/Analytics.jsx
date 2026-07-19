@@ -155,6 +155,11 @@ const Analytics = ({ campaign, clients, onClose }) => {
     });
     topProducts.sort((a, b) => b.count - a.count);
     const topClients = [...clientsAnalysis].sort((a, b) => b.value - a.value).slice(0, 10);
+    const importedIndustries = Object.values(campaign.rcaResult?.industries || {});
+    const importedSales = importedIndustries.reduce((sum, item) => sum + (Number(item.sales) || 0), 0);
+    const importedClientTarget = importedIndustries.reduce((sum, item) => sum + (Number(item.targetQuantity) || 0), 0);
+    const importedClientQuantity = importedIndustries.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+    const hasImportedResults = importedIndustries.length > 0;
     const goalData = Object.values(industriesData).map(industry => {
       const totalSold = industry.alreadySoldValue;
       const remaining = Math.max(industry.targetValue - totalSold, 0);
@@ -178,6 +183,11 @@ const Analytics = ({ campaign, clients, onClose }) => {
       industryNames,
       clientsAnalysis, pieDataGeneral, pieDataCities, barDataProducts,
       topProducts: topProducts.slice(0, 10), topClients, cities, neighborhoods, goalData,
+      hasImportedResults,
+      displayedSales: hasImportedResults ? importedSales : totalValue,
+      displayedPositivationRate: hasImportedResults && importedClientTarget > 0
+        ? (importedClientQuantity / importedClientTarget) * 100
+        : ((totalProducts * filteredClients.length) > 0 ? (totalPositivated / (totalProducts * filteredClients.length)) * 100 : 0),
     };
   }, [campaign, clients, selectedCity, selectedNeighborhood]);
 
@@ -472,8 +482,8 @@ const Analytics = ({ campaign, clients, onClose }) => {
       <div className="metrics-grid">
         <div className="metric-card metric-purple"><div className="metric-icon">👥</div><div className="metric-content"><div className="metric-value">{analytics.totalClients}</div><div className="metric-label">Total de Clientes</div></div></div>
         <div className="metric-card metric-green"><div className="metric-icon">✅</div><div className="metric-content"><div className="metric-value">{analytics.totalPositivated}</div><div className="metric-label">Produtos Positivados</div></div></div>
-        <div className="metric-card metric-blue"><div className="metric-icon">📈</div><div className="metric-content"><div className="metric-value">{analytics.positivationRate.toFixed(1)}%</div><div className="metric-label">Taxa de Positivação</div></div></div>
-        <div className="metric-card metric-orange"><div className="metric-icon">💰</div><div className="metric-content"><div className="metric-value">R$ {(analytics.totalValue / 1000).toFixed(1)}k</div><div className="metric-label">Valor positivado</div></div></div>
+        <div className="metric-card metric-blue"><div className="metric-icon">📈</div><div className="metric-content"><div className="metric-value">{analytics.displayedPositivationRate.toFixed(1)}%</div><div className="metric-label">Taxa de Positivação</div></div></div>
+        <div className="metric-card metric-orange"><div className="metric-icon">💰</div><div className="metric-content"><div className="metric-value">R$ {(analytics.displayedSales / 1000).toFixed(1)}k</div><div className="metric-label">{analytics.hasImportedResults ? 'Vendido na campanha' : 'Valor positivado'}</div></div></div>
         <div className="metric-card metric-gold"><div className="metric-icon">🏆</div><div className="metric-content"><div className="metric-value">{analytics.clientsWithAllProducts}</div><div className="metric-label">Clientes 100%</div></div></div>
       </div>
 

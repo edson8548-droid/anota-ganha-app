@@ -17,6 +17,14 @@ export default function CampaignWeeklyResults({ campaign, onUploaded }) {
 
   const summary = campaign.weeklySummary || {};
   const result = campaign.rcaResult || {};
+  const achievedIndustries = Object.entries(result.industries || {})
+    .filter(([, item]) => (
+      Number(item.minimumSales) > 0
+      && Number(item.sales) >= Number(item.minimumSales)
+      && Number(item.targetQuantity) > 0
+      && Number(item.quantity) >= Number(item.targetQuantity)
+    ))
+    .sort(([nameA], [nameB]) => nameA.localeCompare(nameB, 'pt-BR', { sensitivity: 'base' }));
   const prizeRules = Object.entries(campaign.industries || {}).flatMap(([industryName, industry]) =>
     Object.entries(industry || {})
       .filter(([, product]) => product && typeof product === 'object' && Number(product.premioPorCaixa) > 0)
@@ -55,16 +63,16 @@ export default function CampaignWeeklyResults({ campaign, onUploaded }) {
   };
 
   return (
-    <section style={{ marginTop: 18, padding: 16, border: '1px solid #fed7aa', borderRadius: 14, background: '#fffaf3' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+    <section className="campaign-weekly-results">
+      <div className="campaign-weekly-header">
         <div>
-          <strong>🏆 Itens Premiados</strong>
-          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}>
+          <strong className="campaign-weekly-title">🏆 Itens Premiados</strong>
+          <div className="campaign-weekly-meta">
             Código RCA: {campaign.rcaCode || 'não vinculado'}
             {(summary.periodEnd || result.periodEnd) ? ` · apuração até ${new Date(`${summary.periodEnd || result.periodEnd}T12:00:00`).toLocaleDateString('pt-BR')}` : ''}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="campaign-weekly-actions">
           {!campaign.rcaCode && (
             <input
               type="text"
@@ -74,7 +82,7 @@ export default function CampaignWeeklyResults({ campaign, onUploaded }) {
               placeholder="Seu código RCA (ex.: 614)"
               aria-label="Seu código RCA"
               disabled={uploading || !!preview}
-              style={{ minWidth: 190, padding: '9px 10px', border: '1px solid #fdba74', borderRadius: 8 }}
+              className="campaign-weekly-code-input"
             />
           )}
           <label className="btn-campaign-action secondary" style={{ cursor: uploading ? 'wait' : 'pointer' }}>
@@ -95,13 +103,13 @@ export default function CampaignWeeklyResults({ campaign, onUploaded }) {
       </div>
 
       {preview?.requiresConfirmation && (
-        <div style={{ marginTop: 14, padding: 12, border: '1px solid #fb923c', borderRadius: 10, background: '#fff' }}>
+        <div className="campaign-weekly-confirmation">
           <strong>Confirme seu código antes de vincular</strong>
           <p style={{ margin: '6px 0', fontSize: 13 }}>
             Código {preview.profile?.code} · {preview.profile?.name || 'Nome não informado'}
             {preview.periodEnd ? ` · apuração até ${new Date(`${preview.periodEnd}T12:00:00`).toLocaleDateString('pt-BR')}` : ''}
           </p>
-          <p style={{ margin: '0 0 10px', fontSize: 12, color: '#92400e' }}>
+          <p className="campaign-weekly-confirmation-note">
             Depois de confirmar, somente o administrador poderá alterar este código.
           </p>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -116,9 +124,9 @@ export default function CampaignWeeklyResults({ campaign, onUploaded }) {
       )}
 
       {Array.isArray(summary.suppliers) && summary.suppliers.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10, marginTop: 14 }}>
+        <div className="campaign-weekly-suppliers">
           {summary.suppliers.map(item => (
-            <div key={item.name} style={{ padding: 12, borderRadius: 10, background: '#fff', border: '1px solid #ffedd5' }}>
+            <div key={item.name} className="campaign-weekly-supplier-card">
               <strong>{item.name}</strong>
               <div style={{ fontSize: 12, marginTop: 6 }}>Meta geral: {currency(item.goal)}</div>
               <div style={{ fontSize: 12 }}>Vendido: {currency(item.realized)}</div>
@@ -130,10 +138,10 @@ export default function CampaignWeeklyResults({ campaign, onUploaded }) {
       )}
 
       {prizeRules.length > 0 && (
-        <div style={{ marginTop: 14 }}>
+        <div className="campaign-weekly-section">
           <strong>Produtos e prêmio por caixa</strong>
           {prizeRules.map(item => (
-            <div key={`${item.industryName}:${item.productName}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '7px 0', borderTop: '1px solid #ffedd5', fontSize: 13 }}>
+            <div key={`${item.industryName}:${item.productName}`} className="campaign-weekly-row">
               <span>{item.industryName} · {item.productName}</span>
               <span>
                 {currency(item.premioPorCaixa)} por caixa
@@ -145,11 +153,11 @@ export default function CampaignWeeklyResults({ campaign, onUploaded }) {
       )}
 
       {Array.isArray(result.awardedItems) && result.awardedItems.length > 0 && (
-        <div style={{ marginTop: 14 }}>
+        <div className="campaign-weekly-section">
           <strong>Seu resultado</strong>
           <div style={{ fontSize: 13, margin: '5px 0 8px' }}>Prêmio acumulado: {currency(result.totalPrize)}</div>
           {result.awardedItems.map(item => (
-            <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '7px 0', borderTop: '1px solid #ffedd5', fontSize: 13 }}>
+            <div key={item.name} className="campaign-weekly-row">
               <span>{item.name}</span>
               <span>{Number(item.boxes || 0)} caixas · {currency(item.sales)} · prêmio {currency(item.prize)}</span>
             </div>
@@ -158,20 +166,42 @@ export default function CampaignWeeklyResults({ campaign, onUploaded }) {
       )}
 
       {result.industries && Object.keys(result.industries).length > 0 && (
-        <div style={{ marginTop: 14 }}>
+        <div className="campaign-weekly-section">
           <strong>Suas vendas por indústria</strong>
           {Object.entries(result.industries)
             .sort(([nameA], [nameB]) => nameA.localeCompare(nameB, 'pt-BR', { sensitivity: 'base' }))
             .map(([name, item]) => (
-              <div key={name} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '7px 0', borderTop: '1px solid #ffedd5', fontSize: 13 }}>
+              <div key={name} className="campaign-weekly-row">
                 <span>{name}</span>
-                <span>{currency(item.sales)} · {Number(item.quantity || 0)} clientes atendidos</span>
+                <span>
+                  {currency(item.sales)} · meta {Number(item.targetQuantity || 0)} clientes · realizado {Number(item.quantity || 0)}
+                  {Number(item.targetQuantity) > 0
+                    ? ` · ${((Number(item.quantity || 0) / Number(item.targetQuantity)) * 100).toFixed(1)}%`
+                    : ''}
+                </span>
               </div>
             ))}
         </div>
       )}
 
-      <p style={{ fontSize: 12, color: '#92400e', margin: '12px 0 0' }}>
+      {achievedIndustries.length > 0 && (
+        <div className="campaign-weekly-achievements" aria-live="polite">
+          {achievedIndustries.map(([name, item]) => (
+            <article key={name} className="campaign-weekly-achievement-card">
+              <span className="campaign-weekly-achievement-icon" aria-hidden="true">🏆</span>
+              <div>
+                <strong>Parabéns! Requisitos mínimos cumpridos em {name}</strong>
+                <p>Você é fera! Vendeu {currency(item.sales)} e atendeu {Number(item.quantity)} clientes.</p>
+                <small>
+                  Mínimos: {currency(item.minimumSales)} em vendas e {Number(item.targetQuantity)} clientes.
+                </small>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <p className="campaign-weekly-footnote">
         O prêmio por caixas depende de a indústria atingir a meta geral da campanha.
       </p>
     </section>
