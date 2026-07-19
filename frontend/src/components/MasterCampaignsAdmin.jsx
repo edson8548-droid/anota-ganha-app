@@ -10,6 +10,7 @@ export default function MasterCampaignsAdmin() {
   const [lista, setLista] = useState(null); // null = carregando
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [loadingEditId, setLoadingEditId] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, id: null, nome: '' });
 
   const carregar = useCallback(async () => {
@@ -25,7 +26,18 @@ export default function MasterCampaignsAdmin() {
   useEffect(() => { carregar(); }, [carregar]);
 
   const abrirNova = () => { setEditing(null); setShowModal(true); };
-  const abrirEdicao = (m) => { setEditing(m); setShowModal(true); };
+  const abrirEdicao = async (m) => {
+    try {
+      setLoadingEditId(m.id);
+      const detalhe = await campaignsService.obterMestreAdmin(m.id);
+      setEditing(detalhe);
+      setShowModal(true);
+    } catch (err) {
+      toast.error('Erro ao abrir campanha: ' + (err?.response?.data?.detail || err.message));
+    } finally {
+      setLoadingEditId(null);
+    }
+  };
 
   const excluir = async () => {
     const { id } = confirm;
@@ -83,8 +95,8 @@ export default function MasterCampaignsAdmin() {
                 </span>
               </div>
               <div className="admin-trial-actions">
-                <button type="button" className="admin-refresh" onClick={() => abrirEdicao(m)}>
-                  <Pencil size={14} /> Editar
+                <button type="button" className="admin-refresh" onClick={() => abrirEdicao(m)} disabled={loadingEditId === m.id}>
+                  <Pencil size={14} /> {loadingEditId === m.id ? 'Abrindo...' : 'Editar'}
                 </button>
                 <button type="button" className="admin-refresh" onClick={() => setConfirm({ open: true, id: m.id, nome: m.nome })}>
                   <Trash2 size={14} /> Excluir

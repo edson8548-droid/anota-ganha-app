@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, auth as firebase_auth
 from services.security_audit import audit_event
 from services.security_config import PRODUCTION_CORS_ORIGINS, parse_cors_origins
 from services.security_headers import SecurityHeadersMiddleware
@@ -226,6 +226,8 @@ async def health_check():
         firebase_status = "disconnected"
         firebase_error = None
         firebase_project = None
+        auth_directory_status = "disconnected"
+        auth_directory_error = None
         try:
             firebase_project = getattr(firebase_admin.get_app(), "project_id", None)
             await asyncio.to_thread(
@@ -235,12 +237,20 @@ async def health_check():
         except Exception as exc:
             firebase_error = type(exc).__name__
             logger.exception("[HEALTH] Firestore indisponível")
+        try:
+            await asyncio.to_thread(firebase_auth.list_users, 1)
+            auth_directory_status = "connected"
+        except Exception as exc:
+            auth_directory_error = type(exc).__name__
+            logger.exception("[HEALTH] Diretório do Firebase Auth indisponível")
         return {
             "status": "healthy",
             "database": "connected",
             "firestore": firebase_status,
             "firebase_project": firebase_project,
             "firebase_error": firebase_error,
+            "auth_directory": auth_directory_status,
+            "auth_directory_error": auth_directory_error,
             "build": BUILD_VERSION,
             "commit": BUILD_COMMIT[:12],
         }

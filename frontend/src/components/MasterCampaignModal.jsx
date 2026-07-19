@@ -6,6 +6,49 @@ import TabelaPickerModal from './TabelaPickerModal';
 import { campaignsService } from '../services/campaigns.service';
 import './CreateCampaignModal.css';
 
+const textoSeguro = (value) => value == null ? '' : String(value);
+
+const dataParaInput = (value) => {
+  const text = textoSeguro(value);
+  return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : '';
+};
+
+const categoriasParaTexto = (value) => {
+  if (Array.isArray(value)) return value.map(textoSeguro).filter(Boolean).join(', ');
+  return textoSeguro(value);
+};
+
+export const normalizarMestreParaFormulario = (mestre) => {
+  const industries = mestre?.industries && typeof mestre.industries === 'object' && !Array.isArray(mestre.industries)
+    ? mestre.industries
+    : {};
+  const industriesArray = Object.keys(industries).map((name, i) => {
+    const produtos = industries[name]?.produtos;
+    const produtosValidos = produtos && typeof produtos === 'object' && !Array.isArray(produtos) ? produtos : {};
+    return {
+      id: Date.now() + i,
+      name: textoSeguro(name),
+      products: Object.keys(produtosValidos).map(k => ({
+        nome: textoSeguro(produtosValidos[k]?.nome || k),
+        codigo: textoSeguro(produtosValidos[k]?.codigo),
+        ean: textoSeguro(produtosValidos[k]?.ean),
+      })),
+    };
+  });
+  return {
+    nome: textoSeguro(mestre?.nome),
+    distribuidora: textoSeguro(mestre?.distribuidora),
+    startDate: dataParaInput(mestre?.startDate),
+    endDate: dataParaInput(mestre?.endDate),
+    descricao: textoSeguro(mestre?.descricao),
+    regulamento: textoSeguro(mestre?.regulamento),
+    objetivosGerais: textoSeguro(mestre?.objetivosGerais),
+    categorias: categoriasParaTexto(mestre?.categorias),
+    active: mestre?.active !== false,
+    industries: industriesArray,
+  };
+};
+
 // Campanha MESTRE (admin): estrutura padrão que os RCAs enxergam.
 // NÃO tem meta — as metas são cadastradas por cada RCA na conta dele.
 export default function MasterCampaignModal({ onClose, onSaved, mestre = null }) {
@@ -28,30 +71,7 @@ export default function MasterCampaignModal({ onClose, onSaved, mestre = null })
 
   useEffect(() => {
     if (!mestre) return;
-    const industriesArray = Object.keys(mestre.industries || {}).map((name, i) => {
-      const produtos = mestre.industries[name]?.produtos || {};
-      return {
-        id: Date.now() + i,
-        name,
-        products: Object.keys(produtos).map(k => ({
-          nome: produtos[k]?.nome || k,
-          codigo: produtos[k]?.codigo || '',
-          ean: produtos[k]?.ean || '',
-        })),
-      };
-    });
-    setFormData({
-      nome: mestre.nome || '',
-      distribuidora: mestre.distribuidora || '',
-      startDate: mestre.startDate || '',
-      endDate: mestre.endDate || '',
-      descricao: mestre.descricao || '',
-      regulamento: mestre.regulamento || '',
-      objetivosGerais: mestre.objetivosGerais || '',
-      categorias: (mestre.categorias || []).join(', '),
-      active: mestre.active !== false,
-      industries: industriesArray,
-    });
+    setFormData(normalizarMestreParaFormulario(mestre));
   }, [mestre]);
 
   const setField = (name, value) => {
