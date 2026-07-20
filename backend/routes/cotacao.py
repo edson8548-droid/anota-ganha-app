@@ -30,6 +30,7 @@ from services.excel_processor import (
     processar_arquivo_cotacao,
     gerar_excel_multiprazos,
     detectar_prazos_disponiveis,
+    normalizar_coluna_preco,
 )
 from services.matching_engine import limpar_ean, normalizar_nome
 from services.subscription_access import ensure_subscription_access
@@ -715,11 +716,16 @@ async def processar_cotacao(
     arquivo: UploadFile = File(...),
     tabela_id: str = Form(...),
     modo: str = Form("ean"),
+    coluna_preco: str = Form(""),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     uid = await get_user_id(credentials)
     oid = _object_id_or_400(tabela_id)
     modo = str(modo or "ean").strip().lower()
+    try:
+        coluna_preco = normalizar_coluna_preco(coluna_preco)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
 
     job_ativo = await _preview_ativo_do_usuario(uid)
     if job_ativo:
@@ -760,6 +766,7 @@ async def processar_cotacao(
             tmp_cotacao.name, tmp_mestre.name,
             prazo=doc.get("prazo", 28),
             modo=modo,
+            coluna_preco=coluna_preco,
         )
 
         with open(caminho_resultado, "rb") as f:
@@ -808,6 +815,7 @@ async def preview_cotacao(
     tabela_id: str = Form(...),
     modo: str = Form("ean"),
     prazo: int = Form(0),
+    coluna_preco: str = Form(""),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     """
@@ -820,6 +828,10 @@ async def preview_cotacao(
     uid = await get_user_id(credentials)
     oid = _object_id_or_400(tabela_id)
     modo = str(modo or "ean").strip().lower()
+    try:
+        coluna_preco = normalizar_coluna_preco(coluna_preco)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
 
     job_ativo = await _preview_ativo_do_usuario(uid)
     if job_ativo:
@@ -859,7 +871,7 @@ async def preview_cotacao(
 
         def _processar_sync():
             pd, pl = ler_tabela_mestre(tmp_mestre.name, prazo=prazo_efetivo)
-            its, _ = ler_cotacao(tmp_cotacao.name)
+            its, _ = ler_cotacao(tmp_cotacao.name, coluna_preco=coluna_preco)
             res = processar_cotacao_com_ia(its, pd, pl, modo=modo)
             return pd, pl, its, res
 
@@ -912,10 +924,15 @@ async def _criar_preview_job(
     tabela_id: str,
     modo: str,
     prazo: int,
+    coluna_preco: str = "",
 ):
     """Cria um job de preview já com usuário autenticado."""
     oid = _object_id_or_400(tabela_id)
     modo = str(modo or "ean").strip().lower()
+    try:
+        coluna_preco = normalizar_coluna_preco(coluna_preco)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
 
     doc = await db.tabelas_mestre.find_one({"_id": oid, "user_id": uid})
     if not doc:
@@ -952,6 +969,7 @@ async def _criar_preview_job(
         "input_suffix": _excel_suffix(filename),
         "modo": modo,
         "prazo": prazo,
+        "coluna_preco": coluna_preco,
     }
     try:
         await db.cotacao_jobs.insert_one(job_doc)
@@ -975,11 +993,12 @@ async def preview_cotacao_async(
     tabela_id: str = Form(...),
     modo: str = Form("ean"),
     prazo: int = Form(0),
+    coluna_preco: str = Form(""),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     """Cria um job para o preview da Cotação Pronta sem segurar a requisição aberta."""
     uid = await get_user_id(credentials)
-    return await _criar_preview_job(uid, arquivo, tabela_id, modo, prazo)
+    return await _criar_preview_job(uid, arquivo, tabela_id, modo, prazo, coluna_preco)
 
 
 @router.post("/preview-async-simple")
@@ -988,11 +1007,12 @@ async def preview_cotacao_async_simple(
     tabela_id: str = Form(...),
     modo: str = Form("ean"),
     prazo: int = Form(0),
+    coluna_preco: str = Form(""),
     auth_token: str = Form(...),
 ):
     """Fallback sem header Authorization para redes que bloqueiam preflight CORS."""
     uid = await _get_user_id_from_token(auth_token)
-    return await _criar_preview_job(uid, arquivo, tabela_id, modo, prazo)
+    return await _criar_preview_job(uid, arquivo, tabela_id, modo, prazo, coluna_preco)
 
 
 async def _cleanup_job_input(job):
@@ -1052,7 +1072,7 @@ async def _processar_preview_job(job_id):
 
         def _processar_sync():
             pd, pl = ler_tabela_mestre(tmp_mestre.name, prazo=prazo_efetivo)
-            its, _ = ler_cotacao(tmp_cotacao.name)
+            its, _ = ler_cotacao(tmp_cotacao.name, coluna_preco=job.get("coluna_preco"))
             res = processar_cotacao_com_ia(its, pd, pl, modo=modo)
             return its, res
 

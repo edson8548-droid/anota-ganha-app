@@ -7,7 +7,7 @@ import { listarTabelas, uploadTabela, excluirTabela, processarCotacao, previewCo
 import ReviewMatches from './ReviewMatches';
 import ConfirmDialog from '../components/ConfirmDialog';
 
-const COTACAO_EXTENSION_URL = '/venpro-preencher-cotacao-1.0.62.zip';
+const COTACAO_EXTENSION_URL = '/venpro-preencher-cotacao-1.0.65.zip';
 const DEFAULT_COTACAO_FILENAME = 'cotacao_preenchida.xlsx';
 
 function ensureXlsxFilename(value) {
@@ -50,6 +50,7 @@ export default function Cotacao() {
   const [modoMatch, setModoMatch] = useState('ean');
   const [canalPreenchimento, setCanalPreenchimento] = useState('excel');
   const [arquivoCotacao, setArquivoCotacao] = useState(null);
+  const [colunaPreco, setColunaPreco] = useState('');
 
   // Resultado
   const [resultado, setResultado] = useState(null);
@@ -185,6 +186,7 @@ export default function Cotacao() {
         prazoSelecionado,
         {
           signal: processingAbortRef.current.signal,
+          colunaPreco,
           onJobId: (jobId) => { previewJobIdRef.current = jobId; },
         }
       );
@@ -202,7 +204,7 @@ export default function Cotacao() {
               toast.info('Download cancelado.');
               return;
             }
-            const { blob, stats, semMatch } = await processarCotacao(arquivoCotacao, tabelaSelecionada, modoMatch);
+            const { blob, stats, semMatch } = await processarCotacao(arquivoCotacao, tabelaSelecionada, modoMatch, colunaPreco);
             const filename = await salvarCotacaoPreenchida(blob, destino);
             limparCotacaoSelecionada();
             setResultado({ stats, semMatch, filename });
@@ -340,6 +342,8 @@ export default function Cotacao() {
             setCanalPreenchimento={setCanalPreenchimento}
             arquivoCotacao={arquivoCotacao}
             setArquivoCotacao={setArquivoCotacao}
+            colunaPreco={colunaPreco}
+            setColunaPreco={setColunaPreco}
             processing={processing}
             handleProcessar={handleProcessar}
             handleCancelarProcessamento={handleCancelarProcessamento}
@@ -475,6 +479,7 @@ function CotacaoTab({
   tabelas, tabelaSelecionada, setTabelaSelecionada,
   modoMatch, setModoMatch, canalPreenchimento, setCanalPreenchimento,
   arquivoCotacao, setArquivoCotacao,
+  colunaPreco, setColunaPreco,
   processing, handleProcessar, handleCancelarProcessamento, resultado, setResultado, cotacaoInputRef,
   reviewData, setReviewData, confirmando, handleConfirmar, processingSeg,
   prazoSelecionado, setPrazoSelecionado,
@@ -613,6 +618,17 @@ function CotacaoTab({
                        onChange={e => { setArquivoCotacao(e.target.files?.[0] || null); setReviewData(null); setResultado(null); }}
                        style={{ display: 'none' }} />
               </div>
+              <label style={labelStyle}>Coluna para preencher preço (opcional)</label>
+              <input
+                value={colunaPreco}
+                onChange={e => setColunaPreco(e.target.value.toUpperCase())}
+                placeholder="Ex.: D ou 4"
+                maxLength={3}
+                style={{ ...inputStyle, marginBottom: 6 }}
+              />
+              <p style={{ color: '#A0A3A8', fontSize: 12, margin: '0 0 16px' }}>
+                Deixe em branco para a Venpro identificar a coluna automaticamente.
+              </p>
             </>
           )}
 

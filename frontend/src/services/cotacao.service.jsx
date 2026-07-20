@@ -55,11 +55,12 @@ export const renomearTabela = (id, nome) => {
 
 export const excluirTabela = (id) => api.delete(`/cotacao/tabelas/${id}`);
 
-export const processarCotacao = async (arquivo, tabelaId, modo = 'completo') => {
+export const processarCotacao = async (arquivo, tabelaId, modo = 'completo', colunaPreco = '') => {
   const formData = new FormData();
   formData.append('arquivo', arquivo);
   formData.append('tabela_id', tabelaId);
   formData.append('modo', modo);
+  if (colunaPreco?.trim()) formData.append('coluna_preco', colunaPreco.trim());
 
   const response = await api.post('/cotacao/processar', formData, {
     responseType: 'blob',
@@ -238,6 +239,7 @@ export const previewCotacao = async (arquivo, tabelaId, modo = 'completo', prazo
     formData.append('tabela_id', tabelaId);
     formData.append('modo', modo);
     formData.append('prazo', prazo);
+    if (options.colunaPreco?.trim()) formData.append('coluna_preco', options.colunaPreco.trim());
     if (authToken) formData.append('auth_token', authToken);
     return formData;
   };

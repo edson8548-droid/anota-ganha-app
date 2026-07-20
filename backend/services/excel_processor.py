@@ -23,6 +23,27 @@ def _normalizar_cabecalho(valor) -> str:
     return _re.sub(r"\s+", " ", c).strip()
 
 
+def normalizar_coluna_preco(coluna) -> int | None:
+    """Converte coluna Excel opcional (D ou 4) para índice interno zero-based."""
+    valor = str(coluna or "").strip().upper()
+    if not valor:
+        return None
+    if valor.isdigit():
+        numero = int(valor)
+        if not 1 <= numero <= 16384:
+            raise ValueError("Informe uma coluna entre 1 e 16384.")
+        return numero - 1
+    if not _re.fullmatch(r"[A-Z]{1,3}", valor):
+        raise ValueError("Informe a coluna por letra (ex.: D) ou número (ex.: 4).")
+
+    indice = 0
+    for letra in valor:
+        indice = indice * 26 + (ord(letra) - ord("A") + 1)
+    if indice > 16384:
+        raise ValueError("Informe uma coluna entre A e XFD.")
+    return indice - 1
+
+
 def _cabecalho_contem_prazo(valor, prazo) -> bool:
     """Compara prazos numericamente para aceitar cabeçalhos como ``07 dias``."""
     if prazo is None:
@@ -442,7 +463,7 @@ def _match_cotacao_preco(val):
     return bool(_re.search(r"\bVLR\b.*\bCUSTO\b", c_norm))
 
 
-def _ler_cotacao_worksheet(ws, sheet_name=None, exigir_indicio_cotacao=False):
+def _ler_cotacao_worksheet(ws, sheet_name=None, exigir_indicio_cotacao=False, coluna_preco=None):
     """Lê itens de uma aba de cotação preservando linha, coluna de preço e aba."""
     col_ean = None
     col_nome = None
@@ -509,6 +530,17 @@ def _ler_cotacao_worksheet(ws, sheet_name=None, exigir_indicio_cotacao=False):
 
     if exigir_indicio_cotacao and found_header is None:
         return [], 1
+
+    # Em arquivos com abas auxiliares (pedido, resumo etc.), uma coluna
+    # manual só deve ser aplicada à aba que já se parece com cotação.
+    # Isso evita preencher fórmulas de uma aba de pedido por engano.
+    if exigir_indicio_cotacao and coluna_preco is not None and col_preco is None:
+        return [], 1
+
+    if coluna_preco is not None:
+        if coluna_preco >= ws.max_column:
+            raise ValueError(f"A coluna escolhida não existe na aba '{ws.title}'.")
+        col_preco = coluna_preco
 
     # Cotacao de verdade sem EAN nem preco existe (fica so com nome) e nao
     # pode ser rejeitada. O que rejeitamos e a aba de catalogo/referencia
@@ -724,13 +756,17 @@ def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, p
     return precos, precos_nome_lista
 
 
-def ler_cotacao(caminho_arquivo):
+def ler_cotacao(caminho_arquivo, coluna_preco=None):
     """
     Lê Excel de cotação enviado pelo RCA.
     Corrige automaticamente xlsx com XML inválido (indent > 255).
     Usa detecção parcial de cabeçalhos para tolerar variações de nome.
     Retorna: (itens, header_row)
     """
+    # Rotas internas já guardam o índice zero-based; chamadas externas podem
+    # informar a letra/número visível do Excel.
+    if coluna_preco is not None and not isinstance(coluna_preco, int):
+        coluna_preco = normalizar_coluna_preco(coluna_preco)
     itens = []
     header_row = 1
 
@@ -745,6 +781,7 @@ def ler_cotacao(caminho_arquivo):
                 ws,
                 sheet_name=ws.title if varias_abas else None,
                 exigir_indicio_cotacao=varias_abas,
+                coluna_preco=coluna_preco,
             )
             if sheet_items:
                 itens.extend(sheet_items)
@@ -786,6 +823,11 @@ def ler_cotacao(caminho_arquivo):
                     continue
                 if col_ean is None:
                     col_ean = _inferir_coluna_ean_dataframe(df, ignorar_cols={col_nome, col_preco})
+
+                if coluna_preco is not None:
+                    if coluna_preco >= len(df.columns):
+                        raise ValueError("A coluna escolhida não existe na cotação.")
+                    col_preco = coluna_preco
 
                 header_row = hdr + 1
 
@@ -994,13 +1036,13 @@ def gerar_excel_resultado(caminho_original, itens, resultados):
         return output.name
 
 
-def processar_arquivo_cotacao(caminho_cotacao, caminho_mestre, prazo=28, modo="completo"):
+def processar_arquivo_cotacao(caminho_cotacao, caminho_mestre, prazo=28, modo="completo", coluna_preco=None):
     """
     Pipeline completo: le tabela + cotacao + matching + gera resultado.
     Retorna (caminho_resultado, stats, itens_sem_match)
     """
     precos_dict, precos_lista = ler_tabela_mestre(caminho_mestre, prazo=prazo)
-    itens, header_row = ler_cotacao(caminho_cotacao)
+    itens, header_row = ler_cotacao(caminho_cotacao, coluna_preco=coluna_preco)
 
     resultados = processar_cotacao_com_ia(itens, precos_dict, precos_lista, modo=modo)
     caminho_resultado = gerar_excel_resultado(caminho_cotacao, itens, resultados)

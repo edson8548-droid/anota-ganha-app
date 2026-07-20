@@ -14,6 +14,7 @@ from services.excel_processor import (
     gerar_excel_resultado,
     ler_cotacao,
     ler_tabela_mestre,
+    normalizar_coluna_preco,
 )
 from services.matching_engine import processar_cotacao
 
@@ -82,6 +83,39 @@ def test_cotacao_codigo_nome_preco_reconhece_ean_e_nome():
     assert itens[0]["ean"] == "7891000379585"
     assert itens[0]["nome"] == "ACHOC. NESCAU 200G"
     assert itens[0]["col_preco"] == 2
+
+
+def test_cotacao_permite_escolher_coluna_de_preco_sem_mudar_modo_automatico():
+    path = _xlsx([
+        ["Itens", "QUANTIDADE", "S/PREÇO", "LUIZ", "preco"],
+        ["7891000379585", 2, None, None, None],
+    ])
+    output = None
+    try:
+        automatico, _ = ler_cotacao(path)
+        manual, _ = ler_cotacao(path, coluna_preco="D")
+
+        assert automatico[0]["col_preco"] == 2
+        assert manual[0]["col_preco"] == 3
+        assert normalizar_coluna_preco("4") == 3
+        assert normalizar_coluna_preco("D") == 3
+
+        output = gerar_excel_resultado(
+            path,
+            manual,
+            [{"linha": 2, "preco": 12.34, "tipo": "EAN"}],
+        )
+        wb = load_workbook(output, data_only=True)
+        try:
+            ws = wb.active
+            assert ws.cell(2, 4).value == 12.34
+            assert ws.cell(2, 5).value is None
+        finally:
+            wb.close()
+    finally:
+        os.unlink(path)
+        if output:
+            os.unlink(output)
 
 
 def test_cotacao_prefere_gtin_produto_a_gtin_caixa_e_preenche_preco():
@@ -349,6 +383,25 @@ def test_cotacao_multiplas_abas_preenche_cada_loja_na_aba_correta():
         os.unlink(path)
         if output:
             os.unlink(output)
+
+
+def test_coluna_manual_ignora_aba_auxiliar_sem_coluna_de_preco():
+    path = _xlsx_sheets({
+        "COTACAO": [
+            ["PRODUTO", "EAN", "PREÇO", "FORNECEDOR"],
+            ["ARROZ TESTE", "7891234567890", None, None],
+        ],
+        "PEDIDO": [
+            ["PRODUTO", "QUANTIDADE", "TOTAL", "OBS"],
+            ["ARROZ TESTE", 1, None, None],
+        ],
+    })
+    try:
+        itens, _ = ler_cotacao(path, coluna_preco="D")
+    finally:
+        os.unlink(path)
+
+    assert [(item["sheet_name"], item["col_preco"]) for item in itens] == [("COTACAO", 3)]
 
 
 def test_resultado_preenche_coluna_custo_sem_criar_preco_extra():
