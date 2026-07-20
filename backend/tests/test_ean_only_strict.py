@@ -3,12 +3,13 @@ import sys
 import tempfile
 
 import pandas as pd
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.excel_processor import (
     _append_cotacao_items_from_dataframe,
+    _gerar_excel_de_dados,
     detectar_prazos_disponiveis,
     gerar_excel_resultado,
     ler_cotacao,
@@ -656,6 +657,24 @@ def test_tabela_mestre_reconhece_prazo_com_zero_a_esquerda():
             "DES AERO ABOVE CANDY 150ML",
             "DES AERO ABOVE CREAM WOMEN ORIGINAL 150ML",
         ]
+    finally:
+        os.unlink(path)
+
+
+def test_gerador_de_prazos_inclui_35_e_42_dias():
+    path = _gerar_excel_de_dados(
+        [{"nome": "PRODUTO TESTE", "ean": "7891234567890", "preco_base": 10.0}],
+        {7: 0, 14: 1, 21: 2, 28: 3, 35: 4, 42: 5},
+    )
+    try:
+        workbook = load_workbook(path, data_only=True)
+        sheet = workbook.active
+        assert [sheet.cell(3, col).value for col in range(1, 9)] == [
+            "PRODUTO", "EAN", "7 dias", "14 dias", "21 dias", "28 dias", "35 dias", "42 dias",
+        ]
+        assert sheet.cell(4, 7).value == 10.4
+        assert sheet.cell(4, 8).value == 10.5
+        workbook.close()
     finally:
         os.unlink(path)
 

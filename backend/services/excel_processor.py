@@ -579,12 +579,12 @@ def _ler_cotacao_worksheet(ws, sheet_name=None, exigir_indicio_cotacao=False):
 
 
 def detectar_prazos_disponiveis(caminho_arquivo) -> list:
-    """Detecta quais colunas de prazo (7, 14, 21, 28 dias) existem no Excel."""
+    """Detecta quais colunas de prazo (7 a 42 dias) existem no Excel."""
     for header in range(0, 10):
         try:
             df = pd.read_excel(caminho_arquivo, header=header, nrows=0)
             encontrados = []
-            for prazo in [7, 14, 21, 28]:
+            for prazo in [7, 14, 21, 28, 35, 42]:
                 for col in df.columns:
                     # Normaliza antes de buscar: "preco_14_dias" tem "_" dos
                     # dois lados do numero, e "_" conta como \w no regex, entao
@@ -1453,7 +1453,7 @@ def _gerar_excel_de_dados(rows_data, percentuais):
     ws_out.cell(1, 1).value = "Tabela de Preços com Prazos — gerada pelo Venpro"
     ws_out.cell(1, 1).font = Font(bold=True, size=11, color="2D2926")
 
-    prazos = [7, 14, 21, 28]
+    prazos = [7, 14, 21, 28, 35, 42]
     headers = ["PRODUTO", "EAN"] + [f"{p} dias" for p in prazos]
     header_fill = PatternFill(start_color="B35C44", end_color="B35C44", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=10)
@@ -1477,7 +1477,7 @@ def _gerar_excel_de_dados(rows_data, percentuais):
 
     ws_out.column_dimensions['A'].width = 48
     ws_out.column_dimensions['B'].width = 16
-    for letra in ['C', 'D', 'E', 'F']:
+    for letra in ['C', 'D', 'E', 'F', 'G', 'H']:
         ws_out.column_dimensions[letra].width = 11
 
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
@@ -1489,7 +1489,7 @@ def _gerar_excel_de_dados(rows_data, percentuais):
 def gerar_excel_multiprazos(caminho_base, percentuais, progress_callback=None):
     """
     Orquestrador: aceita Excel (.xlsx/.xls) ou PDF e gera tabela com colunas por prazo.
-    percentuais: {7: 0.0, 14: 2.5, 21: 4.0, 28: 5.5}
+    percentuais: {7: 0.0, 14: 2.5, 21: 4.0, 28: 5.5, 35: 6.5, 42: 7.5}
     """
     if caminho_base.lower().endswith('.pdf'):
         rows_data = _ler_pdf_base(caminho_base, progress_callback=progress_callback)

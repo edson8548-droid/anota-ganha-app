@@ -93,6 +93,8 @@ export const gerarTabelaPrazos = async (arquivo, percentuais, onProgress, option
     formData.append('pct_14', parseFloat(percentuais[14]) || 0);
     formData.append('pct_21', parseFloat(percentuais[21]) || 0);
     formData.append('pct_28', parseFloat(percentuais[28]) || 0);
+    formData.append('pct_35', parseFloat(percentuais[35]) || 0);
+    formData.append('pct_42', parseFloat(percentuais[42]) || 0);
     return formData;
   };
 

@@ -185,7 +185,7 @@ export default function AssistenteIA() {
   // Estado do modal "Gerar Tabela com Prazos"
   const [showTabelaModal, setShowTabelaModal] = useState(false);
   const [tabelaArquivo, setTabelaArquivo] = useState(null);
-  const [pctPrazos, setPctPrazos] = useState({ 7: '', 14: '', 21: '', 28: '' });
+  const [pctPrazos, setPctPrazos] = useState({ 7: '', 14: '', 21: '', 28: '', 35: '', 42: '' });
   const [gerandoTabela, setGerandoTabela] = useState(false);
   const [tabelaSucesso, setTabelaSucesso] = useState(false);
   const [gerandoSeg, setGerandoSeg] = useState(0);
@@ -414,7 +414,7 @@ export default function AssistenteIA() {
 
               {/* % por prazo */}
               <div className="ia-modal-prazos">
-                {[7, 14, 21, 28].map(p => (
+                {[7, 14, 21, 28, 35, 42].map(p => (
                   <div key={p} className="ia-modal-prazo-item">
                     <label>{p} dias</label>
                     <div className="ia-modal-prazo-input">

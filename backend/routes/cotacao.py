@@ -1249,6 +1249,8 @@ async def gerar_tabela_prazos(
     pct_14: float = Form(0.0),
     pct_21: float = Form(0.0),
     pct_28: float = Form(0.0),
+    pct_35: float = Form(0.0),
+    pct_42: float = Form(0.0),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     uid = await get_user_id(credentials)
@@ -1285,6 +1287,8 @@ async def gerar_tabela_prazos(
             "14": pct_14,
             "21": pct_21,
             "28": pct_28,
+            "35": pct_35,
+            "42": pct_42,
         },
     })
 
