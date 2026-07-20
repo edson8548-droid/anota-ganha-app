@@ -23,6 +23,18 @@ def _normalizar_cabecalho(valor) -> str:
     return _re.sub(r"\s+", " ", c).strip()
 
 
+def _cabecalho_contem_prazo(valor, prazo) -> bool:
+    """Compara prazos numericamente para aceitar cabeçalhos como ``07 dias``."""
+    if prazo is None:
+        return False
+    try:
+        prazo_num = int(prazo)
+    except (TypeError, ValueError):
+        return False
+    numeros = _re.findall(r"\b(\d+)\b", _normalizar_cabecalho(valor))
+    return any(int(numero) == prazo_num for numero in numeros)
+
+
 def _cabecalho_sem_nome(valor) -> bool:
     c_norm = _normalizar_cabecalho(valor)
     return not c_norm or c_norm.startswith("UNNAMED ")
@@ -164,10 +176,8 @@ def _score_coluna_preco(nome_coluna, prazo=None) -> int:
     if any(k in c_norm for k in ("TOTAL", "EMB", "CAIXA", "CX", "QTD", "QTDE", "QUANT")):
         return 0
 
-    if prazo:
-        nums = _re.findall(r"\b(\d+)\b", c_norm)
-        if str(prazo) in nums:
-            return 100
+    if _cabecalho_contem_prazo(c_norm, prazo):
+        return 100
 
     if _re.search(r"\b(VL|VLR|VALOR|VAL)\b.*\bLIQUIDO\b", c_norm):
         return 90
@@ -579,8 +589,7 @@ def detectar_prazos_disponiveis(caminho_arquivo) -> list:
                     # Normaliza antes de buscar: "preco_14_dias" tem "_" dos
                     # dois lados do numero, e "_" conta como \w no regex, entao
                     # \b(\d+)\b nunca casava direto na coluna crua.
-                    nums = _re.findall(r'\b(\d+)\b', _normalizar_cabecalho(col))
-                    if str(prazo) in nums:
+                    if _cabecalho_contem_prazo(col, prazo):
                         encontrados.append(prazo)
                         break
             if encontrados:

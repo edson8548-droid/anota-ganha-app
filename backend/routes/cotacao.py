@@ -629,29 +629,48 @@ async def listar_tabelas(credentials: HTTPAuthorizationCredentials = Depends(sec
     async for doc in collection.find({"user_id": uid}).sort("data_upload", -1):
         prazo = doc.get("prazo", 28)
         prazos_disponiveis = doc.get("prazos_disponiveis")
+        qtd_produtos = int(doc.get("qtd_produtos") or 0)
 
-        # Tabelas antigas não têm prazos_disponiveis — detectar e gravar agora
-        if not prazos_disponiveis:
+        # Reindexa metadados antigos ou gravados antes de o parser reconhecer o
+        # formato. A extensão usa qtd_produtos deste endpoint e não lê o XLSX.
+        if not prazos_disponiveis or qtd_produtos <= 0:
+            tmp_path = None
             try:
                 grid_out = await _bucket().open_download_stream(doc["grid_id"])
                 conteudo = await grid_out.read()
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=_tabela_suffix(doc))
                 tmp.write(conteudo)
                 tmp.close()
-                prazos_disponiveis = await asyncio.to_thread(detectar_prazos_disponiveis, tmp.name)
-                os.unlink(tmp.name)
-                await collection.update_one(
-                    {"_id": doc["_id"]},
-                    {"$set": {"prazos_disponiveis": prazos_disponiveis}},
-                )
+                tmp_path = tmp.name
+                updates = {}
+                if not prazos_disponiveis:
+                    prazos_disponiveis = await asyncio.to_thread(detectar_prazos_disponiveis, tmp_path)
+                    updates["prazos_disponiveis"] = prazos_disponiveis
+                if qtd_produtos <= 0:
+                    _, precos_lista = await asyncio.to_thread(
+                        ler_tabela_mestre,
+                        tmp_path,
+                        prazo=prazo,
+                    )
+                    qtd_produtos = len(precos_lista)
+                    if qtd_produtos > 0:
+                        updates["qtd_produtos"] = qtd_produtos
+                if updates:
+                    await collection.update_one({"_id": doc["_id"]}, {"$set": updates})
             except Exception:
-                prazos_disponiveis = [prazo]
+                prazos_disponiveis = prazos_disponiveis or [prazo]
+            finally:
+                if tmp_path:
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
 
         tabelas.append({
             "id": str(doc["_id"]),
             "nome": doc["nome"],
             "filename": doc["filename"],
-            "qtd_produtos": doc["qtd_produtos"],
+            "qtd_produtos": qtd_produtos,
             "prazo": prazo,
             "prazos_disponiveis": prazos_disponiveis,
             "data_upload": doc["data_upload"].isoformat(),

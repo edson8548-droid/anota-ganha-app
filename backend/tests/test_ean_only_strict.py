@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.excel_processor import (
     _append_cotacao_items_from_dataframe,
+    detectar_prazos_disponiveis,
     gerar_excel_resultado,
     ler_cotacao,
     ler_tabela_mestre,
@@ -634,6 +635,27 @@ def test_tabela_mestre_preserva_ean_com_nome_vazio():
         precos, lista = ler_tabela_mestre(path, prazo=7)
         assert precos == {"7891032016625": 16.06}
         assert lista == []
+    finally:
+        os.unlink(path)
+
+
+def test_tabela_mestre_reconhece_prazo_com_zero_a_esquerda():
+    path = _xlsx([
+        ["Código", "Codigo de barras", "Descrição do produto", "07 dias", "Fabricante"],
+        [36650, "7899674017062", "DES AERO ABOVE CANDY 150ML", 5.51, "ABOVE"],
+        [49370, "7899674042873", "DES AERO ABOVE CREAM WOMEN ORIGINAL 150ML", 5.51, "ABOVE"],
+    ])
+    try:
+        assert detectar_prazos_disponiveis(path) == [7]
+        precos, lista = ler_tabela_mestre(path, prazo=7)
+        assert precos == {
+            "7899674017062": 5.51,
+            "7899674042873": 5.51,
+        }
+        assert [item["orig"] for item in lista] == [
+            "DES AERO ABOVE CANDY 150ML",
+            "DES AERO ABOVE CREAM WOMEN ORIGINAL 150ML",
+        ]
     finally:
         os.unlink(path)
 
