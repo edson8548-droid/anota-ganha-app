@@ -122,8 +122,128 @@ describe('extensoes Chrome', () => {
     }
   });
 
+  it('Nafarmas detecta itens e preenche somente Preço Unitário', async () => {
+    const dom = await createContentDom(`
+      <h1>A7Pharma - Cotação Online</h1>
+      <form id="formItensCotacao">
+        <input id="formItensCotacao:itens" value="2" />
+        <table id="formItensCotacao:tabelaItensCotacao">
+          <thead><tr><th></th><th>Cód. Barras</th><th>Produto</th><th>Fabricante</th><th>Unidade</th><th>Qtd</th><th>Preço Unit.</th><th>% Desc.</th></tr></thead>
+          <tbody><tr>
+            <td><input type="checkbox" /></td><td>7899674017062</td><td>DES AERO ABOVE CANDY 150ML</td><td>ABOVE</td><td>1</td><td>6,00</td>
+            <td><input class="numero precoUnitario" id="formItensCotacao:tabelaItensCotacao:0:precoUnitario" /></td>
+            <td><input class="numero desconto" id="formItensCotacao:tabelaItensCotacao:0:desconto" /></td>
+          </tr></tbody>
+        </table>
+        <div id="formItensCotacao:tableItesnScroller"><table><tr><td class="rich-datascr-act">1</td></tr></table></div>
+      </form>
+    `, 'http://nafarmasl.ddns.net:8080/web/cotacao/itensCotacoes.jsp');
+    try {
+      assert.equal(dom.window.eval('detectQuotationSite()'), 'nafarmas-cotacao');
+      const items = await dom.window.eval('extractQuotationItems()');
+      assert.equal(items.length, 1);
+      assert.equal(items[0].ean, '7899674017062');
+      assert.equal(items[0].nome, 'DES AERO ABOVE CANDY 150ML');
+
+      const result = await dom.window.eval(`fillQuotationPrices([{
+        idx: 0, ean: '7899674017062', nome: 'DES AERO ABOVE CANDY 150ML', price: '5,51'
+      }])`);
+      assert.equal(result.filled, 1);
+      assert.equal(dom.window.document.querySelector('input.precoUnitario').value, '5,51');
+      assert.equal(dom.window.document.querySelector('input.desconto').value, '');
+    } finally {
+      dom.window.close();
+    }
+  });
+
+  it('Dobesone usa BARRA como EAN e salva apenas o campo VALOR', async () => {
+    const dom = await createContentDom(`
+      <h2>PRODUTOS COTAÇÃO ONLINE</h2>
+      <table>
+        <thead><tr><th>CÓDIGO</th><th>DESCRIÇÃO</th><th>REFERÊNCIA</th><th>BARRA</th><th>EMB</th><th>UN</th><th>QTDE</th><th>VALOR</th><th>OBSERVAÇÃO</th></tr></thead>
+        <tbody><tr>
+          <td>24396</td><td>CHOCOLATE BATON 16G BRANCO</td><td></td><td>0000078912366</td><td>1</td><td>UN</td><td>90.000</td>
+          <td><input class="form-control input-table maskvalor" id="valor155" name="valor155" /></td>
+          <td><input class="form-control input-table" id="obs155" name="obs155" /></td>
+        </tr></tbody>
+      </table>
+    `, 'https://cotacao.dobesone.emartim.com.br/cotacao.php?chave=teste');
+    try {
+      let saves = 0;
+      dom.window.document.querySelector('#valor155').addEventListener('blur', () => { saves += 1; });
+
+      assert.equal(dom.window.eval('detectQuotationSite()'), 'dobesone-cotacao');
+      const items = await dom.window.eval('extractQuotationItems()');
+      assert.equal(items.length, 1);
+      assert.equal(items[0].ean, '0000078912366');
+      assert.equal(items[0].nome, 'CHOCOLATE BATON 16G BRANCO');
+
+      const result = await dom.window.eval(`fillQuotationPrices([{
+        idx: 0, ean: '0000078912366', nome: 'CHOCOLATE BATON 16G BRANCO', price: '5,51'
+      }])`);
+      assert.equal(result.site, 'dobesone-cotacao');
+      assert.equal(result.filled, 1);
+      assert.equal(dom.window.document.querySelector('#valor155').value, '5,51');
+      assert.equal(dom.window.document.querySelector('#obs155').value, '');
+      assert.ok(saves > 0);
+    } finally {
+      dom.window.close();
+    }
+  });
+
+  it('Syspan preenche Valor Unitário e quantidade mínima sem alterar observações', async () => {
+    const dom = await createContentDom(`
+      <h4>Itens Cotação</h4>
+      <h6>Atenção: Digite a vírgula para as casas decimais</h6>
+      <table>
+        <thead><tr><th>Cód. Barras</th><th>Item</th><th>Unid.</th><th>Qtd Pedido</th><th>Valor Unit.(R$)</th><th>Qtd Mínima</th><th>Subtotal (R$)</th><th>Observação</th></tr></thead>
+        <tbody><tr>
+          <td>07896083800018</td><td>AGUA SANIT.QBOA 1L</td><td>UN</td><td>480</td>
+          <td><input class="direita valor largura_campo" id="vl_845529" name="vl_845529" placeholder="Valor" /></td>
+          <td><input class="direita largura_campo valor_st" id="st_845529" name="st_845529" placeholder="Quantidade" /></td>
+          <td><input disabled id="d_845529" /></td>
+          <td><input id="ma_845529" name="ma_845529" placeholder="Observações" /></td>
+        </tr></tbody>
+      </table>
+    `, 'https://cotacao.syspanweb.com.br/?:=itens_cotacao&tt=atd&c=4204');
+    try {
+      let priceBlurs = 0;
+      let quantityBlurs = 0;
+      dom.window.document.querySelector('#vl_845529').addEventListener('blur', () => { priceBlurs += 1; });
+      dom.window.document.querySelector('#st_845529').addEventListener('blur', () => { quantityBlurs += 1; });
+
+      assert.equal(dom.window.eval('detectQuotationSite()'), 'syspan-cotacao');
+      const items = await dom.window.eval('extractQuotationItems()');
+      assert.equal(items.length, 1);
+      assert.equal(items[0].ean, '07896083800018');
+      assert.equal(items[0].nome, 'AGUA SANIT.QBOA 1L');
+
+      const result = await dom.window.eval(`fillQuotationPrices([{
+        idx: 0, ean: '07896083800018', nome: 'AGUA SANIT.QBOA 1L', price: '5,51'
+      }])`);
+      assert.equal(result.site, 'syspan-cotacao');
+      assert.equal(result.filled, 1);
+      assert.equal(result.diagnostics[0].reason, 'syspan_value_confirmed');
+      assert.equal(dom.window.document.querySelector('#vl_845529').value, '5,51');
+      assert.equal(dom.window.document.querySelector('#st_845529').value, '1');
+      assert.equal(dom.window.document.querySelector('#ma_845529').value, '');
+      assert.ok(priceBlurs > 0);
+      assert.ok(quantityBlurs > 0);
+
+      const withMasterQuantity = await dom.window.eval(`fillQuotationPrices([{
+        idx: 0, ean: '07896083800018', nome: 'AGUA SANIT.QBOA 1L', price: '5,52', fracionamento: '6'
+      }])`);
+      assert.equal(withMasterQuantity.filled, 1);
+      assert.equal(dom.window.document.querySelector('#vl_845529').value, '5,52');
+      assert.equal(dom.window.document.querySelector('#st_845529').value, '6');
+    } finally {
+      dom.window.close();
+    }
+  });
+
   it('manifest da extensao Cotatudo referencia arquivos existentes', () => {
     const manifest = readJson('chrome-extension/manifest.json');
+    const popupJs = readText('chrome-extension/popup.js');
 
     assert.equal(manifest.manifest_version, 3);
     assertFilesExist('chrome-extension', [
@@ -146,6 +266,9 @@ describe('extensoes Chrome', () => {
     assert.match(manifest.description, /Hipcomerp/);
     assert.match(manifest.description, /Easy Cotação Web/);
     assert.match(manifest.description, /Estância/);
+    assert.match(manifest.description, /Nafarmas/);
+    assert.match(manifest.description, /Dobesone/);
+    assert.match(manifest.description, /Syspan/);
     assert.ok(manifest.host_permissions.includes('https://infomagcotacao.com/*'));
     assert.ok(manifest.host_permissions.includes('https://*.intersolid.com.br/*'));
     assert.ok(manifest.host_permissions.includes('http://cotacaoweb.smus.com.br/*'));
@@ -153,6 +276,12 @@ describe('extensoes Chrome', () => {
     assert.ok(manifest.host_permissions.includes('https://cotacao.hipcomerp.com.br/*'));
     assert.ok(manifest.host_permissions.includes('http://gepautomacao.dyndns.org/*'));
     assert.ok(manifest.host_permissions.includes('http://cotacao.estanciasupermercados.com.br/*'));
+    assert.ok(manifest.host_permissions.includes('http://nafarmasl.ddns.net:8080/*'));
+    assert.ok(manifest.host_permissions.includes('https://cotacao.dobesone.emartim.com.br/*'));
+    assert.ok(manifest.host_permissions.includes('https://cotacao.syspanweb.com.br/*'));
+    assert.match(popupJs, /function isSyspanCotacaoUrl/);
+    assert.match(popupJs, /'syspan-cotacao': 'Syspan'/);
+    assert.match(readText('backend/routes/cotacao.py'), /"syspan-cotacao"/);
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('http://179.0.124.205/*')),
       'manifest precisa carregar content script no VR Cotacao conhecido'
@@ -200,6 +329,10 @@ describe('extensoes Chrome', () => {
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('https://*/fornecedores/*/cotacao/*')),
       'manifest precisa carregar content script em rotas genericas de cotacao'
+    );
+    assert.ok(
+      manifest.content_scripts.some(script => (script.matches || []).includes('https://cotacao.syspanweb.com.br/*')),
+      'manifest precisa carregar content script na Syspan'
     );
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('https://anota-ganha-app.web.app/*')),
@@ -270,6 +403,14 @@ describe('extensoes Chrome', () => {
     assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.61.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.62.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.62.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.65.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.65.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.66.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.66.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.67.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.67.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.68.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.68.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-whatsapp-extension.zip')));
   });
 
@@ -298,7 +439,7 @@ describe('extensoes Chrome', () => {
     const contentJs = readText('chrome-extension/content.js');
     const hipcomBridgeJs = readText('chrome-extension/hipcom-main-world.js');
 
-    assert.equal(manifest.version, '1.0.62');
+    assert.equal(manifest.version, '1.0.68');
     assert.ok(
       manifest.content_scripts.some(script => (script.js || []).includes('hipcom-main-world.js') && script.run_at === 'document_start' && script.world === 'MAIN'),
       'Hipcomerp precisa capturar a API antes do Flutter carregar'
@@ -475,7 +616,7 @@ describe('extensoes Chrome', () => {
     const contentJs = readText('chrome-extension/content.js');
     const cotacaoPy = readText('backend/routes/cotacao.py');
 
-    assert.equal(manifest.version, '1.0.62');
+    assert.equal(manifest.version, '1.0.68');
     assert.match(popupJs, /'easy-cotacao-web': 'Easy Cotação Web'/);
     assert.match(popupJs, /function isEasyCotacaoWebUrl/);
     assert.match(popupJs, /gepautomacao\.dyndns\.org/);
@@ -496,7 +637,7 @@ describe('extensoes Chrome', () => {
     const popupJs = readText('chrome-extension/popup.js');
     const contentJs = readText('chrome-extension/content.js');
 
-    assert.equal(manifest.version, '1.0.62');
+    assert.equal(manifest.version, '1.0.68');
     assert.match(popupJs, /'estancia-cotacao': 'Estância'/);
     assert.match(popupJs, /async function runEstanciaJob/);
     assert.match(popupJs, /loadEstanciaQuote/);

@@ -7,7 +7,7 @@ import { listarTabelas, uploadTabela, excluirTabela, processarCotacao, previewCo
 import ReviewMatches from './ReviewMatches';
 import ConfirmDialog from '../components/ConfirmDialog';
 
-const COTACAO_EXTENSION_URL = '/venpro-preencher-cotacao-1.0.65.zip';
+const COTACAO_EXTENSION_URL = '/venpro-preencher-cotacao-1.0.68.zip';
 const DEFAULT_COTACAO_FILENAME = 'cotacao_preenchida.xlsx';
 
 function ensureXlsxFilename(value) {

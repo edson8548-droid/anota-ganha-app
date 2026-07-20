@@ -67,6 +67,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.action === 'getEstanciaState') {
       return getEstanciaState();
     }
+    if (msg.action === 'getNafarmasState') {
+      return getNafarmasState();
+    }
+    if (msg.action === 'loadNextNafarmasPage') {
+      return loadNextNafarmasPage();
+    }
     if (msg.action === 'detectSite') {
       const site = detectQuotationSite();
       const rows = getQuotationRows(site);
@@ -176,6 +182,24 @@ function limparEAN(s) {
 
   const match = s.match(/\d{8,14}/);
   return match ? match[0] : '';
+}
+
+function getDobesoneEan(row) {
+  const cells = getDirectCells(row);
+  const raw = normalizeCellText(cells[3]?.textContent || '');
+  const digits = raw.replace(/\D/g, '');
+  return /^\d{8,14}$/.test(digits) ? digits : limparEAN(raw);
+}
+
+function getSyspanEan(row) {
+  const raw = normalizeCellText(getDirectCells(row)[0]?.textContent || '');
+  const digits = raw.replace(/\D/g, '');
+  return /^\d{8,14}$/.test(digits) ? digits : limparEAN(raw);
+}
+
+function getSyspanMinimumQuantityInput(row) {
+  const input = row.querySelector('input.valor_st[id^="st_"], input[id^="st_"]');
+  return input && !input.disabled && !input.readOnly ? input : null;
 }
 
 function getControlValue(input) {
@@ -2333,6 +2357,18 @@ function getPriceCandidates(row, site = 'generic') {
   if (site === 'sg-cotacao') return getSgCotacaoPriceCandidates(row);
   if (site === 'hr-cotacao') return getHrCotacaoPriceCandidates(row);
   if (site === 'vr-cotacao') return getVrCotacaoPriceCandidates(row);
+  if (site === 'nafarmas-cotacao') {
+    const input = row.querySelector('input.precoUnitario, input[id$=":precoUnitario"]');
+    return input && !input.disabled && !input.readOnly ? [input] : [];
+  }
+  if (site === 'dobesone-cotacao') {
+    const input = row.querySelector('input.maskvalor, input[id^="valor"], input[name^="valor"]');
+    return input && !input.disabled && !input.readOnly ? [input] : [];
+  }
+  if (site === 'syspan-cotacao') {
+    const input = row.querySelector('input.valor[id^="vl_"], input[id^="vl_"]');
+    return input && !input.disabled && !input.readOnly ? [input] : [];
+  }
   const inputs = getEditableInputs(row);
   const priceLike = inputs.filter(isPriceLikeInput);
   return priceLike.length ? priceLike : inputs;
@@ -2340,8 +2376,65 @@ function getPriceCandidates(row, site = 'generic') {
 
 function getSelectedPriceInput(row, empresaColuna, site = 'generic') {
   const candidates = getPriceCandidates(row, site);
-  if (site === 'vr-cotacao') return candidates[0] || null;
+  if (site === 'vr-cotacao' || site === 'dobesone-cotacao' || site === 'syspan-cotacao') return candidates[0] || null;
   return candidates[normalizeEmpresaColuna(empresaColuna)] || null;
+}
+
+function getNafarmasPageSignature() {
+  return Array.from(document.querySelectorAll('#formItensCotacao\\:tabelaItensCotacao tbody tr'))
+    .map(row => normalizeCellText(row.cells?.[1]?.textContent || ''))
+    .filter(Boolean)
+    .join('|');
+}
+
+function getNafarmasState() {
+  if (detectQuotationSite() !== 'nafarmas-cotacao') {
+    return { ok: false, site: 'nafarmas-cotacao', reason: 'not_nafarmas' };
+  }
+  const rows = getQuotationRows('nafarmas-cotacao');
+  const page = Number.parseInt(
+    document.querySelector('#formItensCotacao\\:tableItesnScroller td.rich-datascr-act')?.textContent || '1',
+    10
+  ) || 1;
+  const total = Number.parseInt(
+    document.querySelector('#formItensCotacao\\:itens')?.value || String(rows.length),
+    10
+  ) || rows.length;
+  const pageSize = Math.max(1, rows.length);
+  const hasNext = Array.from(document.querySelectorAll('#formItensCotacao\\:tableItesnScroller td'))
+    .some(cell => normalizeCellText(cell.textContent || '') === 'Próxima' && cell.getAttribute('onclick'));
+  const pages = hasNext ? Math.max(page + 1, Math.ceil(total / pageSize)) : page;
+  return {
+    ok: true,
+    site: 'nafarmas-cotacao',
+    page,
+    pages: Math.max(1, pages),
+    total,
+    pageSize,
+    hasNext,
+    signature: getNafarmasPageSignature(),
+  };
+}
+
+async function loadNextNafarmasPage() {
+  const before = getNafarmasState();
+  if (!before.ok) return before;
+  if (before.page >= before.pages) return { ok: false, reason: 'last_page', state: before };
+
+  const next = Array.from(document.querySelectorAll('#formItensCotacao\\:tableItesnScroller td'))
+    .find(cell => normalizeCellText(cell.textContent || '') === 'Próxima' && cell.getAttribute('onclick'));
+  if (!next) return { ok: false, reason: 'next_button_not_found', state: before };
+
+  next.click();
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 15000) {
+    await waitForGridRender(120);
+    const state = getNafarmasState();
+    if (state.ok && state.page > before.page && state.signature !== before.signature) {
+      return { ok: true, state };
+    }
+  }
+  return { ok: false, reason: 'page_change_timeout', state: getNafarmasState() };
 }
 
 function detectQuotationSite() {
@@ -2362,8 +2455,29 @@ function detectQuotationSite() {
   const looksCotacaoWebSmus = /\bCota[çc][ãa]o\s+Web\b/i.test(bodyText)
     && /\bPre[çc]o\s*UN\b/i.test(bodyText)
     && /\bMensagem\s+Fornecedor\b/i.test(bodyText);
+  const looksNafarmasCotacao = /A7Pharma\s*-\s*Cota[çc][ãa]o\s+Online/i.test(bodyText)
+    && /C[oó]d\.?\s*Barras/i.test(bodyText)
+    && /Pre[çc]o\s+Unit\.?/i.test(bodyText);
+  const looksDobesoneCotacao = /PRODUTOS\s+COTA[ÇC][ÃA]O\s+ONLINE/i.test(bodyText)
+    && /\bBARRA\b/i.test(bodyText)
+    && /\bOBSERVA[ÇC][ÃA]O\b/i.test(bodyText);
+  const looksSyspanCotacao = /Itens\s+Cota[çc][ãa]o/i.test(bodyText)
+    && /C[oó]d\.\s*Barras/i.test(bodyText)
+    && /Valor\s+Unit\.?\s*\(R\$\)/i.test(bodyText)
+    && /Qtd\s+M[ií]nima/i.test(bodyText);
+  const hasSyspanInputGrid = Boolean(
+    document.querySelector('input.valor[id^="vl_"], input[id^="vl_"]')
+    && document.querySelector('input.valor_st[id^="st_"], input[id^="st_"]')
+  );
 
   if (window.location.hostname.includes('cotatudo.com.br')) return 'cotatudo';
+  if (/^nafarmasl\.ddns\.net$/i.test(hostname)
+    && /\/web\/cotacao\/itensCotacoes\.jsp$/i.test(path)) return 'nafarmas-cotacao';
+  if (looksNafarmasCotacao) return 'nafarmas-cotacao';
+  if (/(^|\.)dobesone\.emartim\.com\.br$/i.test(hostname) && /\/cotacao\.php$/i.test(path)) return 'dobesone-cotacao';
+  if (looksDobesoneCotacao) return 'dobesone-cotacao';
+  if (/(^|\.)syspanweb\.com\.br$/i.test(hostname) && (looksSyspanCotacao || hasSyspanInputGrid)) return 'syspan-cotacao';
+  if (looksSyspanCotacao) return 'syspan-cotacao';
   if (isSgCotacaoPage(hostname, bodyText)) return 'sg-cotacao';
   if (isHrCotacaoPage(hostname)) return 'hr-cotacao';
   if (isAriusCotacaoPage(hostname)) return 'arius-cotacao';
@@ -2394,6 +2508,30 @@ function detectQuotationSite() {
 function getQuotationRows(site) {
   if (site === 'cotatudo') {
     return Array.from(document.querySelectorAll('table#conteudo_gvItem tbody tr'));
+  }
+
+  if (site === 'nafarmas-cotacao') {
+    return Array.from(document.querySelectorAll('#formItensCotacao\\:tabelaItensCotacao tbody tr'))
+      .filter(row => getPriceCandidates(row, site).length > 0);
+  }
+
+  if (site === 'dobesone-cotacao') {
+    return Array.from(document.querySelectorAll('table tr')).filter(row => {
+      const cells = getDirectCells(row);
+      return Boolean(
+        getPriceCandidates(row, site).length
+        && getDobesoneEan(row)
+        && normalizeCellText(cells[1]?.textContent || '')
+      );
+    });
+  }
+
+  if (site === 'syspan-cotacao') {
+    return Array.from(document.querySelectorAll('table tbody tr')).filter(row => (
+      getPriceCandidates(row, site).length > 0
+      && getSyspanEan(row)
+      && normalizeCellText(getDirectCells(row)[1]?.textContent || '')
+    ));
   }
 
   if (site === 'sg-cotacao') {
@@ -2676,6 +2814,57 @@ async function scanCotacaoWebSmusRows(onRow, options = {}) {
 }
 
 function extractItemFromRow(row, idx, site, empresaColuna) {
+  if (site === 'nafarmas-cotacao') {
+    const cells = Array.from(row.cells || []);
+    const ean = String(cells[1]?.textContent || '').replace(/\D/g, '');
+    const nome = normalizeCellText(cells[2]?.textContent || '');
+    const priceTarget = getSelectedPriceInput(row, empresaColuna, site);
+    if (!ean && !nome) return null;
+    return {
+      idx,
+      ean: /^\d{8,14}$/.test(ean) ? ean : '',
+      nome,
+      codigo: '',
+      signature: `${ean}|${nome}`,
+      filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
+      current_price: currentPriceValue(priceTarget),
+    };
+  }
+
+  if (site === 'dobesone-cotacao') {
+    const cells = getDirectCells(row);
+    const ean = getDobesoneEan(row);
+    const nome = normalizeCellText(cells[1]?.textContent || '');
+    const priceTarget = getSelectedPriceInput(row, empresaColuna, site);
+    if (!ean && !nome) return null;
+    return {
+      idx,
+      ean,
+      nome,
+      codigo: normalizeCellText(cells[0]?.textContent || ''),
+      signature: `${ean}|${nome}`,
+      filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
+      current_price: currentPriceValue(priceTarget),
+    };
+  }
+
+  if (site === 'syspan-cotacao') {
+    const cells = getDirectCells(row);
+    const ean = getSyspanEan(row);
+    const nome = normalizeCellText(cells[1]?.textContent || '');
+    const priceTarget = getSelectedPriceInput(row, empresaColuna, site);
+    if (!ean && !nome) return null;
+    return {
+      idx,
+      ean,
+      nome,
+      codigo: '',
+      signature: `${ean}|${nome}`,
+      filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
+      current_price: currentPriceValue(priceTarget),
+    };
+  }
+
   if (site === 'sg-cotacao') {
     const ean = getSgCotacaoEan(row);
     const nome = normalizeCellText(getSgCotacaoCell(row, 'Produto')?.textContent || '');
@@ -3454,6 +3643,33 @@ async function fillQuotationPrices(prices, options = {}) {
     return { ok, changed: ok, reason: ok ? 'quantity_filled' : 'quantity_rejected', fracionamento };
   }
 
+  function getSyspanMinimumQuantityValue(item = {}) {
+    return normalizeBubbleCatalogFraction(
+      item.fracionamento
+      ?? item.quantidadeMinima
+      ?? item.quantidade_minima
+      ?? item.minimumQuantity
+      ?? item.qtdMinima
+      ?? item.qtd_minima
+      ?? ''
+    ) || '1';
+  }
+
+  async function ensureSyspanMinimumQuantity(row, item = {}) {
+    const target = getSyspanMinimumQuantityInput(row);
+    const quantidade = getSyspanMinimumQuantityValue(item);
+    if (!target) return { ok: false, changed: false, reason: 'minimum_quantity_input_not_found', quantidade };
+
+    const current = getControlValue(target);
+    if (sameEasyCotacaoQuantity(current, quantidade)) {
+      return { ok: true, changed: false, reason: 'minimum_quantity_already_filled', quantidade };
+    }
+
+    const ok = await setPlainControlValue(target, quantidade);
+    await waitForGridRender(80);
+    return { ok, changed: ok, reason: ok ? 'minimum_quantity_filled' : 'minimum_quantity_rejected', quantidade };
+  }
+
   function getEstanciaPackagePrice(item = {}, row = null) {
     const unitPrice = parsePriceNumber(item.price);
     if (unitPrice === null) return '';
@@ -3652,6 +3868,7 @@ async function fillQuotationPrices(prices, options = {}) {
 
   const isBubbleCatalogFornecedor = site === 'bubble-catalog-fornecedor';
   const isEasyCotacaoWeb = site === 'easy-cotacao-web';
+  const isSyspanCotacao = site === 'syspan-cotacao';
   const isVrCotacao = site === 'vr-cotacao';
   const diagnostics = [];
 
@@ -3675,6 +3892,7 @@ async function fillQuotationPrices(prices, options = {}) {
     let input = getSelectedPriceInput(row, empresaColuna, site);
 
     let fractionResult = null;
+    let syspanQuantityResult = null;
     if (isBubbleCatalogFornecedor) {
       fractionResult = await ensureBubbleCatalogFraction(row, item);
       if (fractionResult.ok || !input) {
@@ -3706,6 +3924,18 @@ async function fillQuotationPrices(prices, options = {}) {
       if (fractionResult.changed || !input) {
         await waitForGridRender(fractionResult.changed ? 160 : 60);
         input = getSelectedPriceInput(row, empresaColuna, site);
+      }
+    }
+    if (isSyspanCotacao) {
+      syspanQuantityResult = await ensureSyspanMinimumQuantity(row, item);
+      if (!syspanQuantityResult.ok) {
+        failed.push(item.idx);
+        details.push({
+          idx: item.idx,
+          reason: syspanQuantityResult.reason,
+          quantidade: syspanQuantityResult.quantidade,
+        });
+        continue;
       }
     }
 
@@ -3758,6 +3988,23 @@ async function fillQuotationPrices(prices, options = {}) {
         attempted: String(item.price ?? ''),
         inputDebug: getVrCotacaoInputDebug(row, currentInput),
       });
+    } else if (isSyspanCotacao) {
+      await waitForGridRender(80);
+      const currentQuantity = getSyspanMinimumQuantityInput(row);
+      persisted = Boolean(
+        ok
+        && samePriceLike(getControlValue(input), item.price)
+        && currentQuantity
+        && sameEasyCotacaoQuantity(getControlValue(currentQuantity), syspanQuantityResult?.quantidade || '1')
+      );
+      diagnostics.push({
+        idx: item.idx,
+        reason: persisted ? 'syspan_value_confirmed' : 'syspan_value_not_confirmed',
+        before,
+        after: getControlValue(input),
+        quantidade: currentQuantity ? getControlValue(currentQuantity) : '',
+        attempted: String(item.price ?? ''),
+      });
     }
 
     if (persisted) count++;
@@ -3771,6 +4018,7 @@ async function fillQuotationPrices(prices, options = {}) {
         after: getControlValue(input),
         attempted: String(item.price ?? ''),
         fracionamento: fractionResult?.fracionamento || '',
+        quantidade: syspanQuantityResult?.quantidade || '',
       });
     }
   }

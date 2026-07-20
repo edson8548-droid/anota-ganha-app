@@ -3,7 +3,7 @@ const BATCH = 50;
 const STUCK_MS = 3 * 60 * 1000;
 const MAX_RESULT_DETAILS = 12;
 const BTN_LABEL = 'Preencher Cotação';
-const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor, Hipcomerp, Easy Cotação Web, Estância, SG Cotação, HR Cotação, Arius Cotação, Bluesoft Cotação ou Guia Cotação primeiro.';
+const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor, Hipcomerp, Easy Cotação Web, Estância, SG Cotação, HR Cotação, Arius Cotação, Bluesoft Cotação, Guia Cotação, Nafarmas, Dobesone ou Syspan primeiro.';
 const SITE_LABELS = {
   cotatudo: 'Cotatudo',
   'vr-cotacao': 'VR Cotação',
@@ -21,6 +21,9 @@ const SITE_LABELS = {
   'arius-cotacao': 'Arius Cotação',
   'bluesoft-cotacao': 'Bluesoft Cotação',
   'guia-cotacao': 'Guia Cotação',
+  'nafarmas-cotacao': 'Nafarmas',
+  'dobesone-cotacao': 'Dobesone',
+  'syspan-cotacao': 'Syspan',
   generic: 'Cotação compatível',
 };
 
@@ -108,6 +111,15 @@ function setDetectedSite(tab, pageInfo = null) {
     type = 'ok';
   } else if (isGuiaCotacaoUrl(url)) {
     label = 'Site detectado: Guia Cotação';
+    type = 'ok';
+  } else if (isNafarmasCotacaoUrl(url)) {
+    label = 'Site detectado: Nafarmas';
+    type = 'ok';
+  } else if (isDobesoneCotacaoUrl(url)) {
+    label = 'Site detectado: Dobesone';
+    type = 'ok';
+  } else if (isSyspanCotacaoUrl(url)) {
+    label = 'Site detectado: Syspan';
     type = 'ok';
   }
 
@@ -415,7 +427,9 @@ function isSupportedQuotationUrl(url = '') {
     || isHrCotacaoUrl(url)
     || isAriusCotacaoUrl(url)
     || isBluesoftCotacaoUrl(url)
-    || isGuiaCotacaoUrl(url);
+    || isGuiaCotacaoUrl(url)
+    || isDobesoneCotacaoUrl(url)
+    || isSyspanCotacaoUrl(url);
 }
 
 function isPotentialQuotationUrl(url = '') {
@@ -553,6 +567,36 @@ function isGuiaCotacaoUrl(url = '') {
   }
 }
 
+function isNafarmasCotacaoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /^nafarmasl\.ddns\.net$/i.test(parsed.hostname)
+      && /\/web\/cotacao\/itensCotacoes\.jsp$/i.test(parsed.pathname);
+  } catch {
+    return /^http:\/\/nafarmasl\.ddns\.net:8080\/web\/cotacao\/itensCotacoes\.jsp/i.test(url);
+  }
+}
+
+function isDobesoneCotacaoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)dobesone\.emartim\.com\.br$/i.test(parsed.hostname)
+      && /\/cotacao\.php$/i.test(parsed.pathname);
+  } catch {
+    return /^(https?:\/\/)?cotacao\.dobesone\.emartim\.com\.br\/cotacao\.php/i.test(url);
+  }
+}
+
+function isSyspanCotacaoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)syspanweb\.com\.br$/i.test(parsed.hostname)
+      && /(?:\?|&)?:?=itens_cotacao/i.test(`${parsed.search}${parsed.hash}`);
+  } catch {
+    return /^(https?:\/\/)?cotacao\.syspanweb\.com\.br\/.*(?:\?|&)?:?=itens_cotacao/i.test(url);
+  }
+}
+
 async function getQuotationTab(options = {}) {
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (active?.id && isPotentialQuotationUrl(active.url || '')) return active;
@@ -594,6 +638,9 @@ async function getQuotationTab(options = {}) {
       'http://erp.bluesoft.com.br/*',
       'https://cg.jrsupermercados.com.br/*',
       'http://cg.jrsupermercados.com.br/*',
+      'http://nafarmasl.ddns.net:8080/*',
+      'https://cotacao.dobesone.emartim.com.br/*',
+      'https://cotacao.syspanweb.com.br/*',
       'https://*/fornecedores/*/cotacao/*',
       'http://*/fornecedores/*/cotacao/*',
       'https://*/cotacao/*',
@@ -629,6 +676,9 @@ function detectSiteFromUrl(url = '') {
   if (isAriusCotacaoUrl(url)) return 'arius-cotacao';
   if (isBluesoftCotacaoUrl(url)) return 'bluesoft-cotacao';
   if (isGuiaCotacaoUrl(url)) return 'guia-cotacao';
+  if (isNafarmasCotacaoUrl(url)) return 'nafarmas-cotacao';
+  if (isDobesoneCotacaoUrl(url)) return 'dobesone-cotacao';
+  if (isSyspanCotacaoUrl(url)) return 'syspan-cotacao';
   return 'generic';
 }
 
@@ -1879,6 +1929,88 @@ async function runEstanciaJob(job, initial = {}) {
   await storageRemove('processingJob');
 }
 
+async function runNafarmasJob(job, initial = {}) {
+  running = true;
+  cancelRequested = false;
+  const token = await getToken();
+  if (!token) throw new Error('Login expirado. Abra o painel do Venpro e tente de novo.');
+
+  let processados = initial.processados || 0;
+  let preenchidos = initial.preenchidos || 0;
+  let naoEncontrados = initial.naoEncontrados || 0;
+  let falhasPreenchimento = initial.falhas || 0;
+  let naoEncontradosDetalhes = Array.isArray(initial.naoEncontradosDetalhes) ? initial.naoEncontradosDetalhes : [];
+  let falhasDetalhes = Array.isArray(initial.falhasDetalhes) ? initial.falhasDetalhes : [];
+
+  while (true) {
+    if (cancelRequested) break;
+    const state = await sendToQuotationPage({ action: 'getNafarmasState' });
+    if (!state?.ok) throw new Error(`Não consegui ler a paginação do Nafarmas (${state?.reason || 'estado indisponível'}).`);
+
+    const extractResult = await extractOpenQuotationItems(job.empresaColuna || 0);
+    const items = extractResult.items || [];
+    if (!items.length) throw new Error(`Não encontrei itens na página ${state.page} do Nafarmas.`);
+
+    job.items = items;
+    job.site = 'nafarmas-cotacao';
+    await storageSet({ processingJob: job });
+    const pct = Math.round(((state.page - 1) / Math.max(1, state.pages)) * 100);
+    setProgress(pct, `Nafarmas · pág. ${state.page}/${state.pages} · ${items.length} itens`);
+    setStatus(`Nafarmas: buscando preços da página ${state.page}/${state.pages}...`, 'info');
+
+    const data = await matchBatch(token, job, items, state.page, state.pages);
+    const precos = Array.isArray(data.precos) ? data.precos : [];
+    const missingDetails = missingDetailsForBatch(items, precos, data.mantidos);
+    const missingCount = missingDetails.length || Math.max(0, items.length - precos.length);
+    naoEncontradosDetalhes = mergeResultDetails(naoEncontradosDetalhes, missingDetails);
+    naoEncontrados += missingCount;
+
+    const pricesToFill = enrichPricesForFill(precos, items);
+    let filled = 0;
+    if (pricesToFill.length) {
+      const fillResult = await sendToQuotationPage({
+        action: 'fillPrices',
+        prices: pricesToFill,
+        empresaColuna: job.empresaColuna || 0,
+      });
+      filled = fillResult?.filled || 0;
+      const failures = failureDetailsFromFill(fillResult, pricesToFill);
+      falhasDetalhes = mergeResultDetails(falhasDetalhes, failures);
+      const failedCount = Array.isArray(fillResult?.failed) ? fillResult.failed.length : 0;
+      if (filled !== pricesToFill.length || failedCount > 0) {
+        falhasPreenchimento += Math.max(failedCount, pricesToFill.length - filled);
+        throw new Error(`Nafarmas: alguns preços não entraram na página ${state.page}. Parei antes de trocar de página.`);
+      }
+    }
+
+    preenchidos += filled;
+    processados += items.length;
+    const completedPct = Math.round((state.page / Math.max(1, state.pages)) * 100);
+    await saveState({
+      status: 'processing', total: state.total, processados, preenchidos,
+      naoEncontrados, falhas: falhasPreenchimento, naoEncontradosDetalhes, falhasDetalhes,
+      pct: completedPct, page: state.page + 1, ts: Date.now(),
+    });
+
+    if (state.page >= state.pages) break;
+    setStatus(`Nafarmas: página ${state.page} preenchida. Abrindo a próxima...`, 'info');
+    const next = await sendToQuotationPage({ action: 'loadNextNafarmasPage' });
+    if (!next?.ok) throw new Error(`Nafarmas: não consegui abrir a próxima página (${next?.reason || 'erro desconhecido'}).`);
+  }
+
+  await reportFill(token, {
+    event_type: 'job', status: 'done', job_id: job.jobId, tabela_id: job.tabelaId,
+    prazo: job.prazo, modo: job.modo, site: 'nafarmas-cotacao', total_itens: processados,
+    batch_total: processados, preenchidos, falhas: falhasPreenchimento, nao_encontrados: naoEncontrados,
+  });
+  await saveState({
+    status: 'done', total: processados, processados, preenchidos, naoEncontrados,
+    falhas: falhasPreenchimento, naoEncontradosDetalhes, falhasDetalhes, pct: 100,
+  });
+  await storageRemove('processingJob');
+  setStatus('Nafarmas preenchido. Revise a última página e clique em Finalizar no portal.', 'ok');
+}
+
 async function startProcessing() {
   const tabelaId = tabelasEl.value;
   const prazo = parseInt(prazoEl.value, 10);
@@ -1934,6 +2066,9 @@ async function startProcessing() {
     } else if (site === 'estancia-cotacao') {
       setStatus(`Estância: iniciando com ${items.length} itens na página atual...`, 'info');
       await runEstanciaJob(job);
+    } else if (site === 'nafarmas-cotacao') {
+      setStatus(`Nafarmas: iniciando com ${items.length} itens na página atual...`, 'info');
+      await runNafarmasJob(job);
     } else {
       setStatus(`Processando ${items.length} itens...`, 'info');
       await runJob(job);
@@ -1947,7 +2082,7 @@ async function resumeProcessing() {
   const data = await storageGet(['processingJob', 'processingState']);
   const job = data.processingJob;
   const state = data.processingState || {};
-  if (!job || (job.site !== 'hipcomerp-cotacao' && job.site !== 'estancia-cotacao' && !job.items?.length)) {
+  if (!job || (job.site !== 'hipcomerp-cotacao' && job.site !== 'estancia-cotacao' && job.site !== 'nafarmas-cotacao' && !job.items?.length)) {
     resetUI();
     setStatus('Não encontrei processamento para retomar. Inicie novamente.', 'err');
     return;
@@ -1987,6 +2122,15 @@ async function resumeProcessing() {
       await runEstanciaJob(job, {
         quoteIndex: state.quoteIndex || 0,
         page: state.page || 1,
+        preenchidos: state.preenchidos || 0,
+        naoEncontrados: state.naoEncontrados || 0,
+        falhas: state.falhas || 0,
+        processados: state.processados || 0,
+        naoEncontradosDetalhes: state.naoEncontradosDetalhes || [],
+        falhasDetalhes: state.falhasDetalhes || [],
+      });
+    } else if (job.site === 'nafarmas-cotacao') {
+      await runNafarmasJob(job, {
         preenchidos: state.preenchidos || 0,
         naoEncontrados: state.naoEncontrados || 0,
         falhas: state.falhas || 0,
