@@ -53,7 +53,7 @@ def _utc_datetime(value: datetime) -> datetime:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
 
-MAX_TABELAS = 8
+MAX_TABELAS = 15
 MAX_EXCEL_BYTES = 20 * 1024 * 1024
 MAX_COTACAO_PREVIEW_BYTES = 14 * 1024 * 1024
 MAX_TABELA_PRAZOS_BYTES = 25 * 1024 * 1024
