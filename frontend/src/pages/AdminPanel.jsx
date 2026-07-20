@@ -128,6 +128,17 @@ const formatDateTime = (value) => {
   }).format(date);
 };
 
+const formatMonth = (value) => {
+  if (!value) return 'mês atual';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'mês atual';
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'UTC',
+    month: 'long',
+    year: 'numeric',
+  }).format(date);
+};
+
 const daysUntil = (value) => {
   if (!value) return null;
   const date = new Date(value);
@@ -450,6 +461,71 @@ const AdminPanel = () => {
       <main className="admin-main">
         {billing && (
           <>
+            <section className="admin-retention-overview">
+              <div className="admin-retention-heading">
+                <div>
+                  <span className="admin-kicker">Retenção</span>
+                  <h2>Assinantes em {formatMonth(billing.monthly?.monthStart)}</h2>
+                  <p>Base no início do mês, entradas, perdas e total atual.</p>
+                </div>
+                <strong className={`admin-retention-net${(billing.monthly?.netChange ?? 0) < 0 ? ' negative' : ''}`}>
+                  {(billing.monthly?.netChange ?? 0) >= 0 ? '+' : ''}{billing.monthly?.netChange ?? 0} no mês
+                </strong>
+              </div>
+              <div className="admin-retention-flow">
+                <div><strong>{billing.monthly?.startingSubscribers ?? 0}</strong><span>Começou o mês</span></div>
+                <div className="positive"><strong>+{billing.monthly?.newSubscribers ?? 0}</strong><span>Entraram</span></div>
+                <div className="negative"><strong>−{billing.monthly?.lostSubscribers ?? 0}</strong><span>Cancelaram</span></div>
+                <div className="current"><strong>{billing.monthly?.currentSubscribers ?? 0}</strong><span>Assinantes atuais</span></div>
+              </div>
+            </section>
+
+            <section className="admin-recovery-grid">
+              <div className="admin-recovery-card danger">
+                <div className="admin-section-header">
+                  <div>
+                    <h2>Cancelaram neste mês</h2>
+                    <p>Chame para entender o motivo e tentar recuperar.</p>
+                  </div>
+                  <strong>{billing.monthly?.lostSubscribers ?? 0}</strong>
+                </div>
+                <div className="admin-job-list">
+                  {billing.monthlyCancellations?.length ? billing.monthlyCancellations.slice(0, 8).map((cancel) => {
+                    const waUrl = whatsappUrl(cancel.phone);
+                    return (
+                      <div className="admin-job" key={`month-cancel-${cancel.uid}`}>
+                        <span>{cancel.name || 'Sem nome'} · {cancel.email || 'Sem email'}</span>
+                        <strong>Cancelou {formatDateOnly(cancel.canceledAt)}{cancel.cancellationReason ? ` · ${cancel.cancellationReason}` : ''}</strong>
+                        {waUrl ? <a className="admin-contact-link" href={waUrl} target="_blank" rel="noreferrer"><MessageCircle size={14} /> WhatsApp</a> : <em>Sem telefone</em>}
+                      </div>
+                    );
+                  }) : <div className="admin-recovery-empty">Nenhum cancelamento registrado neste mês.</div>}
+                </div>
+              </div>
+
+              <div className="admin-recovery-card warn">
+                <div className="admin-section-header">
+                  <div>
+                    <h2>Assinantes há 7+ dias sem usar</h2>
+                    <p>Usaram a ferramenta antes, mas podem estar perto de desistir.</p>
+                  </div>
+                  <strong>{billing.inactiveSubscribers?.length ?? 0}</strong>
+                </div>
+                <div className="admin-job-list">
+                  {billing.inactiveSubscribers?.length ? billing.inactiveSubscribers.slice(0, 8).map((subscriber) => {
+                    const waUrl = whatsappUrl(subscriber.phone);
+                    return (
+                      <div className="admin-job" key={`inactive-${subscriber.uid}`}>
+                        <span>{subscriber.name || 'Sem nome'} · {subscriber.email || 'Sem email'}</span>
+                        <strong>Sem usar há {subscriber.daysSinceToolUse} dias · último uso {formatDateOnly(subscriber.lastToolUseAt)}</strong>
+                        {waUrl ? <a className="admin-contact-link" href={waUrl} target="_blank" rel="noreferrer"><MessageCircle size={14} /> WhatsApp</a> : <em>Sem telefone</em>}
+                      </div>
+                    );
+                  }) : <div className="admin-recovery-empty">Nenhum assinante ativo ficou 7 dias sem usar.</div>}
+                </div>
+              </div>
+            </section>
+
             <section className="admin-metrics-grid">
               <div className="admin-metric static">
                 <div className="admin-metric-icon"><Users size={18} /></div>

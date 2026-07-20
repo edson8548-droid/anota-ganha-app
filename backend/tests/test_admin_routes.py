@@ -805,6 +805,45 @@ def test_billing_overview_lista_cancelamentos_recentes():
     assert "antigo-cancel@example.com" not in emails
 
 
+def test_billing_overview_monta_fluxo_mensal_e_alerta_assinante_inativo():
+    now = datetime(2026, 7, 20, 12, tzinfo=timezone.utc)
+    db = _FakeDb()
+    db.users.update({
+        "antigo-uid": {"email": "antigo@example.com", "name": "Antigo", "role": "user", "telefone": "13999000003"},
+        "novo-uid": {"email": "novo@example.com", "name": "Novo", "role": "user"},
+        "perdido-uid": {"email": "perdido@example.com", "name": "Perdido", "role": "user", "telefone": "13999000004"},
+    })
+    db.subscriptions.update({
+        "antigo-uid": {"status": "active", "planId": "monthly", "firstPaymentDate": now - timedelta(days=50)},
+        "novo-uid": {"status": "active", "planId": "monthly", "firstPaymentDate": now - timedelta(days=4)},
+        "perdido-uid": {"status": "canceled", "planId": "monthly", "canceledAt": now - timedelta(days=3)},
+    })
+    db.audit["antigo-sem-uso"] = _FakeDoc(
+        "antigo-sem-uso",
+        {
+            "uid": "antigo-uid",
+            "action": "cotacao_ready_confirmed",
+            "status": "success",
+            "createdAt": now - timedelta(days=8),
+            "metadata": {},
+        },
+    )
+
+    report = admin._build_billing_overview(db, days=30, now=now)
+
+    assert report["monthly"] == {
+        "monthStart": "2026-07-01T00:00:00Z",
+        "startingSubscribers": 2,
+        "newSubscribers": 1,
+        "lostSubscribers": 1,
+        "currentSubscribers": 2,
+        "netChange": 0,
+    }
+    assert report["monthlyCancellations"][0]["uid"] == "perdido-uid"
+    assert report["inactiveSubscribers"][0]["uid"] == "antigo-uid"
+    assert report["inactiveSubscribers"][0]["daysSinceToolUse"] == 8
+
+
 def test_end_trial_encerra_e_grava_motivo(monkeypatch):
     client = _client(monkeypatch, uid="admin-uid")
     fake_db = admin._fs()

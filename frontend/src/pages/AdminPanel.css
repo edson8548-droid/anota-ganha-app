@@ -866,6 +866,99 @@
   border-color: rgba(248, 113, 113, 0.4);
 }
 
+.admin-retention-overview {
+  margin-bottom: 18px;
+  padding: 20px;
+  border: 1px solid rgba(58, 133, 168, .65);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(58, 133, 168, .20), rgba(54, 57, 64, .96));
+}
+
+.admin-retention-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-retention-heading h2 {
+  margin: 4px 0 5px;
+  color: #fff;
+  font-size: 19px;
+}
+
+.admin-retention-heading p {
+  margin: 0;
+  color: #B9C6CD;
+  font-size: 13px;
+}
+
+.admin-retention-net {
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: rgba(64, 177, 126, .18);
+  color: #92E1B4;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.admin-retention-net.negative {
+  background: rgba(224, 84, 84, .18);
+  color: #F2B3B3;
+}
+
+.admin-retention-flow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 20px;
+  border: 1px solid rgba(143, 209, 230, .18);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.admin-retention-flow > div {
+  padding: 14px;
+  background: rgba(36, 38, 42, .55);
+  border-right: 1px solid rgba(143, 209, 230, .14);
+}
+
+.admin-retention-flow > div:last-child { border-right: 0; }
+.admin-retention-flow strong { display: block; color: #fff; font-size: 22px; }
+.admin-retention-flow span { display: block; margin-top: 4px; color: #A0A3A8; font-size: 12px; font-weight: 700; }
+.admin-retention-flow .positive strong { color: #92E1B4; }
+.admin-retention-flow .negative strong { color: #F2B3B3; }
+.admin-retention-flow .current { background: rgba(58, 133, 168, .17); }
+
+.admin-recovery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.admin-recovery-card {
+  background: #363940;
+  border: 1px solid #4A4D52;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.admin-recovery-card.danger { border-color: rgba(224, 84, 84, .45); }
+.admin-recovery-card.warn { border-color: rgba(232, 168, 48, .45); }
+.admin-recovery-card .admin-section-header > strong { color: #fff; font-size: 24px; }
+.admin-recovery-card.danger .admin-section-header > strong { color: #F2B3B3; }
+.admin-recovery-card.warn .admin-section-header > strong { color: #F2D99A; }
+
+.admin-recovery-empty { padding: 16px 18px; color: #A0A3A8; font-size: 13px; }
+
+@media (max-width: 700px) {
+  .admin-retention-heading { flex-direction: column; }
+  .admin-retention-flow,
+  .admin-recovery-grid { grid-template-columns: 1fr; }
+  .admin-retention-flow > div { border-right: 0; border-bottom: 1px solid rgba(143, 209, 230, .14); }
+  .admin-retention-flow > div:last-child { border-bottom: 0; }
+}
+
 .admin-end-trial:hover {
   background: rgba(248, 113, 113, 0.12);
 }

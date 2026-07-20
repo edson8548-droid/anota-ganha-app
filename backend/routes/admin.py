@@ -67,6 +67,7 @@ BILLING_UPCOMING_DAYS = 7
 BILLING_MONTHLY_PRICE_FALLBACK = 99.90
 TRIAL_RESCUE_WINDOW_DAYS = 7
 BILLING_LIST_LIMIT = 50
+INACTIVE_SUBSCRIBER_DAYS = 7
 WEBHOOK_ALERT_ACTIONS = (
     "asaas_webhook_unmapped",
     "asaas_webhook_invalid_token",
@@ -1367,6 +1368,26 @@ def _billing_user_entry(db, uid: str, subscription: dict, cache: dict) -> dict:
     return entry
 
 
+def _inactive_subscribers(db, active_subscribers: list[dict], now: datetime) -> list[dict]:
+    """Assinantes que já usaram ferramenta e estão há 7+ dias sem uso real."""
+    inactive = []
+    since = now - timedelta(days=90)
+    for subscriber in active_subscribers:
+        activity = _audit_activity(db, subscriber["uid"], since)
+        last_tool_use = _as_utc_datetime(activity.get("lastToolUseAt"))
+        if not last_tool_use:
+            continue
+        days_without_tool = max(0, int((now - last_tool_use).total_seconds() // 86400))
+        if days_without_tool < INACTIVE_SUBSCRIBER_DAYS:
+            continue
+        entry = dict(subscriber)
+        entry["lastToolUseAt"] = _iso(last_tool_use)
+        entry["daysSinceToolUse"] = days_without_tool
+        entry["lastToolAction"] = activity.get("lastToolAction")
+        inactive.append(entry)
+    return sorted(inactive, key=lambda item: item.get("lastToolUseAt") or "")[:BILLING_LIST_LIMIT]
+
+
 def _webhook_alerts(db, since: datetime) -> list[dict]:
     alerts = []
     for action in WEBHOOK_ALERT_ACTIONS:
@@ -1402,6 +1423,7 @@ def _webhook_alerts(db, since: datetime) -> list[dict]:
 def _build_billing_overview(db, *, days: int, now: datetime | None = None) -> dict:
     current = now or datetime.now(timezone.utc)
     since = current - timedelta(days=days)
+    month_start = datetime(current.year, current.month, 1, tzinfo=timezone.utc)
     upcoming_until = current + timedelta(days=BILLING_UPCOMING_DAYS)
     rescue_since = current - timedelta(days=TRIAL_RESCUE_WINDOW_DAYS)
 
@@ -1414,6 +1436,8 @@ def _build_billing_overview(db, *, days: int, now: datetime | None = None) -> di
     trial_conversions = []
     trial_rescues = []
     cancellations = []
+    monthly_new_subscribers = []
+    monthly_cancellations = []
 
     for doc in db.collection("subscriptions").stream():
         subscription = doc.to_dict() or {}
@@ -1461,6 +1485,11 @@ def _build_billing_overview(db, *, days: int, now: datetime | None = None) -> di
             entry["convertedFromTrial"] = bool(subscription.get("convertedFromTrial"))
             trial_conversions.append(entry)
 
+        if first_payment and month_start <= first_payment <= current:
+            entry = _billing_user_entry(db, uid, subscription, user_cache)
+            entry["firstPaymentDate"] = _iso(first_payment)
+            monthly_new_subscribers.append(entry)
+
         # Resgate: trial venceu há poucos dias e o RCA ainda não assinou —
         # é o lead mais quente para contato.
         trial_end = _as_utc_datetime(subscription.get("trialEndsAt"))
@@ -1479,6 +1508,16 @@ def _build_billing_overview(db, *, days: int, now: datetime | None = None) -> di
             entry["canceledAt"] = _iso(canceled_at)
             cancellations.append(entry)
 
+        if status in {"canceling", "canceled"} and canceled_at and month_start <= canceled_at <= current:
+            entry = _billing_user_entry(db, uid, subscription, user_cache)
+            entry["canceledAt"] = _iso(canceled_at)
+            entry["cancellationReason"] = (
+                subscription.get("cancellationReason")
+                or subscription.get("cancelReason")
+                or subscription.get("canceledReason")
+            )
+            monthly_cancellations.append(entry)
+
     webhook_alerts = _webhook_alerts(db, since)
 
     active_subscribers.sort(key=lambda item: item.get("nextDueDate") or "9999")
@@ -1486,9 +1525,17 @@ def _build_billing_overview(db, *, days: int, now: datetime | None = None) -> di
     trial_conversions.sort(key=lambda item: item.get("firstPaymentDate") or "", reverse=True)
     trial_rescues.sort(key=lambda item: item.get("trialEndsAt") or "", reverse=True)
     cancellations.sort(key=lambda item: item.get("canceledAt") or "", reverse=True)
+    monthly_new_subscribers.sort(key=lambda item: item.get("firstPaymentDate") or "", reverse=True)
+    monthly_cancellations.sort(key=lambda item: item.get("canceledAt") or "", reverse=True)
+    inactive_subscribers = _inactive_subscribers(db, active_subscribers, current)
 
     finished_trials = len(trial_conversions) + len(trial_rescues)
     conversion_rate = round(len(trial_conversions) * 100 / finished_trials) if finished_trials else None
+    monthly_new_count = len(monthly_new_subscribers)
+    monthly_lost_count = len(monthly_cancellations)
+    monthly_current_count = counts["active"]
+    # Reconstrói a base no dia 1 pela movimentação do mês: atual - novos + perdas.
+    monthly_start_count = max(0, monthly_current_count - monthly_new_count + monthly_lost_count)
 
     return {
         "window": {
@@ -1496,6 +1543,14 @@ def _build_billing_overview(db, *, days: int, now: datetime | None = None) -> di
             "since": _iso(since),
             "until": _iso(current),
             "upcomingUntil": _iso(upcoming_until),
+        },
+        "monthly": {
+            "monthStart": _iso(month_start),
+            "startingSubscribers": monthly_start_count,
+            "newSubscribers": monthly_new_count,
+            "lostSubscribers": monthly_lost_count,
+            "currentSubscribers": monthly_current_count,
+            "netChange": monthly_current_count - monthly_start_count,
         },
         "totals": {
             "activeSubscribers": counts["active"],
@@ -1520,6 +1575,9 @@ def _build_billing_overview(db, *, days: int, now: datetime | None = None) -> di
         "trialConversions": trial_conversions[:BILLING_LIST_LIMIT],
         "trialRescues": trial_rescues[:BILLING_LIST_LIMIT],
         "cancellations": cancellations[:BILLING_LIST_LIMIT],
+        "monthlyNewSubscribers": monthly_new_subscribers[:BILLING_LIST_LIMIT],
+        "monthlyCancellations": monthly_cancellations[:BILLING_LIST_LIMIT],
+        "inactiveSubscribers": inactive_subscribers,
     }
 
 
