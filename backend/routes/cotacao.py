@@ -58,6 +58,7 @@ MAX_TABELAS = 15
 MAX_EXCEL_BYTES = 20 * 1024 * 1024
 MAX_COTACAO_PREVIEW_BYTES = 14 * 1024 * 1024
 MAX_TABELA_PRAZOS_BYTES = 25 * 1024 * 1024
+PRAZOS_DETECCAO_VERSAO = 2
 MAX_ACTIVE_PREVIEW_JOBS_PER_USER = int(os.environ.get("MAX_ACTIVE_PREVIEW_JOBS_PER_USER", "1"))
 MAX_RUNNING_COTACAO_JOBS = int(os.environ.get("MAX_RUNNING_COTACAO_JOBS", "3"))
 COTACAO_EXTENSION_SITES_COM_FRACIONAMENTO = {"bubble-catalog-fornecedor", "easy-cotacao-web", "syspan-cotacao"}
@@ -607,6 +608,7 @@ async def upload_tabela(
         "grid_id": grid_id,
         "prazo": prazo_padrao,
         "prazos_disponiveis": prazos_disponiveis,
+        "prazos_deteccao_versao": PRAZOS_DETECCAO_VERSAO,
         "qtd_produtos": qtd,
         "data_upload": datetime.now(timezone.utc),
     }
@@ -631,10 +633,15 @@ async def listar_tabelas(credentials: HTTPAuthorizationCredentials = Depends(sec
         prazo = doc.get("prazo", 28)
         prazos_disponiveis = doc.get("prazos_disponiveis")
         qtd_produtos = int(doc.get("qtd_produtos") or 0)
+        try:
+            versao_prazos = int(doc.get("prazos_deteccao_versao") or 0)
+        except (TypeError, ValueError):
+            versao_prazos = 0
+        prazos_precisam_reindexar = versao_prazos < PRAZOS_DETECCAO_VERSAO
 
-        # Reindexa metadados antigos ou gravados antes de o parser reconhecer o
-        # formato. A extensão usa qtd_produtos deste endpoint e não lê o XLSX.
-        if not prazos_disponiveis or qtd_produtos <= 0:
+        # Reindexa uma vez tabelas gravadas antes da correção do detector de
+        # prazos. A extensão usa este endpoint e não lê o XLSX diretamente.
+        if prazos_precisam_reindexar or not prazos_disponiveis or qtd_produtos <= 0:
             tmp_path = None
             try:
                 grid_out = await _bucket().open_download_stream(doc["grid_id"])
@@ -644,9 +651,12 @@ async def listar_tabelas(credentials: HTTPAuthorizationCredentials = Depends(sec
                 tmp.close()
                 tmp_path = tmp.name
                 updates = {}
-                if not prazos_disponiveis:
+                if prazos_precisam_reindexar or not prazos_disponiveis:
                     prazos_disponiveis = await asyncio.to_thread(detectar_prazos_disponiveis, tmp_path)
-                    updates["prazos_disponiveis"] = prazos_disponiveis
+                    updates.update({
+                        "prazos_disponiveis": prazos_disponiveis,
+                        "prazos_deteccao_versao": PRAZOS_DETECCAO_VERSAO,
+                    })
                 if qtd_produtos <= 0:
                     _, precos_lista = await asyncio.to_thread(
                         ler_tabela_mestre,

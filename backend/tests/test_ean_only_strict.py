@@ -714,6 +714,18 @@ def test_tabela_mestre_reconhece_prazo_com_zero_a_esquerda():
         os.unlink(path)
 
 
+def test_detectar_prazos_ignora_data_no_titulo_antes_do_cabecalho():
+    path = _xlsx([
+        ["LIVRO DE PRECO VALIDO DE 18 A 24.07.2026"],
+        ["DESCRICAO", "EAN", "7 DIAS", "14 DIAS", "21 DIAS", "28 DIAS"],
+        ["PRODUTO TESTE", "7891032016625", 10.0, 10.1, 10.2, 10.3],
+    ])
+    try:
+        assert detectar_prazos_disponiveis(path) == [7, 14, 21, 28]
+    finally:
+        os.unlink(path)
+
+
 def test_gerador_de_prazos_inclui_35_e_42_dias():
     path = _gerar_excel_de_dados(
         [{"nome": "PRODUTO TESTE", "ean": "7891234567890", "preco_base": 10.0}],

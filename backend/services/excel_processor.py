@@ -612,6 +612,7 @@ def _ler_cotacao_worksheet(ws, sheet_name=None, exigir_indicio_cotacao=False, co
 
 def detectar_prazos_disponiveis(caminho_arquivo) -> list:
     """Detecta quais colunas de prazo (7 a 42 dias) existem no Excel."""
+    melhor_encontrados = []
     for header in range(0, 10):
         try:
             df = pd.read_excel(caminho_arquivo, header=header, nrows=0)
@@ -624,11 +625,14 @@ def detectar_prazos_disponiveis(caminho_arquivo) -> list:
                     if _cabecalho_contem_prazo(col, prazo):
                         encontrados.append(prazo)
                         break
-            if encontrados:
-                return sorted(encontrados)
+            # Algumas tabelas começam com um título que traz datas de validade.
+            # Em vez de retornar no primeiro número encontrado, mantemos a linha
+            # que identifica a maior quantidade de prazos reais.
+            if len(encontrados) > len(melhor_encontrados):
+                melhor_encontrados = encontrados
         except Exception:
             continue
-    return [28]
+    return sorted(melhor_encontrados) or [28]
 
 
 def ler_tabela_mestre(caminho_arquivo, header_row=None, col_nome=0, col_ean=1, prazo=28, incluir_meta=False):
