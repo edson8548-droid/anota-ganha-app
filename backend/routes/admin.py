@@ -405,7 +405,12 @@ def _cotacao_session_summary(session: dict) -> dict:
 
 
 def _audit_activity(db, uid: str, since: datetime) -> dict:
-    query = db.collection(AUDIT_COLLECTION).where("uid", "==", uid).limit(AUDIT_EVENT_LIMIT)
+    query = (
+        db.collection(AUDIT_COLLECTION)
+        .where("uid", "==", uid)
+        .order_by("createdAt", direction=firestore.Query.DESCENDING)
+        .limit(AUDIT_EVENT_LIMIT)
+    )
     events = []
 
     try:

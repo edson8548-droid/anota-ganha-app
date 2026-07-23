@@ -432,6 +432,42 @@ def test_admin_device_session_alone_is_not_tool_usage():
     assert "deviceHash" not in str(report)
 
 
+def test_admin_audit_activity_limits_only_after_ordering_newest_events():
+    now = datetime.now(timezone.utc)
+    db = _FakeDb()
+    db.audit = {
+        f"old-event-{index:03d}": _FakeDoc(
+            f"old-event-{index:03d}",
+            {
+                "uid": "rca-uid",
+                "action": "cotatudo_extension_match_completed",
+                "status": "success",
+                "createdAt": now - timedelta(days=10, minutes=index),
+                "metadata": {"jobId": f"old-job-{index}"},
+            },
+        )
+        for index in range(80)
+    }
+    db.audit["recent-event"] = _FakeDoc(
+        "recent-event",
+        {
+            "uid": "rca-uid",
+            "action": "cotatudo_extension_fill_reported",
+            "status": "success",
+            "createdAt": now - timedelta(minutes=15),
+            "metadata": {"jobId": "recent-job", "site": "rp-hub"},
+        },
+    )
+
+    activity = admin._audit_activity(db, "rca-uid", now - timedelta(days=30))
+
+    assert activity["auditEventCount"] == admin.AUDIT_EVENT_LIMIT
+    assert activity["lastAction"] == "cotatudo_extension_fill_reported"
+    assert activity["lastToolAction"] == "cotatudo_extension_fill_reported"
+    assert activity["lastToolSite"] == "rp-hub"
+    assert admin._as_utc_datetime(activity["lastToolUseAt"]) == now - timedelta(minutes=15)
+
+
 def test_admin_follow_up_marks_users_who_stopped_after_using_tool():
     now = datetime.now(timezone.utc)
     user = {
