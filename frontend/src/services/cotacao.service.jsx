@@ -55,15 +55,24 @@ export const renomearTabela = (id, nome) => {
 
 export const excluirTabela = (id) => api.delete(`/cotacao/tabelas/${id}`);
 
-export const processarCotacao = async (arquivo, tabelaId, modo = 'completo', colunaPreco = '') => {
+export const processarCotacao = async (
+  arquivo,
+  tabelaId,
+  modo = 'completo',
+  colunaPreco = '',
+  prazo = 0,
+  options = {}
+) => {
   const formData = new FormData();
   formData.append('arquivo', arquivo);
   formData.append('tabela_id', tabelaId);
   formData.append('modo', modo);
+  formData.append('prazo', prazo);
   if (colunaPreco?.trim()) formData.append('coluna_preco', colunaPreco.trim());
 
   const response = await api.post('/cotacao/processar', formData, {
     responseType: 'blob',
+    signal: options.signal,
   });
 
   // Extrair stats do header

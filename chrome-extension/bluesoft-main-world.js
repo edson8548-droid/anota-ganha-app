@@ -94,8 +94,12 @@
     const items = [];
     let idx = 0;
     for (const rec of data) {
-      const current_price = parsePriceNumber(rec.precoUnitario);
-      const filled = current_price > 0;
+      const parsedPrice = parsePriceNumber(rec.precoUnitario);
+      // A API só aceita current_price quando já há preço positivo. No Bluesoft
+      // os itens em aberto vêm como R$0,00; enviar 0 faz o lote inteiro falhar
+      // na validação do backend.
+      const current_price = parsedPrice != null && parsedPrice > 0 ? parsedPrice : null;
+      const filled = current_price !== null;
       const nome = String(rec.descricao || '');
       const codigo = rec.codigoReferencia == null ? '' : String(rec.codigoReferencia);
       const eans = [...new Set((rec.gtins || []).map(g => limpaEan(g && g.gtin)).filter(Boolean))];

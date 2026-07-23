@@ -3,6 +3,7 @@ import React from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
+import TrialEndingAlert from './TrialEndingAlert';
 
 const LoadingScreen = ({ text }) => (
   <div style={{
@@ -220,7 +221,12 @@ const ProtectedRoute = ({ children, requireSubscription = false }) => {
     }
   }
 
-  return children;
+  return (
+    <>
+      {children}
+      <TrialEndingAlert />
+    </>
+  );
 };
 
 export default ProtectedRoute;

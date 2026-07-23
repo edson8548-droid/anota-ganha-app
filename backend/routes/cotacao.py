@@ -726,6 +726,7 @@ async def processar_cotacao(
     arquivo: UploadFile = File(...),
     tabela_id: str = Form(...),
     modo: str = Form("ean"),
+    prazo: int = Form(0),
     coluna_preco: str = Form(""),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
@@ -772,9 +773,10 @@ async def processar_cotacao(
     tmp_cotacao.close()
 
     try:
+        prazo_efetivo = prazo if prazo > 0 else doc.get("prazo", 28)
         caminho_resultado, stats, sem_match = processar_arquivo_cotacao(
             tmp_cotacao.name, tmp_mestre.name,
-            prazo=doc.get("prazo", 28),
+            prazo=prazo_efetivo,
             modo=modo,
             coluna_preco=coluna_preco,
         )
@@ -801,7 +803,7 @@ async def processar_cotacao(
         metadata=_cotacao_audit_metadata(
             source="cotacao_pronta",
             tabela_id=tabela_id,
-            prazo=doc.get("prazo", 28),
+            prazo=prazo_efetivo,
             modo=modo,
             stats=stats,
         ),

@@ -49,7 +49,122 @@ async function createContentDom(html, url) {
   return dom;
 }
 
+async function createRivershopCaptureDom(html) {
+  const { JSDOM } = await import(pathToFileURL(join(root, 'frontend/node_modules/jsdom/lib/api.js')).href);
+  const dom = new JSDOM(html, {
+    url: 'https://www.rivershop.com.br/meus-clientes',
+    runScripts: 'outside-only',
+    pretendToBeVisual: true,
+  });
+  let messageListener;
+  const runtimeMessages = [];
+  dom.window.chrome = {
+    runtime: {
+      onMessage: {
+        addListener(listener) { messageListener = listener; },
+      },
+      sendMessage(message) {
+        runtimeMessages.push(message);
+        return Promise.resolve();
+      },
+    },
+  };
+  dom.window.eval(readText('captura-tabelas-extension/rivershop-capture.js'));
+  return {
+    dom,
+    runtimeMessages,
+    send(message) {
+      return new Promise(resolve => messageListener(message, {}, resolve));
+    },
+  };
+}
+
+async function createMultiTableApi() {
+  const { JSDOM } = await import(pathToFileURL(join(root, 'frontend/node_modules/jsdom/lib/api.js')).href);
+  const dom = new JSDOM('', {
+    url: 'chrome-extension://venpro/popup.html',
+    runScripts: 'outside-only',
+  });
+  dom.window.eval(readText('chrome-extension/multi-table.js'));
+  return dom;
+}
+
 describe('extensoes Chrome', () => {
+  it('comparacao de tabelas escolhe o menor preco antes de preencher o site', async () => {
+    const dom = await createMultiTableApi();
+    try {
+      const api = dom.window.VenproMultiTable;
+      const merged = api.mergeTableMatchResponses([
+        {
+          selection: { tabelaId: 'spani', nome: 'Spani', prazo: 14 },
+          data: {
+            precos: [
+              { idx: 1, price: '5,89' },
+              { idx: 2, price: '4,00' },
+            ],
+            mantidos: [],
+            diagnostics: ['idx=1|decisao=atualizar'],
+          },
+        },
+        {
+          selection: { tabelaId: 'muffato', nome: 'Muffato', prazo: 21 },
+          data: {
+            precos: [
+              { idx: 1, price: '5,50' },
+              { idx: 3, price: '2,00' },
+            ],
+            mantidos: [2, 4],
+            diagnostics: ['idx=1|decisao=atualizar'],
+          },
+        },
+        {
+          selection: { tabelaId: 'compre-facil', nome: 'Compre Fácil', prazo: 28 },
+          data: {
+            precos: [
+              { idx: 1, price: '5,70' },
+              { idx: 2, price: '4,10' },
+            ],
+            mantidos: [],
+          },
+        },
+      ], 5);
+
+      assert.deepEqual(
+        Array.from(merged.precos, item => ({ idx: item.idx, price: item.price, tabela: item.tabela_nome })),
+        [
+          { idx: 1, price: '5,50', tabela: 'Muffato' },
+          { idx: 2, price: '4,00', tabela: 'Spani' },
+          { idx: 3, price: '2,00', tabela: 'Muffato' },
+        ],
+      );
+      assert.deepEqual(Array.from(merged.mantidos), [4]);
+      assert.equal(merged.stats.preenchidos, 3);
+      assert.equal(merged.stats.mantidos_menor_preco, 1);
+      assert.equal(merged.stats.nao_encontrados, 1);
+      assert.match(merged.diagnostics[0], /^tabela=Spani\|/);
+    } finally {
+      dom.window.close();
+    }
+  });
+
+  it('comparacao preserva jobs antigos de uma unica tabela', async () => {
+    const dom = await createMultiTableApi();
+    try {
+      const selections = dom.window.VenproMultiTable.normalizeJobTableSelections({
+        tabelaId: 'spani',
+        tabelaNome: 'Spani',
+        prazo: 14,
+      });
+      assert.equal(selections.length, 1);
+      assert.deepEqual(
+        { ...selections[0] },
+        { tabelaId: 'spani', nome: 'Spani', prazo: 14 },
+      );
+    } finally {
+      dom.window.close();
+    }
+  });
+
   it('extracao generica nao confunde codigo interno curto com EAN', async () => {
     const dom = await createContentDom(`
       <table>
@@ -79,6 +194,29 @@ describe('extensoes Chrome', () => {
       assert.equal(items[0].ean, '7891032016625');
       assert.equal(items[0].filled, true);
       assert.equal(items[0].current_price, 1.70);
+    } finally {
+      dom.window.close();
+    }
+  });
+
+  it('demonstração oficial identifica e preenche uma cotação fictícia', async () => {
+    const dom = await createContentDom(`
+      <table>
+        <thead><tr><th>EAN</th><th>Produto</th><th>Quantidade</th><th>Preço unitário</th></tr></thead>
+        <tbody><tr><td>7891000100103</td><td>Arroz Tipo 1</td><td>20</td><td><input name="preco_1" /></td></tr></tbody>
+      </table>
+    `, 'https://venpro.com.br/demonstracao-extensao-cotacao.html');
+    try {
+      assert.equal(dom.window.eval('detectQuotationSite()'), 'venpro-demo');
+      const items = await dom.window.eval('extractQuotationItems()');
+      assert.equal(items.length, 1);
+      assert.equal(items[0].ean, '7891000100103');
+
+      const result = await dom.window.eval(`fillQuotationPrices([{
+        idx: 0, ean: '7891000100103', nome: 'Arroz Tipo 1', price: '24,90'
+      }])`);
+      assert.equal(result.filled, 1);
+      assert.equal(dom.window.document.querySelector('input[name="preco_1"]').value, '24,90');
     } finally {
       dom.window.close();
     }
@@ -209,8 +347,12 @@ describe('extensoes Chrome', () => {
     try {
       let priceBlurs = 0;
       let quantityBlurs = 0;
+      let emptyValueEvents = 0;
       dom.window.document.querySelector('#vl_845529').addEventListener('blur', () => { priceBlurs += 1; });
       dom.window.document.querySelector('#st_845529').addEventListener('blur', () => { quantityBlurs += 1; });
+      dom.window.document.querySelector('#vl_845529').addEventListener('input', (event) => {
+        if (!event.target.value) emptyValueEvents += 1;
+      });
 
       assert.equal(dom.window.eval('detectQuotationSite()'), 'syspan-cotacao');
       const items = await dom.window.eval('extractQuotationItems()');
@@ -229,6 +371,7 @@ describe('extensoes Chrome', () => {
       assert.equal(dom.window.document.querySelector('#ma_845529').value, '');
       assert.ok(priceBlurs > 0);
       assert.ok(quantityBlurs > 0);
+      assert.equal(emptyValueEvents, 0);
 
       const withMasterQuantity = await dom.window.eval(`fillQuotationPrices([{
         idx: 0, ean: '07896083800018', nome: 'AGUA SANIT.QBOA 1L', price: '5,52', fracionamento: '6'
@@ -241,11 +384,284 @@ describe('extensoes Chrome', () => {
     }
   });
 
+  it('Imperium preenche somente o preço por EAN', async () => {
+    const dom = await createContentDom(`
+      <h1>Cotação #25</h1><h3>Produtos</h3>
+      <table><thead><tr><th>EAN</th><th>Descrição</th><th>Unidade</th><th>Embalagem</th><th>Quantidade</th><th>Preço</th><th>Dias Entrega</th><th>Dias Pagamento</th></tr></thead>
+      <tbody><tr>
+        <td>7896007550463</td><td>ABS INTIMUS DAYS ANTIBACTERIANA</td><td>UN</td><td>4,000</td><td>1,000</td>
+        <td>R$ <input class="txtPreco" id="preco-1" /></td>
+        <td><input class="txtEntrega" type="number" id="entrega-1" value="7" /></td>
+        <td><input class="txtPagamento" type="number" id="pagamento-1" value="28" /></td>
+      </tr></tbody></table>
+    `, 'http://bids.imperiumsolucoes.com/Cotacao.aspx?id=1541&numero=25');
+    try {
+      assert.equal(dom.window.eval('detectQuotationSite()'), 'imperium-cotacao');
+      const items = await dom.window.eval('extractQuotationItems()');
+      assert.equal(items.length, 1);
+      assert.equal(items[0].ean, '7896007550463');
+      assert.equal(items[0].nome, 'ABS INTIMUS DAYS ANTIBACTERIANA');
+
+      const result = await dom.window.eval(`fillQuotationPrices([{
+        idx: 0, ean: '7896007550463', nome: 'ABS INTIMUS DAYS ANTIBACTERIANA', price: '5,51'
+      }])`);
+      assert.equal(result.site, 'imperium-cotacao');
+      assert.equal(result.filled, 1);
+      assert.equal(dom.window.document.querySelector('#preco-1').value, '5,51');
+      assert.equal(dom.window.document.querySelector('#entrega-1').value, '7');
+      assert.equal(dom.window.document.querySelector('#pagamento-1').value, '28');
+    } finally {
+      dom.window.close();
+    }
+  });
+
+  it('Super 20 preenche somente o campo preco por EAN', async () => {
+    const dom = await createContentDom(`
+      <form id="formLancarCotacao"><table><tbody><tr>
+        <td><input name="[0].cod" value="3362"></td>
+        <td><input name="[0].descricao" value="CERVEJA BRAHMA ZERO 350ML"></td>
+        <td><input name="[0].codbarras" value="7891149104932"></td>
+        <td><input name="[0].qtde" value="29,00"></td>
+        <td><input name="[0].preco" value="0,00"></td>
+        <td><input name="[0].observacao" value=""></td>
+      </tr></tbody></table></form>
+    `, 'http://200.160.111.171:8082/Cotacao/LancarCotacao?codigo=122&ord=1');
+    try {
+      assert.equal(dom.window.eval('detectQuotationSite()'), 'super20-cotacao');
+      const items = await dom.window.eval('extractQuotationItems()');
+      assert.equal(items.length, 1);
+      assert.equal(items[0].ean, '7891149104932');
+
+      const result = await dom.window.eval(`fillQuotationPrices([{
+        idx: 0, ean: '7891149104932', nome: 'CERVEJA BRAHMA ZERO 350ML', price: '5,51'
+      }])`);
+      assert.equal(result.site, 'super20-cotacao');
+      assert.equal(result.filled, 1);
+      assert.equal(dom.window.document.querySelector('[name="[0].preco"]').value, '5,51');
+      assert.equal(dom.window.document.querySelector('[name="[0].qtde"]').value, '29,00');
+      assert.equal(dom.window.document.querySelector('[name="[0].observacao"]').value, '');
+    } finally {
+      dom.window.close();
+    }
+  });
+
+  it('Cotefácil preenche preço comum e monitorado sem alterar quantidade ou desconto', async () => {
+    const dom = await createContentDom(`
+      <form id="respostaCotacao">
+        <table id="respostaCotacao:respostas">
+          <tbody><tr>
+            <td>7500435214667</td><td>ABS ALWAYS NOT SV XG C/AB 8UN</td>
+            <td><input id="respostaCotacao:respostas:0:quantidade" value="2"><input type="hidden" value="2"></td>
+            <td><select><option selected>Unidade</option></select><input id="respostaCotacao:respostas:0:txtQtdeEmbalagem" value="1" disabled></td>
+            <td><input id="respostaCotacao:respostas:0:valorBruto" value="0,00"></td>
+            <td><input id="respostaCotacao:respostas:0:valorDesconto" value="4,00"></td>
+            <td>0,00</td>
+          </tr></tbody>
+        </table>
+        <table id="respostaCotacao:respostasMonitorado">
+          <tbody><tr>
+            <td>7891106908221</td><td>BEPANTOL BABY CREME 60G</td>
+            <td><input id="respostaCotacao:respostasMonitorado:0:quantidade" value="3"><input type="hidden" value="3"></td>
+            <td><select><option selected>Unidade</option></select><input id="respostaCotacao:respostasMonitorado:0:txtQtdeEmbalagem" value="1" disabled></td>
+            <td><input id="respostaCotacao:respostasMonitorado:0:valorComST" value="0,00"></td>
+            <td><input id="respostaCotacao:respostasMonitorado:0:descontoInformado" value="2,00"></td>
+          </tr></tbody>
+        </table>
+      </form>
+    `, 'https://sistemas.cotefacil.com/CTFLLogan-webapp/spring/pages/representante/respostas/cotacao?execution=e2s1');
+    try {
+      let priceBlurs = 0;
+      dom.window.document.querySelector('[id$=":valorBruto"]').addEventListener('blur', () => { priceBlurs += 1; });
+      dom.window.document.querySelector('[id$=":valorComST"]').addEventListener('blur', () => { priceBlurs += 1; });
+
+      assert.equal(dom.window.eval('detectQuotationSite()'), 'cotefacil-cotacao');
+      const items = await dom.window.eval('extractQuotationItems()');
+      assert.equal(items.length, 2);
+      assert.equal(items[0].ean, '7500435214667');
+      assert.equal(items[0].nome, 'ABS ALWAYS NOT SV XG C/AB 8UN');
+      assert.equal(items[0].cotefacilSection, 'regular');
+      assert.equal(items[1].ean, '7891106908221');
+      assert.equal(items[1].nome, 'BEPANTOL BABY CREME 60G');
+      assert.equal(items[1].cotefacilSection, 'monitorado');
+
+      const result = await dom.window.eval(`fillQuotationPrices([
+        { idx: 0, ean: '7500435214667', nome: 'ABS ALWAYS NOT SV XG C/AB 8UN', price: '5,51' },
+        { idx: 1, ean: '7891106908221', nome: 'BEPANTOL BABY CREME 60G', price: '12,34' }
+      ])`);
+      assert.equal(result.site, 'cotefacil-cotacao');
+      assert.equal(result.filled, 2);
+      assert.equal(result.failed.length, 0);
+      assert.equal(dom.window.document.querySelector('[id$=":valorBruto"]').value, '5,51');
+      assert.equal(dom.window.document.querySelector('[id$=":valorComST"]').value, '12,34');
+      assert.equal(dom.window.document.querySelector('#respostaCotacao\\:respostas\\:0\\:quantidade').value, '2');
+      assert.equal(dom.window.document.querySelector('#respostaCotacao\\:respostasMonitorado\\:0\\:quantidade').value, '3');
+      assert.equal(dom.window.document.querySelector('[id$=":valorDesconto"]').value, '4,00');
+      assert.equal(dom.window.document.querySelector('[id$=":descontoInformado"]').value, '2,00');
+      assert.ok(priceBlurs >= 2);
+    } finally {
+      dom.window.close();
+    }
+  });
+
+  it('Cotefácil calcula o total e troca de página sem duplicar os monitorados', async () => {
+    const regularRow = index => `
+      <tr>
+        <td>${String(7890000000000 + index)}</td><td>PRODUTO REGULAR ${index}</td>
+        <td><input id="respostaCotacao:respostas:${index}:quantidade" value="1"></td>
+        <td></td><td><input id="respostaCotacao:respostas:${index}:valorBruto" value="0,00"></td><td></td><td></td>
+      </tr>`;
+    const monitoredRow = index => `
+      <tr>
+        <td>${String(7900000000000 + index)}</td><td>PRODUTO MONITORADO ${index}</td>
+        <td><input id="respostaCotacao:respostasMonitorado:${index}:quantidade" value="1"></td>
+        <td></td><td><input id="respostaCotacao:respostasMonitorado:${index}:valorComST" value="0,00"></td><td></td>
+      </tr>`;
+    const dom = await createContentDom(`
+      <form id="respostaCotacao">
+        <span id="respostaCotacao:totalItens">310</span>
+        <table id="respostaCotacao:respostas"><tbody>${Array.from({ length: 10 }, (_, index) => regularRow(index)).join('')}</tbody></table>
+        <div id="respostaCotacao:respostas:j_id530" class="rich-datascr">
+          <table><tbody><tr>
+            <td class="rich-datascr-act">1</td>
+            <td class="rich-datascr-inact" data-page="2" onclick="Event.fire(this, 'rich:datascroller:onscroll', {'page': '2'});">2</td>
+          </tr></tbody></table>
+        </div>
+        <table id="respostaCotacao:respostasMonitorado"><tbody>${Array.from({ length: 5 }, (_, index) => monitoredRow(index)).join('')}</tbody></table>
+      </form>
+    `, 'https://sistemas.cotefacil.com/CTFLLogan-webapp/spring/pages/representante/respostas/cotacao?execution=e2s1');
+    try {
+      const { document } = dom.window;
+      const pageTwoButton = document.querySelector('[data-page="2"]');
+      pageTwoButton.addEventListener('click', () => {
+        document.querySelector('#respostaCotacao\\:respostas tbody').innerHTML = Array.from(
+          { length: 10 },
+          (_, offset) => regularRow(10 + offset)
+        ).join('');
+        document.querySelector('.rich-datascr-act').className = 'rich-datascr-inact';
+        pageTwoButton.className = 'rich-datascr-act';
+      });
+
+      const firstState = dom.window.eval('getCotefacilState()');
+      assert.equal(firstState.ok, true);
+      assert.equal(firstState.page, 1);
+      assert.equal(firstState.pages, 31);
+      assert.equal(firstState.total, 310);
+      assert.equal(firstState.regularTotal, 305);
+      assert.equal(firstState.monitoredTotal, 5);
+
+      const loaded = await dom.window.eval('loadCotefacilPage(2)');
+      assert.equal(loaded.ok, true);
+      assert.equal(loaded.state.page, 2);
+      assert.equal(loaded.state.mainRows, 10);
+
+      const items = await dom.window.eval('extractQuotationItems()');
+      assert.equal(items.length, 15);
+      assert.equal(items.filter(item => item.cotefacilSection === 'regular').length, 10);
+      assert.equal(items.filter(item => item.cotefacilSection === 'monitorado').length, 5);
+
+      const popupJs = readText('chrome-extension/popup.js');
+      assert.match(popupJs, /async function runCotefacilJob/);
+      assert.match(popupJs, /item\.cotefacilSection !== 'monitorado'/);
+      assert.match(popupJs, /action: 'loadCotefacilPage'/);
+      assert.match(popupJs, /function resolveDetectedSite/);
+      assert.match(popupJs, /pageSite && pageSite !== 'generic'/);
+      assert.match(popupJs, /Recarregue a página da cotação uma vez/);
+      assert.match(readText('chrome-extension/content.js'), /contentVersion: COTEFACIL_CONTENT_VERSION/);
+    } finally {
+      dom.window.close();
+    }
+  });
+
+  it('Inplug identifica EAN e salva cada preço pelo editor React sem enviar Enter', async () => {
+    const dom = await createContentDom(`
+      <table>
+        <thead><tr>
+          <th>Código</th><th>Produto</th><th>UN</th><th>EMB</th><th>QTDE</th><th>Cotação R$</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td>7891000315507</td><td>*NESCAFE SOLUVEL 100G MATINAL</td><td>1</td><td>UN</td><td>0</td>
+            <td data-price-cell><button data-slot="button">Inserir valor</button></td>
+          </tr>
+          <tr>
+            <td>7891000100103</td><td>ARROZ TIPO 1 5KG</td><td>1</td><td>UN</td><td>10</td>
+            <td><button data-slot="button">R$ 7,00</button></td>
+          </tr>
+        </tbody>
+      </table>
+    `, 'https://www.cotacao.inplug.online/cotacao/638?page=0&limit=0');
+
+    try {
+      const { document } = dom.window;
+      const priceCell = document.querySelector('[data-price-cell]');
+      let savedValue = '';
+      let saveCount = 0;
+      let enterCount = 0;
+
+      priceCell.querySelector('button').addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.setAttribute('data-slot', 'input');
+        input.setAttribute('inputmode', 'decimal');
+        input.setAttribute('placeholder', '0,00');
+        input.type = 'text';
+        input.addEventListener('input', () => {
+          savedValue = input.value;
+        });
+        input.addEventListener('keydown', event => {
+          if (event.key === 'Enter') enterCount++;
+        });
+        input.addEventListener('blur', () => {
+          saveCount++;
+          const button = document.createElement('button');
+          button.setAttribute('data-slot', 'button');
+          button.textContent = `R$ ${savedValue}`;
+          priceCell.replaceChildren(button);
+        });
+        priceCell.replaceChildren(input);
+        input.focus();
+      });
+
+      assert.equal(dom.window.eval('detectQuotationSite()'), 'inplug-cotacao');
+      const items = await dom.window.eval('extractQuotationItems()');
+      assert.equal(items.length, 2);
+      assert.equal(items[0].ean, '7891000315507');
+      assert.equal(items[0].nome, '*NESCAFE SOLUVEL 100G MATINAL');
+      assert.equal(items[0].filled, false);
+      assert.equal(items[0].current_price, null);
+      assert.equal(items[1].filled, true);
+      assert.equal(items[1].current_price, 7);
+
+      const result = await dom.window.eval(`fillQuotationPrices([{
+        idx: 0,
+        ean: '7891000315507',
+        nome: '*NESCAFE SOLUVEL 100G MATINAL',
+        signature: '7891000315507|*NESCAFE SOLUVEL 100G MATINAL',
+        price: '5,51'
+      }])`);
+
+      assert.equal(result.site, 'inplug-cotacao');
+      assert.equal(result.rowCount, 2);
+      assert.equal(result.filled, 1);
+      assert.equal(result.failed.length, 0);
+      assert.equal(saveCount, 1);
+      assert.equal(enterCount, 0);
+      assert.equal(priceCell.textContent.trim(), 'R$ 5,51');
+      assert.equal(document.querySelector('tbody tr td:nth-child(5)').textContent.trim(), '0');
+    } finally {
+      dom.window.close();
+    }
+  });
+
   it('manifest da extensao Cotatudo referencia arquivos existentes', () => {
     const manifest = readJson('chrome-extension/manifest.json');
     const popupJs = readText('chrome-extension/popup.js');
+    const popupHtml = readText('chrome-extension/popup.html');
 
     assert.equal(manifest.manifest_version, 3);
+    assert.equal(manifest.version, '1.0.81');
+    assert.equal(manifest.minimum_chrome_version, '114');
+    assert.equal(manifest.homepage_url, 'https://venpro.com.br');
+    assert.ok(manifest.description.length <= 132, 'description precisa respeitar o limite da Chrome Web Store');
     assertFilesExist('chrome-extension', [
       manifest.background.service_worker,
       manifest.action?.default_popup || manifest.side_panel?.default_path,
@@ -255,20 +671,11 @@ describe('extensoes Chrome', () => {
     assert.ok(manifest.host_permissions.includes('https://*.venpro.com.br/*'));
     assert.ok(manifest.host_permissions.includes('https://anota-ganha-app.web.app/*'));
     assert.ok(manifest.host_permissions.includes('https://anota-ganha-app.firebaseapp.com/*'));
-    assert.match(manifest.description, /Preenchedor de cotações/);
-    assert.match(manifest.description, /VR Cotação/);
-    assert.match(manifest.description, /RP HUB/);
-    assert.match(manifest.description, /Rede de Fornecedores/);
-    assert.match(manifest.description, /Infomag Cotação/);
-    assert.match(manifest.description, /Intersolid Cotação/);
-    assert.match(manifest.description, /Cotação Web SMUS/);
-    assert.match(manifest.description, /Catalog Fornecedor/);
-    assert.match(manifest.description, /Hipcomerp/);
-    assert.match(manifest.description, /Easy Cotação Web/);
-    assert.match(manifest.description, /Estância/);
-    assert.match(manifest.description, /Nafarmas/);
-    assert.match(manifest.description, /Dobesone/);
-    assert.match(manifest.description, /Syspan/);
+    assert.match(manifest.description, /Preenche cotações/);
+    assert.ok(existsSync(join(root, 'chrome-extension/multi-table.js')));
+    assert.match(popupHtml, /<script src="multi-table\.js"><\/script>/);
+    assert.match(popupHtml, /id="compararTabelas"/);
+    assert.match(popupJs, /mergeTableMatchResponses/);
     assert.ok(manifest.host_permissions.includes('https://infomagcotacao.com/*'));
     assert.ok(manifest.host_permissions.includes('https://*.intersolid.com.br/*'));
     assert.ok(manifest.host_permissions.includes('http://cotacaoweb.smus.com.br/*'));
@@ -279,8 +686,20 @@ describe('extensoes Chrome', () => {
     assert.ok(manifest.host_permissions.includes('http://nafarmasl.ddns.net:8080/*'));
     assert.ok(manifest.host_permissions.includes('https://cotacao.dobesone.emartim.com.br/*'));
     assert.ok(manifest.host_permissions.includes('https://cotacao.syspanweb.com.br/*'));
+    assert.ok(manifest.host_permissions.includes('https://cotacao3.egestora.com.br/*'));
+    assert.ok(manifest.host_permissions.includes('http://bids.imperiumsolucoes.com/*'));
+    assert.ok(manifest.host_permissions.includes('https://sistemas.cotefacil.com/*'));
+    assert.ok(manifest.host_permissions.includes('https://www.cotacao.inplug.online/*'));
     assert.match(popupJs, /function isSyspanCotacaoUrl/);
     assert.match(popupJs, /'syspan-cotacao': 'Syspan'/);
+    assert.match(popupJs, /'egestora-cotacao': 'Egestora'/);
+    assert.match(popupJs, /function isEgestoraCotacaoUrl/);
+    assert.match(popupJs, /function isImperiumCotacaoUrl/);
+    assert.match(popupJs, /'imperium-cotacao': 'Imperium Bids'/);
+    assert.match(popupJs, /function isCotefacilCotacaoUrl/);
+    assert.match(popupJs, /'cotefacil-cotacao': 'Cotefácil'/);
+    assert.match(popupJs, /function isInplugCotacaoUrl/);
+    assert.match(popupJs, /'inplug-cotacao': 'Inplug'/);
     assert.match(readText('backend/routes/cotacao.py'), /"syspan-cotacao"/);
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('http://179.0.124.205/*')),
@@ -326,18 +745,88 @@ describe('extensoes Chrome', () => {
       manifest.content_scripts.some(script => (script.matches || []).includes('http://cotacao.estanciasupermercados.com.br/*')),
       'manifest precisa carregar content script no Estancia'
     );
+    const quotationMatches = manifest.content_scripts.flatMap(script => script.matches || []);
+    assert.ok(!quotationMatches.includes('https://*/fornecedores/*/cotacao/*'));
+    assert.ok(!quotationMatches.includes('https://*/cotacao/*'));
     assert.ok(
-      manifest.content_scripts.some(script => (script.matches || []).includes('https://*/fornecedores/*/cotacao/*')),
-      'manifest precisa carregar content script em rotas genericas de cotacao'
+      quotationMatches.includes('https://venpro.com.br/demonstracao-extensao-cotacao.html'),
+      'manifest precisa carregar content script na demonstração oficial'
     );
     assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('https://cotacao.syspanweb.com.br/*')),
       'manifest precisa carregar content script na Syspan'
     );
     assert.ok(
+      manifest.content_scripts.some(script => (script.matches || []).includes('https://sistemas.cotefacil.com/*')),
+      'manifest precisa carregar content script no Cotefácil'
+    );
+    assert.ok(
+      manifest.content_scripts.some(script => (script.matches || []).includes('https://www.cotacao.inplug.online/*')),
+      'manifest precisa carregar content script no Inplug'
+    );
+    assert.ok(
       manifest.content_scripts.some(script => (script.matches || []).includes('https://anota-ganha-app.web.app/*')),
       'manifest precisa carregar venpro-content no endereco antigo do Firebase'
     );
+  });
+
+  it('edicao Legacy usa popup e bridges compativeis com Chrome 109', () => {
+    const baseDir = 'chrome-extension-legacy-109';
+    const manifest = readJson(`${baseDir}/manifest.json`);
+    const backgroundJs = readText(`${baseDir}/background.js`);
+    const loaderJs = readText(`${baseDir}/legacy-main-world-loader.js`);
+    const webResources = manifest.web_accessible_resources.flatMap(resource => resource.resources || []);
+
+    assert.equal(manifest.manifest_version, 3);
+    assert.equal(manifest.minimum_chrome_version, '109');
+    assert.equal(manifest.version, '1.0.74.109');
+    assert.match(manifest.name, /Chrome 109/);
+    assert.equal(manifest.action.default_popup, 'popup.html');
+    assert.equal(manifest.side_panel, undefined);
+    assert.ok(!manifest.permissions.includes('sidePanel'));
+    assert.ok(manifest.content_scripts.every(script => script.world === undefined));
+    assert.ok(manifest.content_scripts.some(script =>
+      (script.js || []).includes('legacy-main-world-loader.js') && script.run_at === 'document_start'));
+    assertFilesExist(baseDir, [
+      manifest.background.service_worker,
+      manifest.action.default_popup,
+      ...manifest.content_scripts.flatMap(script => script.js || []),
+      ...webResources,
+      'INSTALAR-CHROME-109.txt',
+    ]);
+    for (const bridge of [
+      'hipcom-main-world.js',
+      'arius-main-world.js',
+      'bluesoft-main-world.js',
+      'guiacotacao-main-world.js',
+    ]) {
+      assert.ok(webResources.includes(bridge), `${bridge} precisa ser web accessible no Chrome 109`);
+      assert.match(loaderJs, new RegExp(bridge.replace(/\./g, '\\.')));
+    }
+    assert.doesNotMatch(backgroundJs, /chrome\.sidePanel|side_panel/);
+    assert.match(loaderJs, /chrome\.runtime\.getURL\(bridge\.file\)/);
+  });
+
+  it('loader Legacy injeta o bridge correto no contexto da página', async () => {
+    const { JSDOM } = await import(pathToFileURL(join(root, 'frontend/node_modules/jsdom/lib/api.js')).href);
+    const dom = new JSDOM('<html><head></head><body></body></html>', {
+      url: 'https://erp.bluesoft.com.br/grupomartins/Core/mainMenu/afterLogin',
+      runScripts: 'outside-only',
+    });
+    try {
+      dom.window.chrome = {
+        runtime: {
+          getURL(file) { return `chrome-extension://legacy-test/${file}`; },
+        },
+      };
+      dom.window.eval(readText('chrome-extension-legacy-109/legacy-main-world-loader.js'));
+      const injected = dom.window.document.querySelector('script[data-venpro-legacy-bridge]');
+      assert.ok(injected);
+      assert.equal(injected.dataset.venproLegacyBridge, 'bluesoft-main-world.js');
+      assert.equal(injected.src, 'chrome-extension://legacy-test/bluesoft-main-world.js');
+    } finally {
+      dom.window.close();
+    }
   });
 
   it('manifest da extensao WhatsApp referencia arquivos existentes', () => {
@@ -411,6 +900,22 @@ describe('extensoes Chrome', () => {
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.67.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.68.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.68.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.69.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.69.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.70.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.70.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.71.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.71.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.72.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.72.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.73.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.73.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.77.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.77.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.79.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.79.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.81.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.81.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-whatsapp-extension.zip')));
   });
 
@@ -433,13 +938,211 @@ describe('extensoes Chrome', () => {
     assert.match(contentJs, /bubbleCatalogRowShowsPrice\(row, item\.price, samePriceLike, item\)/);
   });
 
+  it('Bluesoft envia current_price apenas para preço positivo', () => {
+    const bridgeJs = readText('chrome-extension/bluesoft-main-world.js');
+    const popupJs = readText('chrome-extension/popup.js');
+
+    assert.match(bridgeJs, /const current_price = parsedPrice != null && parsedPrice > 0 \? parsedPrice : null/);
+    assert.match(popupJs, /Dados inválidos em \$\{field \|\| 'um item'\}/);
+  });
+
+  it('Captura de Tabelas reúne Bate Forte e Rivershop com os quatro prazos', () => {
+    const manifest = readJson('captura-tabelas-extension/manifest.json');
+    const popupJs = readText('captura-tabelas-extension/popup.js');
+    const popupHtml = readText('captura-tabelas-extension/popup.html');
+    const rivershopJs = readText('captura-tabelas-extension/rivershop-capture.js');
+
+    assert.ok(manifest.host_permissions.includes('https://pwa-rca-prod.bateforte.link/*'));
+    assert.ok(manifest.host_permissions.includes('https://www.rivershop.com.br/*'));
+    assert.ok(manifest.permissions.includes('downloads'));
+    assert.ok(manifest.content_scripts.some(script => (script.js || []).includes('bateforte-capture.js')));
+    assert.ok(manifest.content_scripts.some(script => (script.js || []).includes('rivershop-capture.js')));
+    assert.match(rivershopJs, /async function configureTerm/);
+    assert.match(rivershopJs, /async function capture/);
+    assert.match(rivershopJs, /data-id-embalagem/);
+    assert.match(rivershopJs, /const PAGE_CONCURRENCY = 4/);
+    assert.match(rivershopJs, /Promise\.allSettled/);
+    assert.match(rivershopJs, /url\.searchParams\.delete\('perpage'\)/);
+    assert.match(rivershopJs, /rivershopCaptureProgress/);
+    assert.match(rivershopJs, /new DOMParser\(\)\.parseFromString/);
+    assert.match(rivershopJs, /const DEPARTMENTS = \[/);
+    assert.match(rivershopJs, /rivershopGetCaptureScopes/);
+    assert.match(rivershopJs, /rivershopGetCaptureScope/);
+    assert.doesNotMatch(rivershopJs, /cobranca\\s\\+bancaria/i);
+    assert.match(rivershopJs, /return \{ unavailable: true, days \}/);
+    assert.match(popupJs, /const TERMS = \[7, 14, 21, 28\]/);
+    assert.match(popupJs, /'7 DIAS', '14 DIAS', '21 DIAS', '28 DIAS'/);
+    assert.match(popupJs, /function downloadXlsx/);
+    assert.match(popupJs, /chrome\.downloads\.download/);
+    assert.match(popupJs, /RIVERSHOP_DOWNLOAD_FOLDER = 'Venpro\/Rio Vermelho'/);
+    assert.match(popupJs, /saveCheckpoint/);
+    assert.match(popupJs, /function setProgress/);
+    assert.match(popupHtml, /role="progressbar"/);
+    assert.match(popupJs, /DEPARTAMENTO/);
+    assert.match(popupJs, /rivershop-tabela-\$\{new Date\(\)\.toISOString\(\)\.slice\(0, 10\)\}\.xlsx/);
+    assert.match(popupJs, /const unavailableTerms = \[\]/);
+    assert.match(popupJs, /if \(setup\?\.unavailable\)/);
+    assert.match(popupJs, /rivershopSetTerm', days: 7/);
+  });
+
+  it('Rivershop mantém o pagamento válido do cliente e informa prazo ausente', async () => {
+    const harness = await createRivershopCaptureDom(`
+      <form data-form="selecionarPreferencias">
+        <select name="id_forma_pagamento_preferencia">
+          <option value="pix">PIX</option>
+          <option value="boleto" selected>Boleto</option>
+        </select>
+        <select name="id_condicao_pagamento_preferencia">
+          <option value="7">7 DIAS</option>
+          <option value="14">14 DIAS</option>
+        </select>
+      </form>
+    `);
+    try {
+      let submits = 0;
+      harness.dom.window.document.querySelector('form').requestSubmit = () => { submits += 1; };
+
+      const configured = await harness.send({ action: 'rivershopSetTerm', days: 14 });
+      await new Promise(resolve => setTimeout(resolve, 70));
+      assert.equal(configured.unavailable, false);
+      assert.equal(configured.days, 14);
+      assert.equal(harness.dom.window.document.querySelector('[name="id_forma_pagamento_preferencia"]').value, 'boleto');
+      assert.equal(harness.dom.window.document.querySelector('[name="id_condicao_pagamento_preferencia"]').value, '14');
+      assert.equal(submits, 1);
+
+      const unavailable = await harness.send({ action: 'rivershopSetTerm', days: 21 });
+      assert.equal(unavailable.unavailable, true);
+      assert.equal(unavailable.days, 21);
+      assert.equal(harness.dom.window.document.querySelector('[name="id_forma_pagamento_preferencia"]').value, 'boleto');
+      assert.equal(submits, 1);
+    } finally {
+      harness.dom.window.close();
+    }
+  });
+
+  it('Rivershop busca todas as páginas da categoria sem depender da rolagem', async () => {
+    const harness = await createRivershopCaptureDom(`
+      <a class="filter-categories__item--current" href="/mercearia?page=13&id_colecao=123">MERCEARIA</a>
+      <a href="/higiene-e-beleza">HIGIENE E BELEZA</a><a href="/limpeza">LIMPEZA</a><a href="/bebidas">BEBIDAS</a>
+      <a href="/bazar">BAZAR</a><a href="/agropecuaria">AGROPECUÁRIA</a><a href="/eletro">ELETRO</a><a href="/materiais-construcao">MATERIAIS DE CONSTRUÇÃO</a>
+      <div class="products-view__options">302 produtos ordenados por:</div>
+      <div class="products-list__body products-list__body__last-page">
+        <table><tbody><tr class="product-card-logged"><td data-codigo-produto="123" data-nome="CAFÉ" data-preco="12.50" data-id-embalagem="7891234567890"></td><td>Embalagem: UN</td></tr></tbody></table>
+      </div>
+    `);
+    try {
+      harness.dom.window.history.replaceState(null, '', '/mercearia?page=13&id_colecao=123');
+      const pages = new Map([
+        ['1', `
+          <div class="products-view__options">3 produtos ordenados por:</div>
+          <table><tbody><tr class="product-card-logged"><td data-codigo-produto="123" data-nome="CAFÉ" data-preco="12.50" data-id-embalagem="7891234567890"></td><td>Embalagem: UN</td></tr></tbody></table>
+        `],
+        ['2', `
+          <div class="products-view__options">3 produtos ordenados por:</div>
+          <div class="products-list__body__last-page"><table><tbody><tr class="product-card-logged"><td data-codigo-produto="456" data-nome="AÇÚCAR" data-preco="8.75" data-id-embalagem="7891234567891"></td><td>Embalagem: UN</td></tr></tbody></table></div>
+        `],
+      ]);
+      const requestedUrls = [];
+      harness.dom.window.fetch = async url => {
+        requestedUrls.push(url);
+        return { ok: true, text: async () => pages.get(new URL(url).searchParams.get('page')) || '' };
+      };
+      const scope = await harness.send({ action: 'rivershopGetCaptureScope' });
+      assert.equal(scope.category, 'MERCEARIA');
+      assert.match(scope.url, /\/mercearia\?page=1&id_colecao=123$/);
+      const scopes = await harness.send({ action: 'rivershopGetCaptureScopes' });
+      assert.equal(scopes.length, 8);
+      assert.equal(scopes[1].category, 'HIGIENE E BELEZA');
+      assert.match(scopes[7].url, /\/materiais-construcao\?page=1&id_colecao=123$/);
+
+      const capture = await harness.send({ action: 'rivershopCaptureCatalog', jobId: 'teste-progresso' });
+      assert.equal(capture.done, true);
+      assert.equal(capture.catalogTotal, 3);
+      assert.equal(capture.pages, 2);
+      assert.equal(capture.products.length, 2);
+      assert.equal(capture.products[0].preco, 12.5);
+      assert.doesNotMatch(requestedUrls[0], /perpage=/);
+      assert.ok(harness.runtimeMessages.some(message => message.action === 'rivershopCaptureProgress'));
+      assert.ok(harness.runtimeMessages.some(message => message.completedPages === 2 && message.totalPages === 2));
+    } finally {
+      harness.dom.window.close();
+    }
+  });
+
+  it('Rivershop ignora categoria vazia sem interromper a captura', async () => {
+    const harness = await createRivershopCaptureDom(`
+      <form data-form="selecionarPreferencias"></form>
+      <a class="filter-categories__item--current" href="/limpeza">LIMPEZA</a>
+    `);
+    try {
+      harness.dom.window.fetch = async () => ({
+        ok: true,
+        text: async () => '<form data-form="selecionarPreferencias"></form><h1>LIMPEZA</h1>',
+      });
+      const capture = await harness.send({ action: 'rivershopCaptureCatalog' });
+      assert.equal(capture.done, true);
+      assert.equal(capture.skipped, true);
+      assert.equal(capture.incomplete, undefined);
+      assert.equal(capture.products.length, 0);
+      assert.equal(capture.catalogTotal, 0);
+    } finally {
+      harness.dom.window.close();
+    }
+  });
+
+  it('Rivershop preserva páginas capturadas quando uma página falha após tentativas', async () => {
+    const harness = await createRivershopCaptureDom(`
+      <form data-form="selecionarPreferencias"></form>
+      <a class="filter-categories__item--current" href="/mercearia">MERCEARIA</a>
+    `);
+    try {
+      let pageTwoAttempts = 0;
+      harness.dom.window.fetch = async url => {
+        const page = new URL(url).searchParams.get('page');
+        if (page === '2') {
+          pageTwoAttempts += 1;
+          return { ok: false, status: 503, text: async () => '' };
+        }
+        return {
+          ok: true,
+          text: async () => `
+            <form data-form="selecionarPreferencias"></form>
+            <div class="products-view__options">2 produtos ordenados por:</div>
+            <button data-click="paginate" data-pages="2"></button>
+            <table><tbody><tr class="product-card-logged"><td data-codigo-produto="123" data-nome="CAFÉ" data-preco="12.50" data-id-embalagem="7891234567890"></td><td>Embalagem: UN</td></tr></tbody></table>
+          `,
+        };
+      };
+      const capture = await harness.send({ action: 'rivershopCaptureCatalog', jobId: 'teste-parcial' });
+      assert.equal(capture.done, true);
+      assert.equal(capture.incomplete, true);
+      assert.equal(capture.products.length, 1);
+      assert.equal(pageTwoAttempts, 3);
+      assert.match(capture.warnings.join(' '), /Página 2/);
+    } finally {
+      harness.dom.window.close();
+    }
+  });
+
+  it('Super 20 reconhece EAN e altera somente o input de preço', () => {
+    const manifest = readJson('chrome-extension/manifest.json');
+    const contentJs = readText('chrome-extension/content.js');
+    const popupJs = readText('chrome-extension/popup.js');
+
+    assert.ok(manifest.host_permissions.includes('http://200.160.111.171:8082/*'));
+    assert.match(contentJs, /super20-cotacao/);
+    assert.match(contentJs, /input\[name\$="\.preco"\]/);
+    assert.match(contentJs, /input\[name\$="\.codbarras"\]/);
+    assert.match(popupJs, /function isSuper20CotacaoUrl/);
+  });
+
   it('Hipcomerp usa fluxo paginado com trava antes de salvar', () => {
     const manifest = readJson('chrome-extension/manifest.json');
     const popupJs = readText('chrome-extension/popup.js');
     const contentJs = readText('chrome-extension/content.js');
     const hipcomBridgeJs = readText('chrome-extension/hipcom-main-world.js');
 
-    assert.equal(manifest.version, '1.0.68');
+    assert.equal(manifest.version, '1.0.81');
     assert.ok(
       manifest.content_scripts.some(script => (script.js || []).includes('hipcom-main-world.js') && script.run_at === 'document_start' && script.world === 'MAIN'),
       'Hipcomerp precisa capturar a API antes do Flutter carregar'
@@ -616,7 +1319,7 @@ describe('extensoes Chrome', () => {
     const contentJs = readText('chrome-extension/content.js');
     const cotacaoPy = readText('backend/routes/cotacao.py');
 
-    assert.equal(manifest.version, '1.0.68');
+    assert.equal(manifest.version, '1.0.81');
     assert.match(popupJs, /'easy-cotacao-web': 'Easy Cotação Web'/);
     assert.match(popupJs, /function isEasyCotacaoWebUrl/);
     assert.match(popupJs, /gepautomacao\.dyndns\.org/);
@@ -632,12 +1335,12 @@ describe('extensoes Chrome', () => {
     assert.match(cotacaoPy, /fracionamento = "1"/);
   });
 
-  it('Estancia preenche campos fixos e calcula valor da embalagem', async () => {
+  it('Estancia lê a quantidade numérica da coluna e calcula o valor da embalagem', async () => {
     const manifest = readJson('chrome-extension/manifest.json');
     const popupJs = readText('chrome-extension/popup.js');
     const contentJs = readText('chrome-extension/content.js');
 
-    assert.equal(manifest.version, '1.0.68');
+    assert.equal(manifest.version, '1.0.81');
     assert.match(popupJs, /'estancia-cotacao': 'Estância'/);
     assert.match(popupJs, /async function runEstanciaJob/);
     assert.match(popupJs, /loadEstanciaQuote/);
@@ -675,7 +1378,7 @@ describe('extensoes Chrome', () => {
             <td>7898085943809<input type="hidden" name="codigoplu_0" id="codigoplu_0" value="65308"></td>
             <td>sab davene leite de aveia classico</td>
             <td>1</td>
-            <td>CX 48</td>
+            <td>48</td>
             <td><input type="text" name="vlr1_0" id="vlr1_0" value="0"></td>
             <td><input type="text" name="vlr2_0" id="vlr2_0" value=""></td>
             <td><input type="text" name="vlr3_0" id="vlr3_0" value="0.00"></td>
@@ -690,6 +1393,7 @@ describe('extensoes Chrome', () => {
     assert.equal(items.length, 1);
     assert.equal(items[0].ean, '7898085943809');
     assert.equal(items[0].qtdEmbalagem, 48);
+    assert.equal(dom.window.eval("getEstanciaPackageQtyFromText('CX 48')"), 48);
 
     const fillResult = await dom.window.eval(`
       fillQuotationPrices([{
@@ -698,7 +1402,7 @@ describe('extensoes Chrome', () => {
         nome: 'sab davene leite de aveia classico',
         signature: ${JSON.stringify(items[0].signature)},
         price: '2,50',
-        qtdEmbalagem: 48
+        qtdEmbalagem: 1
       }])
     `);
 

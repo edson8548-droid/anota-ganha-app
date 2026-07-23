@@ -5,6 +5,7 @@ const bubbleCatalogRowMeta = new WeakMap();
 const hipcomerpRowMeta = new WeakMap();
 const easyCotacaoRowMeta = new WeakMap();
 const estanciaRowMeta = new WeakMap();
+const COTEFACIL_CONTENT_VERSION = '1.0.81';
 const HIPCOMERP_BRIDGE_VERSION = '1.0.54';
 const hipcomerpApiState = {
   ready: false,
@@ -73,10 +74,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.action === 'loadNextNafarmasPage') {
       return loadNextNafarmasPage();
     }
+    if (msg.action === 'getCotefacilState') {
+      return getCotefacilState();
+    }
+    if (msg.action === 'loadCotefacilPage') {
+      return loadCotefacilPage(msg.page);
+    }
     if (msg.action === 'detectSite') {
       const site = detectQuotationSite();
       const rows = getQuotationRows(site);
-      return { site, supported: site !== 'generic' || rows.length > 0, rowCount: rows.length };
+      return {
+        site,
+        supported: site !== 'generic' || rows.length > 0,
+        rowCount: rows.length,
+        contentVersion: COTEFACIL_CONTENT_VERSION,
+      };
     }
     return null;
   })()
@@ -197,9 +209,268 @@ function getSyspanEan(row) {
   return /^\d{8,14}$/.test(digits) ? digits : limparEAN(raw);
 }
 
+function getCotefacilEan(row) {
+  const raw = normalizeCellText(getDirectCells(row)[0]?.textContent || '');
+  const digits = raw.replace(/\D/g, '');
+  return /^\d{8,14}$/.test(digits) ? digits : limparEAN(raw);
+}
+
+function getCotefacilPriceInput(row) {
+  const input = row.querySelector(
+    'input[id$=":valorBruto"], input[name$=":valorBruto"], input[id$=":valorComST"], input[name$=":valorComST"]'
+  );
+  return input && !input.disabled && !input.readOnly ? input : null;
+}
+
+function getCotefacilSectionRows(tableId) {
+  const table = document.getElementById(tableId);
+  const tbody = table?.tBodies?.[0];
+  if (!tbody) return [];
+  return Array.from(tbody.children).filter(row => (
+    row.tagName === 'TR'
+    && getCotefacilPriceInput(row)
+    && getCotefacilEan(row)
+    && normalizeCellText(getDirectCells(row)[1]?.textContent || '')
+  ));
+}
+
+function getCotefacilRows() {
+  return [
+    ...getCotefacilSectionRows('respostaCotacao:respostas'),
+    ...getCotefacilSectionRows('respostaCotacao:respostasMonitorado'),
+  ];
+}
+
+function getInplugEan(row) {
+  const raw = normalizeCellText(getDirectCells(row)[0]?.textContent || '');
+  const digits = raw.replace(/\D/g, '');
+  return /^\d{8,14}$/.test(digits) ? digits : '';
+}
+
+function getInplugProductName(row) {
+  return normalizeCellText(getDirectCells(row)[1]?.textContent || '');
+}
+
+function getInplugPriceCell(row) {
+  return getDirectCells(row)[5] || null;
+}
+
+function getInplugPriceInput(row) {
+  const input = getInplugPriceCell(row)?.querySelector(
+    'input[data-slot="input"][inputmode="decimal"], input[inputmode="decimal"][placeholder="0,00"]'
+  );
+  return input && !input.disabled && !input.readOnly ? input : null;
+}
+
+function getInplugPriceButton(row) {
+  return Array.from(getInplugPriceCell(row)?.querySelectorAll('button') || []).find(button => {
+    const text = normalizeCellText(button.textContent || '');
+    return /^Inserir valor$/i.test(text) || /^R\$\s*\d/i.test(text);
+  }) || null;
+}
+
+function getInplugCurrentPrice(row) {
+  const inputValue = getInplugPriceInput(row);
+  if (inputValue) return parsePositivePriceNumber(getControlValue(inputValue));
+  return parsePositivePriceNumber(getInplugPriceButton(row)?.textContent || '');
+}
+
+function getInplugRowSignature(row) {
+  return `${getInplugEan(row)}|${getInplugProductName(row)}`;
+}
+
+function getInplugRows() {
+  return Array.from(document.querySelectorAll('table tbody tr')).filter(row => (
+    Boolean(getInplugEan(row))
+    && Boolean(getInplugProductName(row))
+    && Boolean(getInplugPriceButton(row) || getInplugPriceInput(row))
+  ));
+}
+
+function findInplugCurrentRow(item = {}, fallbackRow = null) {
+  const rows = getInplugRows();
+  const signature = String(item.signature || '');
+  if (signature) {
+    const bySignature = rows.find(row => getInplugRowSignature(row) === signature);
+    if (bySignature) return bySignature;
+  }
+
+  const expectedEan = String(item.ean || '').replace(/\D/g, '');
+  if (expectedEan) {
+    const byEan = rows.filter(row => getInplugEan(row) === expectedEan);
+    if (byEan.length === 1) return byEan[0];
+  }
+
+  const idx = Number(item.idx);
+  return (Number.isInteger(idx) && idx >= 0 ? rows[idx] : null) || fallbackRow || null;
+}
+
+function getCotefacilPageSignature() {
+  return getCotefacilSectionRows('respostaCotacao:respostas')
+    .map(row => {
+      const priceInput = getCotefacilPriceInput(row);
+      return `${getCotefacilEan(row)}|${priceInput?.id || priceInput?.name || ''}`;
+    })
+    .join('||');
+}
+
+function getCotefacilGlobalRowIndex(row) {
+  const control = row.querySelector('input[id*="respostaCotacao:respostas:"], input[name*="respostaCotacao:respostas:"]');
+  const match = String(control?.id || control?.name || '').match(/respostaCotacao:respostas:(\d+):/i);
+  return match ? Number(match[1]) : null;
+}
+
+function getCotefacilState() {
+  const mainRows = getCotefacilSectionRows('respostaCotacao:respostas');
+  const monitoredRows = getCotefacilSectionRows('respostaCotacao:respostasMonitorado');
+  const scroller = document.getElementById('respostaCotacao:respostas:j_id530');
+  if (!scroller || !document.getElementById('respostaCotacao:respostas')) {
+    return { ok: false, site: 'cotefacil-cotacao', reason: 'cotefacil_grid_not_found' };
+  }
+
+  const page = Number.parseInt(scroller.querySelector('.rich-datascr-act')?.textContent || '1', 10) || 1;
+  const total = Number.parseInt(document.getElementById('respostaCotacao:totalItens')?.textContent || '', 10)
+    || (mainRows.length + monitoredRows.length);
+  const firstGlobalIndex = mainRows
+    .map(getCotefacilGlobalRowIndex)
+    .find(index => Number.isInteger(index) && index >= 0);
+  const inferredPageSize = page > 1 && Number.isInteger(firstGlobalIndex)
+    ? Math.round(firstGlobalIndex / (page - 1))
+    : mainRows.length;
+  const pageSize = Math.max(1, inferredPageSize || mainRows.length || 10);
+  const regularTotal = Math.max(mainRows.length, total - monitoredRows.length);
+  const pages = Math.max(page, Math.ceil(regularTotal / pageSize));
+
+  return {
+    ok: true,
+    site: 'cotefacil-cotacao',
+    page,
+    pages,
+    total,
+    regularTotal,
+    monitoredTotal: monitoredRows.length,
+    pageSize,
+    mainRows: mainRows.length,
+    monitoredRows: monitoredRows.length,
+    hasNext: page < pages,
+    signature: getCotefacilPageSignature(),
+  };
+}
+
+function findCotefacilPageButton(scroller, page) {
+  return Array.from(scroller?.querySelectorAll('.rich-datascr-inact') || [])
+    .find(cell => Number.parseInt(cell.textContent || '', 10) === page) || null;
+}
+
+async function waitForCotefacilPage(targetPage, previousSignature, timeoutMs = 15000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    await waitForGridRender(120);
+    const state = getCotefacilState();
+    if (state.ok && state.page === targetPage && state.signature !== previousSignature) return state;
+  }
+  return getCotefacilState();
+}
+
+async function loadCotefacilPage(page) {
+  const targetPage = Number.parseInt(page, 10);
+  let state = getCotefacilState();
+  if (!state.ok) return state;
+  if (!Number.isInteger(targetPage) || targetPage < 1 || targetPage > state.pages) {
+    return { ok: false, reason: 'invalid_page', state };
+  }
+  if (state.page === targetPage) return { ok: true, state };
+
+  const maxSteps = state.pages + 3;
+  for (let step = 0; step < maxSteps && state.page !== targetPage; step++) {
+    const scroller = document.getElementById('respostaCotacao:respostas:j_id530');
+    if (!scroller) return { ok: false, reason: 'scroller_not_found', state };
+
+    let button = findCotefacilPageButton(scroller, targetPage);
+    if (!button && targetPage === 1) {
+      button = scroller.querySelector('[onclick*="first"]');
+    }
+    if (!button && targetPage === state.pages) {
+      button = scroller.querySelector('[onclick*="last"]');
+    }
+    if (!button && targetPage < state.page) {
+      button = scroller.querySelector('[onclick*="first"]');
+    }
+    if (!button && targetPage > state.page) {
+      button = scroller.querySelector('[onclick*="next"]');
+    }
+    if (!button) return { ok: false, reason: 'page_button_not_found', state };
+
+    const previousPage = state.page;
+    const previousSignature = state.signature;
+    button.click();
+    const expectedPage = findCotefacilPageButton(scroller, targetPage) || targetPage === 1 || targetPage === state.pages
+      ? targetPage
+      : Math.min(state.pages, state.page + 1);
+    state = await waitForCotefacilPage(expectedPage, previousSignature);
+    if (!state.ok || state.page === previousPage) {
+      return { ok: false, reason: 'page_change_timeout', state };
+    }
+  }
+
+  return state.page === targetPage
+    ? { ok: true, state }
+    : { ok: false, reason: 'target_page_not_reached', state };
+}
+
 function getSyspanMinimumQuantityInput(row) {
   const input = row.querySelector('input.valor_st[id^="st_"], input[id^="st_"]');
   return input && !input.disabled && !input.readOnly ? input : null;
+}
+
+function findSyspanCurrentRow(item = {}, fallbackRow = null) {
+  const expectedEan = String(item.ean || '').replace(/\D/g, '');
+  const rows = getQuotationRows('syspan-cotacao');
+  if (expectedEan) {
+    const byEan = rows.find(row => getSyspanEan(row) === expectedEan);
+    if (byEan) return byEan;
+  }
+  const byIndex = Number.isInteger(Number(item.idx)) ? rows[Number(item.idx)] : null;
+  return byIndex || fallbackRow || null;
+}
+
+async function waitForSyspanRowsReady(maxAttempts = 20) {
+  let previousCount = -1;
+  let stableReads = 0;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const rows = getQuotationRows('syspan-cotacao');
+    if (rows.length && rows.length === previousCount) {
+      stableReads++;
+      if (stableReads >= 1) return rows;
+    } else {
+      stableReads = 0;
+    }
+    previousCount = rows.length;
+    await new Promise(resolve => setTimeout(resolve, 150));
+  }
+
+  return getQuotationRows('syspan-cotacao');
+}
+
+function getEgestoraEan(row) {
+  const raw = normalizeCellText(getDirectCells(row)[0]?.textContent || '');
+  const digits = raw.replace(/\D/g, '');
+  return /^\d{8,14}$/.test(digits) ? digits : limparEAN(raw);
+}
+
+function getEgestoraPackageInput(row) {
+  const input = row.querySelector('input.valorembalagem[id^="valorembalagem_"]');
+  return input && !input.disabled && !input.readOnly ? input : null;
+}
+
+function getEgestoraPackageQuantity(row) {
+  const unitInput = row.querySelector('input.valorunitario[data-produto-id]');
+  const id = unitInput?.getAttribute('data-produto-id') || '';
+  const metadata = id ? document.querySelector(`#embalagem_${CSS.escape(id)}`)?.getAttribute('data-embalagem') : '';
+  const raw = metadata || normalizeCellText(getDirectCells(row)[4]?.textContent || '');
+  const parsed = Number(String(raw).replace(',', '.'));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
 function getControlValue(input) {
@@ -734,7 +1005,7 @@ function normalizeEstanciaPackageQty(value) {
   return Math.round(n);
 }
 
-function getEstanciaPackageQtyFromText(text) {
+function findEstanciaPackageQtyFromText(text) {
   const normalized = normalizeCellText(text).toUpperCase();
   const patterns = [
     /\b(?:CX|CAIXA|FD|FDO|FARDO|PCT|PACOTE|DISPLAY|DP|SC|SACO|UN|UND|UNID)\s*-?\s*(\d{1,4})\b/,
@@ -746,7 +1017,43 @@ function getEstanciaPackageQtyFromText(text) {
     const qty = normalizeEstanciaPackageQty(match[1]);
     if (qty > 0) return qty;
   }
-  return 1;
+  return null;
+}
+
+function getEstanciaPackageQtyFromText(text) {
+  return findEstanciaPackageQtyFromText(text) ?? 1;
+}
+
+function parseEstanciaPackageQtyCell(value) {
+  const numbers = normalizeCellText(value).match(/\d{1,4}/g) || [];
+  for (let index = numbers.length - 1; index >= 0; index--) {
+    const qty = normalizeEstanciaPackageQty(numbers[index]);
+    if (qty > 0) return qty;
+  }
+  return null;
+}
+
+function findEstanciaPackageQtyFromRow(row) {
+  if (!row) return null;
+  const includePatterns = [
+    /(?:qtd|qtde|quantidade).*?(?:por\s*)?(?:emb|embalagem|cx|caixa)/i,
+    /(?:emb|embalagem|cx|caixa).*?(?:qtd|qtde|quantidade)/i,
+  ];
+  const excludePatterns = [/pedid/i, /dispon/i, /valor/i, /pre[çc]o/i];
+  const visualIndex = findVisualColumnIndexByHeader(row, includePatterns, excludePatterns);
+  const headerCell = getCellAtVisualColumn(row, visualIndex);
+  const headerQty = parseEstanciaPackageQtyCell(headerCell?.textContent || '');
+  if (headerQty !== null) return headerQty;
+
+  for (const cell of Array.from(row.querySelectorAll('[data-label]'))) {
+    const label = normalizeCellText(cell.getAttribute('data-label') || '');
+    if (!includePatterns.some(pattern => pattern.test(label))) continue;
+    if (excludePatterns.some(pattern => pattern.test(label))) continue;
+    const labeledQty = parseEstanciaPackageQtyCell(cell.textContent || '');
+    if (labeledQty !== null) return labeledQty;
+  }
+
+  return findEstanciaPackageQtyFromText(row.innerText || row.textContent || '');
 }
 
 function cleanupEstanciaProductName(value, ean = '') {
@@ -797,7 +1104,8 @@ function parseEstanciaRowMeta(row) {
   const quantityInput = estanciaInput(row, `vlr1_${idx}`) || estanciaInput(document, `vlr1_${idx}`);
   const referenceInput = estanciaInput(row, `vlr2_${idx}`) || estanciaInput(document, `vlr2_${idx}`);
   const priceInput = estanciaInput(row, `vlr3_${idx}`) || estanciaInput(document, `vlr3_${idx}`);
-  const packageQty = getEstanciaPackageQtyFromText(fullText);
+  const detectedPackageQty = findEstanciaPackageQtyFromRow(row);
+  const packageQty = detectedPackageQty ?? 1;
 
   return {
     idx,
@@ -805,6 +1113,7 @@ function parseEstanciaRowMeta(row) {
     ean,
     nome,
     packageQty,
+    packageQtyDetected: detectedPackageQty !== null,
     quantityInput,
     referenceInput,
     priceInput,
@@ -2369,6 +2678,26 @@ function getPriceCandidates(row, site = 'generic') {
     const input = row.querySelector('input.valor[id^="vl_"], input[id^="vl_"]');
     return input && !input.disabled && !input.readOnly ? [input] : [];
   }
+  if (site === 'egestora-cotacao') {
+    const input = row.querySelector('input.valorunitario[id^="valorunitario_"]');
+    return input && !input.disabled && !input.readOnly ? [input] : [];
+  }
+  if (site === 'imperium-cotacao') {
+    const input = row.querySelector('input.txtPreco');
+    return input && !input.disabled && !input.readOnly ? [input] : [];
+  }
+  if (site === 'super20-cotacao') {
+    const input = row.querySelector('input[name$=".preco"]');
+    return input && !input.disabled && !input.readOnly ? [input] : [];
+  }
+  if (site === 'cotefacil-cotacao') {
+    const input = getCotefacilPriceInput(row);
+    return input ? [input] : [];
+  }
+  if (site === 'inplug-cotacao') {
+    const input = getInplugPriceInput(row);
+    return input ? [input] : [];
+  }
   const inputs = getEditableInputs(row);
   const priceLike = inputs.filter(isPriceLikeInput);
   return priceLike.length ? priceLike : inputs;
@@ -2376,7 +2705,7 @@ function getPriceCandidates(row, site = 'generic') {
 
 function getSelectedPriceInput(row, empresaColuna, site = 'generic') {
   const candidates = getPriceCandidates(row, site);
-  if (site === 'vr-cotacao' || site === 'dobesone-cotacao' || site === 'syspan-cotacao') return candidates[0] || null;
+  if (site === 'vr-cotacao' || site === 'dobesone-cotacao' || site === 'syspan-cotacao' || site === 'egestora-cotacao' || site === 'imperium-cotacao' || site === 'super20-cotacao' || site === 'cotefacil-cotacao' || site === 'inplug-cotacao') return candidates[0] || null;
   return candidates[normalizeEmpresaColuna(empresaColuna)] || null;
 }
 
@@ -2470,6 +2799,8 @@ function detectQuotationSite() {
     && document.querySelector('input.valor_st[id^="st_"], input[id^="st_"]')
   );
 
+  if (/^(www\.)?venpro\.com\.br$/i.test(hostname)
+    && /\/demonstracao-extensao-cotacao\.html$/i.test(path)) return 'venpro-demo';
   if (window.location.hostname.includes('cotatudo.com.br')) return 'cotatudo';
   if (/^nafarmasl\.ddns\.net$/i.test(hostname)
     && /\/web\/cotacao\/itensCotacoes\.jsp$/i.test(path)) return 'nafarmas-cotacao';
@@ -2478,6 +2809,17 @@ function detectQuotationSite() {
   if (looksDobesoneCotacao) return 'dobesone-cotacao';
   if (/(^|\.)syspanweb\.com\.br$/i.test(hostname) && (looksSyspanCotacao || hasSyspanInputGrid)) return 'syspan-cotacao';
   if (looksSyspanCotacao) return 'syspan-cotacao';
+  if (/(^|\.)egestora\.com\.br$/i.test(hostname) && /\/Vendedores\/CotarProdutos\//i.test(path)) return 'egestora-cotacao';
+  if (/(^|\.)bids\.imperiumsolucoes\.com$/i.test(hostname) && /\/Cotacao\.aspx$/i.test(path)
+    && document.querySelector('input.txtPreco')) return 'imperium-cotacao';
+  if (hostname === '200.160.111.171' && /\/Cotacao\/LancarCotacao$/i.test(path)
+    && document.querySelector('#formLancarCotacao input[name$=".preco"]')) return 'super20-cotacao';
+  if (/(^|\.)cotacao\.inplug\.online$/i.test(hostname)
+    && /^\/cotacao\/\d+\/?$/i.test(path)
+    && getInplugRows().length > 0) return 'inplug-cotacao';
+  if (/^sistemas\.cotefacil\.com$/i.test(hostname)
+    && /\/CTFLLogan-webapp\/spring\/pages\/representante\/respostas\/cotacao$/i.test(path)
+    && getCotefacilRows().length > 0) return 'cotefacil-cotacao';
   if (isSgCotacaoPage(hostname, bodyText)) return 'sg-cotacao';
   if (isHrCotacaoPage(hostname)) return 'hr-cotacao';
   if (isAriusCotacaoPage(hostname)) return 'arius-cotacao';
@@ -2532,6 +2874,41 @@ function getQuotationRows(site) {
       && getSyspanEan(row)
       && normalizeCellText(getDirectCells(row)[1]?.textContent || '')
     ));
+  }
+
+  if (site === 'egestora-cotacao') {
+    return Array.from(document.querySelectorAll('#tabelaprodutos tbody tr')).filter(row => (
+      getPriceCandidates(row, site).length > 0
+      && getEgestoraEan(row)
+      && normalizeCellText(getDirectCells(row)[2]?.textContent || '')
+    ));
+  }
+
+  if (site === 'imperium-cotacao') {
+    return Array.from(document.querySelectorAll('table tr')).filter(row => {
+      const cells = getDirectCells(row);
+      return Boolean(
+        getPriceCandidates(row, site).length
+        && /^\d{8,14}$/.test(String(cells[0]?.textContent || '').replace(/\D/g, ''))
+        && normalizeCellText(cells[1]?.textContent || '')
+      );
+    });
+  }
+
+  if (site === 'super20-cotacao') {
+    return Array.from(document.querySelectorAll('#formLancarCotacao tbody tr')).filter(row => {
+      const barcode = row.querySelector('input[name$=".codbarras"]')?.value?.replace(/\D/g, '') || '';
+      const description = row.querySelector('input[name$=".descricao"]')?.value || '';
+      return Boolean(getPriceCandidates(row, site).length && /^\d{8,14}$/.test(barcode) && normalizeCellText(description));
+    });
+  }
+
+  if (site === 'cotefacil-cotacao') {
+    return getCotefacilRows();
+  }
+
+  if (site === 'inplug-cotacao') {
+    return getInplugRows();
   }
 
   if (site === 'sg-cotacao') {
@@ -2865,6 +3242,97 @@ function extractItemFromRow(row, idx, site, empresaColuna) {
     };
   }
 
+  if (site === 'egestora-cotacao') {
+    const cells = getDirectCells(row);
+    const ean = getEgestoraEan(row);
+    const nome = normalizeCellText(cells[2]?.textContent || '');
+    const priceTarget = getSelectedPriceInput(row, empresaColuna, site);
+    if (!ean && !nome) return null;
+    return {
+      idx,
+      ean,
+      nome,
+      codigo: normalizeCellText(cells[1]?.textContent || ''),
+      signature: `${ean}|${nome}`,
+      embalagem: String(getEgestoraPackageQuantity(row)),
+      qtdEmbalagem: getEgestoraPackageQuantity(row),
+      filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
+      current_price: currentPriceValue(priceTarget),
+    };
+  }
+
+  if (site === 'imperium-cotacao') {
+    const cells = getDirectCells(row);
+    const ean = String(cells[0]?.textContent || '').replace(/\D/g, '');
+    const nome = normalizeCellText(cells[1]?.textContent || '');
+    const priceTarget = getSelectedPriceInput(row, empresaColuna, site);
+    if (!ean && !nome) return null;
+    return {
+      idx,
+      ean: /^\d{8,14}$/.test(ean) ? ean : '',
+      nome,
+      codigo: '',
+      signature: `${ean}|${nome}`,
+      filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
+      current_price: currentPriceValue(priceTarget),
+    };
+  }
+
+  if (site === 'super20-cotacao') {
+    const ean = String(row.querySelector('input[name$=".codbarras"]')?.value || '').replace(/\D/g, '');
+    const nome = normalizeCellText(row.querySelector('input[name$=".descricao"]')?.value || '');
+    const codigo = normalizeCellText(row.querySelector('input[name$=".cod"]')?.value || '');
+    const priceTarget = getSelectedPriceInput(row, empresaColuna, site);
+    if (!ean && !nome) return null;
+    return {
+      idx,
+      ean: /^\d{8,14}$/.test(ean) ? ean : '',
+      nome,
+      codigo,
+      signature: `${ean}|${nome}`,
+      filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
+      current_price: currentPriceValue(priceTarget),
+    };
+  }
+
+  if (site === 'cotefacil-cotacao') {
+    const cells = getDirectCells(row);
+    const ean = getCotefacilEan(row);
+    const nome = normalizeCellText(cells[1]?.textContent || '');
+    const priceTarget = getSelectedPriceInput(row, empresaColuna, site);
+    const cotefacilSection = row.closest('table')?.id === 'respostaCotacao:respostasMonitorado'
+      ? 'monitorado'
+      : 'regular';
+    if (!ean && !nome) return null;
+    return {
+      idx,
+      ean,
+      nome,
+      codigo: '',
+      signature: `${ean}|${nome}`,
+      cotefacilSection,
+      cotefacilRowIndex: getCotefacilGlobalRowIndex(row),
+      filled: priceTarget ? isFilledPriceValue(getControlValue(priceTarget).trim()) : false,
+      current_price: currentPriceValue(priceTarget),
+    };
+  }
+
+  if (site === 'inplug-cotacao') {
+    const ean = getInplugEan(row);
+    const nome = getInplugProductName(row);
+    const currentPrice = getInplugCurrentPrice(row);
+    if (!ean && !nome) return null;
+    return {
+      idx,
+      ean,
+      nome,
+      codigo: '',
+      signature: getInplugRowSignature(row),
+      filled: currentPrice !== null,
+      current_price: currentPrice,
+    };
+  }
+
   if (site === 'sg-cotacao') {
     const ean = getSgCotacaoEan(row);
     const nome = normalizeCellText(getSgCotacaoCell(row, 'Produto')?.textContent || '');
@@ -3009,7 +3477,9 @@ async function extractQuotationItems(options = {}) {
     if (apiResult.ok && apiResult.items?.length) return apiResult.items;
   }
 
-  const rows = getQuotationRows(site);
+  const rows = site === 'syspan-cotacao'
+    ? await waitForSyspanRowsReady()
+    : getQuotationRows(site);
   const items = [];
   const empresaColuna = normalizeEmpresaColuna(options.empresaColuna);
 
@@ -3032,7 +3502,9 @@ async function fillQuotationPrices(prices, options = {}) {
   if (site === 'guia-cotacao') {
     return fillGuiaPrices(prices);
   }
-  const rows = getQuotationRows(site);
+  let rows = site === 'syspan-cotacao'
+    ? await waitForSyspanRowsReady()
+    : getQuotationRows(site);
   let count = 0;
   const failed = [];
   const details = [];
@@ -3655,6 +4127,47 @@ async function fillQuotationPrices(prices, options = {}) {
     ) || '1';
   }
 
+  async function setSyspanControlValue(input, value, { quantity = false } = {}) {
+    if (!input || !isEditableValueControl(input)) return false;
+
+    const raw = String(value ?? '').trim();
+    const candidates = quantity
+      ? [raw]
+      : priceValueCandidates(value, input);
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      for (const candidate of candidates) {
+        if (!candidate) continue;
+        try {
+        // A Syspan recalcula a linha no blur. Evitar limpar o campo antes do
+        // novo valor impede que o script da página descarte a linha no meio
+        // do preenchimento automatizado.
+        input.scrollIntoView({ block: 'center', inline: 'nearest' });
+        input.focus?.();
+        if ('value' in input) writeNativeValue(input, candidate);
+        else input.textContent = candidate;
+
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.dispatchEvent(new KeyboardEvent('keyup', {
+          bubbles: true,
+          key: 'Tab',
+          code: 'Tab',
+        }));
+        input.blur?.();
+        input.dispatchEvent(new Event('focusout', { bubbles: true }));
+        await waitForGridRender(100);
+
+          const current = getControlValue(input);
+          if (quantity ? sameEasyCotacaoQuantity(current, raw) : samePriceLike(current, value)) return true;
+        } catch {}
+      }
+      await waitForGridRender(120);
+    }
+
+    return false;
+  }
+
   async function ensureSyspanMinimumQuantity(row, item = {}) {
     const target = getSyspanMinimumQuantityInput(row);
     const quantidade = getSyspanMinimumQuantityValue(item);
@@ -3665,9 +4178,10 @@ async function fillQuotationPrices(prices, options = {}) {
       return { ok: true, changed: false, reason: 'minimum_quantity_already_filled', quantidade };
     }
 
-    const ok = await setPlainControlValue(target, quantidade);
-    await waitForGridRender(80);
-    return { ok, changed: ok, reason: ok ? 'minimum_quantity_filled' : 'minimum_quantity_rejected', quantidade };
+    const ok = await setSyspanControlValue(target, quantidade, { quantity: true });
+    await waitForGridRender(120);
+    const persisted = ok && sameEasyCotacaoQuantity(getControlValue(target), quantidade);
+    return { ok: persisted, changed: persisted, reason: persisted ? 'minimum_quantity_filled' : 'minimum_quantity_rejected', quantidade };
   }
 
   function getEstanciaPackagePrice(item = {}, row = null) {
@@ -3675,7 +4189,8 @@ async function fillQuotationPrices(prices, options = {}) {
     if (unitPrice === null) return '';
     const meta = row ? (estanciaRowMeta.get(row) || parseEstanciaRowMeta(row)) : null;
     const packageQty = normalizeEstanciaPackageQty(
-      item.qtdEmbalagem
+      (meta?.packageQtyDetected ? meta.packageQty : null)
+      ?? item.qtdEmbalagem
       ?? item.embalagem
       ?? item.packageQty
       ?? meta?.packageQty
@@ -3859,21 +4374,143 @@ async function fillQuotationPrices(prices, options = {}) {
     return { filled: count, failed, details, site, rowCount: scannedRows };
   }
 
+  async function fillInplugPrices() {
+    const items = Array.isArray(prices) ? prices : [];
+
+    async function waitForEditor(item, fallbackRow, timeoutMs = 3000) {
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < timeoutMs) {
+        const currentRow = findInplugCurrentRow(item, fallbackRow);
+        const input = currentRow ? getInplugPriceInput(currentRow) : null;
+        if (input) return { row: currentRow, input };
+        await waitForGridRender(50);
+      }
+      return { row: findInplugCurrentRow(item, fallbackRow), input: null };
+    }
+
+    async function waitForPersistedPrice(item, fallbackRow, timeoutMs = 12000) {
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < timeoutMs) {
+        const currentRow = findInplugCurrentRow(item, fallbackRow);
+        if (currentRow && samePriceLike(getInplugCurrentPrice(currentRow), item.price)) {
+          return { ok: true, row: currentRow };
+        }
+        await waitForGridRender(100);
+      }
+      return { ok: false, row: findInplugCurrentRow(item, fallbackRow) };
+    }
+
+    for (const item of items) {
+      let row = findInplugCurrentRow(item, rows[Number(item.idx)]);
+      if (!row) {
+        failed.push(item.idx);
+        details.push({ idx: item.idx, reason: 'row_not_found' });
+        continue;
+      }
+
+      if (samePriceLike(getInplugCurrentPrice(row), item.price)) {
+        count++;
+        continue;
+      }
+
+      const button = getInplugPriceButton(row);
+      if (!button) {
+        failed.push(item.idx);
+        details.push({ idx: item.idx, reason: 'edit_button_not_found' });
+        continue;
+      }
+
+      const before = normalizeCellText(getInplugPriceCell(row)?.textContent || '');
+      try {
+        button.scrollIntoView({ block: 'center', inline: 'nearest' });
+        button.click();
+      } catch {
+        failed.push(item.idx);
+        details.push({ idx: item.idx, reason: 'edit_button_rejected', before });
+        continue;
+      }
+
+      const editor = await waitForEditor(item, row);
+      row = editor.row;
+      const input = editor.input;
+      if (!row || !input) {
+        failed.push(item.idx);
+        details.push({ idx: item.idx, reason: 'price_editor_not_opened', before });
+        continue;
+      }
+
+      const candidate = priceValueCandidates(item.price, input)[0] || '';
+      if (!candidate) {
+        input.blur?.();
+        failed.push(item.idx);
+        details.push({ idx: item.idx, reason: 'invalid_price', before, attempted: String(item.price ?? '') });
+        continue;
+      }
+
+      try {
+        input.focus?.();
+        writeNativeValue(input, '');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        writeNativeValue(input, candidate);
+        try {
+          input.dispatchEvent(new InputEvent('input', {
+            bubbles: true,
+            inputType: 'insertText',
+            data: candidate,
+          }));
+        } catch {
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        await waitForGridRender(40);
+        input.blur?.();
+      } catch {
+        failed.push(item.idx);
+        details.push({ idx: item.idx, reason: 'value_rejected', before, attempted: candidate });
+        continue;
+      }
+
+      const persisted = await waitForPersistedPrice(item, row);
+      if (persisted.ok) {
+        count++;
+      } else {
+        failed.push(item.idx);
+        details.push({
+          idx: item.idx,
+          reason: 'value_not_persisted',
+          before,
+          after: normalizeCellText(getInplugPriceCell(persisted.row)?.textContent || ''),
+          attempted: candidate,
+        });
+      }
+    }
+
+    rows = getInplugRows();
+    return { filled: count, failed, details, site, rowCount: rows.length };
+  }
+
   if (site === 'cotacao-web-smus') {
     return fillCotacaoWebSmusPrices();
   }
   if (site === 'estancia-cotacao') {
     return fillEstanciaPrices();
   }
+  if (site === 'inplug-cotacao') {
+    return fillInplugPrices();
+  }
 
   const isBubbleCatalogFornecedor = site === 'bubble-catalog-fornecedor';
   const isEasyCotacaoWeb = site === 'easy-cotacao-web';
   const isSyspanCotacao = site === 'syspan-cotacao';
+  const isEgestoraCotacao = site === 'egestora-cotacao';
   const isVrCotacao = site === 'vr-cotacao';
   const diagnostics = [];
 
   for (const item of prices) {
     let row = rows[item.idx];
+    if (isSyspanCotacao) {
+      row = findSyspanCurrentRow(item, row);
+    }
     if (isBubbleCatalogFornecedor) {
       row = findBubbleCatalogCurrentRowForItem(item, row, { requireExactEan: true });
     }
@@ -3958,7 +4595,9 @@ async function fillQuotationPrices(prices, options = {}) {
     }
 
     const before = getControlValue(input);
-    const ok = await setInputValue(input, item.price);
+    let ok = isSyspanCotacao
+      ? await setSyspanControlValue(input, item.price)
+      : await setInputValue(input, item.price);
     let persisted = ok;
     if (isBubbleCatalogFornecedor) {
       await waitForGridRender(140);
@@ -3990,19 +4629,56 @@ async function fillQuotationPrices(prices, options = {}) {
       });
     } else if (isSyspanCotacao) {
       await waitForGridRender(80);
-      const currentQuantity = getSyspanMinimumQuantityInput(row);
+      let currentQuantity = getSyspanMinimumQuantityInput(row);
       persisted = Boolean(
         ok
         && samePriceLike(getControlValue(input), item.price)
         && currentQuantity
         && sameEasyCotacaoQuantity(getControlValue(currentQuantity), syspanQuantityResult?.quantidade || '1')
       );
+      for (let attempt = 0; !persisted && attempt < 2; attempt++) {
+        await waitForGridRender(180);
+        row = findSyspanCurrentRow(item, row);
+        input = row ? getSelectedPriceInput(row, empresaColuna, site) : null;
+        currentQuantity = row ? getSyspanMinimumQuantityInput(row) : null;
+        if (!input || !currentQuantity) continue;
+        syspanQuantityResult = await ensureSyspanMinimumQuantity(row, item);
+        if (!syspanQuantityResult.ok) continue;
+        ok = await setSyspanControlValue(input, item.price);
+        await waitForGridRender(120);
+        persisted = Boolean(
+          ok
+          && samePriceLike(getControlValue(input), item.price)
+          && sameEasyCotacaoQuantity(getControlValue(currentQuantity), syspanQuantityResult.quantidade)
+        );
+      }
       diagnostics.push({
         idx: item.idx,
         reason: persisted ? 'syspan_value_confirmed' : 'syspan_value_not_confirmed',
         before,
         after: getControlValue(input),
         quantidade: currentQuantity ? getControlValue(currentQuantity) : '',
+        attempted: String(item.price ?? ''),
+      });
+    } else if (isEgestoraCotacao) {
+      const packageInput = getEgestoraPackageInput(row);
+      const packagePrice = getEgestoraPackageQuantity(row) * (parsePriceNumber(item.price) || 0);
+      const packageOk = Boolean(packageInput && packagePrice > 0 && await setInputValue(packageInput, packagePrice.toFixed(2)));
+      await waitForGridRender(180);
+      persisted = Boolean(
+        ok
+        && packageOk
+        && samePriceLike(getControlValue(input), item.price)
+        && packageInput
+        && samePriceLike(getControlValue(packageInput), packagePrice)
+        && row.getAttribute('data-persistido') === '1'
+      );
+      diagnostics.push({
+        idx: item.idx,
+        reason: persisted ? 'egestora_value_confirmed' : 'egestora_value_not_confirmed',
+        before,
+        after: getControlValue(input),
+        embalagem: packageInput ? getControlValue(packageInput) : '',
         attempted: String(item.price ?? ''),
       });
     }

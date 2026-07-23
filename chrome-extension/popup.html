@@ -136,6 +136,88 @@
       color: #6B6E74;
       margin-top: 2px;
     }
+    .privacy-note {
+      margin: 2px 0 12px;
+      padding: 10px 11px;
+      border-left: 3px solid #3A85A8;
+      border-radius: 6px;
+      background: #363940;
+      color: #A0A3A8;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    .privacy-note strong { color: #D5DBE3; }
+    .privacy-note a { color: #6EB6D8; }
+    .multi-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 11px;
+      margin: 0 0 10px;
+      border: 1px solid #4A4D52;
+      border-radius: 7px;
+      background: #363940;
+      color: #E1E1E1;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .multi-toggle.active {
+      border-color: #3A85A8;
+      background: #123247;
+    }
+    .multi-toggle input { margin: 0; }
+    .multi-table-fields {
+      max-height: 230px;
+      overflow-y: auto;
+      padding-right: 2px;
+      margin-bottom: 10px;
+    }
+    .multi-table-row {
+      padding: 9px;
+      margin-bottom: 7px;
+      border: 1px solid #4A4D52;
+      border-radius: 7px;
+      background: #363940;
+    }
+    .multi-table-row.selected {
+      border-color: #3A85A8;
+      background: #123247;
+    }
+    .multi-table-choice {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      margin: 0;
+      color: #E1E1E1;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: 0;
+      cursor: pointer;
+    }
+    .multi-table-choice input { margin-top: 2px; }
+    .multi-table-meta {
+      display: block;
+      margin-top: 2px;
+      color: #A0A3A8;
+      font-size: 10px;
+      font-weight: 500;
+    }
+    .multi-table-term {
+      margin: 8px 0 0 23px;
+      width: calc(100% - 23px);
+      padding: 7px 8px;
+      font-size: 12px;
+    }
+    .multi-hint {
+      margin: -2px 0 10px;
+      color: #6EB6D8;
+      font-size: 11px;
+      line-height: 1.4;
+    }
   </style>
 </head>
 <body>
@@ -148,18 +230,29 @@
   <div id="status" class="status info">Verificando página...</div>
   <div id="siteDetectado" class="status info" style="margin-top:-6px;">Site detectado: verificando...</div>
 
-  <label>Tabela de preços</label>
-  <select id="tabelas" disabled>
-    <option value="">Carregando...</option>
-  </select>
+  <div id="singleTableFields">
+    <label>Tabela de preços</label>
+    <select id="tabelas" disabled>
+      <option value="">Carregando...</option>
+    </select>
 
-  <label>Prazo</label>
-  <select id="prazo">
-    <option value="7">7 dias</option>
-    <option value="14">14 dias</option>
-    <option value="21">21 dias</option>
-    <option value="28" selected>28 dias</option>
-  </select>
+    <label>Prazo</label>
+    <select id="prazo">
+      <option value="7">7 dias</option>
+      <option value="14">14 dias</option>
+      <option value="21">21 dias</option>
+      <option value="28" selected>28 dias</option>
+    </select>
+  </div>
+
+  <label id="multiToggleLabel" class="multi-toggle">
+    <input id="compararTabelas" type="checkbox" disabled>
+    Comparar várias tabelas e preencher somente o menor preço
+  </label>
+  <div id="multiTableFields" style="display:none;">
+    <div id="tabelasMultiplas" class="multi-table-fields"></div>
+    <div id="multiTableHint" class="multi-hint">Selecione pelo menos duas tabelas.</div>
+  </div>
 
   <label>Modo de preenchimento</label>
   <select id="modo">
@@ -175,6 +268,13 @@
     <option value="3">Atacado/Empresa D</option>
     <option value="4">Atacado/Empresa E</option>
   </select>
+
+  <div class="privacy-note">
+    <strong>Privacidade:</strong> ao preencher, a extensão lê somente os produtos desta
+    cotação e os envia com segurança à API Venpro para localizar preços. Senhas dos
+    portais não são enviadas à Venpro.
+    <a href="https://venpro.com.br/privacy-policy.html" target="_blank" rel="noopener noreferrer">Saiba mais</a>.
+  </div>
 
   <button id="btnPreencher" class="btn btn-primary" disabled>
     Preencher Cotação
@@ -202,6 +302,7 @@
 
   <div id="results" class="results"></div>
 
+  <script src="multi-table.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

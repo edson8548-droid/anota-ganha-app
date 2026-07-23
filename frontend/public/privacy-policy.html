@@ -11,28 +11,28 @@
             max-width: 900px;
             margin: 0 auto;
             padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #333;
+            background: #2B2D31;
+            color: #D5DBE3;
         }
         .container {
-            background: white;
+            background: #363940;
             padding: 40px;
             border-radius: 10px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.1);
         }
         h1 {
-            color: #667eea;
-            border-bottom: 3px solid #667eea;
+            color: #ffffff;
+            border-bottom: 3px solid #3A85A8;
             padding-bottom: 10px;
             margin-bottom: 30px;
         }
         h2 {
-            color: #764ba2;
+            color: #6EB6D8;
             margin-top: 30px;
             margin-bottom: 15px;
         }
         .last-updated {
-            color: #666;
+            color: #A0A3A8;
             font-style: italic;
             margin-bottom: 30px;
         }
@@ -46,7 +46,7 @@
             margin-bottom: 10px;
         }
         .contact-info {
-            background: #f8f9fa;
+            background: #2B2D31;
             padding: 20px;
             border-radius: 5px;
             margin-top: 30px;
@@ -55,15 +55,15 @@
             text-align: center;
             margin-top: 40px;
             padding-top: 20px;
-            border-top: 1px solid #ddd;
-            color: #666;
+            border-top: 1px solid #4A4D52;
+            color: #A0A3A8;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Política de Privacidade</h1>
-        <p class="last-updated">Última atualização: 25 de outubro de 2025</p>
+        <p class="last-updated">Última atualização: 22 de julho de 2026</p>
 
         <div class="section">
             <h2>1. Introdução</h2>
@@ -94,6 +94,16 @@
                 <li><strong>Dados Técnicos:</strong> Endereço IP, tipo de navegador, versão do sistema operacional</li>
                 <li><strong>Cookies:</strong> Utilizamos cookies para manter sua sessão ativa e melhorar sua experiência</li>
             </ul>
+
+            <h3>2.3 Extensão Venpro — Preencher Cotação</h3>
+            <p>Quando o usuário aciona a extensão para preencher uma cotação, tratamos apenas os dados necessários para essa função:</p>
+            <ul>
+                <li><strong>Conteúdo da cotação:</strong> código/EAN, descrição, quantidade, preço já informado e estrutura técnica do campo de preço dos produtos exibidos na cotação aberta</li>
+                <li><strong>Conta Venpro:</strong> token de autenticação usado para confirmar a conta e acessar as tabelas cadastradas pelo próprio usuário; o token é armazenado localmente no Chrome</li>
+                <li><strong>Sessão dos portais:</strong> em portais compatíveis, a extensão pode usar a sessão já autenticada no navegador para carregar ou salvar a cotação; senhas e tokens desses portais não são enviados à API Venpro</li>
+                <li><strong>Dados operacionais:</strong> portal utilizado, quantidade de itens processados, preenchidos ou não encontrados e diagnósticos técnicos limitados, usados para segurança, suporte e correção de falhas</li>
+            </ul>
+            <p>A extensão não coleta o histórico geral de navegação e não opera em páginas fora dos portais declarados, exceto quando o próprio usuário aciona o ícone para testar uma cotação na aba atual.</p>
         </div>
 
         <div class="section">
@@ -107,6 +117,7 @@
                 <li>Melhorar, personalizar e expandir nosso aplicativo</li>
                 <li>Analisar como o aplicativo é usado para otimizar a experiência do usuário</li>
                 <li>Detectar, prevenir e resolver problemas técnicos</li>
+                <li>Comparar os produtos da cotação com a tabela de preços escolhida e devolver os preços que devem ser preenchidos</li>
                 <li>Cumprir obrigações legais e regulatórias</li>
             </ul>
         </div>
@@ -116,6 +127,7 @@
             <p>Não vendemos, alugamos ou compartilhamos suas informações pessoais com terceiros, exceto nas seguintes situações:</p>
             <ul>
                 <li><strong>Provedores de Serviço:</strong> Compartilhamos informações com o Asaas para processar pagamentos</li>
+                <li><strong>Infraestrutura:</strong> Utilizamos provedores contratados de hospedagem, banco de dados e segurança somente para operar o Venpro e a extensão</li>
                 <li><strong>Requisitos Legais:</strong> Quando exigido por lei, ordem judicial ou processo legal</li>
                 <li><strong>Proteção de Direitos:</strong> Para proteger nossos direitos, propriedade ou segurança</li>
                 <li><strong>Com Seu Consentimento:</strong> Em outras situações, apenas com sua autorização explícita</li>
@@ -182,6 +194,20 @@
             </ul>
             <p>
                 Você pode configurar seu navegador para recusar cookies, mas isso pode afetar a funcionalidade do aplicativo.
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>8.1 Uso Limitado — Chrome Web Store</h2>
+            <p>
+                O uso das informações obtidas pela extensão Venpro segue a Política de Dados do Usuário
+                da Chrome Web Store, incluindo os requisitos de Uso Limitado. Os dados são usados somente
+                para fornecer e melhorar a função de preencher cotações, manter a segurança e prestar suporte.
+            </p>
+            <p>
+                Não vendemos dados da extensão, não os usamos para publicidade personalizada e não permitimos
+                acesso humano ao conteúdo das cotações, salvo com consentimento específico para suporte,
+                por necessidade de segurança ou quando exigido por lei.
             </p>
         </div>
 

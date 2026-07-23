@@ -6,26 +6,15 @@ import { useAuthContext } from '../contexts/AuthContext';
 import { listarTabelas, uploadTabela, excluirTabela, processarCotacao, previewCotacao, confirmarCotacao, cancelarPreviewCotacao } from '../services/cotacao.service';
 import ReviewMatches from './ReviewMatches';
 import ConfirmDialog from '../components/ConfirmDialog';
+import {
+  criarArquivoCotacaoEncadeado,
+  defaultCotacaoFilename,
+  DEFAULT_COTACAO_FILENAME,
+  ensureXlsxFilename,
+} from '../utils/cotacaoFileChain';
+import { processarTabelasEmSequencia } from '../utils/cotacaoBatch';
 
-const COTACAO_EXTENSION_URL = '/venpro-preencher-cotacao-1.0.68.zip';
-const DEFAULT_COTACAO_FILENAME = 'cotacao_preenchida.xlsx';
-
-function ensureXlsxFilename(value) {
-  const cleaned = String(value || '')
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
-    .replace(/[. ]+$/g, '')
-    .trim();
-  const filename = cleaned || DEFAULT_COTACAO_FILENAME;
-  return /\.xlsx$/i.test(filename) ? filename : `${filename.replace(/\.(xls|csv)$/i, '')}.xlsx`;
-}
-
-function defaultCotacaoFilename(file) {
-  const base = String(file?.name || '')
-    .replace(/\.[^.]+$/g, '')
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
-    .trim();
-  return ensureXlsxFilename(base ? `${base}_preenchida.xlsx` : DEFAULT_COTACAO_FILENAME);
-}
+const COTACAO_EXTENSION_URL = '/venpro-preencher-cotacao-1.0.81.zip';
 
 export default function Cotacao() {
   const navigate = useNavigate();
@@ -51,6 +40,9 @@ export default function Cotacao() {
   const [canalPreenchimento, setCanalPreenchimento] = useState('excel');
   const [arquivoCotacao, setArquivoCotacao] = useState(null);
   const [colunaPreco, setColunaPreco] = useState('');
+  const [compararVariasTabelas, setCompararVariasTabelas] = useState(false);
+  const [tabelasLote, setTabelasLote] = useState({});
+  const [processingLote, setProcessingLote] = useState(null);
 
   // Resultado
   const [resultado, setResultado] = useState(null);
@@ -112,11 +104,13 @@ export default function Cotacao() {
     return a.download;
   };
 
-  const limparCotacaoSelecionada = useCallback(() => {
-    setArquivoCotacao(null);
+  const usarResultadoComoProximaCotacao = useCallback((blob, filename) => {
+    const arquivoEncadeado = criarArquivoCotacaoEncadeado(blob, filename);
+    setArquivoCotacao(arquivoEncadeado);
     if (cotacaoInputRef.current) {
       cotacaoInputRef.current.value = '';
     }
+    return arquivoEncadeado;
   }, []);
 
   const isStorageQuotaError = (err) => {
@@ -168,8 +162,89 @@ export default function Cotacao() {
     });
   };
 
+  const handleProcessarLote = async () => {
+    const selecoes = Object.entries(tabelasLote).map(([id, prazoSelecionadoLote]) => {
+      const tabela = tabelas.find(item => item.id === id);
+      const prazos = tabela?.prazos_disponiveis || [];
+      const prazo = Number(prazoSelecionadoLote)
+        || (prazos.length === 1 ? Number(prazos[0]) : Number(tabela?.prazo || 0));
+      return { id, nome: tabela?.nome || id, prazo, prazosDisponiveis: prazos };
+    });
+
+    if (selecoes.length < 2) {
+      toast.warning('Selecione pelo menos duas tabelas de preço.');
+      return;
+    }
+    if (selecoes.some(item => item.prazosDisponiveis.length > 1 && !item.prazo)) {
+      toast.warning('Escolha o prazo de cada tabela selecionada.');
+      return;
+    }
+
+    const destino = await criarDestinoCotacao(defaultCotacaoFilename(arquivoCotacao));
+    if (!destino) {
+      toast.info('Processamento cancelado.');
+      return;
+    }
+
+    setProcessing(true);
+    setResultado(null);
+    setReviewData(null);
+    setProcessingSeg(0);
+    setProcessingLote(null);
+    processingCancelRequestedRef.current = false;
+    processingAbortRef.current = new AbortController();
+    processingTimerRef.current = setInterval(() => setProcessingSeg(s => s + 1), 1000);
+
+    try {
+      const { arquivoFinal } = await processarTabelasEmSequencia({
+        arquivoInicial: arquivoCotacao,
+        selecoes,
+        processarTabela: ({ arquivo, selecao }) => processarCotacao(
+          arquivo,
+          selecao.id,
+          'ean',
+          colunaPreco,
+          selecao.prazo,
+          { signal: processingAbortRef.current.signal }
+        ),
+        onProgress: setProcessingLote,
+      });
+      const filename = await salvarCotacaoPreenchida(arquivoFinal, destino);
+      usarResultadoComoProximaCotacao(arquivoFinal, filename);
+      setResultado({
+        filename,
+        semMatch: [],
+        lote: {
+          quantidade: selecoes.length,
+          tabelas: selecoes.map(item => `${item.nome} (${item.prazo}d)`),
+        },
+      });
+      toast.success(`${selecoes.length} tabelas comparadas. O Excel final foi salvo com os menores preços.`);
+    } catch (err) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+        if (!processingCancelRequestedRef.current) toast.info('Processamento cancelado.');
+      } else {
+        toast.error('Erro ao comparar tabelas: ' + (err.response?.data?.detail || err.message));
+      }
+    } finally {
+      clearInterval(processingTimerRef.current);
+      processingAbortRef.current = null;
+      setProcessing(false);
+      setProcessingLote(null);
+    }
+  };
+
   const handleProcessar = async () => {
-    if (!tabelaSelecionada || !arquivoCotacao) return;
+    if (!arquivoCotacao) return;
+    if (compararVariasTabelas) {
+      await handleProcessarLote();
+      return;
+    }
+    if (!tabelaSelecionada) return;
+    if (reviewData) {
+      toast.warning('Confirme e salve a prévia atual, ou descarte-a, antes de processar outra tabela.');
+      return;
+    }
     setProcessing(true);
     setResultado(null);
     setReviewData(null);
@@ -204,11 +279,17 @@ export default function Cotacao() {
               toast.info('Download cancelado.');
               return;
             }
-            const { blob, stats, semMatch } = await processarCotacao(arquivoCotacao, tabelaSelecionada, modoMatch, colunaPreco);
+            const { blob, stats, semMatch } = await processarCotacao(
+              arquivoCotacao,
+              tabelaSelecionada,
+              modoMatch,
+              colunaPreco,
+              prazoSelecionado
+            );
             const filename = await salvarCotacaoPreenchida(blob, destino);
-            limparCotacaoSelecionada();
+            usarResultadoComoProximaCotacao(blob, filename);
             setResultado({ stats, semMatch, filename });
-            toast.warning(`Banco no limite: processei em modo direto, sem tela de revisão. Arquivo gerado: ${filename}.`);
+            toast.warning(`Banco no limite: processei em modo direto. ${filename} já está selecionado para a próxima tabela.`);
           } catch (fallbackErr) {
             toast.error('Erro ao processar: ' + (fallbackErr.response?.data?.detail || fallbackErr.message));
           }
@@ -250,10 +331,10 @@ export default function Cotacao() {
     try {
       const { blob, stats, semMatch } = await confirmarCotacao(reviewData.session_id, aprovacoes, precosEditados);
       const filename = await salvarCotacaoPreenchida(blob, destino);
-      limparCotacaoSelecionada();
+      usarResultadoComoProximaCotacao(blob, filename);
       setResultado({ stats, semMatch, filename });
       setReviewData(null);
-      toast.success(`Arquivo gerado: ${filename}`);
+      toast.success(`Arquivo gerado: ${filename}. Ele já está selecionado para a próxima tabela.`);
     } catch (err) {
       toast.error('Erro ao confirmar: ' + (err.response?.data?.detail || err.message));
     } finally {
@@ -266,6 +347,17 @@ export default function Cotacao() {
       localStorage.removeItem('token');
       navigate('/login');
     });
+  };
+
+  const handleDescartarReview = () => {
+    showConfirm(
+      'Descartar prévia',
+      'Descartar esta prévia? Nenhum preço desta tabela será salvo na cotação.',
+      () => {
+        setReviewData(null);
+        toast.info('Prévia descartada. A cotação anterior continua selecionada.');
+      }
+    );
   };
 
   return (
@@ -344,6 +436,17 @@ export default function Cotacao() {
             setArquivoCotacao={setArquivoCotacao}
             colunaPreco={colunaPreco}
             setColunaPreco={setColunaPreco}
+            compararVariasTabelas={compararVariasTabelas}
+            setCompararVariasTabelas={(value) => {
+              setCompararVariasTabelas(value);
+              setResultado(null);
+              if (value) {
+                setModoMatch('ean');
+                setCanalPreenchimento('excel');
+              }
+            }}
+            tabelasLote={tabelasLote}
+            setTabelasLote={setTabelasLote}
             processing={processing}
             handleProcessar={handleProcessar}
             handleCancelarProcessamento={handleCancelarProcessamento}
@@ -354,7 +457,9 @@ export default function Cotacao() {
             setReviewData={setReviewData}
             confirmando={confirmando}
             handleConfirmar={handleConfirmar}
+            handleDescartarReview={handleDescartarReview}
             processingSeg={processingSeg}
+            processingLote={processingLote}
             prazoSelecionado={prazoSelecionado}
             setPrazoSelecionado={setPrazoSelecionado}
           />
@@ -480,13 +585,25 @@ function CotacaoTab({
   modoMatch, setModoMatch, canalPreenchimento, setCanalPreenchimento,
   arquivoCotacao, setArquivoCotacao,
   colunaPreco, setColunaPreco,
+  compararVariasTabelas, setCompararVariasTabelas, tabelasLote, setTabelasLote,
   processing, handleProcessar, handleCancelarProcessamento, resultado, setResultado, cotacaoInputRef,
-  reviewData, setReviewData, confirmando, handleConfirmar, processingSeg,
+  reviewData, setReviewData, confirmando, handleConfirmar, handleDescartarReview, processingSeg, processingLote,
   prazoSelecionado, setPrazoSelecionado,
 }) {
   const tabelaAtual = tabelas.find(t => t.id === tabelaSelecionada);
   const prazosDisponiveis = tabelaAtual?.prazos_disponiveis || [];
   const prazoEfetivo = prazoSelecionado || (prazosDisponiveis.length === 1 ? prazosDisponiveis[0] : 0);
+  const reviewPendente = Boolean(reviewData);
+  const controlesBloqueados = reviewPendente || processing;
+  const tabelasLoteSelecionadas = Object.keys(tabelasLote);
+  const loteComPrazoPendente = tabelas.some(tabela => {
+    if (!Object.prototype.hasOwnProperty.call(tabelasLote, tabela.id)) return false;
+    return (tabela.prazos_disponiveis || []).length > 1 && !Number(tabelasLote[tabela.id]);
+  });
+  const lotePodeProcessar = tabelasLoteSelecionadas.length >= 2 && !loteComPrazoPendente;
+  const processamentoInvalido = compararVariasTabelas
+    ? !lotePodeProcessar
+    : (!tabelaSelecionada || (prazosDisponiveis.length > 1 && !prazoEfetivo));
 
   const cobertura = resultado?.stats
     ? (((resultado.stats.ean || 0) + (resultado.stats.descricao || 0) + (resultado.stats.ia || 0) + (resultado.stats.aprendido || 0)) / resultado.stats.total * 100).toFixed(1)
@@ -510,37 +627,146 @@ function CotacaoTab({
         </div>
       ) : (
         <>
-          {/* Selecionar tabela */}
-          <label style={labelStyle}>Tabela de preço</label>
-          <select value={tabelaSelecionada} onChange={e => setTabelaSelecionada(e.target.value)}
-                  style={inputStyle}>
-            <option value="">Selecione...</option>
-            {tabelas.map(t => (
-              <option key={t.id} value={t.id}>{t.nome} ({t.qtd_produtos} produtos, prazo {t.prazo}d)</option>
-            ))}
-          </select>
+          <div style={{
+            background: compararVariasTabelas ? '#123247' : '#2B2D31',
+            border: `1px solid ${compararVariasTabelas ? '#3A85A8' : '#4A4D52'}`,
+            borderRadius: 10,
+            padding: 14,
+            marginBottom: 16,
+          }}>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              color: '#E1E1E1', cursor: controlesBloqueados ? 'not-allowed' : 'pointer',
+              fontSize: 14, fontWeight: 800,
+            }}>
+              <input
+                type="checkbox"
+                checked={compararVariasTabelas}
+                disabled={controlesBloqueados}
+                onChange={e => setCompararVariasTabelas(e.target.checked)}
+              />
+              Comparar várias tabelas e salvar somente um Excel
+            </label>
+            <p style={{ color: '#A0A3A8', fontSize: 12, lineHeight: 1.5, margin: '6px 0 0 24px' }}>
+              A Venpro compara os atacados por EAN, preenche os vazios e mantém somente o menor preço.
+            </p>
+          </div>
 
-          {/* Prazo */}
-          {prazosDisponiveis.length > 1 && (
+          {compararVariasTabelas ? (
             <>
-              <label style={labelStyle}>Prazo da tabela</label>
-              <div style={{ display: 'flex', gap: 8, margin: '8px 0 16px', flexWrap: 'wrap' }}>
-                {prazosDisponiveis.map(p => (
-                  <button
-                    key={p}
-                    onClick={() => setPrazoSelecionado(p)}
-                    style={{
-                      padding: '8px 18px', borderRadius: 8, fontWeight: 600, fontSize: 14,
-                      cursor: 'pointer', border: 'none',
-                      background: prazoEfetivo === p ? '#3A85A8' : '#45484e',
-                      color: prazoEfetivo === p ? '#fff' : '#A0A3A8',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    {p} dias
-                  </button>
-                ))}
+              <label style={labelStyle}>Tabelas que serão comparadas</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                {tabelas.map(tabela => {
+                  const selecionada = Object.prototype.hasOwnProperty.call(tabelasLote, tabela.id);
+                  const prazos = tabela.prazos_disponiveis || [];
+                  return (
+                    <div key={tabela.id} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      gap: 12, flexWrap: 'wrap',
+                      background: selecionada ? '#123247' : '#2B2D31',
+                      border: `1px solid ${selecionada ? '#3A85A8' : '#4A4D52'}`,
+                      borderRadius: 8, padding: '10px 12px',
+                    }}>
+                      <label style={{
+                        display: 'flex', alignItems: 'center', gap: 8, flex: 1,
+                        color: '#E1E1E1', cursor: processing ? 'not-allowed' : 'pointer', fontSize: 13,
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={selecionada}
+                          disabled={processing}
+                          onChange={e => {
+                            const checked = e.target.checked;
+                            setTabelasLote(prev => {
+                              const proximo = { ...prev };
+                              if (!checked) {
+                                delete proximo[tabela.id];
+                              } else {
+                                proximo[tabela.id] = prazos.length === 1
+                                  ? Number(prazos[0])
+                                  : (prazos.length === 0 ? Number(tabela.prazo || 0) : 0);
+                              }
+                              return proximo;
+                            });
+                          }}
+                        />
+                        <span>
+                          <strong>{tabela.nome}</strong>
+                          <span style={{ color: '#6B6E74' }}> — {tabela.qtd_produtos} produtos</span>
+                        </span>
+                      </label>
+                      {selecionada && prazos.length > 1 && (
+                        <select
+                          aria-label={`Prazo de ${tabela.nome}`}
+                          value={tabelasLote[tabela.id] || ''}
+                          disabled={processing}
+                          onChange={e => setTabelasLote(prev => ({
+                            ...prev,
+                            [tabela.id]: Number(e.target.value),
+                          }))}
+                          style={{ ...inputStyle, width: 150, marginBottom: 0, padding: 8 }}
+                        >
+                          <option value="">Escolha o prazo</option>
+                          {prazos.map(prazo => (
+                            <option key={prazo} value={prazo}>{prazo} dias</option>
+                          ))}
+                        </select>
+                      )}
+                      {selecionada && prazos.length <= 1 && (
+                        <span style={{ color: '#A0A3A8', fontSize: 12, fontWeight: 700 }}>
+                          {Number(prazos[0] || tabela.prazo || 0)} dias
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
+              <p style={{
+                color: lotePodeProcessar ? '#22c55e' : '#f59e0b',
+                fontSize: 12, fontWeight: 700, margin: '-4px 0 16px',
+              }}>
+                {tabelasLoteSelecionadas.length} tabela(s) selecionada(s)
+                {loteComPrazoPendente ? ' — escolha os prazos pendentes' : ''}
+              </p>
+            </>
+          ) : (
+            <>
+              {/* Selecionar tabela */}
+              <label style={labelStyle}>Tabela de preço</label>
+              <select value={tabelaSelecionada} onChange={e => setTabelaSelecionada(e.target.value)}
+                      disabled={controlesBloqueados}
+                      style={{ ...inputStyle, opacity: controlesBloqueados ? 0.6 : 1 }}>
+                <option value="">Selecione...</option>
+                {tabelas.map(t => (
+                  <option key={t.id} value={t.id}>{t.nome} ({t.qtd_produtos} produtos, prazo {t.prazo}d)</option>
+                ))}
+              </select>
+
+              {/* Prazo */}
+              {prazosDisponiveis.length > 1 && (
+                <>
+                  <label style={labelStyle}>Prazo da tabela</label>
+                  <div style={{ display: 'flex', gap: 8, margin: '8px 0 16px', flexWrap: 'wrap' }}>
+                    {prazosDisponiveis.map(p => (
+                      <button
+                        key={p}
+                        onClick={() => setPrazoSelecionado(p)}
+                        disabled={controlesBloqueados}
+                        style={{
+                          padding: '8px 18px', borderRadius: 8, fontWeight: 600, fontSize: 14,
+                          cursor: controlesBloqueados ? 'not-allowed' : 'pointer', border: 'none',
+                          background: prazoEfetivo === p ? '#3A85A8' : '#45484e',
+                          color: prazoEfetivo === p ? '#fff' : '#A0A3A8',
+                          opacity: controlesBloqueados ? 0.6 : 1,
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {p} dias
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </>
           )}
 
@@ -549,11 +775,13 @@ function CotacaoTab({
           <div style={{ display: 'flex', gap: 16, margin: '8px 0 16px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#E1E1E1', cursor: 'pointer', fontSize: 14 }}>
               <input type="radio" name="canal" value="excel" checked={canalPreenchimento === 'excel'}
+                     disabled={controlesBloqueados}
                      onChange={() => setCanalPreenchimento('excel')} />
               Excel (arquivo)
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#E1E1E1', cursor: 'pointer', fontSize: 14 }}>
               <input type="radio" name="canal" value="cotatudo" checked={canalPreenchimento === 'cotatudo'}
+                     disabled={controlesBloqueados || compararVariasTabelas}
                      onChange={() => setCanalPreenchimento('cotatudo')} />
               Sites de cotação
             </label>
@@ -564,15 +792,22 @@ function CotacaoTab({
           <div style={{ display: 'flex', gap: 16, margin: '8px 0 16px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#E1E1E1', cursor: 'pointer', fontSize: 14 }}>
               <input type="radio" name="modo" value="ean" checked={modoMatch === 'ean'}
+                     disabled={controlesBloqueados}
                      onChange={e => setModoMatch(e.target.value)} />
               EAN 100% certeza
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#E1E1E1', cursor: 'pointer', fontSize: 14 }}>
               <input type="radio" name="modo" value="completo" checked={modoMatch === 'completo'}
+                     disabled={controlesBloqueados || compararVariasTabelas}
                      onChange={e => setModoMatch(e.target.value)} />
               Completo (EAN + descrição + IA)
             </label>
           </div>
+          {compararVariasTabelas && (
+            <p style={{ color: '#3A85A8', fontSize: 12, fontWeight: 700, margin: '-8px 0 16px' }}>
+              Na comparação automática, a Venpro usa somente EAN exato para não misturar produtos parecidos.
+            </p>
+          )}
 
           {/* Conteúdo baseado no canal */}
           {canalPreenchimento === 'cotatudo' ? (
@@ -607,14 +842,16 @@ function CotacaoTab({
             <>
               {/* Upload cotação Excel */}
               <label style={labelStyle}>Cotação (Excel)</label>
-              <div onClick={() => cotacaoInputRef.current?.click()}
+              <div onClick={() => { if (!controlesBloqueados) cotacaoInputRef.current?.click(); }}
                    style={{
                      border: '2px dashed #4A4D52', borderRadius: 10, padding: 24,
-                     textAlign: 'center', cursor: 'pointer', marginBottom: 16,
+                     textAlign: 'center', cursor: controlesBloqueados ? 'not-allowed' : 'pointer', marginBottom: 16,
                      color: arquivoCotacao ? '#22c55e' : '#6B6E74',
+                     opacity: controlesBloqueados ? 0.6 : 1,
                    }}>
                 {arquivoCotacao ? arquivoCotacao.name : 'Clique para selecionar ou arraste o arquivo'}
                 <input type="file" accept=".xlsx,.xls" ref={cotacaoInputRef}
+                       disabled={controlesBloqueados}
                        onChange={e => { setArquivoCotacao(e.target.files?.[0] || null); setReviewData(null); setResultado(null); }}
                        style={{ display: 'none' }} />
               </div>
@@ -624,7 +861,8 @@ function CotacaoTab({
                 onChange={e => setColunaPreco(e.target.value.toUpperCase())}
                 placeholder="Ex.: D ou 4"
                 maxLength={3}
-                style={{ ...inputStyle, marginBottom: 6 }}
+                disabled={controlesBloqueados}
+                style={{ ...inputStyle, marginBottom: 6, opacity: controlesBloqueados ? 0.6 : 1 }}
               />
               <p style={{ color: '#A0A3A8', fontSize: 12, margin: '0 0 16px' }}>
                 Deixe em branco para a Venpro identificar a coluna automaticamente.
@@ -635,23 +873,32 @@ function CotacaoTab({
           {/* Processar — só no modo Excel */}
           {canalPreenchimento === 'excel' && (
             <>
-              {prazosDisponiveis.length > 1 && !prazoEfetivo && (
+              {!compararVariasTabelas && prazosDisponiveis.length > 1 && !prazoEfetivo && (
                 <p style={{ color: '#f59e0b', fontSize: 13, margin: '0 0 8px' }}>
                   Selecione o prazo acima antes de processar
                 </p>
               )}
+              {compararVariasTabelas && tabelasLoteSelecionadas.length < 2 && (
+                <p style={{ color: '#f59e0b', fontSize: 13, margin: '0 0 8px' }}>
+                  Selecione pelo menos duas tabelas para comparar
+                </p>
+              )}
               <button onClick={handleProcessar}
-                      disabled={!tabelaSelecionada || !arquivoCotacao || processing || (prazosDisponiveis.length > 1 && !prazoEfetivo)}
+                      disabled={!arquivoCotacao || processing || reviewPendente || processamentoInvalido}
                       style={{
                         ...primaryBtnStyle,
-                        opacity: (!tabelaSelecionada || !arquivoCotacao || (prazosDisponiveis.length > 1 && !prazoEfetivo)) ? 0.5 : 1,
+                        opacity: (!arquivoCotacao || reviewPendente || processamentoInvalido) ? 0.5 : 1,
                         width: '100%', padding: 14, fontSize: 16,
                       }}>
                 {processing
-                  ? 'Processando...'
-                  : prazoEfetivo
-                    ? `Processar Cotação — ${prazoEfetivo} dias`
-                    : 'Processar Cotação'}
+                  ? (processingLote
+                    ? `Comparando ${processingLote.atual} de ${processingLote.total}: ${processingLote.selecao.nome}`
+                    : 'Processando...')
+                  : compararVariasTabelas
+                    ? `Comparar ${tabelasLoteSelecionadas.length} tabelas e salvar melhores preços`
+                    : prazoEfetivo
+                      ? `Processar Cotação — ${prazoEfetivo} dias`
+                      : 'Processar Cotação'}
               </button>
               {processing && (
                 <button
@@ -668,14 +915,26 @@ function CotacaoTab({
           {(processing || reviewData || resultado) && (() => {
             let pct, label, color;
             if (processing) {
-              pct = Math.min(88, Math.round(processingSeg / (processingSeg + 15) * 100));
-              label = pct >= 88
-                ? `Servidor ainda buscando preços... ${processingSeg}s`
-                : `Buscando preços... ${processingSeg}s`;
+              if (processingLote) {
+                const fracaoAtual = Math.min(0.85, processingSeg / (processingSeg + 15));
+                pct = Math.min(95, Math.round(
+                  ((processingLote.concluidas + fracaoAtual) / processingLote.total) * 100
+                ));
+                label = `Comparando ${processingLote.atual} de ${processingLote.total}: ${processingLote.selecao.nome} — ${processingSeg}s`;
+              } else {
+                pct = Math.min(88, Math.round(processingSeg / (processingSeg + 15) * 100));
+                label = pct >= 88
+                  ? `Servidor ainda buscando preços... ${processingSeg}s`
+                  : `Buscando preços... ${processingSeg}s`;
+              }
               color = '#3A85A8';
             } else if (reviewData) {
               pct = 100;
               label = `Leitura concluída: ${reviewResumo.total} itens analisados, ${reviewResumo.preenchidos} com preço e ${reviewResumo.semPreco} sem preço`;
+              color = '#22c55e';
+            } else if (resultado.lote) {
+              pct = 100;
+              label = `Comparação concluída: ${resultado.lote.quantidade} tabelas processadas`;
               color = '#22c55e';
             } else {
               const { ean = 0, descricao = 0, ia = 0, aprendido = 0, total = 1 } = resultado.stats;
@@ -721,6 +980,23 @@ function CotacaoTab({
                   A barra indica que a cotação inteira foi lida. Os cards mostram quantos itens receberam preço e de onde veio o preenchimento.
                 </p>
               </div>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
+                marginTop: 12, padding: 12, borderRadius: 8,
+                background: '#3f2f05', border: '1px solid #854d0e', flexWrap: 'wrap',
+              }}>
+                <span style={{ color: '#fde68a', fontSize: 12, lineHeight: 1.5 }}>
+                  Salve esta prévia antes de trocar a tabela. Assim nenhum preço já obtido será perdido.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleDescartarReview}
+                  disabled={confirmando}
+                  style={{ ...secondaryBtnStyle, padding: '8px 12px', fontWeight: 700 }}
+                >
+                  Descartar prévia
+                </button>
+              </div>
               <ReviewMatches
                 itens={reviewData.itens}
                 modoMatch={modoMatch}
@@ -736,23 +1012,42 @@ function CotacaoTab({
               marginTop: 20, background: '#2B2D31', borderRadius: 10, padding: 20,
             }}>
               <h3 style={{ color: '#E1E1E1', marginTop: 0 }}>Resultado</h3>
-              <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 16 }}>
-                <StatCard label="Cobertura" value={`${cobertura}%`}
-                          color={parseFloat(cobertura) > 70 ? '#22c55e' : '#eab308'} />
-                <StatCard label="EAN" value={resultado.stats.ean || 0} color="#3b82f6" />
-                <StatCard label="Descrição" value={resultado.stats.descricao || 0} color="#8b5cf6" />
-                <StatCard label="Aprendido" value={resultado.stats.aprendido || 0} color="#60a5fa" />
-                <StatCard label="IA" value={resultado.stats.ia || 0} color="#f59e0b" />
-                <StatCard label="Sem match" value={resultado.stats.sem_match || 0} color="#ef4444" />
-              </div>
+              {resultado.lote ? (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+                    <StatCard label="Tabelas comparadas" value={resultado.lote.quantidade} color="#22c55e" />
+                    <StatCard label="Regra aplicada" value="Menor" color="#3A85A8" />
+                  </div>
+                  <p style={{ color: '#A0A3A8', fontSize: 12, lineHeight: 1.6, margin: 0 }}>
+                    {resultado.lote.tabelas.join(' • ')}
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 16 }}>
+                  <StatCard label="Cobertura" value={`${cobertura}%`}
+                            color={parseFloat(cobertura) > 70 ? '#22c55e' : '#eab308'} />
+                  <StatCard label="EAN" value={resultado.stats.ean || 0} color="#3b82f6" />
+                  <StatCard label="Descrição" value={resultado.stats.descricao || 0} color="#8b5cf6" />
+                  <StatCard label="Aprendido" value={resultado.stats.aprendido || 0} color="#60a5fa" />
+                  <StatCard label="IA" value={resultado.stats.ia || 0} color="#f59e0b" />
+                  <StatCard label="Sem match" value={resultado.stats.sem_match || 0} color="#ef4444" />
+                </div>
+              )}
               <p style={{ color: '#6B6E74', fontSize: 13 }}>
-                Arquivo gerado: <strong style={{ color: '#E1E1E1' }}>{resultado.filename || DEFAULT_COTACAO_FILENAME}</strong>. O campo de cotação já está livre para selecionar outro arquivo.
+                Arquivo gerado: <strong style={{ color: '#E1E1E1' }}>{resultado.filename || DEFAULT_COTACAO_FILENAME}</strong>. {resultado.lote
+                  ? 'Ele contém os menores preços encontrados em todas as tabelas selecionadas.'
+                  : 'Este resultado já está selecionado como base da próxima tabela: preços menores substituem os anteriores e campos vazios recebem preço.'}
+              </p>
+              <p style={{ color: '#22c55e', fontSize: 13, fontWeight: 700, marginTop: -4 }}>
+                {resultado.lote
+                  ? 'Foi necessário salvar somente uma vez. Nenhum preço existente foi apagado.'
+                  : 'Escolha outra tabela de preço acima e processe novamente. Os preços existentes não serão apagados.'}
               </p>
               <button
                 onClick={() => cotacaoInputRef.current?.click()}
                 style={{ ...secondaryBtnStyle, padding: '10px 14px', marginBottom: 12, fontWeight: 700 }}
               >
-                Escolher outra cotação
+                Trocar arquivo da cotação
               </button>
               {resultado.semMatch?.length > 0 && (
                 <div style={{ marginTop: 12 }}>

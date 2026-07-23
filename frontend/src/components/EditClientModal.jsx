@@ -2,7 +2,7 @@
 // ALTERADO: O título agora é "Positivar Produtos"
 
 import React, { useState, useEffect } from 'react';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { matchesProductSearch } from '../utils/productSearch';
 import './EditClientModal.css'; 
 
@@ -146,21 +146,15 @@ const EditClientModal = ({ isOpen, onClose, client, onSave, campaign, initialInd
     <div className="modal-overlay" onClick={onClose}>
       <div className="edit-client-modal" onClick={(e) => e.stopPropagation()}>
         
-        {/* ============================================ */}
-        {/* ⭐️ MUDANÇA FEITA AQUI ⭐️ */}
-        {/* ============================================ */}
         <div className="modal-header-edit">
           <div className="modal-header-content">
             <h2>🏭 Positivar Produtos</h2>
             <p>Marque os produtos positivados e insira os valores</p>
           </div>
-          <button className="btn-close-edit" onClick={onClose}>
-            ✕
+          <button type="button" className="btn-close-edit" onClick={onClose} title="Fechar" aria-label="Fechar">
+            <X size={18} strokeWidth={2.25} aria-hidden="true" />
           </button>
         </div>
-        {/* ============================================ */}
-        {/* ⭐️ FIM DA MUDANÇA ⭐️ */}
-        {/* ============================================ */}
 
         <form onSubmit={handleSubmit} className="modal-body-edit">
           {/* Informações do Cliente (agora escondidas, mas mantidas para dados) */}

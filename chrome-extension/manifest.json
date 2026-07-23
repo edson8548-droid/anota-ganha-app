@@ -1,8 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Venpro — Preencher Cotação",
-  "version": "1.0.68",
-  "description": "Preenchedor de cotações do Venpro para Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor, Hipcomerp, Easy Cotação Web, Estância, SG Cotação, HR Cotação, Arius Cotação, Bluesoft Cotação, Guia Cotação, Nafarmas, Dobesone, Syspan e novos portais compatíveis.",
+  "version": "1.0.81",
+  "description": "Preenche cotações em portais compatíveis usando os preços das tabelas cadastradas no Venpro.",
+  "minimum_chrome_version": "114",
+  "homepage_url": "https://venpro.com.br",
   "permissions": [
     "activeTab",
     "scripting",
@@ -53,9 +55,16 @@
     "http://nafarmasl.ddns.net:8080/*",
     "https://cotacao.dobesone.emartim.com.br/*",
     "https://cotacao.syspanweb.com.br/*",
+    "https://cotacao3.egestora.com.br/*",
+    "http://200.160.111.171:8082/*",
+    "http://bids.imperiumsolucoes.com/*",
+    "https://bids.imperiumsolucoes.com/*",
+    "https://sistemas.cotefacil.com/*",
+    "https://www.cotacao.inplug.online/*",
     "https://api.venpro.com.br/*"
   ],
   "action": {
+    "default_title": "Abrir Venpro — Preencher Cotação",
     "default_icon": {
       "16": "icon16.png",
       "48": "icon48.png",
@@ -169,10 +178,14 @@
         "http://nafarmasl.ddns.net:8080/*",
         "https://cotacao.dobesone.emartim.com.br/*",
         "https://cotacao.syspanweb.com.br/*",
-        "https://*/fornecedores/*/cotacao/*",
-        "http://*/fornecedores/*/cotacao/*",
-        "https://*/cotacao/*",
-        "http://*/cotacao/*"
+        "https://cotacao3.egestora.com.br/*",
+        "http://200.160.111.171:8082/Cotacao/*",
+        "http://bids.imperiumsolucoes.com/*",
+        "https://bids.imperiumsolucoes.com/*",
+        "https://sistemas.cotefacil.com/*",
+        "https://www.cotacao.inplug.online/*",
+        "https://venpro.com.br/demonstracao-extensao-cotacao.html",
+        "https://www.venpro.com.br/demonstracao-extensao-cotacao.html"
       ],
       "js": [
         "content.js"

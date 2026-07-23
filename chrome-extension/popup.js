@@ -3,8 +3,10 @@ const BATCH = 50;
 const STUCK_MS = 3 * 60 * 1000;
 const MAX_RESULT_DETAILS = 12;
 const BTN_LABEL = 'Preencher Cotação';
-const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor, Hipcomerp, Easy Cotação Web, Estância, SG Cotação, HR Cotação, Arius Cotação, Bluesoft Cotação, Guia Cotação, Nafarmas, Dobesone ou Syspan primeiro.';
+const COTEFACIL_CONTENT_VERSION = '1.0.81';
+const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor, Hipcomerp, Easy Cotação Web, Estância, SG Cotação, HR Cotação, Arius Cotação, Bluesoft Cotação, Guia Cotação, Nafarmas, Dobesone, Syspan, Imperium, Super 20, Cotefácil ou Inplug primeiro.';
 const SITE_LABELS = {
+  'venpro-demo': 'Demonstração oficial Venpro',
   cotatudo: 'Cotatudo',
   'vr-cotacao': 'VR Cotação',
   'rp-hub': 'RP HUB',
@@ -24,13 +26,24 @@ const SITE_LABELS = {
   'nafarmas-cotacao': 'Nafarmas',
   'dobesone-cotacao': 'Dobesone',
   'syspan-cotacao': 'Syspan',
+  'egestora-cotacao': 'Egestora',
+  'imperium-cotacao': 'Imperium Bids',
+  'super20-cotacao': 'Super 20',
+  'cotefacil-cotacao': 'Cotefácil',
+  'inplug-cotacao': 'Inplug',
   generic: 'Cotação compatível',
 };
 
 const statusEl     = document.getElementById('status');
 const siteDetectadoEl = document.getElementById('siteDetectado');
+const singleTableFieldsEl = document.getElementById('singleTableFields');
 const tabelasEl    = document.getElementById('tabelas');
 const prazoEl      = document.getElementById('prazo');
+const compararTabelasEl = document.getElementById('compararTabelas');
+const multiToggleLabelEl = document.getElementById('multiToggleLabel');
+const multiTableFieldsEl = document.getElementById('multiTableFields');
+const tabelasMultiplasEl = document.getElementById('tabelasMultiplas');
+const multiTableHintEl = document.getElementById('multiTableHint');
 const modoEl       = document.getElementById('modo');
 const empresaColunaEl = document.getElementById('empresaColuna');
 const btnEl        = document.getElementById('btnPreencher');
@@ -44,10 +57,209 @@ const cancelWrap   = document.getElementById('cancelWrap');
 const btnRetomar   = document.getElementById('btnRetomar');
 const btnCancelar  = document.getElementById('btnCancelar');
 const btnParar     = document.getElementById('btnParar');
+// A captura Rivershop foi movida para a extensão independente Captura de Tabelas.
+const btnCapturarRivershop = null;
 
 let tabelasCache = [];
 let running = false;
 let cancelRequested = false;
+let rivershopRunning = false;
+
+function isRivershopUrl(url = '') {
+  try {
+    return /(^|\.)rivershop\.com\.br$/i.test(new URL(url).hostname);
+  } catch {
+    return /https?:\/\/(www\.)?rivershop\.com\.br\//i.test(url);
+  }
+}
+
+function sendRivershopMessage(tabId, message) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.sendMessage(tabId, message, response => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      if (response?.error) {
+        reject(new Error(response.error));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function waitForRivershopCapture(tabId, term) {
+  const deadline = Date.now() + 30000;
+  let lastError = null;
+  while (Date.now() < deadline) {
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      if (tab.status === 'complete' && isRivershopUrl(tab.url || '')) {
+        setStatus(`Capturando ${term} dias...`, 'info');
+        const result = await sendRivershopMessage(tabId, { action: 'rivershopCaptureCatalog' });
+        if (Array.isArray(result?.products) && result.products.length) return result.products;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+    await sleep(800);
+  }
+  throw new Error(lastError?.message || `O catálogo não ficou pronto para capturar ${term} dias.`);
+}
+
+function xmlEscape(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function excelColumn(index) {
+  let value = index + 1;
+  let output = '';
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    output = String.fromCharCode(65 + remainder) + output;
+    value = Math.floor((value - 1) / 26);
+  }
+  return output;
+}
+
+const crc32Table = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n += 1) {
+    let crc = n;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ ((crc & 1) ? 0xEDB88320 : 0);
+    table[n] = crc >>> 0;
+  }
+  return table;
+})();
+
+function crc32(bytes) {
+  let crc = 0xFFFFFFFF;
+  for (const byte of bytes) crc = (crc >>> 8) ^ crc32Table[(crc ^ byte) & 0xFF];
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+function u16(value) {
+  return new Uint8Array([value & 0xFF, (value >>> 8) & 0xFF]);
+}
+
+function u32(value) {
+  return new Uint8Array([value & 0xFF, (value >>> 8) & 0xFF, (value >>> 16) & 0xFF, (value >>> 24) & 0xFF]);
+}
+
+function joinBytes(parts) {
+  const size = parts.reduce((sum, part) => sum + part.length, 0);
+  const output = new Uint8Array(size);
+  let offset = 0;
+  for (const part of parts) {
+    output.set(part, offset);
+    offset += part.length;
+  }
+  return output;
+}
+
+function zipStored(files) {
+  const encoder = new TextEncoder();
+  const locals = [];
+  const central = [];
+  let offset = 0;
+  for (const [name, content] of Object.entries(files)) {
+    const filename = encoder.encode(name);
+    const body = encoder.encode(content);
+    const checksum = crc32(body);
+    const local = joinBytes([
+      u32(0x04034B50), u16(20), u16(0), u16(0), u16(0), u16(0), u32(checksum),
+      u32(body.length), u32(body.length), u16(filename.length), u16(0), filename, body,
+    ]);
+    locals.push(local);
+    central.push(joinBytes([
+      u32(0x02014B50), u16(20), u16(20), u16(0), u16(0), u16(0), u16(0), u32(checksum),
+      u32(body.length), u32(body.length), u16(filename.length), u16(0), u16(0), u16(0), u16(0),
+      u32(0), u32(offset), filename,
+    ]));
+    offset += local.length;
+  }
+  const centralBytes = joinBytes(central);
+  return joinBytes([
+    ...locals,
+    centralBytes,
+    u32(0x06054B50), u16(0), u16(0), u16(central.length), u16(central.length),
+    u32(centralBytes.length), u32(offset), u16(0),
+  ]);
+}
+
+function downloadRivershopXlsx(products) {
+  const header = ['CÓDIGO', 'EAN', 'DESCRIÇÃO', 'EMBALAGEM', '7 DIAS', '14 DIAS', '21 DIAS', '28 DIAS', '35 DIAS'];
+  const rows = [header, ...products.map(product => [
+    product.codigo, product.ean, product.nome, product.embalagem,
+    product.prazos[7] ?? '', product.prazos[14] ?? '', product.prazos[21] ?? '', product.prazos[28] ?? '', product.prazos[35] ?? '',
+  ])];
+  const sheetRows = rows.map((row, rowIndex) => `<row r="${rowIndex + 1}">${row.map((value, columnIndex) => {
+    const cell = `${excelColumn(columnIndex)}${rowIndex + 1}`;
+    if (typeof value === 'number') return `<c r="${cell}"><v>${value}</v></c>`;
+    return `<c r="${cell}" t="inlineStr"><is><t>${xmlEscape(value)}</t></is></c>`;
+  }).join('')}</row>`).join('');
+  const files = {
+    '[Content_Types].xml': '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
+    '_rels/.rels': '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+    'xl/workbook.xml': '<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Rivershop" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    'xl/_rels/workbook.xml.rels': '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+    'xl/styles.xml': '<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="1"><xf xfId="0"/></cellXfs></styleSheet>',
+    'xl/worksheets/sheet1.xml': `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${sheetRows}</sheetData></worksheet>`,
+  };
+  const blob = new Blob([zipStored(files)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `rivershop-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+async function startRivershopCapture() {
+  if (rivershopRunning) return;
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id || !isRivershopUrl(tab.url || '')) {
+    setStatus('Abra uma seção de produtos do Rivershop antes de capturar.', 'err');
+    return;
+  }
+  rivershopRunning = true;
+  btnCapturarRivershop.disabled = true;
+  const merged = new Map();
+  try {
+    for (const days of [7, 14, 21, 28, 35]) {
+      setProgress(0, `Preparando ${days} dias...`);
+      await sendRivershopMessage(tab.id, { action: 'rivershopSetTerm', days });
+      const products = await waitForRivershopCapture(tab.id, days);
+      for (const product of products) {
+        const key = product.ean || product.codigo;
+        const current = merged.get(key) || { ...product, prazos: {} };
+        current.prazos[days] = product.preco;
+        merged.set(key, current);
+      }
+    }
+    const products = [...merged.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    downloadRivershopXlsx(products);
+    resultsEl.innerHTML = `<div class="ok">Tabela Rivershop pronta: ${products.length} produtos.</div><div class="result-details">Colunas geradas: 7, 14, 21, 28 e 35 dias.</div>`;
+    resultsEl.style.display = 'block';
+    setStatus('Captura concluída. XLSX baixado.', 'ok');
+  } catch (error) {
+    setStatus(error.message || 'Não foi possível capturar o catálogo Rivershop.', 'err');
+  } finally {
+    rivershopRunning = false;
+    progressWrap.style.display = 'none';
+    btnCapturarRivershop.disabled = false;
+  }
+}
 
 modoEl.value = 'ean';
 
@@ -56,13 +268,25 @@ function setStatus(text, type = 'info') {
   statusEl.className = `status ${type}`;
 }
 
+function resolveDetectedSite(url, pageInfo = null) {
+  const pageSite = pageInfo?.site || '';
+  const urlSite = detectSiteFromUrl(url);
+  if (pageSite && pageSite !== 'generic') return pageSite;
+  if (urlSite && urlSite !== 'generic') return urlSite;
+  return pageSite || 'generic';
+}
+
 function setDetectedSite(tab, pageInfo = null) {
   const url = tab?.url || '';
+  const resolvedSite = resolveDetectedSite(url, pageInfo);
   let label = 'Site detectado: nenhum site de cotação aberto';
   let type = 'err';
 
   if (pageInfo?.supported) {
-    label = `Site detectado: ${SITE_LABELS[pageInfo.site] || SITE_LABELS.generic}`;
+    label = `Site detectado: ${SITE_LABELS[resolvedSite] || SITE_LABELS.generic}`;
+    type = 'ok';
+  } else if (resolvedSite !== 'generic') {
+    label = `Site detectado: ${SITE_LABELS[resolvedSite] || SITE_LABELS.generic}`;
     type = 'ok';
   } else if (url.includes('cotatudo.com.br')) {
     label = 'Site detectado: Cotatudo';
@@ -121,6 +345,9 @@ function setDetectedSite(tab, pageInfo = null) {
   } else if (isSyspanCotacaoUrl(url)) {
     label = 'Site detectado: Syspan';
     type = 'ok';
+  } else if (isEgestoraCotacaoUrl(url)) {
+    label = 'Site detectado: Egestora';
+    type = 'ok';
   }
 
   siteDetectadoEl.textContent = label;
@@ -134,7 +361,153 @@ function setProgress(pct, label) {
   progressText.textContent = label;
 }
 
+function tableTerms(tabela) {
+  const available = Array.isArray(tabela?.prazos_disponiveis) && tabela.prazos_disponiveis.length
+    ? tabela.prazos_disponiveis
+    : [tabela?.prazo || 28];
+  return [...new Set(available.map(value => Number(value)).filter(value => value > 0))];
+}
+
+function selectedTableConfigs() {
+  if (!compararTabelasEl.checked) {
+    const tabela = tabelasCache.find(item => String(item.id) === String(tabelasEl.value));
+    if (!tabela) return [];
+    return [{
+      tabelaId: String(tabela.id),
+      nome: tabela.nome || 'Tabela',
+      prazo: parseInt(prazoEl.value, 10) || Number(tabela.prazo || 28),
+    }];
+  }
+
+  return [...tabelasMultiplasEl.querySelectorAll('.multi-table-row')]
+    .map(row => {
+      const checkbox = row.querySelector('input[type="checkbox"]');
+      const termSelect = row.querySelector('select');
+      if (!checkbox?.checked) return null;
+      const tabela = tabelasCache.find(item => String(item.id) === String(row.dataset.tabelaId));
+      if (!tabela) return null;
+      return {
+        tabelaId: String(tabela.id),
+        nome: tabela.nome || 'Tabela',
+        prazo: parseInt(termSelect?.value, 10) || Number(tabela.prazo || 28),
+      };
+    })
+    .filter(Boolean);
+}
+
+function updateMultiTableHint() {
+  if (!compararTabelasEl.checked) return;
+  const count = selectedTableConfigs().length;
+  multiTableHintEl.textContent = count >= 2
+    ? `${count} tabelas selecionadas. A extensão preencherá somente o menor preço por EAN.`
+    : `${count} tabela selecionada. Marque pelo menos mais uma para comparar.`;
+  multiTableHintEl.style.color = count >= 2 ? '#2ECC8A' : '#E8A830';
+}
+
+function renderMultiTableOptions() {
+  tabelasMultiplasEl.innerHTML = '';
+
+  tabelasCache.forEach(tabela => {
+    const row = document.createElement('div');
+    row.className = 'multi-table-row';
+    row.dataset.tabelaId = String(tabela.id);
+
+    const choice = document.createElement('label');
+    choice.className = 'multi-table-choice';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.disabled = running;
+
+    const text = document.createElement('span');
+    text.textContent = tabela.nome || 'Tabela sem nome';
+    const meta = document.createElement('span');
+    meta.className = 'multi-table-meta';
+    meta.textContent = `${Number(tabela.qtd_produtos || 0)} produtos`;
+    text.appendChild(meta);
+    choice.append(checkbox, text);
+
+    const termSelect = document.createElement('select');
+    termSelect.className = 'multi-table-term';
+    termSelect.disabled = true;
+    for (const term of tableTerms(tabela)) {
+      const option = document.createElement('option');
+      option.value = String(term);
+      option.textContent = `${term} dias`;
+      termSelect.appendChild(option);
+    }
+
+    checkbox.addEventListener('change', () => {
+      row.classList.toggle('selected', checkbox.checked);
+      termSelect.disabled = !checkbox.checked || running;
+      updateMultiTableHint();
+      updateFillButtonState();
+    });
+    termSelect.addEventListener('change', updateFillButtonState);
+    row.append(choice, termSelect);
+    tabelasMultiplasEl.appendChild(row);
+  });
+}
+
+function syncMultiTableMode() {
+  const enabled = compararTabelasEl.checked;
+  singleTableFieldsEl.style.display = enabled ? 'none' : 'block';
+  multiTableFieldsEl.style.display = enabled ? 'block' : 'none';
+  multiToggleLabelEl.classList.toggle('active', enabled);
+  modoEl.disabled = enabled || running;
+
+  if (enabled) {
+    modoEl.value = 'ean';
+    if (selectedTableConfigs().length === 0) {
+      const currentRow = [...tabelasMultiplasEl.querySelectorAll('.multi-table-row')]
+        .find(row => String(row.dataset.tabelaId) === String(tabelasEl.value));
+      const checkbox = currentRow?.querySelector('input[type="checkbox"]');
+      const termSelect = currentRow?.querySelector('select');
+      if (checkbox) {
+        checkbox.checked = true;
+        currentRow.classList.add('selected');
+        if (termSelect) {
+          termSelect.value = prazoEl.value || termSelect.value;
+          termSelect.disabled = false;
+        }
+      }
+    }
+  }
+
+  updateMultiTableHint();
+  updateFillButtonState();
+}
+
+function restoreTableSelectionFromJob(job) {
+  const selections = globalThis.VenproMultiTable.normalizeJobTableSelections(job);
+  if (selections.length === 0) return;
+
+  compararTabelasEl.checked = selections.length > 1;
+  if (selections.length === 1) {
+    tabelasEl.value = selections[0].tabelaId;
+    syncPrazoOptions();
+    prazoEl.value = String(selections[0].prazo || prazoEl.value);
+    syncMultiTableMode();
+    return;
+  }
+
+  const byId = new Map(selections.map(item => [String(item.tabelaId), item]));
+  for (const row of tabelasMultiplasEl.querySelectorAll('.multi-table-row')) {
+    const selection = byId.get(String(row.dataset.tabelaId));
+    const checkbox = row.querySelector('input[type="checkbox"]');
+    const termSelect = row.querySelector('select');
+    if (!checkbox) continue;
+    checkbox.checked = Boolean(selection);
+    row.classList.toggle('selected', Boolean(selection));
+    if (termSelect) {
+      if (selection?.prazo) termSelect.value = String(selection.prazo);
+      termSelect.disabled = !selection;
+    }
+  }
+  syncMultiTableMode();
+}
+
 function hasTabelaSelecionada() {
+  if (compararTabelasEl.checked) return !compararTabelasEl.disabled && selectedTableConfigs().length >= 2;
   return !tabelasEl.disabled && Boolean(tabelasEl.value);
 }
 
@@ -147,8 +520,22 @@ function updateFillButtonState() {
   btnEl.disabled = running || !hasTabelaSelecionada();
 }
 
+function setTableControlsDisabled(disabled) {
+  tabelasEl.disabled = disabled || tabelasCache.length === 0;
+  prazoEl.disabled = disabled;
+  compararTabelasEl.disabled = disabled || tabelasCache.length === 0;
+  modoEl.disabled = disabled || compararTabelasEl.checked;
+  for (const row of tabelasMultiplasEl.querySelectorAll('.multi-table-row')) {
+    const checkbox = row.querySelector('input[type="checkbox"]');
+    const termSelect = row.querySelector('select');
+    if (checkbox) checkbox.disabled = disabled;
+    if (termSelect) termSelect.disabled = disabled || !checkbox?.checked;
+  }
+}
+
 function showRunning() {
   running = true;
+  setTableControlsDisabled(true);
   stuckWrap.style.display = 'none';
   cancelWrap.style.display = 'block';
   btnEl.disabled = true;
@@ -157,6 +544,7 @@ function showRunning() {
 
 function showStuck(state) {
   running = false;
+  setTableControlsDisabled(true);
   stuckWrap.style.display = 'block';
   cancelWrap.style.display = 'none';
   btnEl.disabled = true;
@@ -167,6 +555,7 @@ function showStuck(state) {
 function resetUI() {
   running = false;
   cancelRequested = false;
+  setTableControlsDisabled(false);
   progressWrap.style.display = 'none';
   stuckWrap.style.display = 'none';
   cancelWrap.style.display = 'none';
@@ -364,6 +753,7 @@ function applyState(state) {
 
   if (state.status === 'done') {
     running = false;
+    setTableControlsDisabled(false);
     stuckWrap.style.display = 'none';
     cancelWrap.style.display = 'none';
     btnEl.textContent = BTN_LABEL;
@@ -375,6 +765,7 @@ function applyState(state) {
 
   if (state.status === 'error') {
     running = false;
+    setTableControlsDisabled(false);
     stuckWrap.style.display = 'none';
     cancelWrap.style.display = 'none';
     btnEl.textContent = BTN_LABEL;
@@ -412,7 +803,8 @@ async function getToken() {
 }
 
 function isSupportedQuotationUrl(url = '') {
-  return url.includes('cotatudo.com.br')
+  return isVenproDemoUrl(url)
+    || url.includes('cotatudo.com.br')
     || /\/php\/vrcotacao\/cotacao\.php/i.test(url)
     || (url.includes('fornecedor.rpinfo.com.br') && /\/supplier\/quotations\//i.test(url))
     || isRedeFornecedoresUrl(url)
@@ -429,7 +821,11 @@ function isSupportedQuotationUrl(url = '') {
     || isBluesoftCotacaoUrl(url)
     || isGuiaCotacaoUrl(url)
     || isDobesoneCotacaoUrl(url)
-    || isSyspanCotacaoUrl(url);
+    || isSyspanCotacaoUrl(url)
+    || isEgestoraCotacaoUrl(url)
+    || isSuper20CotacaoUrl(url)
+    || isCotefacilCotacaoUrl(url)
+    || isInplugCotacaoUrl(url);
 }
 
 function isPotentialQuotationUrl(url = '') {
@@ -567,6 +963,16 @@ function isGuiaCotacaoUrl(url = '') {
   }
 }
 
+function isVenproDemoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /^(www\.)?venpro\.com\.br$/i.test(parsed.hostname)
+      && /\/demonstracao-extensao-cotacao\.html$/i.test(parsed.pathname);
+  } catch {
+    return /^https:\/\/(www\.)?venpro\.com\.br\/demonstracao-extensao-cotacao\.html/i.test(url);
+  }
+}
+
 function isNafarmasCotacaoUrl(url = '') {
   try {
     const parsed = new URL(url);
@@ -594,6 +1000,57 @@ function isSyspanCotacaoUrl(url = '') {
       && /(?:\?|&)?:?=itens_cotacao/i.test(`${parsed.search}${parsed.hash}`);
   } catch {
     return /^(https?:\/\/)?cotacao\.syspanweb\.com\.br\/.*(?:\?|&)?:?=itens_cotacao/i.test(url);
+  }
+}
+
+function isEgestoraCotacaoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)egestora\.com\.br$/i.test(parsed.hostname)
+      && /\/Vendedores\/CotarProdutos\//i.test(parsed.pathname);
+  } catch {
+    return /^(https?:\/\/)?cotacao3\.egestora\.com\.br\/Vendedores\/CotarProdutos\//i.test(url);
+  }
+}
+
+function isImperiumCotacaoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)bids\.imperiumsolucoes\.com$/i.test(parsed.hostname)
+      && /\/Cotacao\.aspx$/i.test(parsed.pathname);
+  } catch {
+    return /^(https?:\/\/)?bids\.imperiumsolucoes\.com\/Cotacao\.aspx/i.test(url);
+  }
+}
+
+function isSuper20CotacaoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === '200.160.111.171'
+      && parsed.port === '8082'
+      && /\/Cotacao\/LancarCotacao$/i.test(parsed.pathname);
+  } catch {
+    return /^http:\/\/200\.160\.111\.171:8082\/Cotacao\/LancarCotacao/i.test(url);
+  }
+}
+
+function isCotefacilCotacaoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /^sistemas\.cotefacil\.com$/i.test(parsed.hostname)
+      && /\/CTFLLogan-webapp\/spring\/pages\/representante\/respostas\/cotacao$/i.test(parsed.pathname);
+  } catch {
+    return /^https:\/\/sistemas\.cotefacil\.com\/CTFLLogan-webapp\/spring\/pages\/representante\/respostas\/cotacao/i.test(url);
+  }
+}
+
+function isInplugCotacaoUrl(url = '') {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)cotacao\.inplug\.online$/i.test(parsed.hostname)
+      && /^\/cotacao\/\d+\/?$/i.test(parsed.pathname);
+  } catch {
+    return /^https:\/\/(?:www\.)?cotacao\.inplug\.online\/cotacao\/\d+/i.test(url);
   }
 }
 
@@ -641,10 +1098,13 @@ async function getQuotationTab(options = {}) {
       'http://nafarmasl.ddns.net:8080/*',
       'https://cotacao.dobesone.emartim.com.br/*',
       'https://cotacao.syspanweb.com.br/*',
-      'https://*/fornecedores/*/cotacao/*',
-      'http://*/fornecedores/*/cotacao/*',
-      'https://*/cotacao/*',
-      'http://*/cotacao/*',
+      'https://cotacao3.egestora.com.br/*',
+      'http://bids.imperiumsolucoes.com/*',
+      'https://bids.imperiumsolucoes.com/*',
+      'https://sistemas.cotefacil.com/*',
+      'https://www.cotacao.inplug.online/*',
+      'https://venpro.com.br/demonstracao-extensao-cotacao.html',
+      'https://www.venpro.com.br/demonstracao-extensao-cotacao.html',
     ],
   });
   return tabs.find(tab => tab?.id) || null;
@@ -660,6 +1120,7 @@ function createJobId() {
 }
 
 function detectSiteFromUrl(url = '') {
+  if (isVenproDemoUrl(url)) return 'venpro-demo';
   if (url.includes('cotatudo.com.br')) return 'cotatudo';
   if (/\/php\/vrcotacao\/cotacao\.php/i.test(url)) return 'vr-cotacao';
   if (url.includes('fornecedor.rpinfo.com.br') && /\/supplier\/quotations\//i.test(url)) return 'rp-hub';
@@ -679,6 +1140,11 @@ function detectSiteFromUrl(url = '') {
   if (isNafarmasCotacaoUrl(url)) return 'nafarmas-cotacao';
   if (isDobesoneCotacaoUrl(url)) return 'dobesone-cotacao';
   if (isSyspanCotacaoUrl(url)) return 'syspan-cotacao';
+  if (isEgestoraCotacaoUrl(url)) return 'egestora-cotacao';
+  if (isImperiumCotacaoUrl(url)) return 'imperium-cotacao';
+  if (isSuper20CotacaoUrl(url)) return 'super20-cotacao';
+  if (isCotefacilCotacaoUrl(url)) return 'cotefacil-cotacao';
+  if (isInplugCotacaoUrl(url)) return 'inplug-cotacao';
   return 'generic';
 }
 
@@ -800,6 +1266,7 @@ async function loadTabelas() {
   try {
     btnEl.disabled = true;
     tabelasEl.disabled = true;
+    compararTabelasEl.disabled = true;
 
     const token = await getToken();
     if (!token) {
@@ -830,12 +1297,17 @@ async function loadTabelas() {
     });
 
     tabelasEl.disabled = false;
+    compararTabelasEl.disabled = false;
     syncPrazoOptions();
+    renderMultiTableOptions();
+    syncMultiTableMode();
+    setTableControlsDisabled(running);
     updateFillButtonState();
     setStatus(`${tabelasCache.length} tabela(s) disponível(is).`, 'ok');
   } catch (err) {
     tabelasCache = [];
     tabelasEl.disabled = true;
+    compararTabelasEl.disabled = true;
     btnEl.disabled = true;
     setStatus(err.message || 'Erro ao carregar tabelas. Faça login no Venpro.', 'err');
   }
@@ -858,13 +1330,13 @@ function syncPrazoOptions() {
   prazoEl.value = prazos.includes(selected) ? String(selected) : String(prazos[0] || 28);
 }
 
-async function matchBatch(token, job, batch, batchIndex, totalBatches) {
+async function matchSingleTable(token, job, selection, batch, batchIndex, totalBatches) {
   const resp = await fetch(`${API_URL}/cotacao/match-cotatudo`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      tabela_id: job.tabelaId,
-      prazo: job.prazo,
+      tabela_id: selection.tabelaId,
+      prazo: selection.prazo,
       modo: job.modo,
       itens: batch,
       job_id: job.jobId,
@@ -878,12 +1350,41 @@ async function matchBatch(token, job, batch, batchIndex, totalBatches) {
     let msg = `Erro ${resp.status} ao buscar preços`;
     try {
       const data = await resp.json();
-      msg = data.detail || msg;
+      if (Array.isArray(data.detail)) {
+        const first = data.detail[0] || {};
+        const field = Array.isArray(first.loc) ? first.loc.join('.') : '';
+        msg = first.msg
+          ? `Dados inválidos em ${field || 'um item'}: ${first.msg}`
+          : msg;
+      } else if (typeof data.detail === 'string' && data.detail.trim()) {
+        msg = data.detail;
+      }
     } catch {}
     throw new Error(msg);
   }
 
   return resp.json();
+}
+
+async function matchBatch(token, job, batch, batchIndex, totalBatches) {
+  const selections = globalThis.VenproMultiTable.normalizeJobTableSelections(job);
+  if (selections.length === 0) throw new Error('Nenhuma tabela foi selecionada.');
+  if (selections.length === 1) {
+    return matchSingleTable(token, job, selections[0], batch, batchIndex, totalBatches);
+  }
+
+  const responses = [];
+  for (let index = 0; index < selections.length; index += 1) {
+    const selection = selections[index];
+    setStatus(
+      `Comparando tabela ${index + 1} de ${selections.length}: ${selection.nome || 'Tabela'}...`,
+      'info'
+    );
+    const data = await matchSingleTable(token, job, selection, batch, batchIndex, totalBatches);
+    responses.push({ selection, data });
+  }
+
+  return globalThis.VenproMultiTable.mergeTableMatchResponses(responses, batch.length);
 }
 
 function enrichPricesForFill(precos, items) {
@@ -2011,14 +2512,130 @@ async function runNafarmasJob(job, initial = {}) {
   setStatus('Nafarmas preenchido. Revise a última página e clique em Finalizar no portal.', 'ok');
 }
 
+async function runCotefacilJob(job, initial = {}) {
+  running = true;
+  cancelRequested = false;
+  const token = await getToken();
+  if (!token) throw new Error('Login expirado. Abra o painel do Venpro e tente de novo.');
+
+  let processados = initial.processados || 0;
+  let preenchidos = initial.preenchidos || 0;
+  let naoEncontrados = initial.naoEncontrados || 0;
+  let falhasPreenchimento = initial.falhas || 0;
+  let naoEncontradosDetalhes = Array.isArray(initial.naoEncontradosDetalhes) ? [...initial.naoEncontradosDetalhes] : [];
+  let falhasDetalhes = Array.isArray(initial.falhasDetalhes) ? [...initial.falhasDetalhes] : [];
+  const startPage = Number.isInteger(Number(initial.page)) ? Math.max(1, Number(initial.page)) : 1;
+
+  let state = await sendToQuotationPage({ action: 'getCotefacilState' });
+  if (!state?.ok) throw new Error(`Não consegui ler a paginação do Cotefácil (${state?.reason || 'estado indisponível'}).`);
+  if (state.page !== startPage) {
+    const loaded = await sendToQuotationPage({ action: 'loadCotefacilPage', page: startPage });
+    if (!loaded?.ok) throw new Error(`Cotefácil: não consegui abrir a página ${startPage} (${loaded?.reason || 'erro desconhecido'}).`);
+    state = loaded.state;
+  }
+
+  const total = Math.max(state.total || 0, processados);
+  for (let page = startPage; page <= state.pages; page++) {
+    if (cancelRequested) {
+      await saveState({
+        status: 'paused', total, processados, preenchidos, naoEncontrados,
+        falhas: falhasPreenchimento, naoEncontradosDetalhes, falhasDetalhes,
+        pct: Math.round(((page - 1) / Math.max(1, state.pages)) * 100), page, ts: Date.now(),
+      });
+      return;
+    }
+
+    state = await sendToQuotationPage({ action: 'getCotefacilState' });
+    if (!state?.ok) throw new Error(`Cotefácil: perdi a paginação na página ${page}.`);
+    if (state.page !== page) {
+      const loaded = await sendToQuotationPage({ action: 'loadCotefacilPage', page });
+      if (!loaded?.ok) throw new Error(`Cotefácil: não consegui abrir a página ${page} (${loaded?.reason || 'erro desconhecido'}).`);
+      state = loaded.state;
+    }
+
+    const extractResult = await extractOpenQuotationItems(job.empresaColuna || 0);
+    const items = (extractResult.items || []).filter(item => (
+      page === 1 || item.cotefacilSection !== 'monitorado'
+    ));
+    if (!items.length) throw new Error(`Cotefácil: não encontrei itens na página ${page}.`);
+
+    job.items = items;
+    job.site = 'cotefacil-cotacao';
+    await storageSet({ processingJob: job });
+    setProgress(
+      Math.round(((page - 1) / Math.max(1, state.pages)) * 100),
+      `Cotefácil · pág. ${page}/${state.pages} · ${processados}/${total} itens`
+    );
+    setStatus(`Cotefácil: buscando preços da página ${page}/${state.pages}...`, 'info');
+
+    const data = await matchBatch(token, job, items, page, state.pages);
+    const precos = Array.isArray(data.precos) ? data.precos : [];
+    const missingDetails = missingDetailsForBatch(items, precos, data.mantidos);
+    const missingCount = missingDetails.length || Math.max(0, items.length - precos.length);
+    naoEncontradosDetalhes = mergeResultDetails(naoEncontradosDetalhes, missingDetails);
+    naoEncontrados += missingCount;
+
+    const pricesToFill = enrichPricesForFill(precos, items);
+    let filled = 0;
+    if (pricesToFill.length) {
+      const fillResult = await sendToQuotationPage({
+        action: 'fillPrices',
+        prices: pricesToFill,
+        empresaColuna: job.empresaColuna || 0,
+      });
+      filled = fillResult?.filled || 0;
+      const failedCount = Array.isArray(fillResult?.failed) ? fillResult.failed.length : 0;
+      const failures = failureDetailsFromFill(fillResult, pricesToFill);
+      falhasDetalhes = mergeResultDetails(falhasDetalhes, failures);
+      if (filled !== pricesToFill.length || failedCount > 0) {
+        falhasPreenchimento += Math.max(failedCount, pricesToFill.length - filled);
+        throw new Error(`Cotefácil: alguns preços não entraram na página ${page}. Parei antes de trocar de página.`);
+      }
+    }
+
+    preenchidos += filled;
+    processados += items.length;
+    const completedPct = Math.round((page / Math.max(1, state.pages)) * 100);
+    await saveState({
+      status: 'processing', total, processados, preenchidos, naoEncontrados,
+      falhas: falhasPreenchimento, naoEncontradosDetalhes, falhasDetalhes,
+      pct: completedPct, page: page + 1, ts: Date.now(),
+    });
+
+    if (page < state.pages) {
+      setStatus(`Cotefácil: página ${page} preenchida. Abrindo a página ${page + 1}...`, 'info');
+      const next = await sendToQuotationPage({ action: 'loadCotefacilPage', page: page + 1 });
+      if (!next?.ok) throw new Error(`Cotefácil: não consegui abrir a página ${page + 1} (${next?.reason || 'erro desconhecido'}).`);
+    }
+  }
+
+  await reportFill(token, {
+    event_type: 'job', status: 'done', job_id: job.jobId, tabela_id: job.tabelaId,
+    prazo: job.prazo, modo: job.modo, site: 'cotefacil-cotacao', total_itens: processados,
+    batch_total: processados, preenchidos, falhas: falhasPreenchimento, nao_encontrados: naoEncontrados,
+  });
+  await saveState({
+    status: 'done', total: processados, processados, preenchidos, naoEncontrados,
+    falhas: falhasPreenchimento, naoEncontradosDetalhes, falhasDetalhes, pct: 100,
+  });
+  await storageRemove('processingJob');
+  setStatus('Cotefácil preenchido. Revise a última página e clique em Concluir Resposta no portal.', 'ok');
+}
+
 async function startProcessing() {
-  const tabelaId = tabelasEl.value;
-  const prazo = parseInt(prazoEl.value, 10);
-  const modo = modoEl.value;
+  const tabelasSelecionadas = selectedTableConfigs();
+  const primeiraTabela = tabelasSelecionadas[0] || null;
+  const tabelaId = primeiraTabela?.tabelaId || '';
+  const prazo = primeiraTabela?.prazo || 0;
+  const modo = tabelasSelecionadas.length > 1 ? 'ean' : modoEl.value;
   const empresaColuna = parseInt(empresaColunaEl.value, 10) || 0;
 
-  if (!tabelaId) {
+  if (tabelasSelecionadas.length === 0) {
     setStatus('Selecione uma tabela.', 'err');
+    return;
+  }
+  if (compararTabelasEl.checked && tabelasSelecionadas.length < 2) {
+    setStatus('Selecione pelo menos duas tabelas para comparar.', 'err');
     return;
   }
 
@@ -2038,7 +2655,17 @@ async function startProcessing() {
       const apiState = await sendToQuotationPage({ action: 'getHipcomerpApiState' });
       if (apiState?.ready || apiState?.usesCanvasKit) {
         await storageRemove(['processingState', 'processingJob']);
-        const job = { jobId: createJobId(), items: [], tabelaId, prazo, modo, empresaColuna, site: 'hipcomerp-cotacao', hipcomerpMode: 'api' };
+        const job = {
+          jobId: createJobId(),
+          items: [],
+          tabelaId,
+          prazo,
+          tabelas: tabelasSelecionadas,
+          modo,
+          empresaColuna,
+          site: 'hipcomerp-cotacao',
+          hipcomerpMode: 'api',
+        };
         setProgress(0, 'Hipcomerp: preparando itens');
         showRunning();
         await runHipcomerpApiJob(job);
@@ -2057,9 +2684,24 @@ async function startProcessing() {
     }
 
     await storageRemove(['processingState', 'processingJob']);
-    const job = { jobId: createJobId(), items, tabelaId, prazo, modo, empresaColuna, site };
+    const job = {
+      jobId: createJobId(),
+      items,
+      tabelaId,
+      prazo,
+      tabelas: tabelasSelecionadas,
+      modo,
+      empresaColuna,
+      site,
+    };
     setProgress(0, `0 / ${items.length} itens`);
     showRunning();
+    if (tabelasSelecionadas.length > 1) {
+      setStatus(
+        `Comparando ${tabelasSelecionadas.length} tabelas antes de preencher ${SITE_LABELS[site] || 'o site'}...`,
+        'info'
+      );
+    }
     if (site === 'hipcomerp-cotacao') {
       setStatus(`Hipcomerp: iniciando com ${items.length} itens visíveis...`, 'info');
       await runHipcomerpJob(job);
@@ -2069,6 +2711,9 @@ async function startProcessing() {
     } else if (site === 'nafarmas-cotacao') {
       setStatus(`Nafarmas: iniciando com ${items.length} itens na página atual...`, 'info');
       await runNafarmasJob(job);
+    } else if (site === 'cotefacil-cotacao') {
+      setStatus('Cotefácil: preparando todas as páginas da cotação...', 'info');
+      await runCotefacilJob(job);
     } else {
       setStatus(`Processando ${items.length} itens...`, 'info');
       await runJob(job);
@@ -2082,7 +2727,7 @@ async function resumeProcessing() {
   const data = await storageGet(['processingJob', 'processingState']);
   const job = data.processingJob;
   const state = data.processingState || {};
-  if (!job || (job.site !== 'hipcomerp-cotacao' && job.site !== 'estancia-cotacao' && job.site !== 'nafarmas-cotacao' && !job.items?.length)) {
+  if (!job || (job.site !== 'hipcomerp-cotacao' && job.site !== 'estancia-cotacao' && job.site !== 'nafarmas-cotacao' && job.site !== 'cotefacil-cotacao' && !job.items?.length)) {
     resetUI();
     setStatus('Não encontrei processamento para retomar. Inicie novamente.', 'err');
     return;
@@ -2138,6 +2783,16 @@ async function resumeProcessing() {
         naoEncontradosDetalhes: state.naoEncontradosDetalhes || [],
         falhasDetalhes: state.falhasDetalhes || [],
       });
+    } else if (job.site === 'cotefacil-cotacao') {
+      await runCotefacilJob(job, {
+        page: state.page || 1,
+        preenchidos: state.preenchidos || 0,
+        naoEncontrados: state.naoEncontrados || 0,
+        falhas: state.falhas || 0,
+        processados: state.processados || 0,
+        naoEncontradosDetalhes: state.naoEncontradosDetalhes || [],
+        falhasDetalhes: state.falhasDetalhes || [],
+      });
     } else {
       await runJob(job, state.batchIndex || 0, {
         preenchidos: state.preenchidos || 0,
@@ -2165,6 +2820,7 @@ tabelasEl.addEventListener('change', () => {
   updateFillButtonState();
 });
 prazoEl.addEventListener('change', updateFillButtonState);
+compararTabelasEl.addEventListener('change', syncMultiTableMode);
 modoEl.addEventListener('change', updateFillButtonState);
 empresaColunaEl.addEventListener('change', () => {
   storageSet({ cotatudoEmpresaColuna: empresaColunaEl.value });
@@ -2174,16 +2830,30 @@ btnEl.addEventListener('click', startProcessing);
 btnRetomar.addEventListener('click', resumeProcessing);
 btnCancelar.addEventListener('click', cancelAndReset);
 btnParar.addEventListener('click', cancelAndReset);
+if (btnCapturarRivershop) btnCapturarRivershop.addEventListener('click', startRivershopCapture);
+
+chrome.runtime.onMessage.addListener((message, sender) => {
+  if (message?.action !== 'rivershopProgress' || !rivershopRunning) return;
+  setProgress(0, `Lendo ${message.found || 0} produtos...`);
+});
 
 async function init() {
-  const data = await storageGet(['processingState', 'cotatudoEmpresaColuna']);
+  const data = await storageGet(['processingState', 'processingJob', 'cotatudoEmpresaColuna']);
   if (data.cotatudoEmpresaColuna != null) {
     empresaColunaEl.value = String(data.cotatudoEmpresaColuna);
   }
 
+  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const tab = await getQuotationTab({ allowActiveFallback: true });
   const pageInfo = await detectPageInfo(tab);
   setDetectedSite(tab, pageInfo);
+  const detectedSite = resolveDetectedSite(tab?.url || '', pageInfo);
+  if (detectedSite === 'cotefacil-cotacao' && pageInfo?.contentVersion !== COTEFACIL_CONTENT_VERSION) {
+    setStatus('Cotefácil reconhecido. Recarregue a página da cotação uma vez para ativar a extensão nova.', 'err');
+    tabelasEl.innerHTML = '<option value="">Recarregue a página do Cotefácil</option>';
+    btnEl.disabled = true;
+    return;
+  }
   if (!tab || (!isSupportedQuotationUrl(tab.url || '') && !pageInfo?.supported)) {
     setStatus(SUPPORTED_SITE_MESSAGE, 'err');
     tabelasEl.innerHTML = '<option value="">Necessário estar na cotação</option>';
@@ -2194,6 +2864,10 @@ async function init() {
   if (data.processingState) applyState(data.processingState);
   setStatus('Carregando tabelas...', 'info');
   await loadTabelas();
+  if (data.processingJob) restoreTableSelectionFromJob(data.processingJob);
+  if (['processing', 'paused'].includes(data.processingState?.status)) {
+    setTableControlsDisabled(true);
+  }
 }
 
 init();

@@ -10,8 +10,8 @@ const VENPRO_APP_URL_PATTERNS = [
   'https://anota-ganha-app.firebaseapp.com/*',
 ];
 
-chrome.action.onClicked.addListener((tab) => {
-  chrome.sidePanel.open({ tabId: tab.id });
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(error => {
+  console.error('[Venpro] Não foi possível configurar o painel lateral:', error);
 });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {

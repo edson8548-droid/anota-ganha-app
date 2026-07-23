@@ -23,6 +23,17 @@ Email atual:
 - CTA: acessar `https://venpro.com.br`
 - suporte: WhatsApp do Venpro
 
+### Aviso dentro do Venpro — últimos 3 dias
+
+O RCA recebe um aviso dentro das telas autenticadas quando faltam 3, 2 ou 1 dia
+para o fim do trial. Se ele ainda estiver usando no próprio dia do encerramento,
+o aviso informa que o teste termina hoje.
+
+- CTA: `Ativar plano`
+- valor apresentado: `R$ 99,90`
+- o aviso pode ser fechado no dia e volta automaticamente no dia seguinte
+- o aviso desaparece quando o trial termina ou o plano é ativado
+
 ## Sequência recomendada para 15 dias
 
 ### Dia 2 — Vitrine Inteligente
@@ -57,7 +68,7 @@ Mensagem principal: assinar para continuar usando Cotação Pronta, Carteira no 
 
 ## Próximos incrementos
 
-1. Automatizar os emails dos dias 2, 5, 10, 12 e 14.
+1. Automatizar os emails dos dias 2, 5, 10, 12 e 14; o aviso dentro do produto já está implementado.
 2. Criar email de pagamento recusado/vencido usando webhook do Asaas.
 3. Medir Core Web Vitals no PageSpeed antes e depois do lançamento.
 4. Avaliar cadastro com menos campos quando a operação estiver estável.
