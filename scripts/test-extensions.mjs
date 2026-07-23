@@ -572,7 +572,7 @@ describe('extensoes Chrome', () => {
     }
   });
 
-  it('Inplug identifica EAN e salva cada preço pelo editor React sem enviar Enter', async () => {
+  it('Inplug identifica EAN e confirma cada preço pelo Enter do editor React', async () => {
     const dom = await createContentDom(`
       <table>
         <thead><tr>
@@ -595,8 +595,10 @@ describe('extensoes Chrome', () => {
       const { document } = dom.window;
       const priceCell = document.querySelector('[data-price-cell]');
       let savedValue = '';
+      let draftValue = '';
       let saveCount = 0;
       let enterCount = 0;
+      let blurCount = 0;
 
       priceCell.querySelector('button').addEventListener('click', () => {
         const input = document.createElement('input');
@@ -605,17 +607,21 @@ describe('extensoes Chrome', () => {
         input.setAttribute('placeholder', '0,00');
         input.type = 'text';
         input.addEventListener('input', () => {
-          savedValue = input.value;
+          draftValue = input.value;
         });
         input.addEventListener('keydown', event => {
-          if (event.key === 'Enter') enterCount++;
-        });
-        input.addEventListener('blur', () => {
+          if (event.key !== 'Enter') return;
+          event.preventDefault();
+          enterCount++;
           saveCount++;
+          savedValue = draftValue;
           const button = document.createElement('button');
           button.setAttribute('data-slot', 'button');
           button.textContent = `R$ ${savedValue}`;
           priceCell.replaceChildren(button);
+        });
+        input.addEventListener('blur', () => {
+          blurCount++;
         });
         priceCell.replaceChildren(input);
         input.focus();
@@ -644,7 +650,8 @@ describe('extensoes Chrome', () => {
       assert.equal(result.filled, 1);
       assert.equal(result.failed.length, 0);
       assert.equal(saveCount, 1);
-      assert.equal(enterCount, 0);
+      assert.equal(enterCount, 1);
+      assert.equal(blurCount, 0);
       assert.equal(priceCell.textContent.trim(), 'R$ 5,51');
       assert.equal(document.querySelector('tbody tr td:nth-child(5)').textContent.trim(), '0');
     } finally {
@@ -658,7 +665,7 @@ describe('extensoes Chrome', () => {
     const popupHtml = readText('chrome-extension/popup.html');
 
     assert.equal(manifest.manifest_version, 3);
-    assert.equal(manifest.version, '1.0.81');
+    assert.equal(manifest.version, '1.0.82');
     assert.equal(manifest.minimum_chrome_version, '114');
     assert.equal(manifest.homepage_url, 'https://venpro.com.br');
     assert.ok(manifest.description.length <= 132, 'description precisa respeitar o limite da Chrome Web Store');
@@ -914,8 +921,8 @@ describe('extensoes Chrome', () => {
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.77.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.79.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.79.zip')));
-    assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.81.zip')));
-    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.81.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-preencher-cotacao-1.0.82.zip')));
+    assert.ok(existsSync(join(root, 'frontend/public/venpro-cotatudo-extension-1.0.82.zip')));
     assert.ok(existsSync(join(root, 'frontend/public/venpro-whatsapp-extension.zip')));
   });
 
@@ -1142,7 +1149,7 @@ describe('extensoes Chrome', () => {
     const contentJs = readText('chrome-extension/content.js');
     const hipcomBridgeJs = readText('chrome-extension/hipcom-main-world.js');
 
-    assert.equal(manifest.version, '1.0.81');
+    assert.equal(manifest.version, '1.0.82');
     assert.ok(
       manifest.content_scripts.some(script => (script.js || []).includes('hipcom-main-world.js') && script.run_at === 'document_start' && script.world === 'MAIN'),
       'Hipcomerp precisa capturar a API antes do Flutter carregar'
@@ -1319,7 +1326,7 @@ describe('extensoes Chrome', () => {
     const contentJs = readText('chrome-extension/content.js');
     const cotacaoPy = readText('backend/routes/cotacao.py');
 
-    assert.equal(manifest.version, '1.0.81');
+    assert.equal(manifest.version, '1.0.82');
     assert.match(popupJs, /'easy-cotacao-web': 'Easy Cotação Web'/);
     assert.match(popupJs, /function isEasyCotacaoWebUrl/);
     assert.match(popupJs, /gepautomacao\.dyndns\.org/);
@@ -1340,7 +1347,7 @@ describe('extensoes Chrome', () => {
     const popupJs = readText('chrome-extension/popup.js');
     const contentJs = readText('chrome-extension/content.js');
 
-    assert.equal(manifest.version, '1.0.81');
+    assert.equal(manifest.version, '1.0.82');
     assert.match(popupJs, /'estancia-cotacao': 'Estância'/);
     assert.match(popupJs, /async function runEstanciaJob/);
     assert.match(popupJs, /loadEstanciaQuote/);

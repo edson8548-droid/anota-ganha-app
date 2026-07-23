@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Venpro — Preencher Cotação",
-  "version": "1.0.81",
+  "version": "1.0.82",
   "description": "Preenche cotações em portais compatíveis usando os preços das tabelas cadastradas no Venpro.",
   "minimum_chrome_version": "114",
   "homepage_url": "https://venpro.com.br",

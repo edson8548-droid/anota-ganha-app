@@ -5,7 +5,7 @@ const bubbleCatalogRowMeta = new WeakMap();
 const hipcomerpRowMeta = new WeakMap();
 const easyCotacaoRowMeta = new WeakMap();
 const estanciaRowMeta = new WeakMap();
-const COTEFACIL_CONTENT_VERSION = '1.0.81';
+const COTEFACIL_CONTENT_VERSION = '1.0.82';
 const HIPCOMERP_BRIDGE_VERSION = '1.0.54';
 const hipcomerpApiState = {
   ready: false,
@@ -4377,6 +4377,35 @@ async function fillQuotationPrices(prices, options = {}) {
   async function fillInplugPrices() {
     const items = Array.isArray(prices) ? prices : [];
 
+    function getInplugSaveErrorElements() {
+      return Array.from(document.querySelectorAll('[data-sonner-toast], [role="alert"]')).filter(element => (
+        /Erro ao cotar produto|Valor inválido|Erro ao salvar/i.test(
+          normalizeCellText(element.textContent || '')
+        )
+      ));
+    }
+
+    function dispatchInplugEditorKey(input, key) {
+      const code = key === 'Enter' ? 'Enter' : 'Escape';
+      const keyCode = key === 'Enter' ? 13 : 27;
+      input.dispatchEvent(new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key,
+        code,
+        keyCode,
+        which: keyCode,
+      }));
+      input.dispatchEvent(new KeyboardEvent('keyup', {
+        bubbles: true,
+        cancelable: true,
+        key,
+        code,
+        keyCode,
+        which: keyCode,
+      }));
+    }
+
     async function waitForEditor(item, fallbackRow, timeoutMs = 3000) {
       const startedAt = Date.now();
       while (Date.now() - startedAt < timeoutMs) {
@@ -4388,16 +4417,35 @@ async function fillQuotationPrices(prices, options = {}) {
       return { row: findInplugCurrentRow(item, fallbackRow), input: null };
     }
 
-    async function waitForPersistedPrice(item, fallbackRow, timeoutMs = 12000) {
+    async function waitForPersistedPrice(item, fallbackRow, previousErrors, timeoutMs = 15000) {
       const startedAt = Date.now();
+      let confirmedAt = null;
       while (Date.now() - startedAt < timeoutMs) {
+        const siteError = getInplugSaveErrorElements().find(element => !previousErrors.has(element));
+        if (siteError) {
+          return {
+            ok: false,
+            row: findInplugCurrentRow(item, fallbackRow),
+            reason: 'site_save_error',
+            message: normalizeCellText(siteError.textContent || ''),
+          };
+        }
+
         const currentRow = findInplugCurrentRow(item, fallbackRow);
-        if (currentRow && samePriceLike(getInplugCurrentPrice(currentRow), item.price)) {
-          return { ok: true, row: currentRow };
+        const currentInput = currentRow ? getInplugPriceInput(currentRow) : null;
+        if (currentRow && !currentInput && samePriceLike(getInplugCurrentPrice(currentRow), item.price)) {
+          if (confirmedAt === null) confirmedAt = Date.now();
+          if (Date.now() - confirmedAt >= 250) return { ok: true, row: currentRow };
+        } else {
+          confirmedAt = null;
         }
         await waitForGridRender(100);
       }
-      return { ok: false, row: findInplugCurrentRow(item, fallbackRow) };
+      return {
+        ok: false,
+        row: findInplugCurrentRow(item, fallbackRow),
+        reason: 'save_confirmation_timeout',
+      };
     }
 
     for (const item of items) {
@@ -4409,30 +4457,41 @@ async function fillQuotationPrices(prices, options = {}) {
       }
 
       if (samePriceLike(getInplugCurrentPrice(row), item.price)) {
+        const openInput = getInplugPriceInput(row);
+        if (openInput) {
+          try {
+            dispatchInplugEditorKey(openInput, 'Escape');
+            await waitForGridRender(40);
+          } catch {}
+        }
         count++;
         continue;
       }
 
-      const button = getInplugPriceButton(row);
-      if (!button) {
-        failed.push(item.idx);
-        details.push({ idx: item.idx, reason: 'edit_button_not_found' });
-        continue;
-      }
-
       const before = normalizeCellText(getInplugPriceCell(row)?.textContent || '');
-      try {
-        button.scrollIntoView({ block: 'center', inline: 'nearest' });
-        button.click();
-      } catch {
-        failed.push(item.idx);
-        details.push({ idx: item.idx, reason: 'edit_button_rejected', before });
-        continue;
+      let input = getInplugPriceInput(row);
+      if (!input) {
+        const button = getInplugPriceButton(row);
+        if (!button) {
+          failed.push(item.idx);
+          details.push({ idx: item.idx, reason: 'edit_button_not_found' });
+          continue;
+        }
+
+        try {
+          button.scrollIntoView({ block: 'center', inline: 'nearest' });
+          button.click();
+        } catch {
+          failed.push(item.idx);
+          details.push({ idx: item.idx, reason: 'edit_button_rejected', before });
+          continue;
+        }
+
+        const editor = await waitForEditor(item, row);
+        row = editor.row;
+        input = editor.input;
       }
 
-      const editor = await waitForEditor(item, row);
-      row = editor.row;
-      const input = editor.input;
       if (!row || !input) {
         failed.push(item.idx);
         details.push({ idx: item.idx, reason: 'price_editor_not_opened', before });
@@ -4462,27 +4521,40 @@ async function fillQuotationPrices(prices, options = {}) {
           input.dispatchEvent(new Event('input', { bubbles: true }));
         }
         input.dispatchEvent(new Event('change', { bubbles: true }));
-        await waitForGridRender(40);
-        input.blur?.();
+        await waitForGridRender(60);
+
+        // O Inplug salva o valor pelo fluxo React do Enter. Apenas tirar o foco
+        // pode deixar o preço visível no estado local sem confirmar o POST.
+        const previousErrors = new WeakSet(getInplugSaveErrorElements());
+        dispatchInplugEditorKey(input, 'Enter');
+        const persisted = await waitForPersistedPrice(item, row, previousErrors);
+        if (persisted.ok) {
+          count++;
+        } else {
+          failed.push(item.idx);
+          details.push({
+            idx: item.idx,
+            reason: persisted.reason || 'value_not_persisted',
+            message: persisted.message || '',
+            before,
+            after: normalizeCellText(getInplugPriceCell(persisted.row)?.textContent || ''),
+            attempted: candidate,
+          });
+        }
       } catch {
         failed.push(item.idx);
         details.push({ idx: item.idx, reason: 'value_rejected', before, attempted: candidate });
-        continue;
       }
+    }
 
-      const persisted = await waitForPersistedPrice(item, row);
-      if (persisted.ok) {
-        count++;
-      } else {
-        failed.push(item.idx);
-        details.push({
-          idx: item.idx,
-          reason: 'value_not_persisted',
-          before,
-          after: normalizeCellText(getInplugPriceCell(persisted.row)?.textContent || ''),
-          attempted: candidate,
-        });
-      }
+    const danglingInput = getInplugRows()
+      .map(row => getInplugPriceInput(row))
+      .find(Boolean);
+    if (danglingInput) {
+      try {
+        dispatchInplugEditorKey(danglingInput, 'Escape');
+        await waitForGridRender(40);
+      } catch {}
     }
 
     rows = getInplugRows();

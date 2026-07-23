@@ -14,7 +14,7 @@ import {
 } from '../utils/cotacaoFileChain';
 import { processarTabelasEmSequencia } from '../utils/cotacaoBatch';
 
-const COTACAO_EXTENSION_URL = '/venpro-preencher-cotacao-1.0.81.zip';
+const COTACAO_EXTENSION_URL = '/venpro-preencher-cotacao-1.0.82.zip';
 
 export default function Cotacao() {
   const navigate = useNavigate();

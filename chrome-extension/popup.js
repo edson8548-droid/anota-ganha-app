@@ -3,7 +3,7 @@ const BATCH = 50;
 const STUCK_MS = 3 * 60 * 1000;
 const MAX_RESULT_DETAILS = 12;
 const BTN_LABEL = 'Preencher Cotação';
-const COTEFACIL_CONTENT_VERSION = '1.0.81';
+const COTEFACIL_CONTENT_VERSION = '1.0.82';
 const SUPPORTED_SITE_MESSAGE = 'Abra uma cotação no Cotatudo, VR Cotação, RP HUB, Rede de Fornecedores, Infomag Cotação, Intersolid Cotação, Cotação Web SMUS, Catalog Fornecedor, Hipcomerp, Easy Cotação Web, Estância, SG Cotação, HR Cotação, Arius Cotação, Bluesoft Cotação, Guia Cotação, Nafarmas, Dobesone, Syspan, Imperium, Super 20, Cotefácil ou Inplug primeiro.';
 const SITE_LABELS = {
   'venpro-demo': 'Demonstração oficial Venpro',
