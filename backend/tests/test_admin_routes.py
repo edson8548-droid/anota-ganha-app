@@ -244,8 +244,10 @@ def test_admin_recent_users_returns_sanitized_operational_data(monkeypatch):
     assert payload["totals"]["recentUsers"] == 1
     assert payload["totals"]["registeredUsers"] == 2
     assert payload["totals"]["usedTool"] == 1
+    assert payload["totals"]["trialUsing"] == 1
     assert "allRegistered" in payload["segments"]
     assert "activeLast7Days" in payload["segments"]
+    assert payload["segments"]["trialUsing"][0]["uid"] == "rca-uid"
     assert len(payload["segments"]["allRegistered"]) == 2
 
     user = payload["users"][0]
@@ -386,15 +388,54 @@ def test_admin_totals_do_not_count_expired_trial_as_active():
         },
     ]
 
-    assert admin._recompute_totals(users) == {
+    assert admin._recompute_totals(users, now) == {
         "recentUsers": 2,
         "activeTrials": 1,
+        "trialUsing": 1,
         "usedTool": 1,
         "noUsage": 1,
         "needsContact": 0,
         "stoppedAfterUse": 0,
         "suspiciousUsers": 0,
     }
+
+
+def test_admin_trial_using_only_includes_active_trials_with_tool_usage_and_sorts_by_expiration():
+    now = datetime(2026, 7, 23, 12, tzinfo=timezone.utc)
+
+    def user(uid, *, status, days, used):
+        return {
+            "uid": uid,
+            "createdAt": (now - timedelta(days=2)).isoformat(),
+            "subscription": {
+                "status": status,
+                "trialEndsAt": (now + timedelta(days=days)).isoformat(),
+            },
+            "activity": {"hasToolUsage": used},
+            "followUp": {},
+        }
+
+    users = [
+        user("trial-vence-depois", status="trialing", days=8, used=True),
+        user("trial-sem-uso", status="trialing", days=3, used=False),
+        user("trial-vencido", status="trialing", days=-1, used=True),
+        user("assinante-pago", status="active", days=20, used=True),
+        user("trial-vence-primeiro", status="trialing", days=2, used=True),
+    ]
+
+    segments = admin._build_segments(
+        users,
+        since=now - timedelta(days=4),
+        now=now,
+        limit=200,
+    )
+    totals = admin._compute_report_totals(users, segments["newUsers"], now)
+
+    assert [item["uid"] for item in segments["trialUsing"]] == [
+        "trial-vence-primeiro",
+        "trial-vence-depois",
+    ]
+    assert totals["trialUsing"] == 2
 
 
 def test_admin_device_session_alone_is_not_tool_usage():

@@ -47,6 +47,11 @@ const FILTERS = {
     title: 'RCAs que testaram a ferramenta',
     empty: 'Nenhum RCA testou a ferramenta nesse filtro.',
   },
+  trialUsing: {
+    label: 'Trials usando',
+    title: 'Trials ativos que já usaram a ferramenta',
+    empty: 'Nenhum trial ativo com uso da ferramenta.',
+  },
   activeToday: {
     label: 'Usaram hoje',
     title: 'RCAs com uso hoje',
@@ -152,6 +157,22 @@ const PAYING_INACTIVE_DAYS = 5;
 const isTrialExpiringSoon = (item) => {
   const remaining = daysUntil(item.subscription?.trialEndsAt);
   return remaining !== null && remaining >= 0 && remaining <= TRIAL_EXPIRING_WINDOW_DAYS;
+};
+
+const isTrialUsing = (item) => {
+  const remaining = daysUntil(item.subscription?.trialEndsAt);
+  return (
+    item.subscription?.status === 'trialing'
+    && remaining !== null
+    && remaining >= 0
+    && Boolean(item.activity?.hasToolUsage)
+  );
+};
+
+const trialRemainingLabel = (remainingDays) => {
+  if (remainingDays === 0) return 'vence hoje';
+  if (remainingDays === 1) return 'falta 1 dia';
+  return `faltam ${remainingDays} dias`;
 };
 
 // Assinante ativo que não usa a ferramenta há dias = cancelamento em gestação.
@@ -287,6 +308,7 @@ const AdminPanel = () => {
   const users = segments.allRegistered || report?.users || [];
 
   const expiringSoon = useMemo(() => users.filter(isTrialExpiringSoon).length, [users]);
+  const trialUsing = useMemo(() => users.filter(isTrialUsing).length, [users]);
   const payingInactive = useMemo(() => users.filter(isPayingInactive).length, [users]);
 
   const healthBadge = useMemo(() => {
@@ -319,6 +341,11 @@ const AdminPanel = () => {
     if (activeFilter === 'used') {
       return users.filter((item) => item.activity?.hasToolUsage);
     }
+    if (activeFilter === 'trialUsing') {
+      return users
+        .filter(isTrialUsing)
+        .sort((a, b) => new Date(a.subscription?.trialEndsAt) - new Date(b.subscription?.trialEndsAt));
+    }
     if (activeFilter === 'needsContact') {
       return users.filter((item) => item.followUp?.shouldContact);
     }
@@ -341,6 +368,7 @@ const AdminPanel = () => {
     { key: 'newUsers', icon: Users, label: FILTERS.newUsers.label, value: totals.recentUsers ?? segments.newUsers?.length ?? 0 },
     { key: 'suspiciousUsers', icon: AlertTriangle, label: FILTERS.suspiciousUsers.label, value: totals.suspiciousUsers ?? segments.suspiciousUsers?.length ?? 0 },
     { key: 'used', icon: Activity, label: FILTERS.used.label, value: totals.usedTool ?? 0 },
+    { key: 'trialUsing', icon: Activity, label: FILTERS.trialUsing.label, value: totals.trialUsing ?? segments.trialUsing?.length ?? trialUsing },
     { key: 'activeToday', icon: Clock3, label: FILTERS.activeToday.label, value: totals.activeToday ?? segments.activeToday?.length ?? 0 },
     { key: 'activeLast7Days', icon: Activity, label: FILTERS.activeLast7Days.label, value: totals.activeLast7Days ?? segments.activeLast7Days?.length ?? 0 },
     { key: 'stoppedUsing', icon: AlertTriangle, label: FILTERS.stoppedUsing.label, value: totals.stoppedUsing ?? totals.stoppedAfterUse ?? 0 },
@@ -882,7 +910,7 @@ const AdminPanel = () => {
                       <span>Fim do trial</span>
                       <strong>
                         {formatDateTime(item.subscription?.trialEndsAt)}
-                        {remainingDays !== null && remainingDays >= 0 ? ` (${remainingDays}d)` : ''}
+                        {remainingDays !== null && remainingDays >= 0 ? ` · ${trialRemainingLabel(remainingDays)}` : ''}
                       </strong>
                     </div>
                     <div>

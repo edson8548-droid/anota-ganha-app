@@ -195,6 +195,13 @@ def _trial_is_active(subscription: dict | None, now: datetime | None = None) -> 
     return bool(trial_end and trial_end > (now or datetime.now(timezone.utc)))
 
 
+def _is_trial_using(user: dict, now: datetime | None = None) -> bool:
+    return (
+        _trial_is_active(user.get("subscription"), now)
+        and bool((user.get("activity") or {}).get("hasToolUsage"))
+    )
+
+
 def _paid_access_until(subscription: dict | None) -> datetime | None:
     if not subscription:
         return None
@@ -827,12 +834,20 @@ def _build_segments(users: list[dict], *, since: datetime, now: datetime, limit:
         for user in users
         if not (user.get("activity") or {}).get("hasToolUsage")
     ]
+    trial_using = sorted(
+        (user for user in users if _is_trial_using(user, now)),
+        key=lambda user: (
+            _as_utc_datetime((user.get("subscription") or {}).get("trialEndsAt"))
+            or datetime.max.replace(tzinfo=timezone.utc)
+        ),
+    )
 
     return {
         "allRegistered": all_registered[:limit],
         "newUsers": new_users[:limit],
         "activeToday": _sort_by_activity_desc(active_today)[:limit],
         "activeLast7Days": _sort_by_activity_desc(active_last_7_days)[:limit],
+        "trialUsing": trial_using[:limit],
         "stoppedUsing": _sort_by_activity_desc(stopped_using)[:limit],
         "needsContact": _sort_by_activity_desc(needs_contact)[:limit],
         "suspiciousUsers": _sort_suspicious_users(suspicious_users)[:limit],
@@ -861,8 +876,9 @@ def _dedupe_activity_items(items: list[dict]) -> list[dict]:
     return deduped
 
 
-def _recompute_totals(users: list[dict]) -> dict:
-    active_trials = sum(1 for user in users if _trial_is_active(user.get("subscription")))
+def _recompute_totals(users: list[dict], now: datetime | None = None) -> dict:
+    active_trials = sum(1 for user in users if _trial_is_active(user.get("subscription"), now))
+    trial_using = sum(1 for user in users if _is_trial_using(user, now))
     used_tool = sum(1 for user in users if (user.get("activity") or {}).get("hasToolUsage"))
     no_usage = len(users) - used_tool
     needs_contact = sum(1 for user in users if (user.get("followUp") or {}).get("shouldContact"))
@@ -871,6 +887,7 @@ def _recompute_totals(users: list[dict]) -> dict:
     return {
         "recentUsers": len(users),
         "activeTrials": active_trials,
+        "trialUsing": trial_using,
         "usedTool": used_tool,
         "noUsage": no_usage,
         "needsContact": needs_contact,
@@ -880,8 +897,8 @@ def _recompute_totals(users: list[dict]) -> dict:
 
 
 def _compute_report_totals(all_users: list[dict], recent_users: list[dict], now: datetime | None = None) -> dict:
-    totals = _recompute_totals(all_users)
     current = now or datetime.now(timezone.utc)
+    totals = _recompute_totals(all_users, current)
     active_today_since = current - timedelta(days=1)
     active_week_since = current - timedelta(days=7)
 
